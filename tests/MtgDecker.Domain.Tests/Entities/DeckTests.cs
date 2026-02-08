@@ -56,16 +56,29 @@ public class DeckTests
     }
 
     [Fact]
-    public void AddCard_DuplicateCard_ThrowsException()
+    public void AddCard_DuplicateCard_IncrementsQuantity()
     {
         var deck = CreateDeck(Format.Modern);
         var card = CreateCard("Lightning Bolt");
         deck.AddCard(card, 2, DeckCategory.MainDeck);
 
+        deck.AddCard(card, 1, DeckCategory.MainDeck);
+
+        deck.Entries.Should().HaveCount(1);
+        deck.Entries[0].Quantity.Should().Be(3);
+    }
+
+    [Fact]
+    public void AddCard_DuplicateExceedsMaxCopies_ThrowsException()
+    {
+        var deck = CreateDeck(Format.Modern);
+        var card = CreateCard("Lightning Bolt");
+        deck.AddCard(card, 3, DeckCategory.MainDeck);
+
         var act = () => deck.AddCard(card, 2, DeckCategory.MainDeck);
 
         act.Should().Throw<DomainException>()
-            .WithMessage("*already in the deck*");
+            .WithMessage("*cannot exceed*");
     }
 
     [Fact]

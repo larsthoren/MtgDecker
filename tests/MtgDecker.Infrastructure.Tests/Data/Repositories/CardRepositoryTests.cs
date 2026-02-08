@@ -141,19 +141,92 @@ public class CardRepositoryTests
         loaded.OracleText.Should().Be("Updated text");
     }
 
+    [Fact]
+    public async Task GetDistinctSetsAsync_MatchingText_ReturnsSets()
+    {
+        using var context = TestDbContextFactory.Create();
+        SeedCard(context, "Goblin Guide", setCode: "zen", setName: "Zendikar");
+        SeedCard(context, "Jace", setCode: "znr", setName: "Zendikar Rising");
+        SeedCard(context, "Bolt", setCode: "lea", setName: "Limited Edition Alpha");
+        var repo = new CardRepository(context);
+
+        var result = await repo.GetDistinctSetsAsync("Zendikar");
+
+        result.Should().HaveCount(2);
+        result.Select(s => s.SetCode).Should().Contain("zen").And.Contain("znr");
+    }
+
+    [Fact]
+    public async Task GetDistinctSetsAsync_BySetCode_ReturnsSets()
+    {
+        using var context = TestDbContextFactory.Create();
+        SeedCard(context, "Goblin Guide", setCode: "zen", setName: "Zendikar");
+        SeedCard(context, "Bolt", setCode: "lea", setName: "Limited Edition Alpha");
+        var repo = new CardRepository(context);
+
+        var result = await repo.GetDistinctSetsAsync("zen");
+
+        result.Should().HaveCount(1);
+        result[0].SetName.Should().Be("Zendikar");
+    }
+
+    [Fact]
+    public async Task GetDistinctSetsAsync_NoMatches_ReturnsEmpty()
+    {
+        using var context = TestDbContextFactory.Create();
+        SeedCard(context, "Bolt", setCode: "lea", setName: "Limited Edition Alpha");
+        var repo = new CardRepository(context);
+
+        var result = await repo.GetDistinctSetsAsync("xyz");
+
+        result.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task GetDistinctTypesAsync_MatchingText_ReturnsTypes()
+    {
+        using var context = TestDbContextFactory.Create();
+        SeedCard(context, "Goblin Guide", typeLine: "Creature — Goblin Scout");
+        SeedCard(context, "Counterspell", typeLine: "Instant");
+        var repo = new CardRepository(context);
+
+        var result = await repo.GetDistinctTypesAsync("Creature");
+
+        result.Should().Contain("Creature");
+    }
+
+    [Fact]
+    public async Task GetDistinctTypesAsync_NoMatches_ReturnsEmpty()
+    {
+        using var context = TestDbContextFactory.Create();
+        SeedCard(context, "Bolt", typeLine: "Instant");
+        var repo = new CardRepository(context);
+
+        var result = await repo.GetDistinctTypesAsync("Planeswalker");
+
+        result.Should().BeEmpty();
+    }
+
     private static Card SeedCard(
         MtgDeckerDbContext context,
         string name,
         string? oracleId = null,
-        string setCode = "tst")
+        string setCode = "tst",
+        string setName = "Test Set",
+        string typeLine = "Instant")
     {
-        var card = CreateCard(name, oracleId, setCode);
+        var card = CreateCard(name, oracleId, setCode, setName, typeLine);
         context.Cards.Add(card);
         context.SaveChanges();
         return card;
     }
 
-    private static Card CreateCard(string name, string? oracleId = null, string setCode = "tst")
+    private static Card CreateCard(
+        string name,
+        string? oracleId = null,
+        string setCode = "tst",
+        string setName = "Test Set",
+        string typeLine = "Instant")
     {
         return new Card
         {
@@ -161,10 +234,10 @@ public class CardRepositoryTests
             ScryfallId = Guid.NewGuid().ToString(),
             OracleId = oracleId ?? Guid.NewGuid().ToString(),
             Name = name,
-            TypeLine = "Instant",
+            TypeLine = typeLine,
             Rarity = "common",
             SetCode = setCode,
-            SetName = "Test Set"
+            SetName = setName
         };
     }
 }

@@ -32,21 +32,31 @@ public class Deck
         if (category == DeckCategory.Sideboard && !FormatRules.HasSideboard(Format))
             throw new DomainException($"{Format} does not allow a sideboard.");
 
-        if (Entries.Any(e => e.CardId == card.Id))
-            throw new DomainException($"{card.Name} is already in the deck.");
-
-        if (!card.IsBasicLand && quantity > FormatRules.GetMaxCopies(Format))
-            throw new DomainException(
-                $"A deck cannot exceed {FormatRules.GetMaxCopies(Format)} copies of {card.Name}.");
-
-        Entries.Add(new DeckEntry
+        var existing = Entries.FirstOrDefault(e => e.CardId == card.Id && e.Category == category);
+        if (existing != null)
         {
-            Id = Guid.NewGuid(),
-            DeckId = Id,
-            CardId = card.Id,
-            Quantity = quantity,
-            Category = category
-        });
+            var newQuantity = existing.Quantity + quantity;
+            if (!card.IsBasicLand && newQuantity > FormatRules.GetMaxCopies(Format))
+                throw new DomainException(
+                    $"A deck cannot exceed {FormatRules.GetMaxCopies(Format)} copies of {card.Name}.");
+
+            existing.Quantity = newQuantity;
+        }
+        else
+        {
+            if (!card.IsBasicLand && quantity > FormatRules.GetMaxCopies(Format))
+                throw new DomainException(
+                    $"A deck cannot exceed {FormatRules.GetMaxCopies(Format)} copies of {card.Name}.");
+
+            Entries.Add(new DeckEntry
+            {
+                Id = Guid.NewGuid(),
+                DeckId = Id,
+                CardId = card.Id,
+                Quantity = quantity,
+                Category = category
+            });
+        }
 
         UpdatedAt = DateTime.UtcNow;
     }

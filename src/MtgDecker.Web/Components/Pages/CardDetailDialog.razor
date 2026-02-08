@@ -73,13 +73,17 @@
                     @* Add to Deck *@
                     @if (_decks.Count > 0)
                     {
-                        <MudMenu Label="Add to Deck" Variant="Variant.Filled" Color="Color.Secondary"
-                                 Size="Size.Small" StartIcon="@Icons.Material.Filled.PlaylistAdd">
-                            @foreach (var deck in _decks)
-                            {
-                                <MudMenuItem OnClick="() => AddToDeck(deck)">@deck.Name (@deck.Format)</MudMenuItem>
-                            }
-                        </MudMenu>
+                        <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+                            <MudNumericField @bind-Value="_addToDeckQty" Label="Qty" Variant="Variant.Outlined"
+                                             Min="1" Max="99" Style="width: 70px;" Margin="Margin.Dense" />
+                            <MudMenu Label="Add to Deck" Variant="Variant.Filled" Color="Color.Secondary"
+                                     Size="Size.Small" StartIcon="@Icons.Material.Filled.PlaylistAdd">
+                                @foreach (var deck in _decks)
+                                {
+                                    <MudMenuItem OnClick="() => AddToDeck(deck)">@deck.Name (@deck.Format)</MudMenuItem>
+                                }
+                            </MudMenu>
+                        </MudStack>
                     }
 
                     <MudDivider />
@@ -163,6 +167,7 @@
     private List<MtgDecker.Domain.Entities.CollectionEntry> _collectionEntries = new();
     private List<DeckUsageInfo> _deckUsage = new();
     private List<Deck> _decks = new();
+    private int _addToDeckQty = 4;
 
     protected override async Task OnInitializedAsync()
     {
@@ -250,17 +255,17 @@
         try
         {
             await Mediator.Send(new MtgDecker.Application.Decks.AddCardToDeckCommand(
-                deck.Id, Card.Id, 1, MtgDecker.Domain.Enums.DeckCategory.MainDeck));
+                deck.Id, Card.Id, _addToDeckQty, MtgDecker.Domain.Enums.DeckCategory.MainDeck));
 
             var existing = _deckUsage.FirstOrDefault(d => d.DeckName == deck.Name);
             if (existing != null)
             {
                 _deckUsage.Remove(existing);
-                _deckUsage.Add(existing with { Quantity = existing.Quantity + 1 });
+                _deckUsage.Add(existing with { Quantity = existing.Quantity + _addToDeckQty });
             }
             else
             {
-                _deckUsage.Add(new DeckUsageInfo(deck.Name, deck.Format.ToString(), 1));
+                _deckUsage.Add(new DeckUsageInfo(deck.Name, deck.Format.ToString(), _addToDeckQty));
             }
 
             Snackbar.Add($"Added {Card.Name} to {deck.Name}", Severity.Success);
