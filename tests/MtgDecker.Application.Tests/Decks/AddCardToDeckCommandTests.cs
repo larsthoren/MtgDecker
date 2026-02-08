@@ -1,0 +1,66 @@
+using FluentAssertions;
+using NSubstitute;
+using MtgDecker.Application.Decks;
+using MtgDecker.Application.Interfaces;
+using MtgDecker.Domain.Entities;
+using MtgDecker.Domain.Enums;
+
+namespace MtgDecker.Application.Tests.Decks;
+
+public class AddCardToDeckCommandTests
+{
+    private readonly IDeckRepository _deckRepo = Substitute.For<IDeckRepository>();
+    private readonly ICardRepository _cardRepo = Substitute.For<ICardRepository>();
+    private readonly AddCardToDeckHandler _handler;
+
+    public AddCardToDeckCommandTests()
+    {
+        _handler = new AddCardToDeckHandler(_deckRepo, _cardRepo);
+    }
+
+    [Fact]
+    public async Task Handle_AddsCardToDeck()
+    {
+        var deckId = Guid.NewGuid();
+        var cardId = Guid.NewGuid();
+        var deck = new Deck { Id = deckId, Name = "Test", Format = Format.Modern, UserId = Guid.NewGuid() };
+        var card = new Card { Id = cardId, Name = "Lightning Bolt", TypeLine = "Instant" };
+
+        _deckRepo.GetByIdAsync(deckId, Arg.Any<CancellationToken>()).Returns(deck);
+        _cardRepo.GetByIdAsync(cardId, Arg.Any<CancellationToken>()).Returns(card);
+
+        var result = await _handler.Handle(
+            new AddCardToDeckCommand(deckId, cardId, 4, DeckCategory.MainDeck),
+            CancellationToken.None);
+
+        result.Entries.Should().HaveCount(1);
+        result.Entries[0].Quantity.Should().Be(4);
+        await _deckRepo.Received(1).UpdateAsync(deck, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_DeckNotFound_Throws()
+    {
+        _deckRepo.GetByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns((Deck?)null);
+
+        var act = () => _handler.Handle(
+            new AddCardToDeckCommand(Guid.NewGuid(), Guid.NewGuid(), 1, DeckCategory.MainDeck),
+            CancellationToken.None);
+
+        await act.Should().ThrowAsync<KeyNotFoundException>();
+    }
+
+    [Fact]
+    public async Task Handle_CardNotFound_Throws()
+    {
+        var deck = new Deck { Id = Guid.NewGuid(), Format = Format.Modern, UserId = Guid.NewGuid() };
+        _deckRepo.GetByIdAsync(deck.Id, Arg.Any<CancellationToken>()).Returns(deck);
+        _cardRepo.GetByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns((Card?)null);
+
+        var act = () => _handler.Handle(
+            new AddCardToDeckCommand(deck.Id, Guid.NewGuid(), 1, DeckCategory.MainDeck),
+            CancellationToken.None);
+
+        await act.Should().ThrowAsync<KeyNotFoundException>();
+    }
+}
