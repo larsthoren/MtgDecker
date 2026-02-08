@@ -110,11 +110,10 @@ else
 
     private async Task ExportDeck(MtgDecker.Domain.Entities.Deck deck)
     {
-        var exportText = await Mediator.Send(new MtgDecker.Application.DeckExport.ExportDeckQuery(deck.Id, "MTGO"));
         var parameters = new DialogParameters<ExportDeckDialog>
         {
-            { x => x.DeckName, deck.Name },
-            { x => x.ExportText, exportText }
+            { x => x.DeckId, deck.Id },
+            { x => x.DeckName, deck.Name }
         };
         await DialogService.ShowAsync<ExportDeckDialog>("Export Deck", parameters,
             new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });

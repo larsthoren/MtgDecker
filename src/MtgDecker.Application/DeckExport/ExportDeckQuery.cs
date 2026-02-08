@@ -72,6 +72,49 @@ public class ExportDeckHandler : IRequestHandler<ExportDeckQuery, string>
                 }
             }
         }
+        else if (request.Format.Equals("Text", StringComparison.OrdinalIgnoreCase))
+        {
+            foreach (var entry in mainDeck)
+            {
+                if (cards.TryGetValue(entry.CardId, out var card))
+                    lines.Add($"{entry.Quantity} {card.Name}");
+            }
+
+            if (sideboard.Any())
+            {
+                lines.Add("");
+                lines.Add("Sideboard");
+                foreach (var entry in sideboard)
+                {
+                    if (cards.TryGetValue(entry.CardId, out var card))
+                        lines.Add($"{entry.Quantity} {card.Name}");
+                }
+            }
+
+            if (maybeboard.Any())
+            {
+                lines.Add("");
+                lines.Add("Maybeboard");
+                foreach (var entry in maybeboard)
+                {
+                    if (cards.TryGetValue(entry.CardId, out var card))
+                        lines.Add($"{entry.Quantity} {card.Name}");
+                }
+            }
+        }
+        else if (request.Format.Equals("CSV", StringComparison.OrdinalIgnoreCase))
+        {
+            lines.Add("Quantity,Name,Set,Category");
+            foreach (var entry in deck.Entries)
+            {
+                if (cards.TryGetValue(entry.CardId, out var card))
+                {
+                    var name = card.Name.Contains(',') ? $"\"{card.Name}\"" : card.Name;
+                    var setCode = card.SetCode.ToUpperInvariant();
+                    lines.Add($"{entry.Quantity},{name},{setCode},{entry.Category}");
+                }
+            }
+        }
         else // MTGO format
         {
             foreach (var entry in mainDeck)

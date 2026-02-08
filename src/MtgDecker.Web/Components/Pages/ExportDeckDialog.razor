@@ -1,20 +1,83 @@
+@inject IMediator Mediator
+@inject IJSRuntime JS
+@inject ISnackbar Snackbar
+
 <MudDialog>
     <TitleContent>
         <MudText Typo="Typo.h6">Export: @DeckName</MudText>
     </TitleContent>
     <DialogContent>
-        <MudTextField Value="@ExportText" Lines="20" Variant="Variant.Outlined" ReadOnly="true"
-                      FullWidth="true" Class="export-text" />
+        <MudSelect T="string" Value="_selectedFormat" ValueChanged="OnFormatChanged" Label="Format"
+                   Variant="Variant.Outlined" Class="mb-3">
+            <MudSelectItem Value="@("Arena")">MTG Arena</MudSelectItem>
+            <MudSelectItem Value="@("MTGO")">MTGO</MudSelectItem>
+            <MudSelectItem Value="@("Text")">Plain Text</MudSelectItem>
+            <MudSelectItem Value="@("CSV")">CSV (Spreadsheet)</MudSelectItem>
+        </MudSelect>
+
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" />
+        }
+        else
+        {
+            <MudTextField Value="@_exportText" Lines="20" Variant="Variant.Outlined" ReadOnly="true"
+                          FullWidth="true" />
+        }
     </DialogContent>
     <DialogActions>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.ContentCopy"
+                   OnClick="CopyToClipboard" Disabled="@string.IsNullOrEmpty(_exportText)">
+            Copy to Clipboard
+        </MudButton>
+        <MudSpacer />
         <MudButton OnClick="Cancel">Close</MudButton>
     </DialogActions>
 </MudDialog>
 
 @code {
     [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public Guid DeckId { get; set; }
     [Parameter] public string DeckName { get; set; } = string.Empty;
-    [Parameter] public string ExportText { get; set; } = string.Empty;
+
+    private string _selectedFormat = "MTGO";
+    private string _exportText = string.Empty;
+    private bool _loading;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await ExportWithFormat();
+    }
+
+    private async Task OnFormatChanged(string format)
+    {
+        _selectedFormat = format;
+        await ExportWithFormat();
+    }
+
+    private async Task ExportWithFormat()
+    {
+        _loading = true;
+        try
+        {
+            _exportText = await Mediator.Send(new MtgDecker.Application.DeckExport.ExportDeckQuery(DeckId, _selectedFormat));
+        }
+        catch
+        {
+            _exportText = "Error exporting deck.";
+        }
+        _loading = false;
+    }
+
+    private async Task CopyToClipboard()
+    {
+        if (!string.IsNullOrEmpty(_exportText))
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", _exportText);
+            Snackbar.Add("Copied to clipboard!", Severity.Success);
+        }
+    }
 
     private void Cancel() => MudDialog.Cancel();
 }
