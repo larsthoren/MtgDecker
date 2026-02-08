@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/MtgDecker.Application/MtgDecker.Application.csproj" />
+    <Project Path="src/MtgDecker.Domain/MtgDecker.Domain.csproj" />
+    <Project Path="src/MtgDecker.Infrastructure/MtgDecker.Infrastructure.csproj" />
+    <Project Path="src/MtgDecker.Web/MtgDecker.Web.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/MtgDecker.Application.Tests/MtgDecker.Application.Tests.csproj" />
+    <Project Path="tests/MtgDecker.Domain.Tests/MtgDecker.Domain.Tests.csproj" />
+    <Project Path="tests/MtgDecker.Infrastructure.Tests/MtgDecker.Infrastructure.Tests.csproj" />
+  </Folder>
+</Solution>
