@@ -1,0 +1,116 @@
+@using MtgDecker.Domain.Entities
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">@Card.Name</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudGrid>
+            <MudItem xs="12" sm="5">
+                @if (!string.IsNullOrEmpty(Card.ImageUri))
+                {
+                    <MudImage Src="@Card.ImageUri" Alt="@Card.Name" ObjectFit="ObjectFit.Contain"
+                              Fluid="true" Class="rounded-lg" />
+                }
+            </MudItem>
+            <MudItem xs="12" sm="7">
+                <MudStack Spacing="2">
+                    <MudText Typo="Typo.subtitle1"><b>@Card.TypeLine</b></MudText>
+
+                    @if (!string.IsNullOrEmpty(Card.ManaCost))
+                    {
+                        <MudText Typo="Typo.body2">Mana Cost: @Card.ManaCost (CMC: @Card.Cmc)</MudText>
+                    }
+
+                    @if (!string.IsNullOrEmpty(Card.OracleText))
+                    {
+                        <MudPaper Class="pa-3" Elevation="0" Outlined="true">
+                            <MudText Typo="Typo.body2" Style="white-space: pre-wrap;">@Card.OracleText</MudText>
+                        </MudPaper>
+                    }
+
+                    <MudDivider />
+
+                    <MudText Typo="Typo.body2">
+                        <b>Set:</b> @Card.SetName (@Card.SetCode.ToUpperInvariant())
+                        @if (!string.IsNullOrEmpty(Card.CollectorNumber))
+                        {
+                            <span> #@Card.CollectorNumber</span>
+                        }
+                    </MudText>
+
+                    <MudText Typo="Typo.body2"><b>Rarity:</b> @Card.Rarity</MudText>
+
+                    @if (!string.IsNullOrEmpty(Card.Colors))
+                    {
+                        <MudText Typo="Typo.body2"><b>Colors:</b> @Card.Colors</MudText>
+                    }
+
+                    @if (Card.Legalities.Any())
+                    {
+                        <MudText Typo="Typo.subtitle2" Class="mt-2">Format Legality</MudText>
+                        <MudSimpleTable Dense="true" Hover="true" Bordered="true">
+                            <thead>
+                                <tr>
+                                    <th>Format</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var legality in Card.Legalities)
+                                {
+                                    <tr>
+                                        <td>@legality.FormatName</td>
+                                        <td>
+                                            <MudChip T="string" Size="Size.Small"
+                                                     Color="@GetLegalityColor(legality.Status)">
+                                                @legality.Status
+                                            </MudChip>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </MudSimpleTable>
+                    }
+
+                    @if (Card.HasMultipleFaces)
+                    {
+                        <MudText Typo="Typo.subtitle2" Class="mt-2">Card Faces</MudText>
+                        @foreach (var face in Card.Faces)
+                        {
+                            <MudPaper Class="pa-2" Outlined="true">
+                                <MudText Typo="Typo.body2"><b>@face.Name</b> - @face.TypeLine</MudText>
+                                @if (!string.IsNullOrEmpty(face.OracleText))
+                                {
+                                    <MudText Typo="Typo.body2">@face.OracleText</MudText>
+                                }
+                                @if (!string.IsNullOrEmpty(face.Power))
+                                {
+                                    <MudText Typo="Typo.body2">@face.Power / @face.Toughness</MudText>
+                                }
+                            </MudPaper>
+                        }
+                    }
+                </MudStack>
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public Card Card { get; set; } = default!;
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private Color GetLegalityColor(MtgDecker.Domain.Enums.LegalityStatus status) => status switch
+    {
+        MtgDecker.Domain.Enums.LegalityStatus.Legal => Color.Success,
+        MtgDecker.Domain.Enums.LegalityStatus.Restricted => Color.Warning,
+        MtgDecker.Domain.Enums.LegalityStatus.Banned => Color.Error,
+        _ => Color.Default
+    };
+}

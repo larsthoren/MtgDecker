@@ -1,9 +1,66 @@
-﻿@inherits LayoutComponentBase
+@inherits LayoutComponentBase
 
-@Body
+<MudThemeProvider @bind-IsDarkMode="_isDarkMode" Theme="_theme" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
 
-<div id="blazor-error-ui" data-nosnippet>
-    An unhandled error has occurred.
-    <a href="." class="reload">Reload</a>
-    <span class="dismiss">🗙</span>
-</div>
+<MudLayout>
+    <MudAppBar Elevation="1">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start"
+                       OnClick="ToggleDrawer" />
+        <MudText Typo="Typo.h5" Class="ml-3">MtgDecker</MudText>
+        <MudSpacer />
+        <MudToggleIconButton @bind-Toggled="_isDarkMode"
+                             Icon="@Icons.Material.Filled.DarkMode"
+                             ToggledIcon="@Icons.Material.Filled.LightMode"
+                             Color="Color.Inherit"
+                             />
+    </MudAppBar>
+
+    <MudDrawer @bind-Open="_drawerOpen" ClipMode="DrawerClipMode.Always" Elevation="2">
+        <MudNavMenu>
+            <MudNavLink Href="/cards" Match="NavLinkMatch.Prefix"
+                        Icon="@Icons.Material.Filled.Search">Card Search</MudNavLink>
+            <MudNavLink Href="/decks" Match="NavLinkMatch.Prefix"
+                        Icon="@Icons.Material.Filled.LibraryBooks">My Decks</MudNavLink>
+            <MudNavLink Href="/collection" Match="NavLinkMatch.Prefix"
+                        Icon="@Icons.Material.Filled.CollectionsBookmark">My Collection</MudNavLink>
+            <MudNavLink Href="/admin/import" Match="NavLinkMatch.Prefix"
+                        Icon="@Icons.Material.Filled.CloudDownload">Import Data</MudNavLink>
+        </MudNavMenu>
+    </MudDrawer>
+
+    <MudMainContent Class="pt-16 px-4">
+        @Body
+    </MudMainContent>
+</MudLayout>
+
+@code {
+    private bool _drawerOpen = true;
+    private bool _isDarkMode = true;
+
+    private MudTheme _theme = new()
+    {
+        PaletteLight = new PaletteLight
+        {
+            Primary = "#5D4E8C",
+            Secondary = "#C69B3C",
+            AppbarBackground = "#5D4E8C"
+        },
+        PaletteDark = new PaletteDark
+        {
+            Primary = "#7B6BA8",
+            Secondary = "#C69B3C",
+            AppbarBackground = "#2D2540",
+            Background = "#1A1625",
+            Surface = "#231E30",
+            DrawerBackground = "#231E30"
+        }
+    };
+
+    private void ToggleDrawer()
+    {
+        _drawerOpen = !_drawerOpen;
+    }
+}
