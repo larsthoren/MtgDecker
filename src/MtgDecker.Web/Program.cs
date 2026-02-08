@@ -2,6 +2,7 @@ using MudBlazor.Services;
 using MtgDecker.Application;
 using MtgDecker.Infrastructure;
 using MtgDecker.Web.Components;
+using MtgDecker.Web.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -14,6 +15,11 @@ builder.Services.AddApplication();
 builder.Services.AddInfrastructure(
     builder.Configuration.GetConnectionString("DefaultConnection")
         ?? "Server=(localdb)\\mssqllocaldb;Database=MtgDecker;Trusted_Connection=True;");
+
+// In-memory log viewer
+var logStore = new InMemoryLogStore();
+builder.Services.AddSingleton(logStore);
+builder.Logging.AddProvider(new InMemoryLogProvider(logStore));
 
 var app = builder.Build();
 

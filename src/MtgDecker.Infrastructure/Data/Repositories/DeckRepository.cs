@@ -37,7 +37,6 @@ public class DeckRepository : IDeckRepository
 
     public async Task UpdateAsync(Deck deck, CancellationToken ct = default)
     {
-        _context.Decks.Update(deck);
         await _context.SaveChangesAsync(ct);
     }
 

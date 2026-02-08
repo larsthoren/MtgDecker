@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using MtgDecker.Application.Cards;
 using MtgDecker.Application.Interfaces;
 using MtgDecker.Domain.Entities;
 using MtgDecker.Domain.Enums;
@@ -130,5 +131,49 @@ public class CardRepository : ICardRepository
         }
 
         await _context.SaveChangesAsync(ct);
+    }
+
+    public async Task<List<SetInfo>> GetDistinctSetsAsync(string searchText, CancellationToken ct = default)
+    {
+        var query = _context.Cards
+            .Select(c => new { c.SetCode, c.SetName })
+            .Distinct();
+
+        if (!string.IsNullOrWhiteSpace(searchText))
+        {
+            query = query.Where(s =>
+                s.SetName.Contains(searchText) || s.SetCode.Contains(searchText));
+        }
+
+        return await query
+            .OrderBy(s => s.SetName)
+            .Take(20)
+            .Select(s => new SetInfo(s.SetCode, s.SetName))
+            .ToListAsync(ct);
+    }
+
+    public async Task<List<string>> GetDistinctTypesAsync(string searchText, CancellationToken ct = default)
+    {
+        var query = _context.Cards
+            .Select(c => c.TypeLine)
+            .Distinct();
+
+        if (!string.IsNullOrWhiteSpace(searchText))
+        {
+            query = query.Where(t => t.Contains(searchText));
+        }
+
+        // Get distinct type lines, then extract unique base types
+        var typeLines = await query.Take(200).ToListAsync(ct);
+
+        return typeLines
+            .SelectMany(t => t.Split('—')[0].Trim().Split(' '))
+            .Where(t => !string.IsNullOrWhiteSpace(t))
+            .Select(t => t.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Where(t => t.Contains(searchText, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(t => t)
+            .Take(20)
+            .ToList();
     }
 }

@@ -194,43 +194,55 @@
 
     private async Task AddToCollection()
     {
-        if (_collectionEntries.Count > 0)
+        try
         {
-            // Increment existing entry
-            var entry = _collectionEntries[0];
-            await Mediator.Send(new MtgDecker.Application.Collection.UpdateCollectionEntryCommand(
-                entry.Id, entry.Quantity + 1, entry.IsFoil, entry.Condition));
-            entry.Quantity++;
+            if (_collectionEntries.Count > 0)
+            {
+                var entry = _collectionEntries[0];
+                await Mediator.Send(new MtgDecker.Application.Collection.UpdateCollectionEntryCommand(
+                    entry.Id, entry.Quantity + 1, entry.IsFoil, entry.Condition));
+                entry.Quantity++;
+            }
+            else
+            {
+                var newEntry = await Mediator.Send(new MtgDecker.Application.Collection.AddToCollectionCommand(
+                    UserId, Card.Id, 1, false, MtgDecker.Domain.Enums.CardCondition.NearMint));
+                _collectionEntries.Add(newEntry);
+            }
+            _collectionTotal = _collectionEntries.Sum(e => e.Quantity);
+            Snackbar.Add($"Added {Card.Name} to collection", Severity.Success);
         }
-        else
+        catch (Exception ex)
         {
-            // Create new entry
-            var newEntry = await Mediator.Send(new MtgDecker.Application.Collection.AddToCollectionCommand(
-                UserId, Card.Id, 1, false, MtgDecker.Domain.Enums.CardCondition.NearMint));
-            _collectionEntries.Add(newEntry);
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
         }
-        _collectionTotal = _collectionEntries.Sum(e => e.Quantity);
-        Snackbar.Add($"Added {Card.Name} to collection", Severity.Success);
     }
 
     private async Task RemoveOneFromCollection()
     {
         if (_collectionEntries.Count == 0) return;
 
-        var entry = _collectionEntries[0];
-        if (entry.Quantity > 1)
+        try
         {
-            await Mediator.Send(new MtgDecker.Application.Collection.UpdateCollectionEntryCommand(
-                entry.Id, entry.Quantity - 1, entry.IsFoil, entry.Condition));
-            entry.Quantity--;
+            var entry = _collectionEntries[0];
+            if (entry.Quantity > 1)
+            {
+                await Mediator.Send(new MtgDecker.Application.Collection.UpdateCollectionEntryCommand(
+                    entry.Id, entry.Quantity - 1, entry.IsFoil, entry.Condition));
+                entry.Quantity--;
+            }
+            else
+            {
+                await Mediator.Send(new MtgDecker.Application.Collection.RemoveFromCollectionCommand(entry.Id));
+                _collectionEntries.Remove(entry);
+            }
+            _collectionTotal = _collectionEntries.Sum(e => e.Quantity);
+            Snackbar.Add($"Removed {Card.Name} from collection", Severity.Info);
         }
-        else
+        catch (Exception ex)
         {
-            await Mediator.Send(new MtgDecker.Application.Collection.RemoveFromCollectionCommand(entry.Id));
-            _collectionEntries.Remove(entry);
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
         }
-        _collectionTotal = _collectionEntries.Sum(e => e.Quantity);
-        Snackbar.Add($"Removed {Card.Name} from collection", Severity.Info);
     }
 
     private async Task AddToDeck(Deck deck)

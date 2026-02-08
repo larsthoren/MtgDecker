@@ -31,12 +31,15 @@
             </MudSelect>
         </MudItem>
         <MudItem xs="12" sm="6" md="2">
-            <MudTextField @bind-Value="_type" Label="Type" Variant="Variant.Outlined"
-                          Placeholder="e.g. Creature" />
+            <MudAutocomplete T="string" @bind-Value="_type" Label="Type" Variant="Variant.Outlined"
+                             SearchFunc="SearchTypes" Clearable="true"
+                             Placeholder="e.g. Creature" DebounceInterval="300" />
         </MudItem>
         <MudItem xs="12" sm="6" md="2">
-            <MudTextField @bind-Value="_setCode" Label="Set" Variant="Variant.Outlined"
-                          Placeholder="e.g. lea" />
+            <MudAutocomplete T="MtgDecker.Application.Cards.SetInfo" @bind-Value="_selectedSet"
+                             Label="Set" Variant="Variant.Outlined"
+                             SearchFunc="SearchSets" ToStringFunc="@(s => s == null ? "" : $"{s.SetName} ({s.SetCode.ToUpperInvariant()})")"
+                             Clearable="true" Placeholder="e.g. Zendikar" DebounceInterval="300" />
         </MudItem>
         <MudItem xs="12" sm="6" md="1" Class="d-flex align-end">
             <MudIconButton Icon="@Icons.Material.Filled.Search" Color="Color.Primary"
@@ -127,7 +130,7 @@ else
     private string? _format;
     private string? _rarity;
     private string? _type;
-    private string? _setCode;
+    private MtgDecker.Application.Cards.SetInfo? _selectedSet;
     private double? _minCmc;
     private double? _maxCmc;
     private bool _gridView = true;
@@ -180,7 +183,7 @@ else
             MinCmc = _minCmc,
             MaxCmc = _maxCmc,
             Rarity = _rarity,
-            SetCode = _setCode,
+            SetCode = _selectedSet?.SetCode,
             Page = _page,
             PageSize = _pageSize
         };
@@ -188,6 +191,22 @@ else
         var result = await Mediator.Send(new MtgDecker.Application.Cards.SearchCardsQuery(filter));
         _cards = result.Cards;
         _totalCount = result.TotalCount;
+    }
+
+    private async Task<IEnumerable<string>> SearchTypes(string value, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(value) || value.Length < 2)
+            return Array.Empty<string>();
+
+        return await Mediator.Send(new MtgDecker.Application.Cards.SearchTypeNamesQuery(value), ct);
+    }
+
+    private async Task<IEnumerable<MtgDecker.Application.Cards.SetInfo>> SearchSets(string value, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(value) || value.Length < 2)
+            return Array.Empty<MtgDecker.Application.Cards.SetInfo>();
+
+        return await Mediator.Send(new MtgDecker.Application.Cards.SearchSetNamesQuery(value), ct);
     }
 
     private async Task ShowCardDetail(MtgDecker.Domain.Entities.Card card)
