@@ -66,15 +66,17 @@ public class GetDeckStatsHandler : IRequestHandler<GetDeckStatsQuery, DeckStats>
             typeBd[mainType] = typeBd.GetValueOrDefault(mainType) + entry.Quantity;
         }
 
+        var countableEntries = deck.Entries.Where(e => e.Category != DeckCategory.Maybeboard).ToList();
+
         var totalPrice = 0m;
-        foreach (var entry in deck.Entries)
+        foreach (var entry in countableEntries)
         {
             if (cards.TryGetValue(entry.CardId, out var priceCard) && priceCard.PriceUsd.HasValue)
                 totalPrice += priceCard.PriceUsd.Value * entry.Quantity;
         }
 
         return new DeckStats(
-            deck.Entries.Sum(e => e.Quantity),
+            countableEntries.Sum(e => e.Quantity),
             deck.TotalMainDeckCount,
             deck.TotalSideboardCount,
             manaCurve,

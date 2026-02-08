@@ -28,6 +28,10 @@ else
             {
                 <span> | SB: @_deck.TotalSideboardCount</span>
             }
+            @if (_deck.TotalMaybeboardCount > 0)
+            {
+                <span> | MB: @_deck.TotalMaybeboardCount</span>
+            }
             @if (_stats?.TotalPriceUsd > 0)
             {
                 <span> | $@_stats.TotalPriceUsd.ToString("F2")</span>
@@ -100,9 +104,12 @@ else
                                 @if (MtgDecker.Domain.Rules.FormatRules.HasSideboard(_deck.Format))
                                 {
                                     <MudIconButton Icon="@Icons.Material.Filled.PlaylistAdd" Size="Size.Small"
-                                                   Color="Color.Secondary"
+                                                   Color="Color.Secondary" Title="Sideboard"
                                                    OnClick="() => AddCardToDeck(card, MtgDecker.Domain.Enums.DeckCategory.Sideboard)" />
                                 }
+                                <MudIconButton Icon="@Icons.Material.Filled.Bookmark" Size="Size.Small"
+                                               Color="Color.Info" Title="Maybeboard"
+                                               OnClick="() => AddCardToDeck(card, MtgDecker.Domain.Enums.DeckCategory.Maybeboard)" />
                             </MudStack>
                         </MudListItem>
                     }
@@ -173,6 +180,34 @@ else
                         }
                     </MudList>
                 }
+
+                @if (_maybeboardEntries.Any())
+                {
+                    <MudDivider Class="my-3" />
+                    <MudText Typo="Typo.subtitle1" Class="mb-2">
+                        Maybeboard (@_deck.TotalMaybeboardCount)
+                    </MudText>
+                    <MudList T="MtgDecker.Domain.Entities.DeckEntry" Dense="true">
+                        @foreach (var entry in _maybeboardEntries)
+                        {
+                            <MudListItem>
+                                <MudStack Row="true" AlignItems="AlignItems.Center">
+                                    <MudText Typo="Typo.body2" Class="flex-grow-1">
+                                        @entry.Quantity x @GetCardName(entry.CardId)
+                                    </MudText>
+                                    <MudIconButton Icon="@Icons.Material.Filled.ArrowUpward" Size="Size.Small"
+                                                   Color="Color.Primary" Title="Move to Main Deck"
+                                                   OnClick="() => MoveToMainDeck(entry)" />
+                                    <MudIconButton Icon="@Icons.Material.Filled.Remove" Size="Size.Small"
+                                                   OnClick="() => ChangeQuantity(entry.CardId, entry.Quantity - 1)" />
+                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
+                                                   Color="Color.Error"
+                                                   OnClick="() => RemoveCard(entry.CardId)" />
+                                </MudStack>
+                            </MudListItem>
+                        }
+                    </MudList>
+                }
             </MudPaper>
         </MudItem>
     </MudGrid>
@@ -197,6 +232,9 @@ else
 
     private IEnumerable<MtgDecker.Domain.Entities.DeckEntry> _sideboardEntries =>
         _deck?.Entries.Where(e => e.Category == MtgDecker.Domain.Enums.DeckCategory.Sideboard) ?? Enumerable.Empty<MtgDecker.Domain.Entities.DeckEntry>();
+
+    private IEnumerable<MtgDecker.Domain.Entities.DeckEntry> _maybeboardEntries =>
+        _deck?.Entries.Where(e => e.Category == MtgDecker.Domain.Enums.DeckCategory.Maybeboard) ?? Enumerable.Empty<MtgDecker.Domain.Entities.DeckEntry>();
 
     // Chart data
     private List<ChartSeries> _manaCurveSeries = new();
@@ -370,6 +408,26 @@ else
         _cardData.TryGetValue(cardId, out var card) ? card.PriceUsd : null;
 
     private int GetShortage(Guid cardId) => _shortages.GetValueOrDefault(cardId, 0);
+
+    private async Task MoveToMainDeck(MtgDecker.Domain.Entities.DeckEntry entry)
+    {
+        try
+        {
+            await Mediator.Send(new MtgDecker.Application.Decks.RemoveCardFromDeckCommand(DeckId, entry.CardId));
+            var card = await Mediator.Send(new MtgDecker.Application.Cards.GetCardByIdQuery(entry.CardId));
+            if (card != null)
+            {
+                _deck = await Mediator.Send(new MtgDecker.Application.Decks.AddCardToDeckCommand(
+                    DeckId, card.Id, entry.Quantity, MtgDecker.Domain.Enums.DeckCategory.MainDeck));
+            }
+            await LoadStats();
+            Snackbar.Add($"Moved {GetCardName(entry.CardId)} to main deck", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
 
     private async Task OpenPlaytest()
     {

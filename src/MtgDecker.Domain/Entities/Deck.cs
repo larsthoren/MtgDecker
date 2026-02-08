@@ -24,6 +24,10 @@ public class Deck
         .Where(e => e.Category == DeckCategory.Sideboard)
         .Sum(e => e.Quantity);
 
+    public int TotalMaybeboardCount => Entries
+        .Where(e => e.Category == DeckCategory.Maybeboard)
+        .Sum(e => e.Quantity);
+
     public void AddCard(Card card, int quantity, DeckCategory category)
     {
         if (quantity < 1)
@@ -36,7 +40,7 @@ public class Deck
         if (existing != null)
         {
             var newQuantity = existing.Quantity + quantity;
-            if (!card.IsBasicLand && newQuantity > FormatRules.GetMaxCopies(Format))
+            if (category != DeckCategory.Maybeboard && !card.IsBasicLand && newQuantity > FormatRules.GetMaxCopies(Format))
                 throw new DomainException(
                     $"A deck cannot exceed {FormatRules.GetMaxCopies(Format)} copies of {card.Name}.");
 
@@ -44,7 +48,7 @@ public class Deck
         }
         else
         {
-            if (!card.IsBasicLand && quantity > FormatRules.GetMaxCopies(Format))
+            if (category != DeckCategory.Maybeboard && !card.IsBasicLand && quantity > FormatRules.GetMaxCopies(Format))
                 throw new DomainException(
                     $"A deck cannot exceed {FormatRules.GetMaxCopies(Format)} copies of {card.Name}.");
 

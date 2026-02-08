@@ -129,6 +129,41 @@ public class DeckTests
             .WithMessage("*must be at least 1*");
     }
 
+    [Fact]
+    public void AddCard_ToMaybeboard_SkipsCopyLimit()
+    {
+        var deck = CreateDeck(Format.Modern);
+        var card = CreateCard("Lightning Bolt");
+
+        deck.AddCard(card, 10, DeckCategory.Maybeboard);
+
+        deck.Entries.Should().HaveCount(1);
+        deck.Entries[0].Quantity.Should().Be(10);
+        deck.Entries[0].Category.Should().Be(DeckCategory.Maybeboard);
+    }
+
+    [Fact]
+    public void AddCard_ToMaybeboard_DoesNotCountInMainDeck()
+    {
+        var deck = CreateDeck(Format.Modern);
+        deck.AddCard(CreateCard("Card A"), 4, DeckCategory.MainDeck);
+        deck.AddCard(CreateCard("Card B"), 3, DeckCategory.Maybeboard);
+
+        deck.TotalMainDeckCount.Should().Be(4);
+        deck.TotalMaybeboardCount.Should().Be(3);
+    }
+
+    [Fact]
+    public void AddCard_ToMaybeboard_InCommanderFormat_Succeeds()
+    {
+        var deck = CreateDeck(Format.Commander);
+        var card = CreateCard("Sol Ring");
+
+        deck.AddCard(card, 5, DeckCategory.Maybeboard);
+
+        deck.Entries.Should().HaveCount(1);
+    }
+
     private static Deck CreateDeck(Format format)
     {
         return new Deck

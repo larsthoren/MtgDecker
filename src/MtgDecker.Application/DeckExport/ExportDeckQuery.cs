@@ -30,6 +30,7 @@ public class ExportDeckHandler : IRequestHandler<ExportDeckQuery, string>
 
         var mainDeck = deck.Entries.Where(e => e.Category == DeckCategory.MainDeck);
         var sideboard = deck.Entries.Where(e => e.Category == DeckCategory.Sideboard);
+        var maybeboard = deck.Entries.Where(e => e.Category == DeckCategory.Maybeboard);
 
         if (request.Format.Equals("Arena", StringComparison.OrdinalIgnoreCase))
         {
@@ -56,6 +57,20 @@ public class ExportDeckHandler : IRequestHandler<ExportDeckQuery, string>
                     }
                 }
             }
+
+            if (maybeboard.Any())
+            {
+                lines.Add("");
+                lines.Add("Maybeboard");
+                foreach (var entry in maybeboard)
+                {
+                    if (cards.TryGetValue(entry.CardId, out var card))
+                    {
+                        var setCode = card.SetCode.ToUpperInvariant();
+                        lines.Add($"{entry.Quantity} {card.Name} ({setCode}) {card.CollectorNumber}");
+                    }
+                }
+            }
         }
         else // MTGO format
         {
@@ -69,6 +84,12 @@ public class ExportDeckHandler : IRequestHandler<ExportDeckQuery, string>
             {
                 if (cards.TryGetValue(entry.CardId, out var card))
                     lines.Add($"SB: {entry.Quantity} {card.Name}");
+            }
+
+            foreach (var entry in maybeboard)
+            {
+                if (cards.TryGetValue(entry.CardId, out var card))
+                    lines.Add($"MB: {entry.Quantity} {card.Name}");
             }
         }
 
