@@ -1,10 +1,11 @@
 using MediatR;
 using MtgDecker.Application.Interfaces;
 using MtgDecker.Domain.Entities;
+using MtgDecker.Domain.Enums;
 
 namespace MtgDecker.Application.Decks;
 
-public record UpdateCardQuantityCommand(Guid DeckId, Guid CardId, int Quantity) : IRequest<Deck>;
+public record UpdateCardQuantityCommand(Guid DeckId, Guid CardId, DeckCategory Category, int Quantity) : IRequest<Deck>;
 
 public class UpdateCardQuantityHandler : IRequestHandler<UpdateCardQuantityCommand, Deck>
 {
@@ -20,7 +21,7 @@ public class UpdateCardQuantityHandler : IRequestHandler<UpdateCardQuantityComma
         var deck = await _deckRepository.GetByIdAsync(request.DeckId, cancellationToken)
             ?? throw new KeyNotFoundException($"Deck {request.DeckId} not found.");
 
-        deck.UpdateCardQuantity(request.CardId, request.Quantity);
+        deck.UpdateCardQuantity(request.CardId, request.Category, request.Quantity);
         await _deckRepository.UpdateAsync(deck, cancellationToken);
 
         return deck;

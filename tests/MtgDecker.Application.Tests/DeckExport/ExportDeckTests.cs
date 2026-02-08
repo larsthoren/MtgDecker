@@ -93,6 +93,99 @@ public class ExportDeckTests
         result.Should().Contain("4 Lightning Bolt (LEA)");
     }
 
+    [Fact]
+    public async Task Handle_ArenaFormat_IncludesMaybeboard()
+    {
+        var (deck, cards) = CreateTestDeckWithMaybeboard();
+        SetupMocks(deck, cards);
+        var handler = new ExportDeckHandler(_deckRepo, _cardRepo);
+
+        var result = await handler.Handle(new ExportDeckQuery(deck.Id, "Arena"), CancellationToken.None);
+
+        result.Should().Contain("Maybeboard");
+        result.Should().Contain("3 Consider This (TST) 1");
+    }
+
+    [Fact]
+    public async Task Handle_TextFormat_IncludesMaybeboard()
+    {
+        var (deck, cards) = CreateTestDeckWithMaybeboard();
+        SetupMocks(deck, cards);
+        var handler = new ExportDeckHandler(_deckRepo, _cardRepo);
+
+        var result = await handler.Handle(new ExportDeckQuery(deck.Id, "Text"), CancellationToken.None);
+
+        result.Should().Contain("Maybeboard");
+        result.Should().Contain("3 Consider This");
+    }
+
+    [Fact]
+    public async Task Handle_MtgoFormat_IncludesMaybeboard()
+    {
+        var (deck, cards) = CreateTestDeckWithMaybeboard();
+        SetupMocks(deck, cards);
+        var handler = new ExportDeckHandler(_deckRepo, _cardRepo);
+
+        var result = await handler.Handle(new ExportDeckQuery(deck.Id, "MTGO"), CancellationToken.None);
+
+        result.Should().Contain("MB: 3 Consider This");
+    }
+
+    [Fact]
+    public async Task Handle_CsvFormat_IncludesMaybeboard()
+    {
+        var (deck, cards) = CreateTestDeckWithMaybeboard();
+        SetupMocks(deck, cards);
+        var handler = new ExportDeckHandler(_deckRepo, _cardRepo);
+
+        var result = await handler.Handle(new ExportDeckQuery(deck.Id, "CSV"), CancellationToken.None);
+
+        result.Should().Contain("3,Consider This,TST,Maybeboard");
+    }
+
+    [Fact]
+    public async Task Handle_CsvFormat_EscapesDoubleQuotesInNames()
+    {
+        var cardId = Guid.NewGuid();
+        var card = new Card
+        {
+            Id = cardId, Name = "Ach! Hans, Run!", TypeLine = "Enchantment",
+            Rarity = "rare", SetCode = "unh", SetName = "Unhinged",
+            ScryfallId = "a", OracleId = "a", CollectorNumber = "116"
+        };
+        var deck = new Deck
+        {
+            Id = Guid.NewGuid(), Name = "Test", Format = Format.Legacy, UserId = Guid.NewGuid(),
+            Entries = new List<DeckEntry>
+            {
+                new() { Id = Guid.NewGuid(), CardId = cardId, Quantity = 1, Category = DeckCategory.MainDeck }
+            }
+        };
+        SetupMocks(deck, new List<Card> { card });
+        var handler = new ExportDeckHandler(_deckRepo, _cardRepo);
+
+        var result = await handler.Handle(new ExportDeckQuery(deck.Id, "CSV"), CancellationToken.None);
+
+        // RFC 4180: commas require quoting, but no double quotes in this name to escape
+        result.Should().Contain("1,\"Ach! Hans, Run!\",UNH,MainDeck");
+    }
+
+    private (Deck, List<Card>) CreateTestDeckWithMaybeboard()
+    {
+        var bolt = new Card { Id = Guid.NewGuid(), Name = "Lightning Bolt", TypeLine = "Instant", Rarity = "common", SetCode = "lea", SetName = "Alpha", ScryfallId = "a", OracleId = "a", CollectorNumber = "161" };
+        var maybe = new Card { Id = Guid.NewGuid(), Name = "Consider This", TypeLine = "Instant", Rarity = "common", SetCode = "tst", SetName = "Test", ScryfallId = "d", OracleId = "d", CollectorNumber = "1" };
+        var deck = new Deck
+        {
+            Id = Guid.NewGuid(), Name = "Test", Format = Format.Legacy, UserId = Guid.NewGuid(),
+            Entries = new List<DeckEntry>
+            {
+                new() { Id = Guid.NewGuid(), CardId = bolt.Id, Quantity = 4, Category = DeckCategory.MainDeck },
+                new() { Id = Guid.NewGuid(), CardId = maybe.Id, Quantity = 3, Category = DeckCategory.Maybeboard }
+            }
+        };
+        return (deck, new List<Card> { bolt, maybe });
+    }
+
     private (Deck, List<Card>) CreateTestDeckWithCards()
     {
         var bolt = new Card { Id = Guid.NewGuid(), Name = "Lightning Bolt", TypeLine = "Instant", Rarity = "common", SetCode = "lea", SetName = "Alpha", ScryfallId = "a", OracleId = "a", CollectorNumber = "161" };

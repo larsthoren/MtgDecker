@@ -220,4 +220,29 @@ public class GetDeckStatsQueryTests
         result.RarityBreakdown["common"].Should().Be(4);
         result.RarityBreakdown["rare"].Should().Be(2);
     }
+
+    [Fact]
+    public async Task Handle_MaybeboardExcludedFromTotalsAndPrice()
+    {
+        var bolt = new Card { Id = Guid.NewGuid(), Name = "Bolt", TypeLine = "Instant", PriceUsd = 2.00m, Rarity = "common", SetCode = "tst", SetName = "Test", ScryfallId = "a", OracleId = "a" };
+        var maybe = new Card { Id = Guid.NewGuid(), Name = "Maybe", TypeLine = "Instant", PriceUsd = 10.00m, Rarity = "rare", SetCode = "tst", SetName = "Test", ScryfallId = "b", OracleId = "b" };
+        var deck = new Deck
+        {
+            Id = Guid.NewGuid(), Name = "Test", Format = Format.Modern, UserId = Guid.NewGuid(),
+            Entries = new List<DeckEntry>
+            {
+                new() { Id = Guid.NewGuid(), CardId = bolt.Id, Quantity = 4, Category = DeckCategory.MainDeck },
+                new() { Id = Guid.NewGuid(), CardId = maybe.Id, Quantity = 3, Category = DeckCategory.Maybeboard }
+            }
+        };
+
+        _deckRepo.GetByIdAsync(deck.Id, Arg.Any<CancellationToken>()).Returns(deck);
+        _cardRepo.GetByIdsAsync(Arg.Any<IEnumerable<Guid>>(), Arg.Any<CancellationToken>())
+            .Returns(new List<Card> { bolt, maybe });
+
+        var result = await _handler.Handle(new GetDeckStatsQuery(deck.Id), CancellationToken.None);
+
+        result.TotalCards.Should().Be(4); // Maybeboard excluded
+        result.TotalPriceUsd.Should().Be(8.00m); // Only 4 bolts at $2
+    }
 }

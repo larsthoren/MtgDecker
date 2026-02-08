@@ -88,7 +88,7 @@ public class DeckTests
         var card = CreateCard("Lightning Bolt");
         deck.AddCard(card, 2, DeckCategory.MainDeck);
 
-        deck.UpdateCardQuantity(card.Id, 4);
+        deck.UpdateCardQuantity(card.Id, DeckCategory.MainDeck, 4);
 
         deck.Entries[0].Quantity.Should().Be(4);
     }
@@ -100,9 +100,68 @@ public class DeckTests
         var card = CreateCard("Lightning Bolt");
         deck.AddCard(card, 4, DeckCategory.MainDeck);
 
-        deck.RemoveCard(card.Id);
+        deck.RemoveCard(card.Id, DeckCategory.MainDeck);
 
         deck.Entries.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void RemoveCard_TargetsCorrectCategory()
+    {
+        var deck = CreateDeck(Format.Modern);
+        var card = CreateCard("Lightning Bolt");
+        deck.AddCard(card, 4, DeckCategory.MainDeck);
+        deck.AddCard(card, 2, DeckCategory.Maybeboard);
+
+        deck.RemoveCard(card.Id, DeckCategory.Maybeboard);
+
+        deck.Entries.Should().HaveCount(1);
+        deck.Entries[0].Category.Should().Be(DeckCategory.MainDeck);
+        deck.Entries[0].Quantity.Should().Be(4);
+    }
+
+    [Fact]
+    public void MoveCardCategory_MovesFromMaybeboardToMainDeck()
+    {
+        var deck = CreateDeck(Format.Modern);
+        var card = CreateCard("Lightning Bolt");
+        deck.AddCard(card, 2, DeckCategory.Maybeboard);
+
+        deck.MoveCardCategory(card, DeckCategory.Maybeboard, DeckCategory.MainDeck);
+
+        deck.Entries.Should().HaveCount(1);
+        deck.Entries[0].Category.Should().Be(DeckCategory.MainDeck);
+        deck.Entries[0].Quantity.Should().Be(2);
+    }
+
+    [Fact]
+    public void MoveCardCategory_MergesWithExistingInTarget()
+    {
+        var deck = CreateDeck(Format.Modern);
+        var card = CreateCard("Lightning Bolt");
+        deck.AddCard(card, 2, DeckCategory.MainDeck);
+        deck.AddCard(card, 1, DeckCategory.Maybeboard);
+
+        deck.MoveCardCategory(card, DeckCategory.Maybeboard, DeckCategory.MainDeck);
+
+        deck.Entries.Should().HaveCount(1);
+        deck.Entries[0].Category.Should().Be(DeckCategory.MainDeck);
+        deck.Entries[0].Quantity.Should().Be(3);
+    }
+
+    [Fact]
+    public void MoveCardCategory_ExceedsCopyLimit_ThrowsWithoutRemoving()
+    {
+        var deck = CreateDeck(Format.Modern);
+        var card = CreateCard("Lightning Bolt");
+        deck.AddCard(card, 4, DeckCategory.MainDeck);
+        deck.AddCard(card, 1, DeckCategory.Maybeboard);
+
+        var act = () => deck.MoveCardCategory(card, DeckCategory.Maybeboard, DeckCategory.MainDeck);
+
+        act.Should().Throw<DomainException>().WithMessage("*cannot exceed*");
+        // Maybeboard entry should still exist
+        deck.Entries.Should().HaveCount(2);
     }
 
     [Fact]

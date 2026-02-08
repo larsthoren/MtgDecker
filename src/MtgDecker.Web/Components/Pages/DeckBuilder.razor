@@ -156,12 +156,12 @@ else
                                     </MudChip>
                                 }
                                 <MudIconButton Icon="@Icons.Material.Filled.Add" Size="Size.Small"
-                                               OnClick="() => ChangeQuantity(entry.CardId, entry.Quantity + 1)" />
+                                               OnClick="() => ChangeQuantity(entry.CardId, entry.Category, entry.Quantity + 1)" />
                                 <MudIconButton Icon="@Icons.Material.Filled.Remove" Size="Size.Small"
-                                               OnClick="() => ChangeQuantity(entry.CardId, entry.Quantity - 1)" />
+                                               OnClick="() => ChangeQuantity(entry.CardId, entry.Category, entry.Quantity - 1)" />
                                 <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
                                                Color="Color.Error"
-                                               OnClick="() => RemoveCard(entry.CardId)" />
+                                               OnClick="() => RemoveCard(entry.CardId, entry.Category)" />
                             </MudStack>
                         </MudListItem>
                     }
@@ -182,10 +182,10 @@ else
                                         @entry.Quantity x @GetCardName(entry.CardId)
                                     </MudText>
                                     <MudIconButton Icon="@Icons.Material.Filled.Remove" Size="Size.Small"
-                                                   OnClick="() => ChangeQuantity(entry.CardId, entry.Quantity - 1)" />
+                                                   OnClick="() => ChangeQuantity(entry.CardId, entry.Category, entry.Quantity - 1)" />
                                     <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
                                                    Color="Color.Error"
-                                                   OnClick="() => RemoveCard(entry.CardId)" />
+                                                   OnClick="() => RemoveCard(entry.CardId, entry.Category)" />
                                 </MudStack>
                             </MudListItem>
                         }
@@ -210,10 +210,10 @@ else
                                                    Color="Color.Primary" Title="Move to Main Deck"
                                                    OnClick="() => MoveToMainDeck(entry)" />
                                     <MudIconButton Icon="@Icons.Material.Filled.Remove" Size="Size.Small"
-                                                   OnClick="() => ChangeQuantity(entry.CardId, entry.Quantity - 1)" />
+                                                   OnClick="() => ChangeQuantity(entry.CardId, entry.Category, entry.Quantity - 1)" />
                                     <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
                                                    Color="Color.Error"
-                                                   OnClick="() => RemoveCard(entry.CardId)" />
+                                                   OnClick="() => RemoveCard(entry.CardId, entry.Category)" />
                                 </MudStack>
                             </MudListItem>
                         }
@@ -275,17 +275,19 @@ else
     private async Task LoadCardNames()
     {
         if (_deck == null) return;
-        foreach (var entry in _deck.Entries)
+        var missingIds = _deck.Entries
+            .Select(e => e.CardId)
+            .Where(id => !_cardData.ContainsKey(id))
+            .Distinct()
+            .ToList();
+
+        if (missingIds.Count == 0) return;
+
+        var cards = await Mediator.Send(new MtgDecker.Application.Cards.GetCardsByIdsQuery(missingIds));
+        foreach (var card in cards)
         {
-            if (!_cardData.ContainsKey(entry.CardId))
-            {
-                var card = await Mediator.Send(new MtgDecker.Application.Cards.GetCardByIdQuery(entry.CardId));
-                if (card != null)
-                {
-                    _cardData[entry.CardId] = card;
-                    _cardNames[entry.CardId] = card.Name;
-                }
-            }
+            _cardData[card.Id] = card;
+            _cardNames[card.Id] = card.Name;
         }
     }
 
@@ -377,18 +379,18 @@ else
         }
     }
 
-    private async Task ChangeQuantity(Guid cardId, int newQuantity)
+    private async Task ChangeQuantity(Guid cardId, MtgDecker.Domain.Enums.DeckCategory category, int newQuantity)
     {
         if (newQuantity < 1)
         {
-            await RemoveCard(cardId);
+            await RemoveCard(cardId, category);
             return;
         }
 
         try
         {
             _deck = await Mediator.Send(new MtgDecker.Application.Decks.UpdateCardQuantityCommand(
-                DeckId, cardId, newQuantity));
+                DeckId, cardId, category, newQuantity));
             await LoadStats();
             await LoadShortages();
         }
@@ -398,11 +400,11 @@ else
         }
     }
 
-    private async Task RemoveCard(Guid cardId)
+    private async Task RemoveCard(Guid cardId, MtgDecker.Domain.Enums.DeckCategory category)
     {
         try
         {
-            _deck = await Mediator.Send(new MtgDecker.Application.Decks.RemoveCardFromDeckCommand(DeckId, cardId));
+            _deck = await Mediator.Send(new MtgDecker.Application.Decks.RemoveCardFromDeckCommand(DeckId, cardId, category));
             _cardNames.Remove(cardId);
             await LoadStats();
             await LoadShortages();
@@ -424,13 +426,8 @@ else
     {
         try
         {
-            await Mediator.Send(new MtgDecker.Application.Decks.RemoveCardFromDeckCommand(DeckId, entry.CardId));
-            var card = await Mediator.Send(new MtgDecker.Application.Cards.GetCardByIdQuery(entry.CardId));
-            if (card != null)
-            {
-                _deck = await Mediator.Send(new MtgDecker.Application.Decks.AddCardToDeckCommand(
-                    DeckId, card.Id, entry.Quantity, MtgDecker.Domain.Enums.DeckCategory.MainDeck));
-            }
+            _deck = await Mediator.Send(new MtgDecker.Application.Decks.MoveCardCategoryCommand(
+                DeckId, entry.CardId, MtgDecker.Domain.Enums.DeckCategory.Maybeboard, MtgDecker.Domain.Enums.DeckCategory.MainDeck));
             await LoadStats();
             Snackbar.Add($"Moved {GetCardName(entry.CardId)} to main deck", Severity.Success);
         }

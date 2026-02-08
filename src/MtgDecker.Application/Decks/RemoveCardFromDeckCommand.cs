@@ -1,10 +1,11 @@
 using MediatR;
 using MtgDecker.Application.Interfaces;
 using MtgDecker.Domain.Entities;
+using MtgDecker.Domain.Enums;
 
 namespace MtgDecker.Application.Decks;
 
-public record RemoveCardFromDeckCommand(Guid DeckId, Guid CardId) : IRequest<Deck>;
+public record RemoveCardFromDeckCommand(Guid DeckId, Guid CardId, DeckCategory Category) : IRequest<Deck>;
 
 public class RemoveCardFromDeckHandler : IRequestHandler<RemoveCardFromDeckCommand, Deck>
 {
@@ -20,7 +21,7 @@ public class RemoveCardFromDeckHandler : IRequestHandler<RemoveCardFromDeckComma
         var deck = await _deckRepository.GetByIdAsync(request.DeckId, cancellationToken)
             ?? throw new KeyNotFoundException($"Deck {request.DeckId} not found.");
 
-        deck.RemoveCard(request.CardId);
+        deck.RemoveCard(request.CardId, request.Category);
         await _deckRepository.UpdateAsync(deck, cancellationToken);
 
         return deck;

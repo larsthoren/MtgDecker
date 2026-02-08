@@ -6,18 +6,20 @@ namespace MtgDecker.Application.Stats;
 
 public record GetDeckStatsQuery(Guid DeckId) : IRequest<DeckStats>;
 
-public record DeckStats(
-    int TotalCards,
-    int MainDeckCount,
-    int SideboardCount,
-    Dictionary<int, int> ManaCurve,
-    Dictionary<string, int> ColorDistribution,
-    Dictionary<string, int> TypeBreakdown,
-    decimal TotalPriceUsd,
-    double AverageCmc,
-    int LandCount,
-    int SpellCount,
-    Dictionary<string, int> RarityBreakdown);
+public record DeckStats
+{
+    public required int TotalCards { get; init; }
+    public required int MainDeckCount { get; init; }
+    public required int SideboardCount { get; init; }
+    public required Dictionary<int, int> ManaCurve { get; init; }
+    public required Dictionary<string, int> ColorDistribution { get; init; }
+    public required Dictionary<string, int> TypeBreakdown { get; init; }
+    public required decimal TotalPriceUsd { get; init; }
+    public required double AverageCmc { get; init; }
+    public required int LandCount { get; init; }
+    public required int SpellCount { get; init; }
+    public required Dictionary<string, int> RarityBreakdown { get; init; }
+}
 
 public class GetDeckStatsHandler : IRequestHandler<GetDeckStatsQuery, DeckStats>
 {
@@ -106,17 +108,19 @@ public class GetDeckStatsHandler : IRequestHandler<GetDeckStatsQuery, DeckStats>
                 totalPrice += priceCard.PriceUsd.Value * entry.Quantity;
         }
 
-        return new DeckStats(
-            countableEntries.Sum(e => e.Quantity),
-            deck.TotalMainDeckCount,
-            deck.TotalSideboardCount,
-            manaCurve,
-            colorDist,
-            typeBd,
-            totalPrice,
-            nonLandCardCount > 0 ? totalCmc / nonLandCardCount : 0,
-            landCount,
-            spellCount,
-            rarityBd);
+        return new DeckStats
+        {
+            TotalCards = countableEntries.Sum(e => e.Quantity),
+            MainDeckCount = deck.TotalMainDeckCount,
+            SideboardCount = deck.TotalSideboardCount,
+            ManaCurve = manaCurve,
+            ColorDistribution = colorDist,
+            TypeBreakdown = typeBd,
+            TotalPriceUsd = totalPrice,
+            AverageCmc = nonLandCardCount > 0 ? totalCmc / nonLandCardCount : 0,
+            LandCount = landCount,
+            SpellCount = spellCount,
+            RarityBreakdown = rarityBd
+        };
     }
 }
