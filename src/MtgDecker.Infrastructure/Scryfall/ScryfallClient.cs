@@ -6,12 +6,11 @@ namespace MtgDecker.Infrastructure.Scryfall;
 public class ScryfallClient : IScryfallClient
 {
     private readonly HttpClient _httpClient;
-    private const string BulkDataUrl = "https://api.scryfall.com/bulk-data";
+    private const string BulkDataUrl = "bulk-data";
 
     public ScryfallClient(HttpClient httpClient)
     {
         _httpClient = httpClient;
-        _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("MtgDecker/1.0");
     }
 
     public async Task<BulkDataInfo?> GetBulkDataInfoAsync(string dataType = "default_cards", CancellationToken ct = default)

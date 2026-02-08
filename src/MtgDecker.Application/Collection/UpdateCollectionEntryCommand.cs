@@ -1,3 +1,4 @@
+using FluentValidation;
 using MediatR;
 using MtgDecker.Application.Interfaces;
 using MtgDecker.Domain.Entities;
@@ -6,6 +7,16 @@ using MtgDecker.Domain.Enums;
 namespace MtgDecker.Application.Collection;
 
 public record UpdateCollectionEntryCommand(Guid Id, int Quantity, bool IsFoil, CardCondition Condition) : IRequest<CollectionEntry>;
+
+public class UpdateCollectionEntryValidator : AbstractValidator<UpdateCollectionEntryCommand>
+{
+    public UpdateCollectionEntryValidator()
+    {
+        RuleFor(x => x.Id).NotEmpty();
+        RuleFor(x => x.Quantity).GreaterThanOrEqualTo(1);
+        RuleFor(x => x.Condition).IsInEnum();
+    }
+}
 
 public class UpdateCollectionEntryHandler : IRequestHandler<UpdateCollectionEntryCommand, CollectionEntry>
 {

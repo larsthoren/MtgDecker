@@ -1,3 +1,4 @@
+using FluentValidation;
 using MediatR;
 using MtgDecker.Application.Interfaces;
 using MtgDecker.Domain.Entities;
@@ -6,6 +7,15 @@ using MtgDecker.Domain.Enums;
 namespace MtgDecker.Application.DeckExport;
 
 public record ExportDeckQuery(Guid DeckId, string Format) : IRequest<string>;
+
+public class ExportDeckValidator : AbstractValidator<ExportDeckQuery>
+{
+    public ExportDeckValidator()
+    {
+        RuleFor(x => x.DeckId).NotEmpty();
+        RuleFor(x => x.Format).NotEmpty();
+    }
+}
 
 public class ExportDeckHandler : IRequestHandler<ExportDeckQuery, string>
 {

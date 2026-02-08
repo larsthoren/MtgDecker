@@ -35,5 +35,3 @@ public static class ShortageCalculator
         return shortages;
     }
 }
-
-public record CardShortage(string CardName, int Needed, int Owned, int Shortage);

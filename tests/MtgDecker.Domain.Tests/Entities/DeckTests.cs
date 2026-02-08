@@ -223,6 +223,57 @@ public class DeckTests
         deck.Entries.Should().HaveCount(1);
     }
 
+    [Fact]
+    public void AddCard_SetsUpdatedAtToProvidedTimestamp()
+    {
+        var deck = CreateDeck(Format.Modern);
+        var card = CreateCard("Lightning Bolt");
+        var timestamp = new DateTime(2025, 6, 15, 12, 0, 0, DateTimeKind.Utc);
+
+        deck.AddCard(card, 4, DeckCategory.MainDeck, timestamp);
+
+        deck.UpdatedAt.Should().Be(timestamp);
+    }
+
+    [Fact]
+    public void UpdateCardQuantity_SetsUpdatedAtToProvidedTimestamp()
+    {
+        var deck = CreateDeck(Format.Modern);
+        var card = CreateCard("Lightning Bolt");
+        deck.AddCard(card, 2, DeckCategory.MainDeck);
+        var timestamp = new DateTime(2025, 6, 15, 12, 0, 0, DateTimeKind.Utc);
+
+        deck.UpdateCardQuantity(card.Id, DeckCategory.MainDeck, 4, timestamp);
+
+        deck.UpdatedAt.Should().Be(timestamp);
+    }
+
+    [Fact]
+    public void RemoveCard_SetsUpdatedAtToProvidedTimestamp()
+    {
+        var deck = CreateDeck(Format.Modern);
+        var card = CreateCard("Lightning Bolt");
+        deck.AddCard(card, 4, DeckCategory.MainDeck);
+        var timestamp = new DateTime(2025, 6, 15, 12, 0, 0, DateTimeKind.Utc);
+
+        deck.RemoveCard(card.Id, DeckCategory.MainDeck, timestamp);
+
+        deck.UpdatedAt.Should().Be(timestamp);
+    }
+
+    [Fact]
+    public void MoveCardCategory_SetsUpdatedAtToProvidedTimestamp()
+    {
+        var deck = CreateDeck(Format.Modern);
+        var card = CreateCard("Lightning Bolt");
+        deck.AddCard(card, 2, DeckCategory.Maybeboard);
+        var timestamp = new DateTime(2025, 6, 15, 12, 0, 0, DateTimeKind.Utc);
+
+        deck.MoveCardCategory(card, DeckCategory.Maybeboard, DeckCategory.MainDeck, timestamp);
+
+        deck.UpdatedAt.Should().Be(timestamp);
+    }
+
     private static Deck CreateDeck(Format format)
     {
         return new Deck

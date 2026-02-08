@@ -1,3 +1,4 @@
+using FluentValidation;
 using MediatR;
 using MtgDecker.Application.Interfaces;
 using MtgDecker.Domain.Entities;
@@ -7,13 +8,26 @@ namespace MtgDecker.Application.Decks;
 
 public record UpdateCardQuantityCommand(Guid DeckId, Guid CardId, DeckCategory Category, int Quantity) : IRequest<Deck>;
 
+public class UpdateCardQuantityValidator : AbstractValidator<UpdateCardQuantityCommand>
+{
+    public UpdateCardQuantityValidator()
+    {
+        RuleFor(x => x.DeckId).NotEmpty();
+        RuleFor(x => x.CardId).NotEmpty();
+        RuleFor(x => x.Category).IsInEnum();
+        RuleFor(x => x.Quantity).GreaterThanOrEqualTo(1);
+    }
+}
+
 public class UpdateCardQuantityHandler : IRequestHandler<UpdateCardQuantityCommand, Deck>
 {
     private readonly IDeckRepository _deckRepository;
+    private readonly TimeProvider _timeProvider;
 
-    public UpdateCardQuantityHandler(IDeckRepository deckRepository)
+    public UpdateCardQuantityHandler(IDeckRepository deckRepository, TimeProvider timeProvider)
     {
         _deckRepository = deckRepository;
+        _timeProvider = timeProvider;
     }
 
     public async Task<Deck> Handle(UpdateCardQuantityCommand request, CancellationToken cancellationToken)
@@ -21,7 +35,7 @@ public class UpdateCardQuantityHandler : IRequestHandler<UpdateCardQuantityComma
         var deck = await _deckRepository.GetByIdAsync(request.DeckId, cancellationToken)
             ?? throw new KeyNotFoundException($"Deck {request.DeckId} not found.");
 
-        deck.UpdateCardQuantity(request.CardId, request.Category, request.Quantity);
+        deck.UpdateCardQuantity(request.CardId, request.Category, request.Quantity, _timeProvider.GetUtcNow().UtcDateTime);
         await _deckRepository.UpdateAsync(deck, cancellationToken);
 
         return deck;

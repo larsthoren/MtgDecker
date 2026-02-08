@@ -1,6 +1,8 @@
+using Microsoft.EntityFrameworkCore;
 using MudBlazor.Services;
 using MtgDecker.Application;
 using MtgDecker.Infrastructure;
+using MtgDecker.Infrastructure.Data;
 using MtgDecker.Web.Components;
 using MtgDecker.Web.Services;
 
@@ -22,6 +24,13 @@ builder.Services.AddSingleton(logStore);
 builder.Logging.AddProvider(new InMemoryLogProvider(logStore));
 
 var app = builder.Build();
+
+// Auto-migrate database on startup
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<MtgDeckerDbContext>();
+    db.Database.Migrate();
+}
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())

@@ -10,8 +10,8 @@ public class Deck
     public string Name { get; set; } = string.Empty;
     public Format Format { get; set; }
     public string? Description { get; set; }
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
     public Guid UserId { get; set; }
 
     public List<DeckEntry> Entries { get; set; } = new();
@@ -28,7 +28,7 @@ public class Deck
         .Where(e => e.Category == DeckCategory.Maybeboard)
         .Sum(e => e.Quantity);
 
-    public void AddCard(Card card, int quantity, DeckCategory category)
+    public void AddCard(Card card, int quantity, DeckCategory category, DateTime? utcNow = null)
     {
         if (quantity < 1)
             throw new DomainException("Quantity must be at least 1.");
@@ -62,10 +62,10 @@ public class Deck
             });
         }
 
-        UpdatedAt = DateTime.UtcNow;
+        UpdatedAt = utcNow ?? DateTime.UtcNow;
     }
 
-    public void UpdateCardQuantity(Guid cardId, DeckCategory category, int quantity)
+    public void UpdateCardQuantity(Guid cardId, DeckCategory category, int quantity, DateTime? utcNow = null)
     {
         var entry = Entries.FirstOrDefault(e => e.CardId == cardId && e.Category == category)
             ?? throw new DomainException("Card not found in deck.");
@@ -74,19 +74,19 @@ public class Deck
             throw new DomainException("Quantity must be at least 1.");
 
         entry.Quantity = quantity;
-        UpdatedAt = DateTime.UtcNow;
+        UpdatedAt = utcNow ?? DateTime.UtcNow;
     }
 
-    public void RemoveCard(Guid cardId, DeckCategory category)
+    public void RemoveCard(Guid cardId, DeckCategory category, DateTime? utcNow = null)
     {
         var entry = Entries.FirstOrDefault(e => e.CardId == cardId && e.Category == category)
             ?? throw new DomainException("Card not found in deck.");
 
         Entries.Remove(entry);
-        UpdatedAt = DateTime.UtcNow;
+        UpdatedAt = utcNow ?? DateTime.UtcNow;
     }
 
-    public void MoveCardCategory(Card card, DeckCategory from, DeckCategory to)
+    public void MoveCardCategory(Card card, DeckCategory from, DeckCategory to, DateTime? utcNow = null)
     {
         var entry = Entries.FirstOrDefault(e => e.CardId == card.Id && e.Category == from)
             ?? throw new DomainException("Card not found in deck.");
@@ -125,6 +125,6 @@ public class Deck
         }
 
         Entries.Remove(entry);
-        UpdatedAt = DateTime.UtcNow;
+        UpdatedAt = utcNow ?? DateTime.UtcNow;
     }
 }

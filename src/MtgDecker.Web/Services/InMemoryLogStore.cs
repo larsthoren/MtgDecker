@@ -23,7 +23,13 @@ public class InMemoryLogStore
         _entries.Enqueue(entry);
         while (_entries.Count > MaxEntries)
             _entries.TryDequeue(out _);
-        OnNewEntry?.Invoke();
+
+        var handler = OnNewEntry;
+        if (handler != null)
+        {
+            try { handler.Invoke(); }
+            catch { /* Subscriber errors should not break logging */ }
+        }
     }
 
     public IReadOnlyList<LogEntry> GetEntries() => _entries.ToArray();
@@ -68,7 +74,7 @@ public class InMemoryLogProvider : ILoggerProvider
 
             _store.Add(new LogEntry
             {
-                Timestamp = DateTime.Now,
+                Timestamp = DateTime.UtcNow,
                 Level = logLevel,
                 Category = _category,
                 Message = formatter(state, exception),

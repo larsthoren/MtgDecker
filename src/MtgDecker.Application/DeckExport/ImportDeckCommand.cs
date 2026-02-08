@@ -1,3 +1,4 @@
+using FluentValidation;
 using MediatR;
 using MtgDecker.Application.Interfaces;
 using MtgDecker.Domain.Entities;
@@ -12,6 +13,18 @@ public record ImportDeckCommand(
     Format DeckFormat,
     Guid UserId) : IRequest<ImportDeckResult>;
 
+public class ImportDeckValidator : AbstractValidator<ImportDeckCommand>
+{
+    public ImportDeckValidator()
+    {
+        RuleFor(x => x.DeckText).NotEmpty();
+        RuleFor(x => x.ParserFormat).NotEmpty();
+        RuleFor(x => x.DeckName).NotEmpty().MaximumLength(200);
+        RuleFor(x => x.DeckFormat).IsInEnum();
+        RuleFor(x => x.UserId).NotEmpty();
+    }
+}
+
 public record ImportDeckResult(Deck Deck, List<string> UnresolvedCards);
 
 public class ImportDeckHandler : IRequestHandler<ImportDeckCommand, ImportDeckResult>
@@ -19,15 +32,18 @@ public class ImportDeckHandler : IRequestHandler<ImportDeckCommand, ImportDeckRe
     private readonly IEnumerable<IDeckParser> _parsers;
     private readonly ICardRepository _cardRepository;
     private readonly IDeckRepository _deckRepository;
+    private readonly TimeProvider _timeProvider;
 
     public ImportDeckHandler(
         IEnumerable<IDeckParser> parsers,
         ICardRepository cardRepository,
-        IDeckRepository deckRepository)
+        IDeckRepository deckRepository,
+        TimeProvider timeProvider)
     {
         _parsers = parsers;
         _cardRepository = cardRepository;
         _deckRepository = deckRepository;
+        _timeProvider = timeProvider;
     }
 
     public async Task<ImportDeckResult> Handle(ImportDeckCommand request, CancellationToken cancellationToken)
@@ -37,6 +53,7 @@ public class ImportDeckHandler : IRequestHandler<ImportDeckCommand, ImportDeckRe
             ?? throw new InvalidOperationException($"No parser found for format '{request.ParserFormat}'.");
 
         var parsed = parser.Parse(request.DeckText);
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
 
         var deck = new Deck
         {
@@ -44,8 +61,8 @@ public class ImportDeckHandler : IRequestHandler<ImportDeckCommand, ImportDeckRe
             Name = request.DeckName,
             Format = request.DeckFormat,
             UserId = request.UserId,
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow
+            CreatedAt = utcNow,
+            UpdatedAt = utcNow
         };
 
         var unresolved = new List<string>();
@@ -58,7 +75,7 @@ public class ImportDeckHandler : IRequestHandler<ImportDeckCommand, ImportDeckRe
                 unresolved.Add(entry.CardName);
                 continue;
             }
-            deck.AddCard(card, entry.Quantity, DeckCategory.MainDeck);
+            deck.AddCard(card, entry.Quantity, DeckCategory.MainDeck, utcNow);
         }
 
         foreach (var entry in parsed.Sideboard)
@@ -69,7 +86,7 @@ public class ImportDeckHandler : IRequestHandler<ImportDeckCommand, ImportDeckRe
                 unresolved.Add(entry.CardName);
                 continue;
             }
-            deck.AddCard(card, entry.Quantity, DeckCategory.Sideboard);
+            deck.AddCard(card, entry.Quantity, DeckCategory.Sideboard, utcNow);
         }
 
         await _deckRepository.AddAsync(deck, cancellationToken);

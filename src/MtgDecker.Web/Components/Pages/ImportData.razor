@@ -1,6 +1,7 @@
 @page "/admin/import"
 @inject IMediator Mediator
 @inject ISnackbar Snackbar
+@inject ILogger<ImportData> Logger
 
 <PageTitle>Import Data - MtgDecker</PageTitle>
 
@@ -113,7 +114,7 @@
         {
             _bulkDataInfo = await Mediator.Send(new MtgDecker.Application.Import.CheckForUpdatesQuery());
         }
-        catch { /* Non-critical */ }
+        catch (Exception ex) { Logger.LogWarning(ex, "Failed to check for Scryfall updates"); }
     }
 
     private async Task StartImport()

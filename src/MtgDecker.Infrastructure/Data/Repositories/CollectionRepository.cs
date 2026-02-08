@@ -54,12 +54,11 @@ public class CollectionRepository : ICollectionRepository
 
         if (!string.IsNullOrWhiteSpace(searchText))
         {
-            var cardIds = await _context.Cards
+            var matchingCardIds = _context.Cards
                 .Where(c => c.Name.Contains(searchText))
-                .Select(c => c.Id)
-                .ToListAsync(ct);
+                .Select(c => c.Id);
 
-            query = query.Where(e => cardIds.Contains(e.CardId));
+            query = query.Where(e => matchingCardIds.Contains(e.CardId));
         }
 
         return await query.ToListAsync(ct);

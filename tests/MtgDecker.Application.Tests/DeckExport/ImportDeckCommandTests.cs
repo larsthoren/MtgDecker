@@ -17,7 +17,7 @@ public class ImportDeckCommandTests
     public ImportDeckCommandTests()
     {
         _mtgoParser.FormatName.Returns("MTGO");
-        _handler = new ImportDeckHandler(new[] { _mtgoParser }, _cardRepo, _deckRepo);
+        _handler = new ImportDeckHandler(new[] { _mtgoParser }, _cardRepo, _deckRepo, TimeProvider.System);
     }
 
     [Fact]

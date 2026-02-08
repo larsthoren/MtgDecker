@@ -34,13 +34,26 @@
     </MudDrawer>
 
     <MudMainContent Class="pt-16 px-4">
-        @Body
+        <ErrorBoundary @ref="_errorBoundary">
+            <ChildContent>
+                @Body
+            </ChildContent>
+            <ErrorContent Context="ex">
+                <MudAlert Severity="Severity.Error" Class="my-4">
+                    <MudText Typo="Typo.h6">Something went wrong</MudText>
+                    <MudText Typo="Typo.body2">@ex.Message</MudText>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Error" Class="mt-2"
+                               OnClick="RecoverFromError">Try Again</MudButton>
+                </MudAlert>
+            </ErrorContent>
+        </ErrorBoundary>
     </MudMainContent>
 </MudLayout>
 
 @code {
     private bool _drawerOpen = true;
     private bool _isDarkMode = true;
+    private ErrorBoundary? _errorBoundary;
 
     private MudTheme _theme = new()
     {
@@ -64,5 +77,10 @@
     private void ToggleDrawer()
     {
         _drawerOpen = !_drawerOpen;
+    }
+
+    private void RecoverFromError()
+    {
+        _errorBoundary?.Recover();
     }
 }

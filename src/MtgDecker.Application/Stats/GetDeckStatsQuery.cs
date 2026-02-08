@@ -1,3 +1,4 @@
+using FluentValidation;
 using MediatR;
 using MtgDecker.Application.Interfaces;
 using MtgDecker.Domain.Enums;
@@ -5,6 +6,14 @@ using MtgDecker.Domain.Enums;
 namespace MtgDecker.Application.Stats;
 
 public record GetDeckStatsQuery(Guid DeckId) : IRequest<DeckStats>;
+
+public class GetDeckStatsValidator : AbstractValidator<GetDeckStatsQuery>
+{
+    public GetDeckStatsValidator()
+    {
+        RuleFor(x => x.DeckId).NotEmpty();
+    }
+}
 
 public record DeckStats
 {

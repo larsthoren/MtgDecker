@@ -14,7 +14,7 @@ public class CreateDeckCommandTests
 
     public CreateDeckCommandTests()
     {
-        _handler = new CreateDeckHandler(_deckRepo);
+        _handler = new CreateDeckHandler(_deckRepo, TimeProvider.System);
     }
 
     [Fact]

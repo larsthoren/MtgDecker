@@ -1,9 +1,18 @@
+using FluentValidation;
 using MediatR;
 using MtgDecker.Application.Interfaces;
 
 namespace MtgDecker.Application.Collection;
 
 public record RemoveFromCollectionCommand(Guid Id) : IRequest;
+
+public class RemoveFromCollectionValidator : AbstractValidator<RemoveFromCollectionCommand>
+{
+    public RemoveFromCollectionValidator()
+    {
+        RuleFor(x => x.Id).NotEmpty();
+    }
+}
 
 public class RemoveFromCollectionHandler : IRequestHandler<RemoveFromCollectionCommand>
 {

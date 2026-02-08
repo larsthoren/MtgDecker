@@ -4,11 +4,12 @@ public class SampleHandSimulator
 {
     private readonly List<Guid> _originalLibrary;
     private List<Guid> _library = new();
+    private int _drawIndex;
     private readonly List<Guid> _hand = new();
     private readonly Random _rng = new();
 
     public IReadOnlyList<Guid> Hand => _hand;
-    public int LibraryCount => _library.Count;
+    public int LibraryCount => _library.Count - _drawIndex;
     public int MulliganCount { get; private set; }
 
     public SampleHandSimulator(List<Guid> cardIds)
@@ -37,9 +38,9 @@ public class SampleHandSimulator
 
     public bool DrawCard()
     {
-        if (_library.Count == 0) return false;
-        _hand.Add(_library[0]);
-        _library.RemoveAt(0);
+        if (_drawIndex >= _library.Count) return false;
+        _hand.Add(_library[_drawIndex]);
+        _drawIndex++;
         return true;
     }
 
@@ -58,6 +59,7 @@ public class SampleHandSimulator
     private void Shuffle()
     {
         _library = new List<Guid>(_originalLibrary);
+        _drawIndex = 0;
         for (int i = _library.Count - 1; i > 0; i--)
         {
             int j = _rng.Next(i + 1);
@@ -67,11 +69,11 @@ public class SampleHandSimulator
 
     private void Draw(int count)
     {
-        var toDraw = Math.Min(count, _library.Count);
+        var toDraw = Math.Min(count, LibraryCount);
         for (int i = 0; i < toDraw; i++)
         {
-            _hand.Add(_library[0]);
-            _library.RemoveAt(0);
+            _hand.Add(_library[_drawIndex]);
+            _drawIndex++;
         }
     }
 }

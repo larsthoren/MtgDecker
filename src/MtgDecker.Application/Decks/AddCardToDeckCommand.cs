@@ -23,11 +23,13 @@ public class AddCardToDeckHandler : IRequestHandler<AddCardToDeckCommand, Deck>
 {
     private readonly IDeckRepository _deckRepository;
     private readonly ICardRepository _cardRepository;
+    private readonly TimeProvider _timeProvider;
 
-    public AddCardToDeckHandler(IDeckRepository deckRepository, ICardRepository cardRepository)
+    public AddCardToDeckHandler(IDeckRepository deckRepository, ICardRepository cardRepository, TimeProvider timeProvider)
     {
         _deckRepository = deckRepository;
         _cardRepository = cardRepository;
+        _timeProvider = timeProvider;
     }
 
     public async Task<Deck> Handle(AddCardToDeckCommand request, CancellationToken cancellationToken)
@@ -38,7 +40,7 @@ public class AddCardToDeckHandler : IRequestHandler<AddCardToDeckCommand, Deck>
         var card = await _cardRepository.GetByIdAsync(request.CardId, cancellationToken)
             ?? throw new KeyNotFoundException($"Card {request.CardId} not found.");
 
-        deck.AddCard(card, request.Quantity, request.Category);
+        deck.AddCard(card, request.Quantity, request.Category, _timeProvider.GetUtcNow().UtcDateTime);
         await _deckRepository.UpdateAsync(deck, cancellationToken);
 
         return deck;

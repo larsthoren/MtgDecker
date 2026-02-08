@@ -15,7 +15,7 @@ public class AddCardToDeckCommandTests
 
     public AddCardToDeckCommandTests()
     {
-        _handler = new AddCardToDeckHandler(_deckRepo, _cardRepo);
+        _handler = new AddCardToDeckHandler(_deckRepo, _cardRepo, TimeProvider.System);
     }
 
     [Fact]

@@ -3,6 +3,7 @@
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
+@inject ILogger<DeckBuilder> Logger
 
 <PageTitle>Deck Builder - MtgDecker</PageTitle>
 
@@ -300,7 +301,7 @@ else
             _stats = await Mediator.Send(new MtgDecker.Application.Stats.GetDeckStatsQuery(DeckId));
             UpdateChartData();
         }
-        catch { /* Stats are non-critical */ }
+        catch (Exception ex) { Logger.LogWarning(ex, "Failed to load deck stats"); }
     }
 
     private async Task LoadShortages()
@@ -318,7 +319,7 @@ else
                     return shortageList.FirstOrDefault(s => s.CardName == name)?.Shortage ?? 0;
                 });
         }
-        catch { /* Shortages are non-critical */ }
+        catch (Exception ex) { Logger.LogWarning(ex, "Failed to load deck shortages"); }
     }
 
     private void UpdateChartData()

@@ -21,14 +21,17 @@ public class CreateDeckValidator : AbstractValidator<CreateDeckCommand>
 public class CreateDeckHandler : IRequestHandler<CreateDeckCommand, Deck>
 {
     private readonly IDeckRepository _deckRepository;
+    private readonly TimeProvider _timeProvider;
 
-    public CreateDeckHandler(IDeckRepository deckRepository)
+    public CreateDeckHandler(IDeckRepository deckRepository, TimeProvider timeProvider)
     {
         _deckRepository = deckRepository;
+        _timeProvider = timeProvider;
     }
 
     public async Task<Deck> Handle(CreateDeckCommand request, CancellationToken cancellationToken)
     {
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         var deck = new Deck
         {
             Id = Guid.NewGuid(),
@@ -36,8 +39,8 @@ public class CreateDeckHandler : IRequestHandler<CreateDeckCommand, Deck>
             Format = request.Format,
             Description = request.Description,
             UserId = request.UserId,
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow
+            CreatedAt = utcNow,
+            UpdatedAt = utcNow
         };
 
         await _deckRepository.AddAsync(deck, cancellationToken);
