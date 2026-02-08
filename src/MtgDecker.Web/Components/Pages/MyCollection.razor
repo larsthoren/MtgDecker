@@ -1,0 +1,169 @@
+@page "/collection"
+@rendermode InteractiveServer
+@inject IMediator Mediator
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>My Collection - MtgDecker</PageTitle>
+
+<MudStack Row="true" Class="mb-4" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+    <MudText Typo="Typo.h4">My Collection</MudText>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary"
+               StartIcon="@Icons.Material.Filled.Add" OnClick="AddEntry">
+        Add Cards
+    </MudButton>
+</MudStack>
+
+<MudPaper Class="pa-4 mb-4" Elevation="1">
+    <MudStack Row="true">
+        <MudTextField @bind-Value="_searchText" Label="Search collection" Variant="Variant.Outlined"
+                      Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.Search"
+                      OnKeyUp="OnSearchKeyUp" Class="flex-grow-1" />
+        <MudIconButton Icon="@Icons.Material.Filled.Search" Color="Color.Primary"
+                       Variant="Variant.Filled" OnClick="SearchCollection" />
+    </MudStack>
+</MudPaper>
+
+@if (_loading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+}
+else if (_entries.Count == 0)
+{
+    <MudPaper Class="pa-8 d-flex flex-column align-center" Elevation="1">
+        <MudIcon Icon="@Icons.Material.Filled.CollectionsBookmark" Size="Size.Large" Color="Color.Secondary" Class="mb-4" />
+        <MudText Typo="Typo.h6">No cards in collection</MudText>
+        <MudText Typo="Typo.body1" Class="mb-4">Start adding cards from the Card Search page.</MudText>
+    </MudPaper>
+}
+else
+{
+    <MudDataGrid T="CollectionDisplayEntry" Items="@_displayEntries" Dense="true" Hover="true">
+        <Columns>
+            <PropertyColumn Property="x => x.CardName" Title="Card Name" />
+            <PropertyColumn Property="x => x.SetCode" Title="Set" />
+            <PropertyColumn Property="x => x.Quantity" Title="Qty" />
+            <PropertyColumn Property="x => x.Foil" Title="Foil" />
+            <PropertyColumn Property="x => x.Condition" Title="Condition" />
+            <TemplateColumn Title="Actions">
+                <CellTemplate>
+                    <MudStack Row="true">
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
+                                       OnClick="() => EditEntry(context.Item)" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
+                                       Color="Color.Error" OnClick="() => DeleteEntry(context.Item)" />
+                    </MudStack>
+                </CellTemplate>
+            </TemplateColumn>
+        </Columns>
+    </MudDataGrid>
+}
+
+@code {
+    private List<MtgDecker.Domain.Entities.CollectionEntry> _entries = new();
+    private List<CollectionDisplayEntry> _displayEntries = new();
+    private string? _searchText;
+    private bool _loading = true;
+
+    private static readonly Guid UserId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCollection();
+    }
+
+    private async Task LoadCollection()
+    {
+        _loading = true;
+        _entries = await Mediator.Send(new MtgDecker.Application.Collection.SearchCollectionQuery(UserId, _searchText));
+
+        _displayEntries = new();
+        foreach (var entry in _entries)
+        {
+            var card = await Mediator.Send(new MtgDecker.Application.Cards.GetCardByIdQuery(entry.CardId));
+            _displayEntries.Add(new CollectionDisplayEntry
+            {
+                Id = entry.Id,
+                CardId = entry.CardId,
+                CardName = card?.Name ?? "Unknown",
+                SetCode = card?.SetCode?.ToUpperInvariant() ?? "",
+                Quantity = entry.Quantity,
+                Foil = entry.IsFoil ? "Yes" : "No",
+                Condition = entry.Condition.ToString()
+            });
+        }
+
+        _loading = false;
+    }
+
+    private async Task OnSearchKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+            await SearchCollection();
+    }
+
+    private async Task SearchCollection()
+    {
+        await LoadCollection();
+    }
+
+    private async Task AddEntry()
+    {
+        var parameters = new DialogParameters<AddCollectionDialog>();
+        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<AddCollectionDialog>("Add to Collection", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+        {
+            await LoadCollection();
+            Snackbar.Add("Card added to collection", Severity.Success);
+        }
+    }
+
+    private async Task EditEntry(CollectionDisplayEntry entry)
+    {
+        var original = _entries.FirstOrDefault(e => e.Id == entry.Id);
+        if (original == null) return;
+
+        var parameters = new DialogParameters<EditCollectionDialog>
+        {
+            { x => x.Entry, original },
+            { x => x.CardName, entry.CardName }
+        };
+        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<EditCollectionDialog>("Edit Entry", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+        {
+            await LoadCollection();
+        }
+    }
+
+    private async Task DeleteEntry(CollectionDisplayEntry entry)
+    {
+        var confirm = await DialogService.ShowMessageBox(
+            "Remove from Collection",
+            $"Remove {entry.CardName} from your collection?",
+            yesText: "Remove", cancelText: "Cancel");
+
+        if (confirm == true)
+        {
+            await Mediator.Send(new MtgDecker.Application.Collection.RemoveFromCollectionCommand(entry.Id));
+            await LoadCollection();
+            Snackbar.Add("Removed from collection", Severity.Info);
+        }
+    }
+
+    private class CollectionDisplayEntry
+    {
+        public Guid Id { get; set; }
+        public Guid CardId { get; set; }
+        public string CardName { get; set; } = string.Empty;
+        public string SetCode { get; set; } = string.Empty;
+        public int Quantity { get; set; }
+        public string Foil { get; set; } = "No";
+        public string Condition { get; set; } = string.Empty;
+    }
+}

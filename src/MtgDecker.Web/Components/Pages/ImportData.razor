@@ -1,0 +1,174 @@
+@page "/admin/import"
+@rendermode InteractiveServer
+@inject IMediator Mediator
+@inject ISnackbar Snackbar
+
+<PageTitle>Import Data - MtgDecker</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Import Card Data</MudText>
+
+<MudPaper Class="pa-6" Elevation="1" MaxWidth="600px">
+    <MudStack Spacing="4">
+        <MudText Typo="Typo.body1">
+            Import card data from Scryfall's bulk data download. This will download the complete
+            card database and update your local copy.
+        </MudText>
+
+        @if (_bulkDataInfo != null)
+        {
+            <MudAlert Severity="Severity.Info">
+                Data available: @(_bulkDataInfo.Size / 1_000_000) MB,
+                last updated @_bulkDataInfo.UpdatedAt.ToString("MMM dd, yyyy HH:mm UTC")
+            </MudAlert>
+        }
+
+        @if (_importing)
+        {
+            <MudStack Spacing="2">
+                <MudText Typo="Typo.body2">Importing cards... @_importedCount imported so far.</MudText>
+                <MudProgressLinear Color="Color.Primary" Indeterminate="@(_importedCount == 0)"
+                                   Value="@(_importedCount > 0 ? Math.Min(100, _importedCount / 1000.0) : 0)" />
+            </MudStack>
+        }
+        else
+        {
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.CloudDownload"
+                       OnClick="StartImport" Size="Size.Large">
+                Import from Scryfall
+            </MudButton>
+        }
+
+        @if (_lastResult.HasValue)
+        {
+            <MudAlert Severity="Severity.Success">
+                Successfully imported @_lastResult.Value cards.
+            </MudAlert>
+        }
+
+        @if (_error != null)
+        {
+            <MudAlert Severity="Severity.Error">
+                Import failed: @_error
+            </MudAlert>
+        }
+
+        <MudDivider />
+
+        <MudText Typo="Typo.subtitle1">Import Deck from Text</MudText>
+        <MudTextField @bind-Value="_deckText" Label="Paste deck list" Variant="Variant.Outlined"
+                      Lines="10" Placeholder="4 Lightning Bolt&#10;4 Counterspell&#10;SB: 2 Pyroblast" />
+
+        <MudStack Row="true" Spacing="2">
+            <MudSelect @bind-Value="_parserFormat" Label="Format" Variant="Variant.Outlined" Style="width: 150px;">
+                <MudSelectItem Value="@("MTGO")">MTGO</MudSelectItem>
+                <MudSelectItem Value="@("Arena")">Arena</MudSelectItem>
+            </MudSelect>
+            <MudTextField @bind-Value="_deckName" Label="Deck Name" Variant="Variant.Outlined" Class="flex-grow-1" />
+            <MudSelect @bind-Value="_deckFormat" Label="Deck Format" Variant="Variant.Outlined" Style="width: 150px;">
+                <MudSelectItem Value="MtgDecker.Domain.Enums.Format.Modern">Modern</MudSelectItem>
+                <MudSelectItem Value="MtgDecker.Domain.Enums.Format.Legacy">Legacy</MudSelectItem>
+                <MudSelectItem Value="MtgDecker.Domain.Enums.Format.Vintage">Vintage</MudSelectItem>
+                <MudSelectItem Value="MtgDecker.Domain.Enums.Format.Pauper">Pauper</MudSelectItem>
+                <MudSelectItem Value="MtgDecker.Domain.Enums.Format.Commander">Commander</MudSelectItem>
+            </MudSelect>
+        </MudStack>
+
+        <MudButton Variant="Variant.Filled" Color="Color.Secondary"
+                   OnClick="ImportDeck" Disabled="@(string.IsNullOrWhiteSpace(_deckText) || string.IsNullOrWhiteSpace(_deckName))">
+            Import Deck
+        </MudButton>
+
+        @if (_unresolvedCards.Count > 0)
+        {
+            <MudAlert Severity="Severity.Warning">
+                Some cards could not be found: @string.Join(", ", _unresolvedCards)
+            </MudAlert>
+        }
+    </MudStack>
+</MudPaper>
+
+@code {
+    private MtgDecker.Application.Interfaces.BulkDataInfo? _bulkDataInfo;
+    private bool _importing;
+    private int _importedCount;
+    private int? _lastResult;
+    private string? _error;
+
+    private string? _deckText;
+    private string _parserFormat = "MTGO";
+    private string _deckName = string.Empty;
+    private MtgDecker.Domain.Enums.Format _deckFormat = MtgDecker.Domain.Enums.Format.Modern;
+    private List<string> _unresolvedCards = new();
+
+    private static readonly Guid UserId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CheckForUpdates();
+    }
+
+    private async Task CheckForUpdates()
+    {
+        try
+        {
+            _bulkDataInfo = await Mediator.Send(new MtgDecker.Application.Import.CheckForUpdatesQuery());
+        }
+        catch { /* Non-critical */ }
+    }
+
+    private async Task StartImport()
+    {
+        _importing = true;
+        _error = null;
+        _lastResult = null;
+        _importedCount = 0;
+
+        try
+        {
+            var progress = new Progress<int>(count =>
+            {
+                _importedCount = count;
+                InvokeAsync(StateHasChanged);
+            });
+
+            var count = await Mediator.Send(new MtgDecker.Application.Import.ImportBulkDataCommand(progress));
+            _lastResult = count;
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _importing = false;
+        }
+    }
+
+    private async Task ImportDeck()
+    {
+        try
+        {
+            var result = await Mediator.Send(new MtgDecker.Application.DeckExport.ImportDeckCommand(
+                _deckText!, _parserFormat, _deckName, _deckFormat, UserId));
+
+            _unresolvedCards = result.UnresolvedCards;
+
+            if (result.UnresolvedCards.Count == 0)
+            {
+                Snackbar.Add($"Deck '{_deckName}' imported with {result.Deck.Entries.Count} cards", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add($"Deck imported with {result.UnresolvedCards.Count} unresolved cards", Severity.Warning);
+            }
+
+            _deckText = null;
+            _deckName = string.Empty;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Import failed: {ex.Message}", Severity.Error);
+        }
+    }
+}

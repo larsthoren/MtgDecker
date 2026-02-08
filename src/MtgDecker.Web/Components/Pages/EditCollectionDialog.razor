@@ -1,0 +1,51 @@
+@inject IMediator Mediator
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">Edit: @CardName</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudNumericField @bind-Value="_quantity" Label="Quantity" Variant="Variant.Outlined"
+                             Min="1" Max="99" />
+            <MudCheckBox @bind-Value="_isFoil" Label="Foil" Color="Color.Primary" />
+            <MudSelect @bind-Value="_condition" Label="Condition" Variant="Variant.Outlined">
+                <MudSelectItem Value="MtgDecker.Domain.Enums.CardCondition.Mint">Mint</MudSelectItem>
+                <MudSelectItem Value="MtgDecker.Domain.Enums.CardCondition.NearMint">Near Mint</MudSelectItem>
+                <MudSelectItem Value="MtgDecker.Domain.Enums.CardCondition.LightlyPlayed">Lightly Played</MudSelectItem>
+                <MudSelectItem Value="MtgDecker.Domain.Enums.CardCondition.Played">Played</MudSelectItem>
+                <MudSelectItem Value="MtgDecker.Domain.Enums.CardCondition.Damaged">Damaged</MudSelectItem>
+            </MudSelect>
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Save">Save</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public MtgDecker.Domain.Entities.CollectionEntry Entry { get; set; } = default!;
+    [Parameter] public string CardName { get; set; } = string.Empty;
+
+    private int _quantity;
+    private bool _isFoil;
+    private MtgDecker.Domain.Enums.CardCondition _condition;
+
+    protected override void OnParametersSet()
+    {
+        _quantity = Entry.Quantity;
+        _isFoil = Entry.IsFoil;
+        _condition = Entry.Condition;
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Save()
+    {
+        await Mediator.Send(new MtgDecker.Application.Collection.UpdateCollectionEntryCommand(
+            Entry.Id, _quantity, _isFoil, _condition));
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+}

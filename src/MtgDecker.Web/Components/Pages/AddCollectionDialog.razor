@@ -1,0 +1,53 @@
+@inject IMediator Mediator
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudTextField @bind-Value="_cardName" Label="Card Name" Variant="Variant.Outlined"
+                          Required="true" />
+            <MudNumericField @bind-Value="_quantity" Label="Quantity" Variant="Variant.Outlined"
+                             Min="1" Max="99" />
+            <MudCheckBox @bind-Value="_isFoil" Label="Foil" Color="Color.Primary" />
+            <MudSelect @bind-Value="_condition" Label="Condition" Variant="Variant.Outlined">
+                <MudSelectItem Value="MtgDecker.Domain.Enums.CardCondition.Mint">Mint</MudSelectItem>
+                <MudSelectItem Value="MtgDecker.Domain.Enums.CardCondition.NearMint">Near Mint</MudSelectItem>
+                <MudSelectItem Value="MtgDecker.Domain.Enums.CardCondition.LightlyPlayed">Lightly Played</MudSelectItem>
+                <MudSelectItem Value="MtgDecker.Domain.Enums.CardCondition.Played">Played</MudSelectItem>
+                <MudSelectItem Value="MtgDecker.Domain.Enums.CardCondition.Damaged">Damaged</MudSelectItem>
+            </MudSelect>
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Add"
+                   Disabled="@(string.IsNullOrWhiteSpace(_cardName))">Add</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    private string _cardName = string.Empty;
+    private int _quantity = 1;
+    private bool _isFoil;
+    private MtgDecker.Domain.Enums.CardCondition _condition = MtgDecker.Domain.Enums.CardCondition.NearMint;
+
+    private static readonly Guid UserId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Add()
+    {
+        // Look up card by name
+        var card = await Mediator.Send(new MtgDecker.Application.Cards.GetCardByNameQuery(_cardName));
+        if (card == null)
+        {
+            MudDialog.Cancel();
+            return;
+        }
+
+        await Mediator.Send(new MtgDecker.Application.Collection.AddToCollectionCommand(
+            UserId, card.Id, _quantity, _isFoil, _condition));
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+}

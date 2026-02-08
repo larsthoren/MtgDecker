@@ -1,0 +1,20 @@
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">Export: @DeckName</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudTextField Value="@ExportText" Lines="20" Variant="Variant.Outlined" ReadOnly="true"
+                      FullWidth="true" Class="export-text" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public string DeckName { get; set; } = string.Empty;
+    [Parameter] public string ExportText { get; set; } = string.Empty;
+
+    private void Cancel() => MudDialog.Cancel();
+}

@@ -1,0 +1,357 @@
+@page "/decks/{DeckId:guid}/edit"
+@rendermode InteractiveServer
+@inject IMediator Mediator
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>Deck Builder - MtgDecker</PageTitle>
+
+@if (_deck == null)
+{
+    <MudProgressLinear Indeterminate="true" />
+}
+else
+{
+    <MudStack Row="true" Class="mb-3" AlignItems="AlignItems.Center">
+        <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" OnClick="@(() => Navigation.NavigateTo("/decks"))" />
+        <MudText Typo="Typo.h5">@_deck.Name</MudText>
+        <MudChip T="string" Size="Size.Small" Color="Color.Primary">@_deck.Format</MudChip>
+        <MudSpacer />
+        <MudText Typo="Typo.body2">
+            Main: @_deck.TotalMainDeckCount
+            @if (_deck.TotalSideboardCount > 0)
+            {
+                <span> | SB: @_deck.TotalSideboardCount</span>
+            }
+        </MudText>
+    </MudStack>
+
+    @* Stats Bar *@
+    @if (_stats != null)
+    {
+        <MudPaper Class="pa-3 mb-3" Elevation="1">
+            <MudGrid>
+                <MudItem xs="12" md="4">
+                    <MudText Typo="Typo.subtitle2" Class="mb-1">Mana Curve</MudText>
+                    <MudChart ChartType="ChartType.Bar" ChartSeries="@_manaCurveSeries"
+                              XAxisLabels="@_manaCurveLabels" Width="100%" Height="120px" />
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudText Typo="Typo.subtitle2" Class="mb-1">Colors</MudText>
+                    <MudChart ChartType="ChartType.Donut" InputData="@_colorData"
+                              InputLabels="@_colorLabels" Width="120px" Height="120px" />
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudText Typo="Typo.subtitle2" Class="mb-1">Types</MudText>
+                    @foreach (var type in (_stats.TypeBreakdown ?? new()))
+                    {
+                        <MudText Typo="Typo.body2">@type.Key: @type.Value</MudText>
+                    }
+                </MudItem>
+            </MudGrid>
+        </MudPaper>
+    }
+
+    @* Two-Panel Layout *@
+    <MudGrid>
+        @* Left Panel: Card Search *@
+        <MudItem xs="12" md="6">
+            <MudPaper Class="pa-3" Elevation="1">
+                <MudText Typo="Typo.subtitle1" Class="mb-2">Search Cards</MudText>
+                <MudStack Row="true" Class="mb-3">
+                    <MudTextField @bind-Value="_searchText" Label="Card Name" Variant="Variant.Outlined"
+                                  Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.Search"
+                                  OnKeyUp="OnSearchKeyUp" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Search" Color="Color.Primary"
+                                   Variant="Variant.Filled" OnClick="SearchCards" />
+                </MudStack>
+
+                @if (_searchLoading)
+                {
+                    <MudProgressLinear Indeterminate="true" />
+                }
+
+                <MudList T="MtgDecker.Domain.Entities.Card" Dense="true">
+                    @foreach (var card in _searchResults)
+                    {
+                        <MudListItem>
+                            <MudStack Row="true" AlignItems="AlignItems.Center">
+                                @if (!string.IsNullOrEmpty(card.ImageUriSmall))
+                                {
+                                    <MudImage Src="@card.ImageUriSmall" Width="40" Height="56"
+                                              ObjectFit="ObjectFit.Cover" Class="rounded" />
+                                }
+                                <MudStack Spacing="0" Class="flex-grow-1">
+                                    <MudText Typo="Typo.body2"><b>@card.Name</b></MudText>
+                                    <MudText Typo="Typo.caption">@card.ManaCost @card.TypeLine</MudText>
+                                </MudStack>
+                                <MudIconButton Icon="@Icons.Material.Filled.Add" Size="Size.Small"
+                                               Color="Color.Primary"
+                                               OnClick="() => AddCardToDeck(card, MtgDecker.Domain.Enums.DeckCategory.MainDeck)" />
+                                @if (MtgDecker.Domain.Rules.FormatRules.HasSideboard(_deck.Format))
+                                {
+                                    <MudIconButton Icon="@Icons.Material.Filled.PlaylistAdd" Size="Size.Small"
+                                                   Color="Color.Secondary"
+                                                   OnClick="() => AddCardToDeck(card, MtgDecker.Domain.Enums.DeckCategory.Sideboard)" />
+                                }
+                            </MudStack>
+                        </MudListItem>
+                    }
+                </MudList>
+            </MudPaper>
+        </MudItem>
+
+        @* Right Panel: Deck List *@
+        <MudItem xs="12" md="6">
+            <MudPaper Class="pa-3" Elevation="1">
+                <MudText Typo="Typo.subtitle1" Class="mb-2">
+                    Main Deck (@_deck.TotalMainDeckCount)
+                </MudText>
+                <MudList T="MtgDecker.Domain.Entities.DeckEntry" Dense="true">
+                    @foreach (var entry in _mainDeckEntries)
+                    {
+                        <MudListItem>
+                            <MudStack Row="true" AlignItems="AlignItems.Center">
+                                <MudText Typo="Typo.body2" Class="flex-grow-1">
+                                    @entry.Quantity x @GetCardName(entry.CardId)
+                                </MudText>
+                                @if (GetShortage(entry.CardId) > 0)
+                                {
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Error">
+                                        Need @GetShortage(entry.CardId)
+                                    </MudChip>
+                                }
+                                <MudIconButton Icon="@Icons.Material.Filled.Add" Size="Size.Small"
+                                               OnClick="() => ChangeQuantity(entry.CardId, entry.Quantity + 1)" />
+                                <MudIconButton Icon="@Icons.Material.Filled.Remove" Size="Size.Small"
+                                               OnClick="() => ChangeQuantity(entry.CardId, entry.Quantity - 1)" />
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
+                                               Color="Color.Error"
+                                               OnClick="() => RemoveCard(entry.CardId)" />
+                            </MudStack>
+                        </MudListItem>
+                    }
+                </MudList>
+
+                @if (_sideboardEntries.Any())
+                {
+                    <MudDivider Class="my-3" />
+                    <MudText Typo="Typo.subtitle1" Class="mb-2">
+                        Sideboard (@_deck.TotalSideboardCount)
+                    </MudText>
+                    <MudList T="MtgDecker.Domain.Entities.DeckEntry" Dense="true">
+                        @foreach (var entry in _sideboardEntries)
+                        {
+                            <MudListItem>
+                                <MudStack Row="true" AlignItems="AlignItems.Center">
+                                    <MudText Typo="Typo.body2" Class="flex-grow-1">
+                                        @entry.Quantity x @GetCardName(entry.CardId)
+                                    </MudText>
+                                    <MudIconButton Icon="@Icons.Material.Filled.Remove" Size="Size.Small"
+                                                   OnClick="() => ChangeQuantity(entry.CardId, entry.Quantity - 1)" />
+                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
+                                                   Color="Color.Error"
+                                                   OnClick="() => RemoveCard(entry.CardId)" />
+                                </MudStack>
+                            </MudListItem>
+                        }
+                    </MudList>
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    [Parameter] public Guid DeckId { get; set; }
+
+    private MtgDecker.Domain.Entities.Deck? _deck;
+    private MtgDecker.Application.Stats.DeckStats? _stats;
+    private List<MtgDecker.Domain.Entities.Card> _searchResults = new();
+    private Dictionary<Guid, string> _cardNames = new();
+    private Dictionary<Guid, int> _shortages = new();
+    private string? _searchText;
+    private bool _searchLoading;
+
+    private static readonly Guid UserId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+
+    private IEnumerable<MtgDecker.Domain.Entities.DeckEntry> _mainDeckEntries =>
+        _deck?.Entries.Where(e => e.Category == MtgDecker.Domain.Enums.DeckCategory.MainDeck) ?? Enumerable.Empty<MtgDecker.Domain.Entities.DeckEntry>();
+
+    private IEnumerable<MtgDecker.Domain.Entities.DeckEntry> _sideboardEntries =>
+        _deck?.Entries.Where(e => e.Category == MtgDecker.Domain.Enums.DeckCategory.Sideboard) ?? Enumerable.Empty<MtgDecker.Domain.Entities.DeckEntry>();
+
+    // Chart data
+    private List<ChartSeries> _manaCurveSeries = new();
+    private string[] _manaCurveLabels = Array.Empty<string>();
+    private double[] _colorData = Array.Empty<double>();
+    private string[] _colorLabels = Array.Empty<string>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDeck();
+    }
+
+    private async Task LoadDeck()
+    {
+        _deck = await Mediator.Send(new MtgDecker.Application.Decks.GetDeckQuery(DeckId));
+        if (_deck == null)
+        {
+            Navigation.NavigateTo("/decks");
+            return;
+        }
+
+        await LoadCardNames();
+        await LoadStats();
+        await LoadShortages();
+    }
+
+    private async Task LoadCardNames()
+    {
+        if (_deck == null) return;
+        var cardIds = _deck.Entries.Select(e => e.CardId).Distinct().ToList();
+        if (cardIds.Count == 0) return;
+
+        var cards = await Mediator.Send(new MtgDecker.Application.Cards.SearchCardsQuery(
+            new MtgDecker.Application.Interfaces.CardSearchFilter { PageSize = 1000 }));
+
+        // Simple approach: get cards by ID
+        foreach (var entry in _deck.Entries)
+        {
+            if (!_cardNames.ContainsKey(entry.CardId))
+            {
+                var card = await Mediator.Send(new MtgDecker.Application.Cards.GetCardByIdQuery(entry.CardId));
+                if (card != null)
+                    _cardNames[entry.CardId] = card.Name;
+            }
+        }
+    }
+
+    private async Task LoadStats()
+    {
+        if (_deck == null || _deck.Entries.Count == 0) return;
+
+        try
+        {
+            _stats = await Mediator.Send(new MtgDecker.Application.Stats.GetDeckStatsQuery(DeckId));
+            UpdateChartData();
+        }
+        catch { /* Stats are non-critical */ }
+    }
+
+    private async Task LoadShortages()
+    {
+        if (_deck == null) return;
+
+        try
+        {
+            var shortageList = await Mediator.Send(
+                new MtgDecker.Application.Decks.GetDeckShortagesQuery(DeckId, UserId));
+            _shortages = _deck.Entries
+                .ToDictionary(e => e.CardId, e =>
+                {
+                    var name = _cardNames.GetValueOrDefault(e.CardId, "");
+                    return shortageList.FirstOrDefault(s => s.CardName == name)?.Shortage ?? 0;
+                });
+        }
+        catch { /* Shortages are non-critical */ }
+    }
+
+    private void UpdateChartData()
+    {
+        if (_stats == null) return;
+
+        // Mana curve
+        var maxCmc = _stats.ManaCurve.Keys.DefaultIfEmpty(0).Max();
+        _manaCurveLabels = Enumerable.Range(0, Math.Max(maxCmc + 1, 8))
+            .Select(i => i >= 7 ? "7+" : i.ToString()).ToArray();
+        var curveData = Enumerable.Range(0, Math.Max(maxCmc + 1, 8))
+            .Select(i => (double)_stats.ManaCurve.GetValueOrDefault(i, 0)).ToArray();
+        _manaCurveSeries = new List<ChartSeries> { new() { Name = "Cards", Data = curveData } };
+
+        // Color distribution
+        if (_stats.ColorDistribution.Count > 0)
+        {
+            _colorLabels = _stats.ColorDistribution.Keys.ToArray();
+            _colorData = _stats.ColorDistribution.Values.Select(v => (double)v).ToArray();
+        }
+    }
+
+    private async Task OnSearchKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+            await SearchCards();
+    }
+
+    private async Task SearchCards()
+    {
+        if (string.IsNullOrWhiteSpace(_searchText)) return;
+
+        _searchLoading = true;
+        var result = await Mediator.Send(new MtgDecker.Application.Cards.SearchCardsQuery(
+            new MtgDecker.Application.Interfaces.CardSearchFilter
+            {
+                SearchText = _searchText,
+                PageSize = 20
+            }));
+        _searchResults = result.Cards;
+        _searchLoading = false;
+    }
+
+    private async Task AddCardToDeck(MtgDecker.Domain.Entities.Card card, MtgDecker.Domain.Enums.DeckCategory category)
+    {
+        try
+        {
+            _deck = await Mediator.Send(new MtgDecker.Application.Decks.AddCardToDeckCommand(
+                DeckId, card.Id, 1, category));
+            _cardNames[card.Id] = card.Name;
+            await LoadStats();
+            await LoadShortages();
+            Snackbar.Add($"Added {card.Name}", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+
+    private async Task ChangeQuantity(Guid cardId, int newQuantity)
+    {
+        if (newQuantity < 1)
+        {
+            await RemoveCard(cardId);
+            return;
+        }
+
+        try
+        {
+            _deck = await Mediator.Send(new MtgDecker.Application.Decks.UpdateCardQuantityCommand(
+                DeckId, cardId, newQuantity));
+            await LoadStats();
+            await LoadShortages();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+
+    private async Task RemoveCard(Guid cardId)
+    {
+        try
+        {
+            _deck = await Mediator.Send(new MtgDecker.Application.Decks.RemoveCardFromDeckCommand(DeckId, cardId));
+            _cardNames.Remove(cardId);
+            await LoadStats();
+            await LoadShortages();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+
+    private string GetCardName(Guid cardId) => _cardNames.GetValueOrDefault(cardId, "Unknown Card");
+
+    private int GetShortage(Guid cardId) => _shortages.GetValueOrDefault(cardId, 0);
+}

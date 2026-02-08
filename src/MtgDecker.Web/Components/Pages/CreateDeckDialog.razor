@@ -1,0 +1,40 @@
+@inject IMediator Mediator
+
+<MudDialog>
+    <DialogContent>
+        <MudTextField @bind-Value="_name" Label="Deck Name" Variant="Variant.Outlined" Required="true" Class="mb-3" />
+        <MudSelect @bind-Value="_format" Label="Format" Variant="Variant.Outlined" Required="true" Class="mb-3">
+            <MudSelectItem Value="MtgDecker.Domain.Enums.Format.Modern">Modern</MudSelectItem>
+            <MudSelectItem Value="MtgDecker.Domain.Enums.Format.Legacy">Legacy</MudSelectItem>
+            <MudSelectItem Value="MtgDecker.Domain.Enums.Format.Vintage">Vintage</MudSelectItem>
+            <MudSelectItem Value="MtgDecker.Domain.Enums.Format.Pauper">Pauper</MudSelectItem>
+            <MudSelectItem Value="MtgDecker.Domain.Enums.Format.Commander">Commander</MudSelectItem>
+            <MudSelectItem Value="MtgDecker.Domain.Enums.Format.Premodern">Premodern</MudSelectItem>
+        </MudSelect>
+        <MudTextField @bind-Value="_description" Label="Description" Variant="Variant.Outlined" Lines="2" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Create"
+                   Disabled="@(string.IsNullOrWhiteSpace(_name))">Create</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    private string _name = string.Empty;
+    private MtgDecker.Domain.Enums.Format _format = MtgDecker.Domain.Enums.Format.Modern;
+    private string? _description;
+
+    private static readonly Guid UserId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Create()
+    {
+        var deck = await Mediator.Send(new MtgDecker.Application.Decks.CreateDeckCommand(
+            _name, _format, _description, UserId));
+        MudDialog.Close(DialogResult.Ok(deck));
+    }
+}

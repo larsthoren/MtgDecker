@@ -1,0 +1,137 @@
+@page "/decks"
+@rendermode InteractiveServer
+@inject IMediator Mediator
+@inject NavigationManager Navigation
+@inject IDialogService DialogService
+
+<PageTitle>My Decks - MtgDecker</PageTitle>
+
+<MudStack Row="true" Class="mb-4" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+    <MudText Typo="Typo.h4">My Decks</MudText>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary"
+               StartIcon="@Icons.Material.Filled.Add" OnClick="CreateNewDeck">
+        New Deck
+    </MudButton>
+</MudStack>
+
+@if (_loading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+}
+else if (_decks.Count == 0)
+{
+    <MudPaper Class="pa-8 d-flex flex-column align-center" Elevation="1">
+        <MudIcon Icon="@Icons.Material.Filled.LibraryBooks" Size="Size.Large" Color="Color.Secondary" Class="mb-4" />
+        <MudText Typo="Typo.h6" Class="mb-2">No decks yet</MudText>
+        <MudText Typo="Typo.body1" Class="mb-4">Create your first deck to get started.</MudText>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CreateNewDeck">
+            Create Deck
+        </MudButton>
+    </MudPaper>
+}
+else
+{
+    <MudGrid>
+        @foreach (var deck in _decks)
+        {
+            <MudItem xs="12" sm="6" md="4" lg="3">
+                <MudCard Class="cursor-pointer" @onclick="() => EditDeck(deck.Id)">
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6">@deck.Name</MudText>
+                            <MudChip T="string" Size="Size.Small" Color="Color.Primary">@deck.Format</MudChip>
+                        </CardHeaderContent>
+                        <CardHeaderActions>
+                            <MudMenu Icon="@Icons.Material.Filled.MoreVert">
+                                <MudMenuItem OnClick="() => EditDeck(deck.Id)"
+                                             Icon="@Icons.Material.Filled.Edit">Edit</MudMenuItem>
+                                <MudMenuItem OnClick="() => ExportDeck(deck)"
+                                             Icon="@Icons.Material.Filled.FileDownload">Export</MudMenuItem>
+                                <MudMenuItem OnClick="() => DeleteDeck(deck)"
+                                             Icon="@Icons.Material.Filled.Delete" IconColor="Color.Error">Delete</MudMenuItem>
+                            </MudMenu>
+                        </CardHeaderActions>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        @if (!string.IsNullOrEmpty(deck.Description))
+                        {
+                            <MudText Typo="Typo.body2" Class="mb-2">@deck.Description</MudText>
+                        }
+                        <MudText Typo="Typo.body2">Main: @deck.TotalMainDeckCount cards</MudText>
+                        @if (deck.TotalSideboardCount > 0)
+                        {
+                            <MudText Typo="Typo.body2">Sideboard: @deck.TotalSideboardCount cards</MudText>
+                        }
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            Updated: @deck.UpdatedAt.ToString("MMM dd, yyyy")
+                        </MudText>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+        }
+    </MudGrid>
+}
+
+@code {
+    private List<MtgDecker.Domain.Entities.Deck> _decks = new();
+    private bool _loading = true;
+
+    // Hardcoded user ID for single-user mode
+    private static readonly Guid UserId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDecks();
+    }
+
+    private async Task LoadDecks()
+    {
+        _loading = true;
+        _decks = await Mediator.Send(new MtgDecker.Application.Decks.ListDecksQuery(UserId));
+        _loading = false;
+    }
+
+    private async Task CreateNewDeck()
+    {
+        var parameters = new DialogParameters<CreateDeckDialog>();
+        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<CreateDeckDialog>("Create New Deck", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false, Data: MtgDecker.Domain.Entities.Deck deck })
+        {
+            Navigation.NavigateTo($"/decks/{deck.Id}/edit");
+        }
+    }
+
+    private void EditDeck(Guid deckId)
+    {
+        Navigation.NavigateTo($"/decks/{deckId}/edit");
+    }
+
+    private async Task ExportDeck(MtgDecker.Domain.Entities.Deck deck)
+    {
+        var exportText = await Mediator.Send(new MtgDecker.Application.DeckExport.ExportDeckQuery(deck.Id, "MTGO"));
+        var parameters = new DialogParameters<ExportDeckDialog>
+        {
+            { x => x.DeckName, deck.Name },
+            { x => x.ExportText, exportText }
+        };
+        await DialogService.ShowAsync<ExportDeckDialog>("Export Deck", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+    }
+
+    private async Task DeleteDeck(MtgDecker.Domain.Entities.Deck deck)
+    {
+        var confirm = await DialogService.ShowMessageBox(
+            "Delete Deck",
+            $"Are you sure you want to delete '{deck.Name}'?",
+            yesText: "Delete", cancelText: "Cancel");
+
+        if (confirm == true)
+        {
+            await Mediator.Send(new MtgDecker.Application.Decks.DeleteDeckCommand(deck.Id));
+            await LoadDecks();
+        }
+    }
+}
