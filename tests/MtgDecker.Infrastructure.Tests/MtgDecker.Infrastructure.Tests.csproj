@@ -21,6 +21,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Update="Scryfall\Fixtures\sample-cards.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\MtgDecker.Infrastructure\MtgDecker.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\MtgDecker.Domain\MtgDecker.Domain.csproj" />
   </ItemGroup>

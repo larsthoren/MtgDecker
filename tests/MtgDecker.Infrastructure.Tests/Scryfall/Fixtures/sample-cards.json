@@ -1,0 +1,107 @@
+[
+  {
+    "id": "f7f508fa-a152-41f5-a8d0-1a09c2862a7f",
+    "oracle_id": "c4763049-5e46-402d-abfc-473ee9dd4695",
+    "name": "Lightning Bolt",
+    "mana_cost": "{R}",
+    "cmc": 1.0,
+    "type_line": "Instant",
+    "oracle_text": "Lightning Bolt deals 3 damage to any target.",
+    "colors": ["R"],
+    "color_identity": ["R"],
+    "rarity": "uncommon",
+    "set": "lea",
+    "set_name": "Limited Edition Alpha",
+    "collector_number": "161",
+    "layout": "normal",
+    "image_uris": {
+      "normal": "https://cards.scryfall.io/normal/front/bolt.jpg",
+      "small": "https://cards.scryfall.io/small/front/bolt.jpg",
+      "art_crop": "https://cards.scryfall.io/art_crop/front/bolt.jpg"
+    },
+    "legalities": {
+      "modern": "legal",
+      "vintage": "restricted",
+      "legacy": "legal",
+      "pauper": "legal",
+      "commander": "legal"
+    }
+  },
+  {
+    "id": "b2e3d59e-b8a9-4b7a-8e4f-1a2c3d4e5f6a",
+    "oracle_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "name": "Counterspell",
+    "mana_cost": "{U}{U}",
+    "cmc": 2.0,
+    "type_line": "Instant",
+    "oracle_text": "Counter target spell.",
+    "colors": ["U"],
+    "color_identity": ["U"],
+    "rarity": "uncommon",
+    "set": "lea",
+    "set_name": "Limited Edition Alpha",
+    "collector_number": "54",
+    "layout": "normal",
+    "image_uris": {
+      "normal": "https://cards.scryfall.io/normal/front/counter.jpg",
+      "small": "https://cards.scryfall.io/small/front/counter.jpg",
+      "art_crop": "https://cards.scryfall.io/art_crop/front/counter.jpg"
+    },
+    "legalities": {
+      "modern": "not_legal",
+      "vintage": "legal",
+      "legacy": "legal",
+      "pauper": "legal",
+      "commander": "legal"
+    }
+  },
+  {
+    "id": "c3d4e5f6-a7b8-9012-cdef-345678901234",
+    "oracle_id": "d4e5f6a7-b8c9-0123-def4-567890abcdef",
+    "name": "Delver of Secrets // Insectile Aberration",
+    "mana_cost": "{U}",
+    "cmc": 1.0,
+    "type_line": "Creature — Human Wizard // Creature — Human Insect",
+    "colors": ["U"],
+    "color_identity": ["U"],
+    "rarity": "common",
+    "set": "isd",
+    "set_name": "Innistrad",
+    "collector_number": "51",
+    "layout": "transform",
+    "legalities": {
+      "modern": "legal",
+      "vintage": "legal",
+      "legacy": "legal",
+      "pauper": "legal",
+      "commander": "legal"
+    },
+    "card_faces": [
+      {
+        "name": "Delver of Secrets",
+        "mana_cost": "{U}",
+        "type_line": "Creature — Human Wizard",
+        "oracle_text": "At the beginning of your upkeep, look at the top card of your library.",
+        "power": "1",
+        "toughness": "1",
+        "image_uris": {
+          "normal": "https://cards.scryfall.io/normal/front/delver.jpg",
+          "small": "https://cards.scryfall.io/small/front/delver.jpg",
+          "art_crop": "https://cards.scryfall.io/art_crop/front/delver.jpg"
+        }
+      },
+      {
+        "name": "Insectile Aberration",
+        "type_line": "Creature — Human Insect",
+        "oracle_text": "Flying",
+        "power": "3",
+        "toughness": "2",
+        "image_uris": {
+          "normal": "https://cards.scryfall.io/normal/back/aberration.jpg",
+          "small": "https://cards.scryfall.io/small/back/aberration.jpg",
+          "art_crop": "https://cards.scryfall.io/art_crop/back/aberration.jpg"
+        }
+      }
+    ]
+  }
+]
