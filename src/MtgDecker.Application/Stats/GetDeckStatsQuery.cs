@@ -12,7 +12,8 @@ public record DeckStats(
     int SideboardCount,
     Dictionary<int, int> ManaCurve,
     Dictionary<string, int> ColorDistribution,
-    Dictionary<string, int> TypeBreakdown);
+    Dictionary<string, int> TypeBreakdown,
+    decimal TotalPriceUsd);
 
 public class GetDeckStatsHandler : IRequestHandler<GetDeckStatsQuery, DeckStats>
 {
@@ -65,12 +66,20 @@ public class GetDeckStatsHandler : IRequestHandler<GetDeckStatsQuery, DeckStats>
             typeBd[mainType] = typeBd.GetValueOrDefault(mainType) + entry.Quantity;
         }
 
+        var totalPrice = 0m;
+        foreach (var entry in deck.Entries)
+        {
+            if (cards.TryGetValue(entry.CardId, out var priceCard) && priceCard.PriceUsd.HasValue)
+                totalPrice += priceCard.PriceUsd.Value * entry.Quantity;
+        }
+
         return new DeckStats(
             deck.Entries.Sum(e => e.Quantity),
             deck.TotalMainDeckCount,
             deck.TotalSideboardCount,
             manaCurve,
             colorDist,
-            typeBd);
+            typeBd,
+            totalPrice);
     }
 }

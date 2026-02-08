@@ -98,6 +98,12 @@
                             <MudText Typo="Typo.body2" Align="Align.Center">@card.Name</MudText>
                         </MudPaper>
                     }
+                    @if (card.PriceUsd.HasValue)
+                    {
+                        <MudText Typo="Typo.caption" Align="Align.Center" Class="mt-1">
+                            $@card.PriceUsd.Value.ToString("F2")
+                        </MudText>
+                    }
                 </div>
             </MudItem>
         }
@@ -112,6 +118,7 @@ else
             <PropertyColumn Property="x => x.TypeLine" Title="Type" />
             <PropertyColumn Property="x => x.Rarity" Title="Rarity" />
             <PropertyColumn Property="x => x.SetCode" Title="Set" />
+            <PropertyColumn Property="x => x.PriceUsd" Title="Price" Format="$0.00" />
         </Columns>
     </MudDataGrid>
 }

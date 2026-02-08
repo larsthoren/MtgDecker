@@ -27,7 +27,12 @@ public static class ScryfallCardMapper
             Layout = source.Layout,
             ImageUri = source.ImageUris?.Normal,
             ImageUriSmall = source.ImageUris?.Small,
-            ImageUriArtCrop = source.ImageUris?.ArtCrop
+            ImageUriArtCrop = source.ImageUris?.ArtCrop,
+            PriceUsd = ParsePrice(source.Prices?.Usd),
+            PriceUsdFoil = ParsePrice(source.Prices?.UsdFoil),
+            PriceEur = ParsePrice(source.Prices?.Eur),
+            PriceEurFoil = ParsePrice(source.Prices?.EurFoil),
+            PriceTix = ParsePrice(source.Prices?.Tix)
         };
 
         if (source.Legalities != null)
@@ -67,6 +72,11 @@ public static class ScryfallCardMapper
 
         return card;
     }
+
+    private static decimal? ParsePrice(string? value)
+        => decimal.TryParse(value, System.Globalization.NumberStyles.Any,
+            System.Globalization.CultureInfo.InvariantCulture, out var result)
+            ? result : null;
 
     private static LegalityStatus ParseLegalityStatus(string status) => status switch
     {

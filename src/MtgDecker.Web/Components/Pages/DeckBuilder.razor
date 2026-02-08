@@ -22,6 +22,10 @@ else
             {
                 <span> | SB: @_deck.TotalSideboardCount</span>
             }
+            @if (_stats?.TotalPriceUsd > 0)
+            {
+                <span> | $@_stats.TotalPriceUsd.ToString("F2")</span>
+            }
         </MudText>
     </MudStack>
 
@@ -113,6 +117,13 @@ else
                             <MudStack Row="true" AlignItems="AlignItems.Center">
                                 <MudText Typo="Typo.body2" Class="flex-grow-1">
                                     @entry.Quantity x @GetCardName(entry.CardId)
+                                    @{ var price = GetCardPrice(entry.CardId); }
+                                    @if (price.HasValue)
+                                    {
+                                        <span style="color: var(--mud-palette-text-secondary); font-size: 0.8em;">
+                                            ($@((price.Value * entry.Quantity).ToString("F2")))
+                                        </span>
+                                    }
                                 </MudText>
                                 @if (GetShortage(entry.CardId) > 0)
                                 {
@@ -168,6 +179,7 @@ else
     private MtgDecker.Application.Stats.DeckStats? _stats;
     private List<MtgDecker.Domain.Entities.Card> _searchResults = new();
     private Dictionary<Guid, string> _cardNames = new();
+    private Dictionary<Guid, MtgDecker.Domain.Entities.Card> _cardData = new();
     private Dictionary<Guid, int> _shortages = new();
     private string? _searchText;
     private bool _searchLoading;
@@ -208,20 +220,16 @@ else
     private async Task LoadCardNames()
     {
         if (_deck == null) return;
-        var cardIds = _deck.Entries.Select(e => e.CardId).Distinct().ToList();
-        if (cardIds.Count == 0) return;
-
-        var cards = await Mediator.Send(new MtgDecker.Application.Cards.SearchCardsQuery(
-            new MtgDecker.Application.Interfaces.CardSearchFilter { PageSize = 1000 }));
-
-        // Simple approach: get cards by ID
         foreach (var entry in _deck.Entries)
         {
-            if (!_cardNames.ContainsKey(entry.CardId))
+            if (!_cardData.ContainsKey(entry.CardId))
             {
                 var card = await Mediator.Send(new MtgDecker.Application.Cards.GetCardByIdQuery(entry.CardId));
                 if (card != null)
+                {
+                    _cardData[entry.CardId] = card;
                     _cardNames[entry.CardId] = card.Name;
+                }
             }
         }
     }
@@ -351,6 +359,9 @@ else
     }
 
     private string GetCardName(Guid cardId) => _cardNames.GetValueOrDefault(cardId, "Unknown Card");
+
+    private decimal? GetCardPrice(Guid cardId) =>
+        _cardData.TryGetValue(cardId, out var card) ? card.PriceUsd : null;
 
     private int GetShortage(Guid cardId) => _shortages.GetValueOrDefault(cardId, 0);
 }

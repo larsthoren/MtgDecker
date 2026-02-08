@@ -67,6 +67,52 @@ public class GetDeckStatsQueryTests
     }
 
     [Fact]
+    public async Task Handle_CalculatesTotalPrice()
+    {
+        var cardA = new Card { Id = Guid.NewGuid(), Name = "Bolt", TypeLine = "Instant", PriceUsd = 1.50m, Rarity = "common", SetCode = "lea", SetName = "Alpha", ScryfallId = "a", OracleId = "a" };
+        var cardB = new Card { Id = Guid.NewGuid(), Name = "Force", TypeLine = "Instant", PriceUsd = 80.00m, Rarity = "rare", SetCode = "all", SetName = "Alliances", ScryfallId = "b", OracleId = "b" };
+        var deck = new Deck
+        {
+            Id = Guid.NewGuid(), Name = "Test", Format = Format.Legacy, UserId = Guid.NewGuid(),
+            Entries = new List<DeckEntry>
+            {
+                new() { Id = Guid.NewGuid(), CardId = cardA.Id, Quantity = 4, Category = DeckCategory.MainDeck },
+                new() { Id = Guid.NewGuid(), CardId = cardB.Id, Quantity = 2, Category = DeckCategory.MainDeck }
+            }
+        };
+
+        _deckRepo.GetByIdAsync(deck.Id, Arg.Any<CancellationToken>()).Returns(deck);
+        _cardRepo.GetByIdsAsync(Arg.Any<IEnumerable<Guid>>(), Arg.Any<CancellationToken>())
+            .Returns(new List<Card> { cardA, cardB });
+
+        var result = await _handler.Handle(new GetDeckStatsQuery(deck.Id), CancellationToken.None);
+
+        result.TotalPriceUsd.Should().Be(166.00m);
+    }
+
+    [Fact]
+    public async Task Handle_CardsWithNoPrices_TotalPriceIsZero()
+    {
+        var card = new Card { Id = Guid.NewGuid(), Name = "Bolt", TypeLine = "Instant", PriceUsd = null, Rarity = "common", SetCode = "lea", SetName = "Alpha", ScryfallId = "a", OracleId = "a" };
+        var deck = new Deck
+        {
+            Id = Guid.NewGuid(), Name = "Test", Format = Format.Legacy, UserId = Guid.NewGuid(),
+            Entries = new List<DeckEntry>
+            {
+                new() { Id = Guid.NewGuid(), CardId = card.Id, Quantity = 4, Category = DeckCategory.MainDeck }
+            }
+        };
+
+        _deckRepo.GetByIdAsync(deck.Id, Arg.Any<CancellationToken>()).Returns(deck);
+        _cardRepo.GetByIdsAsync(Arg.Any<IEnumerable<Guid>>(), Arg.Any<CancellationToken>())
+            .Returns(new List<Card> { card });
+
+        var result = await _handler.Handle(new GetDeckStatsQuery(deck.Id), CancellationToken.None);
+
+        result.TotalPriceUsd.Should().Be(0m);
+    }
+
+    [Fact]
     public async Task Handle_DeckNotFound_Throws()
     {
         _deckRepo.GetByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns((Deck?)null);

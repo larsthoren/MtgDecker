@@ -25,6 +25,12 @@ public class Card
     public string? ImageUriArtCrop { get; set; }
     public string? Layout { get; set; }
 
+    public decimal? PriceUsd { get; set; }
+    public decimal? PriceUsdFoil { get; set; }
+    public decimal? PriceEur { get; set; }
+    public decimal? PriceEurFoil { get; set; }
+    public decimal? PriceTix { get; set; }
+
     public List<CardFace> Faces { get; set; } = new();
     public List<CardLegality> Legalities { get; set; } = new();
 

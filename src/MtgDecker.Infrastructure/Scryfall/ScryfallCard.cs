@@ -54,6 +54,9 @@ public class ScryfallCard
 
     [JsonPropertyName("card_faces")]
     public List<ScryfallCardFace>? CardFaces { get; set; }
+
+    [JsonPropertyName("prices")]
+    public ScryfallPrices? Prices { get; set; }
 }
 
 public class ScryfallImageUris
@@ -90,6 +93,24 @@ public class ScryfallCardFace
 
     [JsonPropertyName("image_uris")]
     public ScryfallImageUris? ImageUris { get; set; }
+}
+
+public class ScryfallPrices
+{
+    [JsonPropertyName("usd")]
+    public string? Usd { get; set; }
+
+    [JsonPropertyName("usd_foil")]
+    public string? UsdFoil { get; set; }
+
+    [JsonPropertyName("eur")]
+    public string? Eur { get; set; }
+
+    [JsonPropertyName("eur_foil")]
+    public string? EurFoil { get; set; }
+
+    [JsonPropertyName("tix")]
+    public string? Tix { get; set; }
 }
 
 public class ScryfallBulkDataResponse

@@ -157,6 +157,63 @@ public class ScryfallCardMapperTests
         card.ColorIdentity.Should().BeEmpty();
     }
 
+    [Fact]
+    public void MapToCard_WithPrices_MapsPriceFields()
+    {
+        var source = CreateMinimalCard();
+        source.Prices = new ScryfallPrices
+        {
+            Usd = "1.50",
+            UsdFoil = "3.25",
+            Eur = "1.20",
+            EurFoil = "2.80",
+            Tix = "0.50"
+        };
+
+        var card = ScryfallCardMapper.MapToCard(source);
+
+        card.PriceUsd.Should().Be(1.50m);
+        card.PriceUsdFoil.Should().Be(3.25m);
+        card.PriceEur.Should().Be(1.20m);
+        card.PriceEurFoil.Should().Be(2.80m);
+        card.PriceTix.Should().Be(0.50m);
+    }
+
+    [Fact]
+    public void MapToCard_NullPrices_DefaultsToNull()
+    {
+        var source = CreateMinimalCard();
+        source.Prices = null;
+
+        var card = ScryfallCardMapper.MapToCard(source);
+
+        card.PriceUsd.Should().BeNull();
+        card.PriceUsdFoil.Should().BeNull();
+        card.PriceEur.Should().BeNull();
+        card.PriceEurFoil.Should().BeNull();
+        card.PriceTix.Should().BeNull();
+    }
+
+    [Fact]
+    public void MapToCard_PartialPrices_MapsAvailableOnes()
+    {
+        var source = CreateMinimalCard();
+        source.Prices = new ScryfallPrices
+        {
+            Usd = "0.25",
+            UsdFoil = null,
+            Eur = null,
+            EurFoil = null,
+            Tix = null
+        };
+
+        var card = ScryfallCardMapper.MapToCard(source);
+
+        card.PriceUsd.Should().Be(0.25m);
+        card.PriceUsdFoil.Should().BeNull();
+        card.PriceEur.Should().BeNull();
+    }
+
     private static ScryfallCard CreateMinimalCard()
     {
         return new ScryfallCard

@@ -37,6 +37,20 @@ else if (_entries.Count == 0)
 }
 else
 {
+    <MudPaper Class="pa-3 mb-3" Elevation="1">
+        <MudStack Row="true" Spacing="4" AlignItems="AlignItems.Center">
+            <MudText Typo="Typo.body1">
+                <b>Total Cards:</b> @_displayEntries.Sum(e => e.Quantity)
+            </MudText>
+            <MudText Typo="Typo.body1">
+                <b>Unique Cards:</b> @_displayEntries.Count
+            </MudText>
+            <MudText Typo="Typo.body1">
+                <b>Collection Value:</b> $@(_displayEntries.Where(e => e.Price.HasValue).Sum(e => e.Price!.Value * e.Quantity).ToString("F2"))
+            </MudText>
+        </MudStack>
+    </MudPaper>
+
     <MudDataGrid T="CollectionDisplayEntry" Items="@_displayEntries" Dense="true" Hover="true">
         <Columns>
             <PropertyColumn Property="x => x.CardName" Title="Card Name" />
@@ -44,6 +58,8 @@ else
             <PropertyColumn Property="x => x.Quantity" Title="Qty" />
             <PropertyColumn Property="x => x.Foil" Title="Foil" />
             <PropertyColumn Property="x => x.Condition" Title="Condition" />
+            <PropertyColumn Property="x => x.PriceDisplay" Title="Price" />
+            <PropertyColumn Property="x => x.TotalValueDisplay" Title="Total" />
             <TemplateColumn Title="Actions">
                 <CellTemplate>
                     <MudStack Row="true">
@@ -88,7 +104,8 @@ else
                 SetCode = card?.SetCode?.ToUpperInvariant() ?? "",
                 Quantity = entry.Quantity,
                 Foil = entry.IsFoil ? "Yes" : "No",
-                Condition = entry.Condition.ToString()
+                Condition = entry.Condition.ToString(),
+                Price = entry.IsFoil ? card?.PriceUsdFoil ?? card?.PriceUsd : card?.PriceUsd
             });
         }
 
@@ -164,5 +181,8 @@ else
         public int Quantity { get; set; }
         public string Foil { get; set; } = "No";
         public string Condition { get; set; } = string.Empty;
+        public decimal? Price { get; set; }
+        public string PriceDisplay => Price.HasValue ? $"${Price.Value:F2}" : "—";
+        public string TotalValueDisplay => Price.HasValue ? $"${(Price.Value * Quantity):F2}" : "—";
     }
 }
