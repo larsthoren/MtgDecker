@@ -21,7 +21,7 @@ public static class DependencyInjection
 
         services.AddHttpClient<IScryfallClient, ScryfallClient>(client =>
         {
-            client.BaseAddress = new Uri("https://api.scryfall.com");
+            client.BaseAddress = new Uri("https://api.scryfall.com/");
             client.DefaultRequestHeaders.Add("User-Agent", "MtgDecker/1.0");
         });
         services.AddScoped<IBulkDataImporter, BulkDataImporter>();

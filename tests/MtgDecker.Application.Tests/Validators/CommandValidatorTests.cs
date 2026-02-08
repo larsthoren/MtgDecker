@@ -16,7 +16,10 @@ public class CommandValidatorTests
         var validator = new RemoveCardFromDeckValidator();
         var cmd = new RemoveCardFromDeckCommand(Guid.Empty, Guid.NewGuid(), DeckCategory.MainDeck);
 
-        validator.Validate(cmd).IsValid.Should().BeFalse();
+        var result = validator.Validate(cmd);
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(e => e.PropertyName == "DeckId");
     }
 
     [Fact]
@@ -25,7 +28,10 @@ public class CommandValidatorTests
         var validator = new RemoveCardFromDeckValidator();
         var cmd = new RemoveCardFromDeckCommand(Guid.NewGuid(), Guid.Empty, DeckCategory.MainDeck);
 
-        validator.Validate(cmd).IsValid.Should().BeFalse();
+        var result = validator.Validate(cmd);
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(e => e.PropertyName == "CardId");
     }
 
     [Fact]
@@ -43,7 +49,10 @@ public class CommandValidatorTests
         var validator = new UpdateCardQuantityValidator();
         var cmd = new UpdateCardQuantityCommand(Guid.NewGuid(), Guid.NewGuid(), DeckCategory.MainDeck, 0);
 
-        validator.Validate(cmd).IsValid.Should().BeFalse();
+        var result = validator.Validate(cmd);
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(e => e.PropertyName == "Quantity");
     }
 
     [Fact]
@@ -52,7 +61,10 @@ public class CommandValidatorTests
         var validator = new UpdateCardQuantityValidator();
         var cmd = new UpdateCardQuantityCommand(Guid.Empty, Guid.NewGuid(), DeckCategory.MainDeck, 1);
 
-        validator.Validate(cmd).IsValid.Should().BeFalse();
+        var result = validator.Validate(cmd);
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(e => e.PropertyName == "DeckId");
     }
 
     [Fact]
@@ -70,7 +82,10 @@ public class CommandValidatorTests
         var validator = new MoveCardCategoryValidator();
         var cmd = new MoveCardCategoryCommand(Guid.Empty, Guid.NewGuid(), DeckCategory.Maybeboard, DeckCategory.MainDeck);
 
-        validator.Validate(cmd).IsValid.Should().BeFalse();
+        var result = validator.Validate(cmd);
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(e => e.PropertyName == "DeckId");
     }
 
     [Fact]
@@ -97,7 +112,10 @@ public class CommandValidatorTests
         var validator = new RemoveFromCollectionValidator();
         var cmd = new RemoveFromCollectionCommand(Guid.Empty);
 
-        validator.Validate(cmd).IsValid.Should().BeFalse();
+        var result = validator.Validate(cmd);
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(e => e.PropertyName == "Id");
     }
 
     [Fact]
@@ -106,7 +124,10 @@ public class CommandValidatorTests
         var validator = new UpdateCollectionEntryValidator();
         var cmd = new UpdateCollectionEntryCommand(Guid.NewGuid(), 0, false, CardCondition.NearMint);
 
-        validator.Validate(cmd).IsValid.Should().BeFalse();
+        var result = validator.Validate(cmd);
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(e => e.PropertyName == "Quantity");
     }
 
     [Fact]
@@ -124,7 +145,10 @@ public class CommandValidatorTests
         var validator = new ImportDeckValidator();
         var cmd = new ImportDeckCommand("", "MTGO", "Test", Format.Modern, Guid.NewGuid());
 
-        validator.Validate(cmd).IsValid.Should().BeFalse();
+        var result = validator.Validate(cmd);
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(e => e.PropertyName == "DeckText");
     }
 
     [Fact]
@@ -133,7 +157,10 @@ public class CommandValidatorTests
         var validator = new ImportDeckValidator();
         var cmd = new ImportDeckCommand("4 Bolt", "MTGO", "", Format.Modern, Guid.NewGuid());
 
-        validator.Validate(cmd).IsValid.Should().BeFalse();
+        var result = validator.Validate(cmd);
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(e => e.PropertyName == "DeckName");
     }
 
     [Fact]
@@ -151,7 +178,10 @@ public class CommandValidatorTests
         var validator = new ExportDeckValidator();
         var cmd = new ExportDeckQuery(Guid.Empty, "Text");
 
-        validator.Validate(cmd).IsValid.Should().BeFalse();
+        var result = validator.Validate(cmd);
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(e => e.PropertyName == "DeckId");
     }
 
     [Fact]
@@ -160,7 +190,10 @@ public class CommandValidatorTests
         var validator = new ExportDeckValidator();
         var cmd = new ExportDeckQuery(Guid.NewGuid(), "");
 
-        validator.Validate(cmd).IsValid.Should().BeFalse();
+        var result = validator.Validate(cmd);
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(e => e.PropertyName == "Format");
     }
 
     [Fact]
@@ -169,6 +202,9 @@ public class CommandValidatorTests
         var validator = new GetDeckStatsValidator();
         var cmd = new GetDeckStatsQuery(Guid.Empty);
 
-        validator.Validate(cmd).IsValid.Should().BeFalse();
+        var result = validator.Validate(cmd);
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(e => e.PropertyName == "DeckId");
     }
 }

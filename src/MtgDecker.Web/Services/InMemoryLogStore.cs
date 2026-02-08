@@ -28,7 +28,7 @@ public class InMemoryLogStore
         if (handler != null)
         {
             try { handler.Invoke(); }
-            catch { /* Subscriber errors should not break logging */ }
+            catch (Exception) { /* Subscriber errors should not break logging */ }
         }
     }
 
@@ -43,24 +43,28 @@ public class InMemoryLogStore
 public class InMemoryLogProvider : ILoggerProvider
 {
     private readonly InMemoryLogStore _store;
+    private readonly TimeProvider _timeProvider;
 
-    public InMemoryLogProvider(InMemoryLogStore store)
+    public InMemoryLogProvider(InMemoryLogStore store, TimeProvider timeProvider)
     {
         _store = store;
+        _timeProvider = timeProvider;
     }
 
-    public ILogger CreateLogger(string categoryName) => new InMemoryLogger(_store, categoryName);
+    public ILogger CreateLogger(string categoryName) => new InMemoryLogger(_store, _timeProvider, categoryName);
 
     public void Dispose() { }
 
     private class InMemoryLogger : ILogger
     {
         private readonly InMemoryLogStore _store;
+        private readonly TimeProvider _timeProvider;
         private readonly string _category;
 
-        public InMemoryLogger(InMemoryLogStore store, string category)
+        public InMemoryLogger(InMemoryLogStore store, TimeProvider timeProvider, string category)
         {
             _store = store;
+            _timeProvider = timeProvider;
             _category = category;
         }
 
@@ -74,7 +78,7 @@ public class InMemoryLogProvider : ILoggerProvider
 
             _store.Add(new LogEntry
             {
-                Timestamp = DateTime.UtcNow,
+                Timestamp = _timeProvider.GetUtcNow().UtcDateTime,
                 Level = logLevel,
                 Category = _category,
                 Message = formatter(state, exception),

@@ -2,6 +2,8 @@ using MtgDecker.Domain.Entities;
 
 namespace MtgDecker.Domain.Services;
 
+public record CardShortage(string CardName, int Needed, int Owned, int Shortage);
+
 public static class ShortageCalculator
 {
     public static List<CardShortage> Calculate(

@@ -21,13 +21,14 @@ builder.Services.AddInfrastructure(
 // In-memory log viewer
 var logStore = new InMemoryLogStore();
 builder.Services.AddSingleton(logStore);
-builder.Logging.AddProvider(new InMemoryLogProvider(logStore));
+builder.Logging.AddProvider(new InMemoryLogProvider(logStore, TimeProvider.System));
 
 var app = builder.Build();
 
-// Auto-migrate database on startup
-using (var scope = app.Services.CreateScope())
+// Auto-migrate database on startup (dev only; use explicit migrations in production)
+if (app.Environment.IsDevelopment())
 {
+    using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<MtgDeckerDbContext>();
     db.Database.Migrate();
 }
