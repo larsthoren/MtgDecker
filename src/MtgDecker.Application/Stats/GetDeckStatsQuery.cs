@@ -13,7 +13,11 @@ public record DeckStats(
     Dictionary<int, int> ManaCurve,
     Dictionary<string, int> ColorDistribution,
     Dictionary<string, int> TypeBreakdown,
-    decimal TotalPriceUsd);
+    decimal TotalPriceUsd,
+    double AverageCmc,
+    int LandCount,
+    int SpellCount,
+    Dictionary<string, int> RarityBreakdown);
 
 public class GetDeckStatsHandler : IRequestHandler<GetDeckStatsQuery, DeckStats>
 {
@@ -38,16 +42,36 @@ public class GetDeckStatsHandler : IRequestHandler<GetDeckStatsQuery, DeckStats>
         var manaCurve = new Dictionary<int, int>();
         var colorDist = new Dictionary<string, int>();
         var typeBd = new Dictionary<string, int>();
+        var rarityBd = new Dictionary<string, int>();
+        double totalCmc = 0;
+        int nonLandCardCount = 0;
+        int landCount = 0;
+        int spellCount = 0;
 
         foreach (var entry in deck.Entries.Where(e => e.Category == DeckCategory.MainDeck))
         {
             if (!cards.TryGetValue(entry.CardId, out var card)) continue;
 
+            bool isLand = card.TypeLine.Contains("Land", StringComparison.OrdinalIgnoreCase);
+
             // Mana curve (lands excluded)
-            if (!card.TypeLine.Contains("Land", StringComparison.OrdinalIgnoreCase))
+            if (!isLand)
             {
                 var cmcKey = (int)Math.Min(card.Cmc, 7); // 7+ grouped
                 manaCurve[cmcKey] = manaCurve.GetValueOrDefault(cmcKey) + entry.Quantity;
+            }
+
+            // Land vs spell count
+            if (isLand)
+                landCount += entry.Quantity;
+            else
+                spellCount += entry.Quantity;
+
+            // Average CMC (exclude lands)
+            if (!isLand)
+            {
+                totalCmc += card.Cmc * entry.Quantity;
+                nonLandCardCount += entry.Quantity;
             }
 
             // Color distribution
@@ -64,6 +88,13 @@ public class GetDeckStatsHandler : IRequestHandler<GetDeckStatsQuery, DeckStats>
             var typeLine = card.TypeLine.Split('—')[0].Trim();
             var mainType = typeLine.Split(' ').Last(); // "Legendary Creature" -> "Creature"
             typeBd[mainType] = typeBd.GetValueOrDefault(mainType) + entry.Quantity;
+
+            // Rarity breakdown
+            if (!string.IsNullOrEmpty(card.Rarity))
+            {
+                var rarity = card.Rarity.ToLowerInvariant();
+                rarityBd[rarity] = rarityBd.GetValueOrDefault(rarity) + entry.Quantity;
+            }
         }
 
         var countableEntries = deck.Entries.Where(e => e.Category != DeckCategory.Maybeboard).ToList();
@@ -82,6 +113,10 @@ public class GetDeckStatsHandler : IRequestHandler<GetDeckStatsQuery, DeckStats>
             manaCurve,
             colorDist,
             typeBd,
-            totalPrice);
+            totalPrice,
+            nonLandCardCount > 0 ? totalCmc / nonLandCardCount : 0,
+            landCount,
+            spellCount,
+            rarityBd);
     }
 }

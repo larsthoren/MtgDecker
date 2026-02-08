@@ -55,11 +55,22 @@ else
                               InputLabels="@_colorLabels" Width="120px" Height="120px" />
                 </MudItem>
                 <MudItem xs="12" md="4">
-                    <MudText Typo="Typo.subtitle2" Class="mb-1">Types</MudText>
-                    @foreach (var type in (_stats.TypeBreakdown ?? new()))
-                    {
-                        <MudText Typo="Typo.body2">@type.Key: @type.Value</MudText>
-                    }
+                    <MudText Typo="Typo.subtitle2" Class="mb-1">Deck Info</MudText>
+                    <MudStack Spacing="1">
+                        @foreach (var type in (_stats.TypeBreakdown ?? new()))
+                        {
+                            <MudText Typo="Typo.body2">@type.Key: @type.Value</MudText>
+                        }
+                        <MudDivider Class="my-1" />
+                        <MudText Typo="Typo.body2">Avg CMC: @_stats.AverageCmc.ToString("F2")</MudText>
+                        <MudText Typo="Typo.body2">Lands: @_stats.LandCount | Spells: @_stats.SpellCount</MudText>
+                        @if (_stats.RarityBreakdown.Count > 0)
+                        {
+                            <MudText Typo="Typo.body2">
+                                @string.Join(" | ", _stats.RarityBreakdown.OrderBy(r => r.Key).Select(r => $"{r.Key}: {r.Value}"))
+                            </MudText>
+                        }
+                    </MudStack>
                 </MudItem>
             </MudGrid>
         </MudPaper>

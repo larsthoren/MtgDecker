@@ -121,4 +121,103 @@ public class GetDeckStatsQueryTests
 
         await act.Should().ThrowAsync<KeyNotFoundException>();
     }
+
+    [Fact]
+    public async Task Handle_CalculatesAverageCmc()
+    {
+        var bolt = new Card { Id = Guid.NewGuid(), Name = "Bolt", Cmc = 1, TypeLine = "Instant", Rarity = "common", SetCode = "tst", SetName = "Test", ScryfallId = "a", OracleId = "a" };
+        var jace = new Card { Id = Guid.NewGuid(), Name = "Jace", Cmc = 4, TypeLine = "Planeswalker", Rarity = "mythic", SetCode = "tst", SetName = "Test", ScryfallId = "b", OracleId = "b" };
+        var deck = new Deck
+        {
+            Id = Guid.NewGuid(), Name = "Test", Format = Format.Modern, UserId = Guid.NewGuid(),
+            Entries = new List<DeckEntry>
+            {
+                new() { Id = Guid.NewGuid(), CardId = bolt.Id, Quantity = 4, Category = DeckCategory.MainDeck },
+                new() { Id = Guid.NewGuid(), CardId = jace.Id, Quantity = 2, Category = DeckCategory.MainDeck }
+            }
+        };
+
+        _deckRepo.GetByIdAsync(deck.Id, Arg.Any<CancellationToken>()).Returns(deck);
+        _cardRepo.GetByIdsAsync(Arg.Any<IEnumerable<Guid>>(), Arg.Any<CancellationToken>())
+            .Returns(new List<Card> { bolt, jace });
+
+        var result = await _handler.Handle(new GetDeckStatsQuery(deck.Id), CancellationToken.None);
+
+        // (4*1 + 2*4) / 6 = 12/6 = 2.0
+        result.AverageCmc.Should().BeApproximately(2.0, 0.01);
+    }
+
+    [Fact]
+    public async Task Handle_AverageCmc_ExcludesLands()
+    {
+        var bolt = new Card { Id = Guid.NewGuid(), Name = "Bolt", Cmc = 1, TypeLine = "Instant", Rarity = "common", SetCode = "tst", SetName = "Test", ScryfallId = "a", OracleId = "a" };
+        var mountain = new Card { Id = Guid.NewGuid(), Name = "Mountain", Cmc = 0, TypeLine = "Basic Land — Mountain", Rarity = "common", SetCode = "tst", SetName = "Test", ScryfallId = "b", OracleId = "b" };
+        var deck = new Deck
+        {
+            Id = Guid.NewGuid(), Name = "Test", Format = Format.Modern, UserId = Guid.NewGuid(),
+            Entries = new List<DeckEntry>
+            {
+                new() { Id = Guid.NewGuid(), CardId = bolt.Id, Quantity = 4, Category = DeckCategory.MainDeck },
+                new() { Id = Guid.NewGuid(), CardId = mountain.Id, Quantity = 20, Category = DeckCategory.MainDeck }
+            }
+        };
+
+        _deckRepo.GetByIdAsync(deck.Id, Arg.Any<CancellationToken>()).Returns(deck);
+        _cardRepo.GetByIdsAsync(Arg.Any<IEnumerable<Guid>>(), Arg.Any<CancellationToken>())
+            .Returns(new List<Card> { bolt, mountain });
+
+        var result = await _handler.Handle(new GetDeckStatsQuery(deck.Id), CancellationToken.None);
+
+        result.AverageCmc.Should().BeApproximately(1.0, 0.01);
+    }
+
+    [Fact]
+    public async Task Handle_CalculatesLandAndSpellCounts()
+    {
+        var bolt = new Card { Id = Guid.NewGuid(), Name = "Bolt", Cmc = 1, TypeLine = "Instant", Rarity = "common", SetCode = "tst", SetName = "Test", ScryfallId = "a", OracleId = "a" };
+        var mountain = new Card { Id = Guid.NewGuid(), Name = "Mountain", Cmc = 0, TypeLine = "Basic Land — Mountain", Rarity = "common", SetCode = "tst", SetName = "Test", ScryfallId = "b", OracleId = "b" };
+        var deck = new Deck
+        {
+            Id = Guid.NewGuid(), Name = "Test", Format = Format.Modern, UserId = Guid.NewGuid(),
+            Entries = new List<DeckEntry>
+            {
+                new() { Id = Guid.NewGuid(), CardId = bolt.Id, Quantity = 36, Category = DeckCategory.MainDeck },
+                new() { Id = Guid.NewGuid(), CardId = mountain.Id, Quantity = 24, Category = DeckCategory.MainDeck }
+            }
+        };
+
+        _deckRepo.GetByIdAsync(deck.Id, Arg.Any<CancellationToken>()).Returns(deck);
+        _cardRepo.GetByIdsAsync(Arg.Any<IEnumerable<Guid>>(), Arg.Any<CancellationToken>())
+            .Returns(new List<Card> { bolt, mountain });
+
+        var result = await _handler.Handle(new GetDeckStatsQuery(deck.Id), CancellationToken.None);
+
+        result.LandCount.Should().Be(24);
+        result.SpellCount.Should().Be(36);
+    }
+
+    [Fact]
+    public async Task Handle_CalculatesRarityBreakdown()
+    {
+        var common = new Card { Id = Guid.NewGuid(), Name = "Bolt", TypeLine = "Instant", Rarity = "common", SetCode = "tst", SetName = "Test", ScryfallId = "a", OracleId = "a" };
+        var rare = new Card { Id = Guid.NewGuid(), Name = "Jace", TypeLine = "Planeswalker", Rarity = "rare", SetCode = "tst", SetName = "Test", ScryfallId = "b", OracleId = "b" };
+        var deck = new Deck
+        {
+            Id = Guid.NewGuid(), Name = "Test", Format = Format.Modern, UserId = Guid.NewGuid(),
+            Entries = new List<DeckEntry>
+            {
+                new() { Id = Guid.NewGuid(), CardId = common.Id, Quantity = 4, Category = DeckCategory.MainDeck },
+                new() { Id = Guid.NewGuid(), CardId = rare.Id, Quantity = 2, Category = DeckCategory.MainDeck }
+            }
+        };
+
+        _deckRepo.GetByIdAsync(deck.Id, Arg.Any<CancellationToken>()).Returns(deck);
+        _cardRepo.GetByIdsAsync(Arg.Any<IEnumerable<Guid>>(), Arg.Any<CancellationToken>())
+            .Returns(new List<Card> { common, rare });
+
+        var result = await _handler.Handle(new GetDeckStatsQuery(deck.Id), CancellationToken.None);
+
+        result.RarityBreakdown["common"].Should().Be(4);
+        result.RarityBreakdown["rare"].Should().Be(2);
+    }
 }
