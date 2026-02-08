@@ -1,5 +1,4 @@
 @page "/cards"
-@rendermode InteractiveServer
 @inject IMediator Mediator
 
 <PageTitle>Card Search - MtgDecker</PageTitle>
@@ -84,18 +83,19 @@
         @foreach (var card in _cards)
         {
             <MudItem xs="6" sm="4" md="3" lg="2">
-                <MudCard Class="cursor-pointer" @onclick="() => ShowCardDetail(card)">
+                <div class="cursor-pointer" @onclick="() => ShowCardDetail(card)">
                     @if (!string.IsNullOrEmpty(card.ImageUri))
                     {
-                        <MudCardMedia Image="@card.ImageUri" Height="300" />
+                        <img src="@card.ImageUri" alt="@card.Name" loading="lazy"
+                             style="width: 100%; border-radius: 8px; display: block;" />
                     }
                     else
                     {
-                        <MudCardContent Style="height: 300px;" Class="d-flex align-center justify-center">
+                        <MudPaper Style="aspect-ratio: 5/7;" Class="d-flex align-center justify-center rounded-lg">
                             <MudText Typo="Typo.body2" Align="Align.Center">@card.Name</MudText>
-                        </MudCardContent>
+                        </MudPaper>
                     }
-                </MudCard>
+                </div>
             </MudItem>
         }
     </MudGrid>

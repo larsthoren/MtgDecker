@@ -13,7 +13,7 @@ public class CardFaceConfiguration : IEntityTypeConfiguration<CardFace>
         builder.Property(f => f.Name).HasMaxLength(300).IsRequired();
         builder.Property(f => f.ManaCost).HasMaxLength(50);
         builder.Property(f => f.TypeLine).HasMaxLength(200);
-        builder.Property(f => f.OracleText).HasMaxLength(1000);
+        builder.Property(f => f.OracleText).HasColumnType("nvarchar(max)");
         builder.Property(f => f.ImageUri).HasMaxLength(500);
         builder.Property(f => f.Power).HasMaxLength(10);
         builder.Property(f => f.Toughness).HasMaxLength(10);

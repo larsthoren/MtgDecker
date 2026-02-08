@@ -1,4 +1,6 @@
 @using MtgDecker.Domain.Entities
+@inject IMediator Mediator
+@inject ISnackbar Snackbar
 
 <MudDialog>
     <TitleContent>
@@ -31,6 +33,57 @@
 
                     <MudDivider />
 
+                    @* Ownership & Deck Info *@
+                    <MudPaper Class="pa-3" Elevation="0" Outlined="true">
+                        <MudStack Spacing="2">
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                <MudIcon Icon="@Icons.Material.Filled.CollectionsBookmark" Size="Size.Small" />
+                                <MudText Typo="Typo.body2"><b>Collection:</b></MudText>
+                                <MudIconButton Icon="@Icons.Material.Filled.Remove" Size="Size.Small"
+                                               Disabled="@(_collectionTotal <= 0)"
+                                               OnClick="RemoveOneFromCollection" />
+                                <MudText Typo="Typo.body1"><b>@_collectionTotal</b></MudText>
+                                <MudIconButton Icon="@Icons.Material.Filled.Add" Size="Size.Small"
+                                               Color="Color.Primary"
+                                               OnClick="AddToCollection" />
+                            </MudStack>
+                            @if (_deckUsage.Count > 0)
+                            {
+                                <MudStack Row="true" AlignItems="AlignItems.Start">
+                                    <MudIcon Icon="@Icons.Material.Filled.LibraryBooks" Size="Size.Small" Class="mt-1" />
+                                    <MudStack Spacing="0">
+                                        <MudText Typo="Typo.body2"><b>In Decks:</b></MudText>
+                                        @foreach (var usage in _deckUsage)
+                                        {
+                                            <MudText Typo="Typo.body2" Class="ml-2">@usage.DeckName — @usage.Quantity copies</MudText>
+                                        }
+                                    </MudStack>
+                                </MudStack>
+                            }
+                            else
+                            {
+                                <MudStack Row="true" AlignItems="AlignItems.Center">
+                                    <MudIcon Icon="@Icons.Material.Filled.LibraryBooks" Size="Size.Small" />
+                                    <MudText Typo="Typo.body2"><b>In Decks:</b> None</MudText>
+                                </MudStack>
+                            }
+                        </MudStack>
+                    </MudPaper>
+
+                    @* Add to Deck *@
+                    @if (_decks.Count > 0)
+                    {
+                        <MudMenu Label="Add to Deck" Variant="Variant.Filled" Color="Color.Secondary"
+                                 Size="Size.Small" StartIcon="@Icons.Material.Filled.PlaylistAdd">
+                            @foreach (var deck in _decks)
+                            {
+                                <MudMenuItem OnClick="() => AddToDeck(deck)">@deck.Name (@deck.Format)</MudMenuItem>
+                            }
+                        </MudMenu>
+                    }
+
+                    <MudDivider />
+
                     <MudText Typo="Typo.body2">
                         <b>Set:</b> @Card.SetName (@Card.SetCode.ToUpperInvariant())
                         @if (!string.IsNullOrEmpty(Card.CollectorNumber))
@@ -57,7 +110,7 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                @foreach (var legality in Card.Legalities)
+                                @foreach (var legality in Card.Legalities.Where(l => _displayFormats.Contains(l.FormatName)))
                                 {
                                     <tr>
                                         <td>@legality.FormatName</td>
@@ -104,6 +157,108 @@
     [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
     [Parameter] public Card Card { get; set; } = default!;
 
+    private static readonly Guid UserId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+
+    private int _collectionTotal;
+    private List<MtgDecker.Domain.Entities.CollectionEntry> _collectionEntries = new();
+    private List<DeckUsageInfo> _deckUsage = new();
+    private List<Deck> _decks = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadOwnershipInfo();
+    }
+
+    private async Task LoadOwnershipInfo()
+    {
+        // Collection entries for this card
+        var allEntries = await Mediator.Send(
+            new MtgDecker.Application.Collection.SearchCollectionQuery(UserId));
+        _collectionEntries = allEntries.Where(e => e.CardId == Card.Id).ToList();
+        _collectionTotal = _collectionEntries.Sum(e => e.Quantity);
+
+        // Deck usage
+        _decks = await Mediator.Send(new MtgDecker.Application.Decks.ListDecksQuery(UserId));
+        _deckUsage = new();
+        foreach (var deck in _decks)
+        {
+            var fullDeck = await Mediator.Send(new MtgDecker.Application.Decks.GetDeckQuery(deck.Id));
+            if (fullDeck == null) continue;
+            var entry = fullDeck.Entries.FirstOrDefault(e => e.CardId == Card.Id);
+            if (entry != null)
+            {
+                _deckUsage.Add(new DeckUsageInfo(fullDeck.Name, fullDeck.Format.ToString(), entry.Quantity));
+            }
+        }
+    }
+
+    private async Task AddToCollection()
+    {
+        if (_collectionEntries.Count > 0)
+        {
+            // Increment existing entry
+            var entry = _collectionEntries[0];
+            await Mediator.Send(new MtgDecker.Application.Collection.UpdateCollectionEntryCommand(
+                entry.Id, entry.Quantity + 1, entry.IsFoil, entry.Condition));
+            entry.Quantity++;
+        }
+        else
+        {
+            // Create new entry
+            var newEntry = await Mediator.Send(new MtgDecker.Application.Collection.AddToCollectionCommand(
+                UserId, Card.Id, 1, false, MtgDecker.Domain.Enums.CardCondition.NearMint));
+            _collectionEntries.Add(newEntry);
+        }
+        _collectionTotal = _collectionEntries.Sum(e => e.Quantity);
+        Snackbar.Add($"Added {Card.Name} to collection", Severity.Success);
+    }
+
+    private async Task RemoveOneFromCollection()
+    {
+        if (_collectionEntries.Count == 0) return;
+
+        var entry = _collectionEntries[0];
+        if (entry.Quantity > 1)
+        {
+            await Mediator.Send(new MtgDecker.Application.Collection.UpdateCollectionEntryCommand(
+                entry.Id, entry.Quantity - 1, entry.IsFoil, entry.Condition));
+            entry.Quantity--;
+        }
+        else
+        {
+            await Mediator.Send(new MtgDecker.Application.Collection.RemoveFromCollectionCommand(entry.Id));
+            _collectionEntries.Remove(entry);
+        }
+        _collectionTotal = _collectionEntries.Sum(e => e.Quantity);
+        Snackbar.Add($"Removed {Card.Name} from collection", Severity.Info);
+    }
+
+    private async Task AddToDeck(Deck deck)
+    {
+        try
+        {
+            await Mediator.Send(new MtgDecker.Application.Decks.AddCardToDeckCommand(
+                deck.Id, Card.Id, 1, MtgDecker.Domain.Enums.DeckCategory.MainDeck));
+
+            var existing = _deckUsage.FirstOrDefault(d => d.DeckName == deck.Name);
+            if (existing != null)
+            {
+                _deckUsage.Remove(existing);
+                _deckUsage.Add(existing with { Quantity = existing.Quantity + 1 });
+            }
+            else
+            {
+                _deckUsage.Add(new DeckUsageInfo(deck.Name, deck.Format.ToString(), 1));
+            }
+
+            Snackbar.Add($"Added {Card.Name} to {deck.Name}", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+
     private void Cancel() => MudDialog.Cancel();
 
     private Color GetLegalityColor(MtgDecker.Domain.Enums.LegalityStatus status) => status switch
@@ -113,4 +268,11 @@
         MtgDecker.Domain.Enums.LegalityStatus.Banned => Color.Error,
         _ => Color.Default
     };
+
+    private static readonly HashSet<string> _displayFormats = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "legacy", "vintage", "modern", "premodern", "pauper", "oldschool", "commander"
+    };
+
+    private record DeckUsageInfo(string DeckName, string Format, int Quantity);
 }

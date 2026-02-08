@@ -15,7 +15,7 @@ public class CardConfiguration : IEntityTypeConfiguration<Card>
         builder.Property(c => c.Name).HasMaxLength(300).IsRequired();
         builder.Property(c => c.ManaCost).HasMaxLength(50);
         builder.Property(c => c.TypeLine).HasMaxLength(200).IsRequired();
-        builder.Property(c => c.OracleText).HasMaxLength(1000);
+        builder.Property(c => c.OracleText).HasColumnType("nvarchar(max)");
         builder.Property(c => c.Colors).HasMaxLength(20);
         builder.Property(c => c.ColorIdentity).HasMaxLength(20);
         builder.Property(c => c.Rarity).HasMaxLength(20).IsRequired();
