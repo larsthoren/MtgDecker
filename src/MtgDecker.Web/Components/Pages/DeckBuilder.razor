@@ -2,6 +2,7 @@
 @inject IMediator Mediator
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
 
 <PageTitle>Deck Builder - MtgDecker</PageTitle>
 
@@ -15,6 +16,11 @@ else
         <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" OnClick="@(() => Navigation.NavigateTo("/decks"))" />
         <MudText Typo="Typo.h5">@_deck.Name</MudText>
         <MudChip T="string" Size="Size.Small" Color="Color.Primary">@_deck.Format</MudChip>
+        <MudButton Variant="Variant.Outlined" Color="Color.Tertiary"
+                   StartIcon="@Icons.Material.Filled.Casino"
+                   OnClick="OpenPlaytest" Size="Size.Small">
+            Playtest
+        </MudButton>
         <MudSpacer />
         <MudText Typo="Typo.body2">
             Main: @_deck.TotalMainDeckCount
@@ -364,4 +370,20 @@ else
         _cardData.TryGetValue(cardId, out var card) ? card.PriceUsd : null;
 
     private int GetShortage(Guid cardId) => _shortages.GetValueOrDefault(cardId, 0);
+
+    private async Task OpenPlaytest()
+    {
+        var parameters = new DialogParameters<PlaytestDialog>
+        {
+            { x => x.DeckId, DeckId },
+            { x => x.DeckName, _deck?.Name ?? "" }
+        };
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Large,
+            FullWidth = true,
+            CloseOnEscapeKey = true
+        };
+        await DialogService.ShowAsync<PlaytestDialog>("Playtest", parameters, options);
+    }
 }

@@ -1,0 +1,119 @@
+@using MtgDecker.Domain.Entities
+@using MtgDecker.Domain.Services
+@inject IMediator Mediator
+
+<MudDialog>
+    <TitleContent>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudText Typo="Typo.h6">Playtest: @DeckName</MudText>
+            @if (_simulator != null)
+            {
+                <MudChip T="string" Size="Size.Small">Library: @_simulator.LibraryCount</MudChip>
+                <MudChip T="string" Size="Size.Small" Color="Color.Info">Turn: @_turnCount</MudChip>
+                @if (_simulator.MulliganCount > 0)
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Warning">
+                        Mulligan @_simulator.MulliganCount
+                    </MudChip>
+                }
+            }
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" />
+        }
+        else if (_simulator != null)
+        {
+            <MudText Typo="Typo.subtitle2" Class="mb-2">Hand (@_simulator.Hand.Count cards)</MudText>
+            <MudGrid>
+                @foreach (var cardId in _simulator.Hand)
+                {
+                    @if (_cards.TryGetValue(cardId, out var card))
+                    {
+                        <MudItem xs="6" sm="4" md="3">
+                            @if (!string.IsNullOrEmpty(card.ImageUri))
+                            {
+                                <img src="@card.ImageUri" alt="@card.Name" loading="lazy"
+                                     style="width: 100%; border-radius: 8px; display: block;" />
+                            }
+                            else
+                            {
+                                <MudPaper Style="aspect-ratio: 5/7;" Class="d-flex align-center justify-center rounded-lg">
+                                    <MudText Typo="Typo.body2" Align="Align.Center">@card.Name</MudText>
+                                </MudPaper>
+                            }
+                        </MudItem>
+                    }
+                }
+            </MudGrid>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="NewGame" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Refresh">
+            New Hand
+        </MudButton>
+        <MudButton OnClick="MulliganHand" Variant="Variant.Outlined" Color="Color.Warning"
+                   Disabled="@(_simulator == null || _simulator.MulliganCount >= 6)"
+                   StartIcon="@Icons.Material.Filled.Replay">
+            Mulligan (@(7 - (_simulator?.MulliganCount ?? 0) - 1))
+        </MudButton>
+        <MudButton OnClick="DrawNext" Variant="Variant.Outlined" Color="Color.Primary"
+                   Disabled="@(_simulator == null || _simulator.LibraryCount == 0)"
+                   StartIcon="@Icons.Material.Filled.Style">
+            Draw
+        </MudButton>
+        <MudSpacer />
+        <MudButton OnClick="Close">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public Guid DeckId { get; set; }
+    [Parameter] public string DeckName { get; set; } = string.Empty;
+
+    private SampleHandSimulator? _simulator;
+    private Dictionary<Guid, Card> _cards = new();
+    private bool _loading = true;
+    private int _turnCount = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var deck = await Mediator.Send(new MtgDecker.Application.Decks.GetDeckQuery(DeckId));
+        if (deck == null) return;
+
+        var cardIds = deck.Entries.Select(e => e.CardId).Distinct().ToList();
+        var cards = await Mediator.Send(new MtgDecker.Application.Cards.GetCardsByIdsQuery(cardIds));
+        _cards = cards.ToDictionary(c => c.Id);
+
+        var mainDeckEntries = deck.Entries
+            .Where(e => e.Category == MtgDecker.Domain.Enums.DeckCategory.MainDeck)
+            .Select(e => (e.CardId, e.Quantity))
+            .ToList();
+
+        _simulator = SampleHandSimulator.FromDeckEntries(mainDeckEntries);
+        _simulator.NewGame();
+        _loading = false;
+    }
+
+    private void NewGame()
+    {
+        _simulator?.NewGame();
+        _turnCount = 0;
+    }
+
+    private void MulliganHand()
+    {
+        _simulator?.Mulligan();
+    }
+
+    private void DrawNext()
+    {
+        if (_simulator?.DrawCard() == true)
+            _turnCount++;
+    }
+
+    private void Close() => MudDialog.Cancel();
+}
