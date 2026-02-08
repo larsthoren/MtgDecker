@@ -6,6 +6,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="*" />
     <PackageReference Include="MudBlazor" Version="8.15.0" />
   </ItemGroup>
 
