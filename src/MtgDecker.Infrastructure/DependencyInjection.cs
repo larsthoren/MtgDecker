@@ -1,6 +1,8 @@
+using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using MtgDecker.Application.Interfaces;
+using MtgDecker.Infrastructure.Behaviors;
 using MtgDecker.Infrastructure.Data;
 using MtgDecker.Infrastructure.Data.Repositories;
 using MtgDecker.Infrastructure.Parsers;
@@ -14,6 +16,9 @@ public static class DependencyInjection
     {
         services.AddDbContext<MtgDeckerDbContext>(options =>
             options.UseSqlServer(connectionString));
+
+        // Clear EF change tracker before each MediatR request (Blazor Server long-lived scope fix)
+        services.AddTransient(typeof(IPipelineBehavior<,>), typeof(DbContextResetBehavior<,>));
 
         services.AddScoped<ICardRepository, CardRepository>();
         services.AddScoped<IDeckRepository, DeckRepository>();

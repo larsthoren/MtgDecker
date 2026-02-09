@@ -50,7 +50,6 @@ public static class ScryfallCardMapper
             {
                 card.Faces.Add(new CardFace
                 {
-                    Id = Guid.NewGuid(),
                     Name = face.Name,
                     ManaCost = face.ManaCost,
                     TypeLine = face.TypeLine,

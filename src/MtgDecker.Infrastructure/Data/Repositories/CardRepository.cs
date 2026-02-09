@@ -160,7 +160,6 @@ public class CardRepository : ICardRepository
         }
 
         await _context.SaveChangesAsync(ct);
-        _context.ChangeTracker.Clear();
     }
 
     public async Task<List<SetInfo>> GetDistinctSetsAsync(string searchText, CancellationToken ct = default)

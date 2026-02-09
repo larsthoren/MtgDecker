@@ -93,6 +93,17 @@ tests/
 - **Card images**: Scryfall CDN links stored on Card entity, not downloaded locally.
 - **Single-user**: Hardcoded UserId in Web layer, data model supports multi-user.
 
+## Critical: EF Core + Blazor Server Pitfalls
+
+**Never set `Id = Guid.NewGuid()` on entities added to tracked navigation properties.**
+EF Core treats Guid keys as `ValueGeneratedOnAdd` by convention. When an untracked entity with a non-default key (e.g. `Guid.NewGuid()`) is discovered in a tracked collection during `DetectChanges`, EF marks it as `Modified` (existing) instead of `Added` (new), causing a failed UPDATE instead of INSERT. Leave the `Id` as `Guid.Empty` — EF will generate it on insert. This only applies to entities added via navigation properties; explicit `context.Add()` correctly forces `Added` state regardless of key value.
+
+**DbContext is scoped per-circuit in Blazor Server (long-lived).**
+A `DbContextResetBehavior` MediatR pipeline clears the change tracker before each request to prevent stale entity state across requests. Do not remove this behavior. If adding new repositories or handlers, ensure they don't rely on cross-request change tracking.
+
+**Use `CultureInfo.InvariantCulture` for all price/decimal formatting.**
+`ToString("F2")` without a culture uses the thread's current culture, which may use comma decimal separators. Always pass `CultureInfo.InvariantCulture`. The `System.Globalization` namespace is imported in `_Imports.razor`.
+
 ## Conventions
 
 - TDD: Write failing test first, implement minimal code, refactor.

@@ -50,7 +50,6 @@ public class Deck
 
             Entries.Add(new DeckEntry
             {
-                Id = Guid.NewGuid(),
                 DeckId = Id,
                 CardId = card.Id,
                 Quantity = quantity,
@@ -110,7 +109,6 @@ public class Deck
         {
             Entries.Add(new DeckEntry
             {
-                Id = Guid.NewGuid(),
                 DeckId = Id,
                 CardId = card.Id,
                 Quantity = quantity,
