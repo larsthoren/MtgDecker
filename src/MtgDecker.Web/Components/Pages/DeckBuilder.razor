@@ -35,7 +35,7 @@ else
             }
             @if (_stats?.TotalPriceUsd > 0)
             {
-                <span> | $@_stats.TotalPriceUsd.ToString("F2")</span>
+                <span> | $@_stats.TotalPriceUsd.ToString("F2", CultureInfo.InvariantCulture)</span>
             }
         </MudText>
     </MudStack>
@@ -63,7 +63,7 @@ else
                             <MudText Typo="Typo.body2">@type.Key: @type.Value</MudText>
                         }
                         <MudDivider Class="my-1" />
-                        <MudText Typo="Typo.body2">Avg CMC: @_stats.AverageCmc.ToString("F2")</MudText>
+                        <MudText Typo="Typo.body2">Avg CMC: @_stats.AverageCmc.ToString("F2", CultureInfo.InvariantCulture)</MudText>
                         <MudText Typo="Typo.body2">Lands: @_stats.LandCount | Spells: @_stats.SpellCount</MudText>
                         @if (_stats.RarityBreakdown.Count > 0)
                         {
@@ -108,7 +108,7 @@ else
                                 }
                                 <MudStack Spacing="0" Class="flex-grow-1">
                                     <MudText Typo="Typo.body2"><b>@card.Name</b></MudText>
-                                    <MudText Typo="Typo.caption">@card.ManaCost @card.TypeLine</MudText>
+                                    <MudText Typo="Typo.caption">@card.ManaCost @card.TypeLine · @card.SetCode.ToUpperInvariant()</MudText>
                                 </MudStack>
                                 <MudIconButton Icon="@Icons.Material.Filled.Add" Size="Size.Small"
                                                Color="Color.Primary"
@@ -146,7 +146,7 @@ else
                                     @if (price.HasValue)
                                     {
                                         <span style="color: var(--mud-palette-text-secondary); font-size: 0.8em;">
-                                            ($@((price.Value * entry.Quantity).ToString("F2")))
+                                            ($@((price.Value * entry.Quantity).ToString("F2", CultureInfo.InvariantCulture)))
                                         </span>
                                     }
                                 </MudText>
@@ -301,6 +301,7 @@ else
             _stats = await Mediator.Send(new MtgDecker.Application.Stats.GetDeckStatsQuery(DeckId));
             UpdateChartData();
         }
+        catch (OperationCanceledException) { }
         catch (Exception ex) { Logger.LogWarning(ex, "Failed to load deck stats"); }
     }
 
@@ -319,6 +320,7 @@ else
                     return shortageList.FirstOrDefault(s => s.CardName == name)?.Shortage ?? 0;
                 });
         }
+        catch (OperationCanceledException) { }
         catch (Exception ex) { Logger.LogWarning(ex, "Failed to load deck shortages"); }
     }
 
@@ -352,15 +354,27 @@ else
     {
         if (string.IsNullOrWhiteSpace(_searchText)) return;
 
-        _searchLoading = true;
-        var result = await Mediator.Send(new MtgDecker.Application.Cards.SearchCardsQuery(
-            new MtgDecker.Application.Interfaces.CardSearchFilter
-            {
-                SearchText = _searchText,
-                PageSize = 20
-            }));
-        _searchResults = result.Cards;
-        _searchLoading = false;
+        try
+        {
+            _searchLoading = true;
+            var result = await Mediator.Send(new MtgDecker.Application.Cards.SearchCardsQuery(
+                new MtgDecker.Application.Interfaces.CardSearchFilter
+                {
+                    SearchText = _searchText,
+                    PageSize = 20
+                }));
+            _searchResults = result.Cards;
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to search cards");
+            Snackbar.Add("Failed to search cards. Please try again.", Severity.Error);
+        }
+        finally
+        {
+            _searchLoading = false;
+        }
     }
 
     private async Task AddCardToDeck(MtgDecker.Domain.Entities.Card card, MtgDecker.Domain.Enums.DeckCategory category)
@@ -370,6 +384,7 @@ else
             _deck = await Mediator.Send(new MtgDecker.Application.Decks.AddCardToDeckCommand(
                 DeckId, card.Id, 1, category));
             _cardNames[card.Id] = card.Name;
+            _cardData[card.Id] = card;
             await LoadStats();
             await LoadShortages();
             Snackbar.Add($"Added {card.Name}", Severity.Success);
@@ -406,7 +421,11 @@ else
         try
         {
             _deck = await Mediator.Send(new MtgDecker.Application.Decks.RemoveCardFromDeckCommand(DeckId, cardId, category));
-            _cardNames.Remove(cardId);
+            if (_deck.Entries.All(e => e.CardId != cardId))
+            {
+                _cardNames.Remove(cardId);
+                _cardData.Remove(cardId);
+            }
             await LoadStats();
             await LoadShortages();
         }

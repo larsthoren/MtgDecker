@@ -47,7 +47,7 @@ else
                 <b>Unique Cards:</b> @_displayEntries.Count
             </MudText>
             <MudText Typo="Typo.body1">
-                <b>Collection Value:</b> $@(_displayEntries.Where(e => e.Price.HasValue).Sum(e => e.Price!.Value * e.Quantity).ToString("F2"))
+                <b>Collection Value:</b> $@(_displayEntries.Where(e => e.Price.HasValue).Sum(e => e.Price!.Value * e.Quantity).ToString("F2", CultureInfo.InvariantCulture))
             </MudText>
         </MudStack>
     </MudPaper>
@@ -116,6 +116,7 @@ else
                 });
             }
         }
+        catch (OperationCanceledException) { }
         catch (Exception ex)
         {
             Logger.LogWarning(ex, "Failed to load collection");
@@ -197,7 +198,7 @@ else
         public string Foil { get; set; } = "No";
         public string Condition { get; set; } = string.Empty;
         public decimal? Price { get; set; }
-        public string PriceDisplay => Price.HasValue ? $"${Price.Value:F2}" : "—";
-        public string TotalValueDisplay => Price.HasValue ? $"${(Price.Value * Quantity):F2}" : "—";
+        public string PriceDisplay => Price.HasValue ? $"${Price.Value.ToString("F2", CultureInfo.InvariantCulture)}" : "—";
+        public string TotalValueDisplay => Price.HasValue ? $"${(Price.Value * Quantity).ToString("F2", CultureInfo.InvariantCulture)}" : "—";
     }
 }

@@ -387,6 +387,38 @@ public class CommandValidatorTests
         result.IsValid.Should().BeTrue();
     }
 
+    [Fact]
+    public void SearchCards_NegativeMinCmc_Fails()
+    {
+        var validator = new SearchCardsValidator();
+        var filter = new CardSearchFilter { MinCmc = -1 };
+        var result = validator.Validate(new SearchCardsQuery(filter));
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(e => e.PropertyName == "Filter.MinCmc");
+    }
+
+    [Fact]
+    public void SearchCards_NegativeMaxCmc_Fails()
+    {
+        var validator = new SearchCardsValidator();
+        var filter = new CardSearchFilter { MaxCmc = -5 };
+        var result = validator.Validate(new SearchCardsQuery(filter));
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(e => e.PropertyName == "Filter.MaxCmc");
+    }
+
+    [Fact]
+    public void SearchCards_ZeroCmc_Passes()
+    {
+        var validator = new SearchCardsValidator();
+        var filter = new CardSearchFilter { MinCmc = 0, MaxCmc = 0 };
+        var result = validator.Validate(new SearchCardsQuery(filter));
+
+        result.IsValid.Should().BeTrue();
+    }
+
     // ── SearchSetNames validator tests ───────────────────────────────────
 
     [Fact]

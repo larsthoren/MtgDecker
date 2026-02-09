@@ -15,7 +15,7 @@
                           Immediate="false" OnKeyUp="OnSearchKeyUp" />
         </MudItem>
         <MudItem xs="12" sm="6" md="2">
-            <MudSelect @bind-Value="_format" Label="Format" Variant="Variant.Outlined" Clearable="true">
+            <MudSelect T="string" Value="_format" ValueChanged="OnFormatChanged" Label="Format" Variant="Variant.Outlined" Clearable="true">
                 <MudSelectItem Value="@("modern")">Modern</MudSelectItem>
                 <MudSelectItem Value="@("legacy")">Legacy</MudSelectItem>
                 <MudSelectItem Value="@("vintage")">Vintage</MudSelectItem>
@@ -25,7 +25,7 @@
             </MudSelect>
         </MudItem>
         <MudItem xs="12" sm="6" md="2">
-            <MudSelect @bind-Value="_rarity" Label="Rarity" Variant="Variant.Outlined" Clearable="true">
+            <MudSelect T="string" Value="_rarity" ValueChanged="OnRarityChanged" Label="Rarity" Variant="Variant.Outlined" Clearable="true">
                 <MudSelectItem Value="@("common")">Common</MudSelectItem>
                 <MudSelectItem Value="@("uncommon")">Uncommon</MudSelectItem>
                 <MudSelectItem Value="@("rare")">Rare</MudSelectItem>
@@ -35,13 +35,15 @@
         <MudItem xs="12" sm="6" md="2">
             <MudAutocomplete T="string" @bind-Value="_type" Label="Type" Variant="Variant.Outlined"
                              SearchFunc="SearchTypes" Clearable="true"
-                             Placeholder="e.g. Creature" DebounceInterval="300" />
+                             Placeholder="e.g. Creature" DebounceInterval="300"
+                             HelperText="Type 2+ chars to search" />
         </MudItem>
         <MudItem xs="12" sm="6" md="2">
             <MudAutocomplete T="MtgDecker.Application.Cards.SetInfo" @bind-Value="_selectedSet"
                              Label="Set" Variant="Variant.Outlined"
                              SearchFunc="SearchSets" ToStringFunc="@(s => s == null ? "" : $"{s.SetName} ({s.SetCode.ToUpperInvariant()})")"
-                             Clearable="true" Placeholder="e.g. Zendikar" DebounceInterval="300" />
+                             Clearable="true" Placeholder="e.g. Zendikar" DebounceInterval="300"
+                             HelperText="Type 2+ chars to search" />
         </MudItem>
         <MudItem xs="12" sm="6" md="1" Class="d-flex align-end">
             <MudIconButton Icon="@Icons.Material.Filled.Search" Color="Color.Primary"
@@ -69,6 +71,10 @@
         @if (_totalCount > 0)
         {
             @($"{_totalCount} results found (page {_page} of {(int)Math.Ceiling((double)_totalCount / _pageSize)})")
+        }
+        else if (_hasSearched && !_loading)
+        {
+            @("No results found. Try adjusting your search filters.")
         }
     </MudText>
     <MudToggleIconButton @bind-Toggled="_gridView"
@@ -103,7 +109,7 @@
                     @if (card.PriceUsd.HasValue)
                     {
                         <MudText Typo="Typo.caption" Align="Align.Center" Class="mt-1">
-                            $@card.PriceUsd.Value.ToString("F2")
+                            $@card.PriceUsd.Value.ToString("F2", CultureInfo.InvariantCulture)
                         </MudText>
                     }
                 </div>
@@ -120,7 +126,14 @@ else
             <PropertyColumn Property="x => x.TypeLine" Title="Type" />
             <PropertyColumn Property="x => x.Rarity" Title="Rarity" />
             <PropertyColumn Property="x => x.SetCode" Title="Set" />
-            <PropertyColumn Property="x => x.PriceUsd" Title="Price" Format="$0.00" />
+            <TemplateColumn Title="Price">
+                <CellTemplate>
+                    @if (context.Item.PriceUsd.HasValue)
+                    {
+                        @($"${context.Item.PriceUsd.Value.ToString("F2", CultureInfo.InvariantCulture)}")
+                    }
+                </CellTemplate>
+            </TemplateColumn>
         </Columns>
     </MudDataGrid>
 }
@@ -144,6 +157,7 @@ else
     private double? _maxCmc;
     private bool _gridView = true;
     private bool _loading;
+    private bool _hasSearched;
     private int _page = 1;
     private int _pageSize = 24;
     private int _totalCount;
@@ -163,6 +177,18 @@ else
             await SearchCards();
     }
 
+    private async Task OnFormatChanged(string? value)
+    {
+        _format = value;
+        if (_hasSearched) await SearchCards();
+    }
+
+    private async Task OnRarityChanged(string? value)
+    {
+        _rarity = value;
+        if (_hasSearched) await SearchCards();
+    }
+
     private async Task SearchCards()
     {
         try
@@ -171,6 +197,7 @@ else
             _page = 1;
             await LoadCards();
         }
+        catch (OperationCanceledException) { }
         catch (Exception ex)
         {
             Logger.LogWarning(ex, "Failed to search cards");
@@ -190,6 +217,7 @@ else
             _loading = true;
             await LoadCards();
         }
+        catch (OperationCanceledException) { }
         catch (Exception ex)
         {
             Logger.LogWarning(ex, "Failed to load page {Page}", page);
@@ -222,6 +250,7 @@ else
         var result = await Mediator.Send(new MtgDecker.Application.Cards.SearchCardsQuery(filter));
         _cards = result.Cards;
         _totalCount = result.TotalCount;
+        _hasSearched = true;
     }
 
     private async Task<IEnumerable<string>> SearchTypes(string value, CancellationToken ct)

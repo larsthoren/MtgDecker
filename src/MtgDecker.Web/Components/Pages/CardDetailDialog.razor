@@ -109,20 +109,20 @@
                             @if (Card.PriceUsd.HasValue)
                             {
                                 <MudText Typo="Typo.body2">
-                                    <b>USD:</b> $@Card.PriceUsd.Value.ToString("F2")
+                                    <b>USD:</b> $@Card.PriceUsd.Value.ToString("F2", CultureInfo.InvariantCulture)
                                     @if (Card.PriceUsdFoil.HasValue)
                                     {
-                                        <span class="ml-2">(Foil: $@Card.PriceUsdFoil.Value.ToString("F2"))</span>
+                                        <span class="ml-2">(Foil: $@Card.PriceUsdFoil.Value.ToString("F2", CultureInfo.InvariantCulture))</span>
                                     }
                                 </MudText>
                             }
                             @if (Card.PriceEur.HasValue)
                             {
                                 <MudText Typo="Typo.body2">
-                                    <b>EUR:</b> @("\u20AC")@Card.PriceEur.Value.ToString("F2")
+                                    <b>EUR:</b> @("\u20AC")@Card.PriceEur.Value.ToString("F2", CultureInfo.InvariantCulture)
                                     @if (Card.PriceEurFoil.HasValue)
                                     {
-                                        <span class="ml-2">(Foil: @("\u20AC")@Card.PriceEurFoil.Value.ToString("F2"))</span>
+                                        <span class="ml-2">(Foil: @("\u20AC")@Card.PriceEurFoil.Value.ToString("F2", CultureInfo.InvariantCulture))</span>
                                     }
                                 </MudText>
                             }

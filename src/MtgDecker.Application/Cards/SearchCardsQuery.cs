@@ -16,6 +16,8 @@ public class SearchCardsValidator : AbstractValidator<SearchCardsQuery>
         RuleFor(x => x.Filter).NotNull();
         RuleFor(x => x.Filter.PageSize).InclusiveBetween(1, 100).When(x => x.Filter is not null);
         RuleFor(x => x.Filter.Page).GreaterThanOrEqualTo(1).When(x => x.Filter is not null);
+        RuleFor(x => x.Filter.MinCmc).GreaterThanOrEqualTo(0).When(x => x.Filter is not null && x.Filter.MinCmc.HasValue);
+        RuleFor(x => x.Filter.MaxCmc).GreaterThanOrEqualTo(0).When(x => x.Filter is not null && x.Filter.MaxCmc.HasValue);
     }
 }
 
