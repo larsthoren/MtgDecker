@@ -10,10 +10,14 @@ public record ExportDeckQuery(Guid DeckId, string Format) : IRequest<string>;
 
 public class ExportDeckValidator : AbstractValidator<ExportDeckQuery>
 {
+    private static readonly string[] ValidFormats = ["Text", "CSV", "MTGO", "Arena"];
+
     public ExportDeckValidator()
     {
         RuleFor(x => x.DeckId).NotEmpty();
-        RuleFor(x => x.Format).NotEmpty();
+        RuleFor(x => x.Format).NotEmpty()
+            .Must(f => ValidFormats.Contains(f, StringComparer.OrdinalIgnoreCase))
+            .WithMessage("Format must be one of: Text, CSV, MTGO, Arena.");
     }
 }
 

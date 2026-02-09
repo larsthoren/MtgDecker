@@ -28,7 +28,8 @@ public class ImportDeckCommandTests
         {
             MainDeck = new List<ParsedDeckEntry> { new() { Quantity = 4, CardName = "Lightning Bolt" } }
         });
-        _cardRepo.GetByNameAsync("Lightning Bolt", Arg.Any<CancellationToken>()).Returns(card);
+        _cardRepo.GetByNamesAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>())
+            .Returns(new List<Card> { card });
 
         var result = await _handler.Handle(
             new ImportDeckCommand("4 Lightning Bolt", "MTGO", "Burn", Format.Modern, Guid.NewGuid()),
@@ -46,7 +47,8 @@ public class ImportDeckCommandTests
         {
             MainDeck = new List<ParsedDeckEntry> { new() { Quantity = 4, CardName = "Fake Card" } }
         });
-        _cardRepo.GetByNameAsync("Fake Card", Arg.Any<CancellationToken>()).Returns((Card?)null);
+        _cardRepo.GetByNamesAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>())
+            .Returns(new List<Card>());
 
         var result = await _handler.Handle(
             new ImportDeckCommand("4 Fake Card", "MTGO", "Test", Format.Modern, Guid.NewGuid()),
@@ -64,5 +66,66 @@ public class ImportDeckCommandTests
             CancellationToken.None);
 
         await act.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    [Fact]
+    public async Task Handle_BatchFetchesCards_NotOneByOne()
+    {
+        var bolt = new Card { Id = Guid.NewGuid(), Name = "Lightning Bolt", TypeLine = "Instant" };
+        var guide = new Card { Id = Guid.NewGuid(), Name = "Goblin Guide", TypeLine = "Creature" };
+        _mtgoParser.Parse(Arg.Any<string>()).Returns(new ParsedDeck
+        {
+            MainDeck = new List<ParsedDeckEntry>
+            {
+                new() { Quantity = 4, CardName = "Lightning Bolt" },
+                new() { Quantity = 4, CardName = "Goblin Guide" }
+            },
+            Sideboard = new List<ParsedDeckEntry>
+            {
+                new() { Quantity = 2, CardName = "Lightning Bolt" }
+            }
+        });
+        _cardRepo.GetByNamesAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>())
+            .Returns(new List<Card> { bolt, guide });
+
+        var result = await _handler.Handle(
+            new ImportDeckCommand("deck text", "MTGO", "Burn", Format.Modern, Guid.NewGuid()),
+            CancellationToken.None);
+
+        // Should call GetByNamesAsync exactly once (batch), never GetByNameAsync
+        await _cardRepo.Received(1).GetByNamesAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>());
+        await _cardRepo.DidNotReceive().GetByNameAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+
+        // Bolt in MainDeck + Guide in MainDeck + Bolt in Sideboard = 3 entries
+        result.Deck.Entries.Should().HaveCount(3);
+        result.UnresolvedCards.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Handle_MainDeckAndSideboard_BothResolved()
+    {
+        var bolt = new Card { Id = Guid.NewGuid(), Name = "Lightning Bolt", TypeLine = "Instant" };
+        var guide = new Card { Id = Guid.NewGuid(), Name = "Goblin Guide", TypeLine = "Creature" };
+        _mtgoParser.Parse(Arg.Any<string>()).Returns(new ParsedDeck
+        {
+            MainDeck = new List<ParsedDeckEntry>
+            {
+                new() { Quantity = 4, CardName = "Lightning Bolt" }
+            },
+            Sideboard = new List<ParsedDeckEntry>
+            {
+                new() { Quantity = 2, CardName = "Goblin Guide" }
+            }
+        });
+        _cardRepo.GetByNamesAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>())
+            .Returns(new List<Card> { bolt, guide });
+
+        var result = await _handler.Handle(
+            new ImportDeckCommand("deck text", "MTGO", "Burn", Format.Modern, Guid.NewGuid()),
+            CancellationToken.None);
+
+        result.Deck.Entries.Should().HaveCount(2);
+        result.Deck.Entries.Should().Contain(e => e.CardId == bolt.Id && e.Category == DeckCategory.MainDeck);
+        result.Deck.Entries.Should().Contain(e => e.CardId == guide.Id && e.Category == DeckCategory.Sideboard);
     }
 }

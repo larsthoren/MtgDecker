@@ -13,7 +13,7 @@ public class DeckTests
         var deck = CreateDeck(Format.Modern);
         var card = CreateCard("Lightning Bolt");
 
-        deck.AddCard(card, 4, DeckCategory.MainDeck);
+        deck.AddCard(card, 4, DeckCategory.MainDeck, DateTime.UtcNow);
 
         deck.Entries.Should().HaveCount(1);
         deck.Entries[0].Quantity.Should().Be(4);
@@ -25,7 +25,7 @@ public class DeckTests
         var deck = CreateDeck(Format.Modern);
         var card = CreateCard("Lightning Bolt");
 
-        var act = () => deck.AddCard(card, 5, DeckCategory.MainDeck);
+        var act = () => deck.AddCard(card, 5, DeckCategory.MainDeck, DateTime.UtcNow);
 
         act.Should().Throw<DomainException>()
             .WithMessage("*cannot exceed 4 copies*");
@@ -37,7 +37,7 @@ public class DeckTests
         var deck = CreateDeck(Format.Modern);
         var card = CreateCard("Mountain", typeLine: "Basic Land — Mountain");
 
-        deck.AddCard(card, 20, DeckCategory.MainDeck);
+        deck.AddCard(card, 20, DeckCategory.MainDeck, DateTime.UtcNow);
 
         deck.Entries.Should().HaveCount(1);
         deck.Entries[0].Quantity.Should().Be(20);
@@ -49,7 +49,7 @@ public class DeckTests
         var deck = CreateDeck(Format.Commander);
         var card = CreateCard("Sol Ring");
 
-        var act = () => deck.AddCard(card, 1, DeckCategory.Sideboard);
+        var act = () => deck.AddCard(card, 1, DeckCategory.Sideboard, DateTime.UtcNow);
 
         act.Should().Throw<DomainException>()
             .WithMessage("*does not allow a sideboard*");
@@ -60,9 +60,9 @@ public class DeckTests
     {
         var deck = CreateDeck(Format.Modern);
         var card = CreateCard("Lightning Bolt");
-        deck.AddCard(card, 2, DeckCategory.MainDeck);
+        deck.AddCard(card, 2, DeckCategory.MainDeck, DateTime.UtcNow);
 
-        deck.AddCard(card, 1, DeckCategory.MainDeck);
+        deck.AddCard(card, 1, DeckCategory.MainDeck, DateTime.UtcNow);
 
         deck.Entries.Should().HaveCount(1);
         deck.Entries[0].Quantity.Should().Be(3);
@@ -73,9 +73,9 @@ public class DeckTests
     {
         var deck = CreateDeck(Format.Modern);
         var card = CreateCard("Lightning Bolt");
-        deck.AddCard(card, 3, DeckCategory.MainDeck);
+        deck.AddCard(card, 3, DeckCategory.MainDeck, DateTime.UtcNow);
 
-        var act = () => deck.AddCard(card, 2, DeckCategory.MainDeck);
+        var act = () => deck.AddCard(card, 2, DeckCategory.MainDeck, DateTime.UtcNow);
 
         act.Should().Throw<DomainException>()
             .WithMessage("*cannot exceed*");
@@ -86,11 +86,60 @@ public class DeckTests
     {
         var deck = CreateDeck(Format.Modern);
         var card = CreateCard("Lightning Bolt");
-        deck.AddCard(card, 2, DeckCategory.MainDeck);
+        deck.AddCard(card, 2, DeckCategory.MainDeck, DateTime.UtcNow);
 
-        deck.UpdateCardQuantity(card.Id, DeckCategory.MainDeck, 4);
+        deck.UpdateCardQuantity(card, DeckCategory.MainDeck, 4, DateTime.UtcNow);
 
         deck.Entries[0].Quantity.Should().Be(4);
+    }
+
+    [Fact]
+    public void UpdateCardQuantity_ExceedsCopyLimit_ThrowsException()
+    {
+        var deck = CreateDeck(Format.Modern);
+        var card = CreateCard("Lightning Bolt");
+        deck.AddCard(card, 2, DeckCategory.MainDeck, DateTime.UtcNow);
+
+        var act = () => deck.UpdateCardQuantity(card, DeckCategory.MainDeck, 5, DateTime.UtcNow);
+
+        act.Should().Throw<DomainException>()
+            .WithMessage("*cannot exceed 4 copies*");
+    }
+
+    [Fact]
+    public void UpdateCardQuantity_BasicLand_AllowsExceedingCopyLimit()
+    {
+        var deck = CreateDeck(Format.Modern);
+        var card = CreateCard("Mountain", typeLine: "Basic Land — Mountain");
+        deck.AddCard(card, 4, DeckCategory.MainDeck, DateTime.UtcNow);
+
+        deck.UpdateCardQuantity(card, DeckCategory.MainDeck, 20, DateTime.UtcNow);
+
+        deck.Entries[0].Quantity.Should().Be(20);
+    }
+
+    [Fact]
+    public void UpdateCardQuantity_Maybeboard_AllowsExceedingCopyLimit()
+    {
+        var deck = CreateDeck(Format.Modern);
+        var card = CreateCard("Lightning Bolt");
+        deck.AddCard(card, 2, DeckCategory.Maybeboard, DateTime.UtcNow);
+
+        deck.UpdateCardQuantity(card, DeckCategory.Maybeboard, 10, DateTime.UtcNow);
+
+        deck.Entries[0].Quantity.Should().Be(10);
+    }
+
+    [Fact]
+    public void UpdateCardQuantity_CardNotInDeck_ThrowsException()
+    {
+        var deck = CreateDeck(Format.Modern);
+        var card = CreateCard("Lightning Bolt");
+
+        var act = () => deck.UpdateCardQuantity(card, DeckCategory.MainDeck, 4, DateTime.UtcNow);
+
+        act.Should().Throw<DomainException>()
+            .WithMessage("*not found in deck*");
     }
 
     [Fact]
@@ -98,9 +147,9 @@ public class DeckTests
     {
         var deck = CreateDeck(Format.Modern);
         var card = CreateCard("Lightning Bolt");
-        deck.AddCard(card, 4, DeckCategory.MainDeck);
+        deck.AddCard(card, 4, DeckCategory.MainDeck, DateTime.UtcNow);
 
-        deck.RemoveCard(card.Id, DeckCategory.MainDeck);
+        deck.RemoveCard(card.Id, DeckCategory.MainDeck, DateTime.UtcNow);
 
         deck.Entries.Should().BeEmpty();
     }
@@ -110,10 +159,10 @@ public class DeckTests
     {
         var deck = CreateDeck(Format.Modern);
         var card = CreateCard("Lightning Bolt");
-        deck.AddCard(card, 4, DeckCategory.MainDeck);
-        deck.AddCard(card, 2, DeckCategory.Maybeboard);
+        deck.AddCard(card, 4, DeckCategory.MainDeck, DateTime.UtcNow);
+        deck.AddCard(card, 2, DeckCategory.Maybeboard, DateTime.UtcNow);
 
-        deck.RemoveCard(card.Id, DeckCategory.Maybeboard);
+        deck.RemoveCard(card.Id, DeckCategory.Maybeboard, DateTime.UtcNow);
 
         deck.Entries.Should().HaveCount(1);
         deck.Entries[0].Category.Should().Be(DeckCategory.MainDeck);
@@ -121,13 +170,25 @@ public class DeckTests
     }
 
     [Fact]
+    public void RemoveCard_NonExistentCard_ThrowsException()
+    {
+        var deck = CreateDeck(Format.Modern);
+        var cardId = Guid.NewGuid();
+
+        var act = () => deck.RemoveCard(cardId, DeckCategory.MainDeck, DateTime.UtcNow);
+
+        act.Should().Throw<DomainException>()
+            .WithMessage("*not found in deck*");
+    }
+
+    [Fact]
     public void MoveCardCategory_MovesFromMaybeboardToMainDeck()
     {
         var deck = CreateDeck(Format.Modern);
         var card = CreateCard("Lightning Bolt");
-        deck.AddCard(card, 2, DeckCategory.Maybeboard);
+        deck.AddCard(card, 2, DeckCategory.Maybeboard, DateTime.UtcNow);
 
-        deck.MoveCardCategory(card, DeckCategory.Maybeboard, DeckCategory.MainDeck);
+        deck.MoveCardCategory(card, DeckCategory.Maybeboard, DeckCategory.MainDeck, DateTime.UtcNow);
 
         deck.Entries.Should().HaveCount(1);
         deck.Entries[0].Category.Should().Be(DeckCategory.MainDeck);
@@ -139,10 +200,10 @@ public class DeckTests
     {
         var deck = CreateDeck(Format.Modern);
         var card = CreateCard("Lightning Bolt");
-        deck.AddCard(card, 2, DeckCategory.MainDeck);
-        deck.AddCard(card, 1, DeckCategory.Maybeboard);
+        deck.AddCard(card, 2, DeckCategory.MainDeck, DateTime.UtcNow);
+        deck.AddCard(card, 1, DeckCategory.Maybeboard, DateTime.UtcNow);
 
-        deck.MoveCardCategory(card, DeckCategory.Maybeboard, DeckCategory.MainDeck);
+        deck.MoveCardCategory(card, DeckCategory.Maybeboard, DeckCategory.MainDeck, DateTime.UtcNow);
 
         deck.Entries.Should().HaveCount(1);
         deck.Entries[0].Category.Should().Be(DeckCategory.MainDeck);
@@ -154,10 +215,10 @@ public class DeckTests
     {
         var deck = CreateDeck(Format.Modern);
         var card = CreateCard("Lightning Bolt");
-        deck.AddCard(card, 4, DeckCategory.MainDeck);
-        deck.AddCard(card, 1, DeckCategory.Maybeboard);
+        deck.AddCard(card, 4, DeckCategory.MainDeck, DateTime.UtcNow);
+        deck.AddCard(card, 1, DeckCategory.Maybeboard, DateTime.UtcNow);
 
-        var act = () => deck.MoveCardCategory(card, DeckCategory.Maybeboard, DeckCategory.MainDeck);
+        var act = () => deck.MoveCardCategory(card, DeckCategory.Maybeboard, DeckCategory.MainDeck, DateTime.UtcNow);
 
         act.Should().Throw<DomainException>().WithMessage("*cannot exceed*");
         // Maybeboard entry should still exist
@@ -165,12 +226,37 @@ public class DeckTests
     }
 
     [Fact]
+    public void MoveCardCategory_SourceNotFound_ThrowsException()
+    {
+        var deck = CreateDeck(Format.Modern);
+        var card = CreateCard("Lightning Bolt");
+
+        var act = () => deck.MoveCardCategory(card, DeckCategory.MainDeck, DeckCategory.Sideboard, DateTime.UtcNow);
+
+        act.Should().Throw<DomainException>()
+            .WithMessage("*not found in deck*");
+    }
+
+    [Fact]
+    public void MoveCardCategory_ToSideboardInCommander_ThrowsException()
+    {
+        var deck = CreateDeck(Format.Commander);
+        var card = CreateCard("Sol Ring");
+        deck.AddCard(card, 1, DeckCategory.MainDeck, DateTime.UtcNow);
+
+        var act = () => deck.MoveCardCategory(card, DeckCategory.MainDeck, DeckCategory.Sideboard, DateTime.UtcNow);
+
+        act.Should().Throw<DomainException>()
+            .WithMessage("*does not allow a sideboard*");
+    }
+
+    [Fact]
     public void TotalCardCount_ReturnsSumOfAllEntries()
     {
         var deck = CreateDeck(Format.Modern);
-        deck.AddCard(CreateCard("Card A"), 4, DeckCategory.MainDeck);
-        deck.AddCard(CreateCard("Card B"), 3, DeckCategory.MainDeck);
-        deck.AddCard(CreateCard("Card C"), 2, DeckCategory.Sideboard);
+        deck.AddCard(CreateCard("Card A"), 4, DeckCategory.MainDeck, DateTime.UtcNow);
+        deck.AddCard(CreateCard("Card B"), 3, DeckCategory.MainDeck, DateTime.UtcNow);
+        deck.AddCard(CreateCard("Card C"), 2, DeckCategory.Sideboard, DateTime.UtcNow);
 
         deck.TotalMainDeckCount.Should().Be(7);
         deck.TotalSideboardCount.Should().Be(2);
@@ -182,7 +268,7 @@ public class DeckTests
         var deck = CreateDeck(Format.Modern);
         var card = CreateCard("Lightning Bolt");
 
-        var act = () => deck.AddCard(card, 0, DeckCategory.MainDeck);
+        var act = () => deck.AddCard(card, 0, DeckCategory.MainDeck, DateTime.UtcNow);
 
         act.Should().Throw<DomainException>()
             .WithMessage("*must be at least 1*");
@@ -194,7 +280,7 @@ public class DeckTests
         var deck = CreateDeck(Format.Modern);
         var card = CreateCard("Lightning Bolt");
 
-        deck.AddCard(card, 10, DeckCategory.Maybeboard);
+        deck.AddCard(card, 10, DeckCategory.Maybeboard, DateTime.UtcNow);
 
         deck.Entries.Should().HaveCount(1);
         deck.Entries[0].Quantity.Should().Be(10);
@@ -205,8 +291,8 @@ public class DeckTests
     public void AddCard_ToMaybeboard_DoesNotCountInMainDeck()
     {
         var deck = CreateDeck(Format.Modern);
-        deck.AddCard(CreateCard("Card A"), 4, DeckCategory.MainDeck);
-        deck.AddCard(CreateCard("Card B"), 3, DeckCategory.Maybeboard);
+        deck.AddCard(CreateCard("Card A"), 4, DeckCategory.MainDeck, DateTime.UtcNow);
+        deck.AddCard(CreateCard("Card B"), 3, DeckCategory.Maybeboard, DateTime.UtcNow);
 
         deck.TotalMainDeckCount.Should().Be(4);
         deck.TotalMaybeboardCount.Should().Be(3);
@@ -218,7 +304,7 @@ public class DeckTests
         var deck = CreateDeck(Format.Commander);
         var card = CreateCard("Sol Ring");
 
-        deck.AddCard(card, 5, DeckCategory.Maybeboard);
+        deck.AddCard(card, 5, DeckCategory.Maybeboard, DateTime.UtcNow);
 
         deck.Entries.Should().HaveCount(1);
     }
@@ -240,10 +326,10 @@ public class DeckTests
     {
         var deck = CreateDeck(Format.Modern);
         var card = CreateCard("Lightning Bolt");
-        deck.AddCard(card, 2, DeckCategory.MainDeck);
+        deck.AddCard(card, 2, DeckCategory.MainDeck, DateTime.UtcNow);
         var timestamp = new DateTime(2025, 6, 15, 12, 0, 0, DateTimeKind.Utc);
 
-        deck.UpdateCardQuantity(card.Id, DeckCategory.MainDeck, 4, timestamp);
+        deck.UpdateCardQuantity(card, DeckCategory.MainDeck, 4, timestamp);
 
         deck.UpdatedAt.Should().Be(timestamp);
     }
@@ -253,7 +339,7 @@ public class DeckTests
     {
         var deck = CreateDeck(Format.Modern);
         var card = CreateCard("Lightning Bolt");
-        deck.AddCard(card, 4, DeckCategory.MainDeck);
+        deck.AddCard(card, 4, DeckCategory.MainDeck, DateTime.UtcNow);
         var timestamp = new DateTime(2025, 6, 15, 12, 0, 0, DateTimeKind.Utc);
 
         deck.RemoveCard(card.Id, DeckCategory.MainDeck, timestamp);
@@ -266,7 +352,7 @@ public class DeckTests
     {
         var deck = CreateDeck(Format.Modern);
         var card = CreateCard("Lightning Bolt");
-        deck.AddCard(card, 2, DeckCategory.Maybeboard);
+        deck.AddCard(card, 2, DeckCategory.Maybeboard, DateTime.UtcNow);
         var timestamp = new DateTime(2025, 6, 15, 12, 0, 0, DateTimeKind.Utc);
 
         deck.MoveCardCategory(card, DeckCategory.Maybeboard, DeckCategory.MainDeck, timestamp);

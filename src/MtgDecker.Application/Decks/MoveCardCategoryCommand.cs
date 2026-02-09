@@ -39,8 +39,7 @@ public class MoveCardCategoryHandler : IRequestHandler<MoveCardCategoryCommand, 
         var deck = await _deckRepository.GetByIdAsync(request.DeckId, cancellationToken)
             ?? throw new KeyNotFoundException($"Deck {request.DeckId} not found.");
 
-        var cards = await _cardRepository.GetByIdsAsync(new[] { request.CardId }, cancellationToken);
-        var card = cards.FirstOrDefault()
+        var card = await _cardRepository.GetByIdAsync(request.CardId, cancellationToken)
             ?? throw new KeyNotFoundException($"Card {request.CardId} not found.");
 
         deck.MoveCardCategory(card, request.From, request.To, _timeProvider.GetUtcNow().UtcDateTime);

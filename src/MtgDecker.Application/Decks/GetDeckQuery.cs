@@ -1,3 +1,4 @@
+using FluentValidation;
 using MediatR;
 using MtgDecker.Application.Interfaces;
 using MtgDecker.Domain.Entities;
@@ -5,6 +6,14 @@ using MtgDecker.Domain.Entities;
 namespace MtgDecker.Application.Decks;
 
 public record GetDeckQuery(Guid Id) : IRequest<Deck?>;
+
+public class GetDeckValidator : AbstractValidator<GetDeckQuery>
+{
+    public GetDeckValidator()
+    {
+        RuleFor(x => x.Id).NotEmpty();
+    }
+}
 
 public class GetDeckHandler : IRequestHandler<GetDeckQuery, Deck?>
 {

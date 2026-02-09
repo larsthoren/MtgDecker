@@ -25,6 +25,9 @@ public class RemoveFromCollectionHandler : IRequestHandler<RemoveFromCollectionC
 
     public async Task Handle(RemoveFromCollectionCommand request, CancellationToken cancellationToken)
     {
+        var entry = await _collectionRepository.GetByIdAsync(request.Id, cancellationToken)
+            ?? throw new KeyNotFoundException($"Collection entry {request.Id} not found.");
+
         await _collectionRepository.DeleteAsync(request.Id, cancellationToken);
     }
 }

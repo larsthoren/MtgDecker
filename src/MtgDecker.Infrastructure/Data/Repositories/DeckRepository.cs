@@ -23,7 +23,6 @@ public class DeckRepository : IDeckRepository
     public async Task<List<Deck>> ListByUserAsync(Guid userId, CancellationToken ct = default)
     {
         return await _context.Decks
-            .Include(d => d.Entries)
             .Where(d => d.UserId == userId)
             .OrderByDescending(d => d.UpdatedAt)
             .ToListAsync(ct);

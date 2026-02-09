@@ -37,6 +37,8 @@ public class CardConfiguration : IEntityTypeConfiguration<Card>
         builder.HasIndex(c => c.OracleId);
         builder.HasIndex(c => c.SetCode);
         builder.HasIndex(c => c.ScryfallId).IsUnique();
+        builder.HasIndex(c => c.Rarity);
+        builder.HasIndex(c => c.Cmc);
 
         builder.HasMany(c => c.Faces)
             .WithOne()

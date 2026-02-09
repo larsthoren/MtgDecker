@@ -6,15 +6,16 @@ public class SampleHandSimulator
     private List<Guid> _library = new();
     private int _drawIndex;
     private readonly List<Guid> _hand = new();
-    private readonly Random _rng = new();
+    private readonly Random _rng;
 
     public IReadOnlyList<Guid> Hand => _hand;
     public int LibraryCount => _library.Count - _drawIndex;
     public int MulliganCount { get; private set; }
 
-    public SampleHandSimulator(List<Guid> cardIds)
+    public SampleHandSimulator(List<Guid> cardIds, Random? rng = null)
     {
         _originalLibrary = new List<Guid>(cardIds);
+        _rng = rng ?? new Random();
     }
 
     public static SampleHandSimulator FromDeckEntries(List<(Guid CardId, int Quantity)> entries)

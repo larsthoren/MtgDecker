@@ -22,11 +22,13 @@ public class UpdateCardQuantityValidator : AbstractValidator<UpdateCardQuantityC
 public class UpdateCardQuantityHandler : IRequestHandler<UpdateCardQuantityCommand, Deck>
 {
     private readonly IDeckRepository _deckRepository;
+    private readonly ICardRepository _cardRepository;
     private readonly TimeProvider _timeProvider;
 
-    public UpdateCardQuantityHandler(IDeckRepository deckRepository, TimeProvider timeProvider)
+    public UpdateCardQuantityHandler(IDeckRepository deckRepository, ICardRepository cardRepository, TimeProvider timeProvider)
     {
         _deckRepository = deckRepository;
+        _cardRepository = cardRepository;
         _timeProvider = timeProvider;
     }
 
@@ -35,7 +37,10 @@ public class UpdateCardQuantityHandler : IRequestHandler<UpdateCardQuantityComma
         var deck = await _deckRepository.GetByIdAsync(request.DeckId, cancellationToken)
             ?? throw new KeyNotFoundException($"Deck {request.DeckId} not found.");
 
-        deck.UpdateCardQuantity(request.CardId, request.Category, request.Quantity, _timeProvider.GetUtcNow().UtcDateTime);
+        var card = await _cardRepository.GetByIdAsync(request.CardId, cancellationToken)
+            ?? throw new KeyNotFoundException($"Card {request.CardId} not found.");
+
+        deck.UpdateCardQuantity(card, request.Category, request.Quantity, _timeProvider.GetUtcNow().UtcDateTime);
         await _deckRepository.UpdateAsync(deck, cancellationToken);
 
         return deck;

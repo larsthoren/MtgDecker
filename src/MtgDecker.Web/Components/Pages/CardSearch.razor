@@ -1,5 +1,7 @@
 @page "/cards"
 @inject IMediator Mediator
+@inject ISnackbar Snackbar
+@inject ILogger<CardSearch> Logger
 
 <PageTitle>Card Search - MtgDecker</PageTitle>
 
@@ -163,18 +165,40 @@ else
 
     private async Task SearchCards()
     {
-        _loading = true;
-        _page = 1;
-        await LoadCards();
-        _loading = false;
+        try
+        {
+            _loading = true;
+            _page = 1;
+            await LoadCards();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to search cards");
+            Snackbar.Add("Failed to search cards. Please try again.", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
     }
 
     private async Task OnPageChanged(int page)
     {
-        _page = page;
-        _loading = true;
-        await LoadCards();
-        _loading = false;
+        try
+        {
+            _page = page;
+            _loading = true;
+            await LoadCards();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to load page {Page}", page);
+            Snackbar.Add("Failed to load page. Please try again.", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
     }
 
     private async Task LoadCards()

@@ -1,6 +1,7 @@
 @inject IMediator Mediator
 @inject IJSRuntime JS
 @inject ISnackbar Snackbar
+@inject ILogger<ExportDeckDialog> Logger
 
 <MudDialog>
     <TitleContent>
@@ -63,8 +64,9 @@
         {
             _exportText = await Mediator.Send(new MtgDecker.Application.DeckExport.ExportDeckQuery(DeckId, _selectedFormat));
         }
-        catch
+        catch (Exception ex)
         {
+            Logger.LogWarning(ex, "Failed to export deck");
             _exportText = "Error exporting deck.";
         }
         _loading = false;

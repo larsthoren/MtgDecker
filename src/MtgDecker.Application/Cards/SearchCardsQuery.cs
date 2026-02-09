@@ -1,3 +1,4 @@
+using FluentValidation;
 using MediatR;
 using MtgDecker.Application.Interfaces;
 using MtgDecker.Domain.Entities;
@@ -7,6 +8,16 @@ namespace MtgDecker.Application.Cards;
 public record SearchCardsQuery(CardSearchFilter Filter) : IRequest<SearchCardsResult>;
 
 public record SearchCardsResult(List<Card> Cards, int TotalCount);
+
+public class SearchCardsValidator : AbstractValidator<SearchCardsQuery>
+{
+    public SearchCardsValidator()
+    {
+        RuleFor(x => x.Filter).NotNull();
+        RuleFor(x => x.Filter.PageSize).InclusiveBetween(1, 100).When(x => x.Filter is not null);
+        RuleFor(x => x.Filter.Page).GreaterThanOrEqualTo(1).When(x => x.Filter is not null);
+    }
+}
 
 public class SearchCardsHandler : IRequestHandler<SearchCardsQuery, SearchCardsResult>
 {

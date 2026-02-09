@@ -1,3 +1,4 @@
+using FluentValidation;
 using MediatR;
 using MtgDecker.Application.Interfaces;
 using MtgDecker.Domain.Services;
@@ -5,6 +6,15 @@ using MtgDecker.Domain.Services;
 namespace MtgDecker.Application.Decks;
 
 public record GetDeckShortagesQuery(Guid DeckId, Guid UserId) : IRequest<List<CardShortage>>;
+
+public class GetDeckShortagesValidator : AbstractValidator<GetDeckShortagesQuery>
+{
+    public GetDeckShortagesValidator()
+    {
+        RuleFor(x => x.DeckId).NotEmpty();
+        RuleFor(x => x.UserId).NotEmpty();
+    }
+}
 
 public class GetDeckShortagesHandler : IRequestHandler<GetDeckShortagesQuery, List<CardShortage>>
 {

@@ -28,7 +28,7 @@ public class Deck
         .Where(e => e.Category == DeckCategory.Maybeboard)
         .Sum(e => e.Quantity);
 
-    public void AddCard(Card card, int quantity, DeckCategory category, DateTime? utcNow = null)
+    public void AddCard(Card card, int quantity, DeckCategory category, DateTime utcNow)
     {
         if (quantity < 1)
             throw new DomainException("Quantity must be at least 1.");
@@ -40,17 +40,13 @@ public class Deck
         if (existing != null)
         {
             var newQuantity = existing.Quantity + quantity;
-            if (category != DeckCategory.Maybeboard && !card.IsBasicLand && newQuantity > FormatRules.GetMaxCopies(Format))
-                throw new DomainException(
-                    $"A deck cannot exceed {FormatRules.GetMaxCopies(Format)} copies of {card.Name}.");
+            ValidateMaxCopies(card, category, newQuantity);
 
             existing.Quantity = newQuantity;
         }
         else
         {
-            if (category != DeckCategory.Maybeboard && !card.IsBasicLand && quantity > FormatRules.GetMaxCopies(Format))
-                throw new DomainException(
-                    $"A deck cannot exceed {FormatRules.GetMaxCopies(Format)} copies of {card.Name}.");
+            ValidateMaxCopies(card, category, quantity);
 
             Entries.Add(new DeckEntry
             {
@@ -62,31 +58,33 @@ public class Deck
             });
         }
 
-        UpdatedAt = utcNow ?? DateTime.UtcNow;
+        UpdatedAt = utcNow;
     }
 
-    public void UpdateCardQuantity(Guid cardId, DeckCategory category, int quantity, DateTime? utcNow = null)
+    public void UpdateCardQuantity(Card card, DeckCategory category, int quantity, DateTime utcNow)
     {
-        var entry = Entries.FirstOrDefault(e => e.CardId == cardId && e.Category == category)
+        var entry = Entries.FirstOrDefault(e => e.CardId == card.Id && e.Category == category)
             ?? throw new DomainException("Card not found in deck.");
 
         if (quantity < 1)
             throw new DomainException("Quantity must be at least 1.");
 
+        ValidateMaxCopies(card, category, quantity);
+
         entry.Quantity = quantity;
-        UpdatedAt = utcNow ?? DateTime.UtcNow;
+        UpdatedAt = utcNow;
     }
 
-    public void RemoveCard(Guid cardId, DeckCategory category, DateTime? utcNow = null)
+    public void RemoveCard(Guid cardId, DeckCategory category, DateTime utcNow)
     {
         var entry = Entries.FirstOrDefault(e => e.CardId == cardId && e.Category == category)
             ?? throw new DomainException("Card not found in deck.");
 
         Entries.Remove(entry);
-        UpdatedAt = utcNow ?? DateTime.UtcNow;
+        UpdatedAt = utcNow;
     }
 
-    public void MoveCardCategory(Card card, DeckCategory from, DeckCategory to, DateTime? utcNow = null)
+    public void MoveCardCategory(Card card, DeckCategory from, DeckCategory to, DateTime utcNow)
     {
         var entry = Entries.FirstOrDefault(e => e.CardId == card.Id && e.Category == from)
             ?? throw new DomainException("Card not found in deck.");
@@ -97,18 +95,14 @@ public class Deck
         if (to == DeckCategory.Sideboard && !FormatRules.HasSideboard(Format))
             throw new DomainException($"{Format} does not allow a sideboard.");
 
-        if (to != DeckCategory.Maybeboard && !card.IsBasicLand && quantity > FormatRules.GetMaxCopies(Format))
-            throw new DomainException(
-                $"A deck cannot exceed {FormatRules.GetMaxCopies(Format)} copies of {card.Name}.");
+        ValidateMaxCopies(card, to, quantity);
 
         // Check if card already exists in target category
         var existingInTarget = Entries.FirstOrDefault(e => e.CardId == card.Id && e.Category == to);
         if (existingInTarget != null)
         {
             var newQuantity = existingInTarget.Quantity + quantity;
-            if (to != DeckCategory.Maybeboard && !card.IsBasicLand && newQuantity > FormatRules.GetMaxCopies(Format))
-                throw new DomainException(
-                    $"A deck cannot exceed {FormatRules.GetMaxCopies(Format)} copies of {card.Name}.");
+            ValidateMaxCopies(card, to, newQuantity);
 
             existingInTarget.Quantity = newQuantity;
         }
@@ -125,6 +119,13 @@ public class Deck
         }
 
         Entries.Remove(entry);
-        UpdatedAt = utcNow ?? DateTime.UtcNow;
+        UpdatedAt = utcNow;
+    }
+
+    private void ValidateMaxCopies(Card card, DeckCategory category, int quantity)
+    {
+        if (category != DeckCategory.Maybeboard && !card.IsBasicLand && quantity > FormatRules.GetMaxCopies(Format))
+            throw new DomainException(
+                $"A deck cannot exceed {FormatRules.GetMaxCopies(Format)} copies of {card.Name}.");
     }
 }

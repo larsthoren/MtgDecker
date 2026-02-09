@@ -7,30 +7,25 @@ using MtgDecker.Domain.Enums;
 
 namespace MtgDecker.Application.Tests.Decks;
 
-public class RemoveCardFromDeckCommandTests
+public class DeleteDeckCommandTests
 {
     private readonly IDeckRepository _deckRepo = Substitute.For<IDeckRepository>();
-    private readonly RemoveCardFromDeckHandler _handler;
+    private readonly DeleteDeckHandler _handler;
 
-    public RemoveCardFromDeckCommandTests()
+    public DeleteDeckCommandTests()
     {
-        _handler = new RemoveCardFromDeckHandler(_deckRepo, TimeProvider.System);
+        _handler = new DeleteDeckHandler(_deckRepo);
     }
 
     [Fact]
-    public async Task Handle_RemovesCardAndSaves()
+    public async Task Handle_DeletesDeck()
     {
-        var cardId = Guid.NewGuid();
         var deck = new Deck { Id = Guid.NewGuid(), Name = "Test", Format = Format.Modern, UserId = Guid.NewGuid() };
-        deck.AddCard(new Card { Id = cardId, Name = "Lightning Bolt", TypeLine = "Instant" }, 4, DeckCategory.MainDeck, DateTime.UtcNow);
         _deckRepo.GetByIdAsync(deck.Id, Arg.Any<CancellationToken>()).Returns(deck);
 
-        var result = await _handler.Handle(
-            new RemoveCardFromDeckCommand(deck.Id, cardId, DeckCategory.MainDeck),
-            CancellationToken.None);
+        await _handler.Handle(new DeleteDeckCommand(deck.Id), CancellationToken.None);
 
-        result.Entries.Should().BeEmpty();
-        await _deckRepo.Received(1).UpdateAsync(deck, Arg.Any<CancellationToken>());
+        await _deckRepo.Received(1).DeleteAsync(deck.Id, Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -39,7 +34,7 @@ public class RemoveCardFromDeckCommandTests
         _deckRepo.GetByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns((Deck?)null);
 
         var act = () => _handler.Handle(
-            new RemoveCardFromDeckCommand(Guid.NewGuid(), Guid.NewGuid(), DeckCategory.MainDeck),
+            new DeleteDeckCommand(Guid.NewGuid()),
             CancellationToken.None);
 
         await act.Should().ThrowAsync<KeyNotFoundException>();

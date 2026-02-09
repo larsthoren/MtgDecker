@@ -1,4 +1,5 @@
 @inject IMediator Mediator
+@inject ISnackbar Snackbar
 
 <MudDialog>
     <DialogContent>
@@ -42,7 +43,7 @@
         var card = await Mediator.Send(new MtgDecker.Application.Cards.GetCardByNameQuery(_cardName));
         if (card == null)
         {
-            MudDialog.Cancel();
+            Snackbar.Add($"Card not found: {_cardName}", Severity.Warning);
             return;
         }
 

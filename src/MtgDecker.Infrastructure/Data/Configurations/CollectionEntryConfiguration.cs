@@ -17,5 +17,7 @@ public class CollectionEntryConfiguration : IEntityTypeConfiguration<CollectionE
 
         builder.HasIndex(c => c.UserId);
         builder.HasIndex(c => c.CardId);
+
+        builder.HasIndex(c => new { c.UserId, c.CardId, c.IsFoil, c.Condition }).IsUnique();
     }
 }

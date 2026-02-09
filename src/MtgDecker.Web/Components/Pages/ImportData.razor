@@ -128,8 +128,11 @@
         {
             var progress = new Progress<int>(count =>
             {
-                _importedCount = count;
-                InvokeAsync(StateHasChanged);
+                _ = InvokeAsync(() =>
+                {
+                    _importedCount = count;
+                    StateHasChanged();
+                });
             });
 
             var count = await Mediator.Send(new MtgDecker.Application.Import.ImportBulkDataCommand(progress));

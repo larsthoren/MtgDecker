@@ -27,8 +27,8 @@ public class GetDeckStatsQueryTests
         var snap = new Card { Id = snapId, Name = "Snapcaster Mage", Cmc = 2, Colors = "U", TypeLine = "Creature — Human Wizard" };
 
         var deck = new Deck { Id = Guid.NewGuid(), Format = Format.Modern, UserId = Guid.NewGuid() };
-        deck.AddCard(bolt, 4, DeckCategory.MainDeck);
-        deck.AddCard(snap, 3, DeckCategory.MainDeck);
+        deck.AddCard(bolt, 4, DeckCategory.MainDeck, DateTime.UtcNow);
+        deck.AddCard(snap, 3, DeckCategory.MainDeck, DateTime.UtcNow);
 
         _deckRepo.GetByIdAsync(deck.Id, Arg.Any<CancellationToken>()).Returns(deck);
         _cardRepo.GetByIdsAsync(Arg.Any<IEnumerable<Guid>>(), Arg.Any<CancellationToken>())
@@ -54,7 +54,7 @@ public class GetDeckStatsQueryTests
         var land = new Card { Id = landId, Name = "Mountain", Cmc = 0, Colors = "", TypeLine = "Basic Land — Mountain" };
 
         var deck = new Deck { Id = Guid.NewGuid(), Format = Format.Modern, UserId = Guid.NewGuid() };
-        deck.AddCard(land, 20, DeckCategory.MainDeck);
+        deck.AddCard(land, 20, DeckCategory.MainDeck, DateTime.UtcNow);
 
         _deckRepo.GetByIdAsync(deck.Id, Arg.Any<CancellationToken>()).Returns(deck);
         _cardRepo.GetByIdsAsync(Arg.Any<IEnumerable<Guid>>(), Arg.Any<CancellationToken>())

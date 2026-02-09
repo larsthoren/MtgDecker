@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
 using MtgDecker.Application.Interfaces;
 using MtgDecker.Domain.Entities;
 using MtgDecker.Domain.Enums;
@@ -139,6 +140,117 @@ public class CardRepositoryTests
         context.Cards.Count().Should().Be(1);
         var loaded = context.Cards.First(c => c.ScryfallId == card.ScryfallId);
         loaded.OracleText.Should().Be("Updated text");
+    }
+
+    [Fact]
+    public async Task UpsertBatchAsync_BatchFetch_DoesNotQueryPerCard()
+    {
+        // Arrange: seed multiple existing cards, then upsert a mix of new and existing
+        using var context = TestDbContextFactory.Create();
+        var scryfallId1 = Guid.NewGuid().ToString();
+        var scryfallId2 = Guid.NewGuid().ToString();
+
+        var existing1 = new Card
+        {
+            Id = Guid.NewGuid(),
+            ScryfallId = scryfallId1,
+            OracleId = Guid.NewGuid().ToString(),
+            Name = "Card One",
+            TypeLine = "Creature",
+            Rarity = "common",
+            SetCode = "tst",
+            SetName = "Test Set",
+            Legalities = new List<CardLegality>
+            {
+                new("standard", LegalityStatus.Legal)
+            }
+        };
+        var existing2 = new Card
+        {
+            Id = Guid.NewGuid(),
+            ScryfallId = scryfallId2,
+            OracleId = Guid.NewGuid().ToString(),
+            Name = "Card Two",
+            TypeLine = "Instant",
+            Rarity = "rare",
+            SetCode = "tst",
+            SetName = "Test Set",
+            Legalities = new List<CardLegality>
+            {
+                new("vintage", LegalityStatus.Legal)
+            }
+        };
+        context.Cards.AddRange(existing1, existing2);
+        context.SaveChanges();
+        context.ChangeTracker.Clear();
+
+        // Act: upsert 2 existing cards (updated) + 1 new card
+        var repo = new CardRepository(context);
+        var batch = new List<Card>
+        {
+            new()
+            {
+                Id = Guid.NewGuid(),
+                ScryfallId = scryfallId1,
+                OracleId = existing1.OracleId,
+                Name = "Card One Updated",
+                TypeLine = "Creature",
+                Rarity = "common",
+                SetCode = "tst",
+                SetName = "Test Set",
+                Legalities = new List<CardLegality>
+                {
+                    new("standard", LegalityStatus.Banned)
+                }
+            },
+            new()
+            {
+                Id = Guid.NewGuid(),
+                ScryfallId = scryfallId2,
+                OracleId = existing2.OracleId,
+                Name = "Card Two Updated",
+                TypeLine = "Instant",
+                Rarity = "rare",
+                SetCode = "tst",
+                SetName = "Test Set",
+                Legalities = new List<CardLegality>
+                {
+                    new("vintage", LegalityStatus.Restricted)
+                }
+            },
+            new()
+            {
+                Id = Guid.NewGuid(),
+                ScryfallId = Guid.NewGuid().ToString(),
+                OracleId = Guid.NewGuid().ToString(),
+                Name = "Card Three New",
+                TypeLine = "Sorcery",
+                Rarity = "uncommon",
+                SetCode = "tst",
+                SetName = "Test Set"
+            }
+        };
+
+        await repo.UpsertBatchAsync(batch);
+        context.ChangeTracker.Clear();
+
+        // Assert: 3 total cards (2 updated + 1 new)
+        context.Cards.Count().Should().Be(3);
+
+        // Assert: existing cards were updated (not duplicated)
+        var card1 = context.Cards.Include(c => c.Legalities).First(c => c.ScryfallId == scryfallId1);
+        card1.Name.Should().Be("Card One Updated");
+        card1.Legalities.Should().HaveCount(1);
+        card1.Legalities[0].Status.Should().Be(LegalityStatus.Banned);
+
+        var card2 = context.Cards.Include(c => c.Legalities).First(c => c.ScryfallId == scryfallId2);
+        card2.Name.Should().Be("Card Two Updated");
+        card2.Legalities.Should().HaveCount(1);
+        card2.Legalities[0].Status.Should().Be(LegalityStatus.Restricted);
+
+        // Assert: new card was inserted
+        var card3 = context.Cards.First(c => c.Name == "Card Three New");
+        card3.Should().NotBeNull();
     }
 
     [Fact]

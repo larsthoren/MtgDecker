@@ -2,6 +2,7 @@
 @inject IMediator Mediator
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
+@inject ILogger<MyCollection> Logger
 
 <PageTitle>My Collection - MtgDecker</PageTitle>
 
@@ -89,27 +90,41 @@ else
 
     private async Task LoadCollection()
     {
-        _loading = true;
-        _entries = await Mediator.Send(new MtgDecker.Application.Collection.SearchCollectionQuery(UserId, _searchText));
-
-        _displayEntries = new();
-        foreach (var entry in _entries)
+        try
         {
-            var card = await Mediator.Send(new MtgDecker.Application.Cards.GetCardByIdQuery(entry.CardId));
-            _displayEntries.Add(new CollectionDisplayEntry
-            {
-                Id = entry.Id,
-                CardId = entry.CardId,
-                CardName = card?.Name ?? "Unknown",
-                SetCode = card?.SetCode?.ToUpperInvariant() ?? "",
-                Quantity = entry.Quantity,
-                Foil = entry.IsFoil ? "Yes" : "No",
-                Condition = entry.Condition.ToString(),
-                Price = entry.IsFoil ? card?.PriceUsdFoil ?? card?.PriceUsd : card?.PriceUsd
-            });
-        }
+            _loading = true;
+            _entries = await Mediator.Send(new MtgDecker.Application.Collection.SearchCollectionQuery(UserId, _searchText));
 
-        _loading = false;
+            var cardIds = _entries.Select(e => e.CardId).Distinct().ToList();
+            var cards = await Mediator.Send(new MtgDecker.Application.Cards.GetCardsByIdsQuery(cardIds));
+            var cardsDict = cards.ToDictionary(c => c.Id);
+
+            _displayEntries = new();
+            foreach (var entry in _entries)
+            {
+                cardsDict.TryGetValue(entry.CardId, out var card);
+                _displayEntries.Add(new CollectionDisplayEntry
+                {
+                    Id = entry.Id,
+                    CardId = entry.CardId,
+                    CardName = card?.Name ?? "Unknown",
+                    SetCode = card?.SetCode?.ToUpperInvariant() ?? "",
+                    Quantity = entry.Quantity,
+                    Foil = entry.IsFoil ? "Yes" : "No",
+                    Condition = entry.Condition.ToString(),
+                    Price = entry.IsFoil ? card?.PriceUsdFoil ?? card?.PriceUsd : card?.PriceUsd
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to load collection");
+            Snackbar.Add("Failed to load collection. Please try again.", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
     }
 
     private async Task OnSearchKeyUp(KeyboardEventArgs e)

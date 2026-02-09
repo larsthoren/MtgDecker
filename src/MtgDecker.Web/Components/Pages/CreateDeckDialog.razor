@@ -1,4 +1,5 @@
 @inject IMediator Mediator
+@inject ISnackbar Snackbar
 
 <MudDialog>
     <DialogContent>
@@ -33,8 +34,15 @@
 
     private async Task Create()
     {
-        var deck = await Mediator.Send(new MtgDecker.Application.Decks.CreateDeckCommand(
-            _name, _format, _description, UserId));
-        MudDialog.Close(DialogResult.Ok(deck));
+        try
+        {
+            var deck = await Mediator.Send(new MtgDecker.Application.Decks.CreateDeckCommand(
+                _name, _format, _description, UserId));
+            MudDialog.Close(DialogResult.Ok(deck));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to create deck: {ex.Message}", Severity.Error);
+        }
     }
 }

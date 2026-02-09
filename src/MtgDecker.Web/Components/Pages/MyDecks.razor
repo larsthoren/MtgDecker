@@ -2,6 +2,8 @@
 @inject IMediator Mediator
 @inject NavigationManager Navigation
 @inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject ILogger<MyDecks> Logger
 
 <PageTitle>My Decks - MtgDecker</PageTitle>
 
@@ -85,9 +87,20 @@ else
 
     private async Task LoadDecks()
     {
-        _loading = true;
-        _decks = await Mediator.Send(new MtgDecker.Application.Decks.ListDecksQuery(UserId));
-        _loading = false;
+        try
+        {
+            _loading = true;
+            _decks = await Mediator.Send(new MtgDecker.Application.Decks.ListDecksQuery(UserId));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to load decks");
+            Snackbar.Add("Failed to load decks. Please try again.", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
     }
 
     private async Task CreateNewDeck()

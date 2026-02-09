@@ -31,6 +31,16 @@ public class CardRepository : ICardRepository
             .FirstOrDefaultAsync(c => c.Name == name, ct);
     }
 
+    public async Task<List<Card>> GetByNamesAsync(IEnumerable<string> names, CancellationToken ct = default)
+    {
+        var nameList = names.ToList();
+        return await _context.Cards
+            .Include(c => c.Faces)
+            .Include(c => c.Legalities)
+            .Where(c => nameList.Contains(c.Name))
+            .ToListAsync(ct);
+    }
+
     public async Task<(List<Card> Cards, int TotalCount)> SearchAsync(CardSearchFilter filter, CancellationToken ct = default)
     {
         var query = _context.Cards.AsQueryable();
@@ -100,16 +110,18 @@ public class CardRepository : ICardRepository
 
     public async Task UpsertBatchAsync(IEnumerable<Card> cards, CancellationToken ct = default)
     {
-        foreach (var card in cards)
-        {
-            var existing = await _context.Cards
-                .FirstOrDefaultAsync(c => c.ScryfallId == card.ScryfallId, ct);
+        var cardList = cards.ToList();
+        var scryfallIds = cardList.Select(c => c.ScryfallId).ToList();
 
-            if (existing == null)
-            {
-                _context.Cards.Add(card);
-            }
-            else
+        var existingCards = await _context.Cards
+            .Include(c => c.Legalities)
+            .Include(c => c.Faces)
+            .Where(c => scryfallIds.Contains(c.ScryfallId))
+            .ToDictionaryAsync(c => c.ScryfallId, ct);
+
+        foreach (var card in cardList)
+        {
+            if (existingCards.TryGetValue(card.ScryfallId, out var existing))
             {
                 existing.OracleId = card.OracleId;
                 existing.Name = card.Name;
@@ -132,10 +144,23 @@ public class CardRepository : ICardRepository
                 existing.PriceEur = card.PriceEur;
                 existing.PriceEurFoil = card.PriceEurFoil;
                 existing.PriceTix = card.PriceTix;
+
+                existing.Legalities.Clear();
+                foreach (var legality in card.Legalities)
+                    existing.Legalities.Add(legality);
+
+                existing.Faces.Clear();
+                foreach (var face in card.Faces)
+                    existing.Faces.Add(face);
+            }
+            else
+            {
+                _context.Cards.Add(card);
             }
         }
 
         await _context.SaveChangesAsync(ct);
+        _context.ChangeTracker.Clear();
     }
 
     public async Task<List<SetInfo>> GetDistinctSetsAsync(string searchText, CancellationToken ct = default)
@@ -169,7 +194,7 @@ public class CardRepository : ICardRepository
         }
 
         // Get distinct type lines, then extract unique base types
-        var typeLines = await query.Take(200).ToListAsync(ct);
+        var typeLines = await query.OrderBy(t => t).Take(200).ToListAsync(ct);
 
         return typeLines
             .SelectMany(t => t.Split('—')[0].Trim().Split(' '))

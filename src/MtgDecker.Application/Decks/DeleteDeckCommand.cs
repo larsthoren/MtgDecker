@@ -1,9 +1,18 @@
+using FluentValidation;
 using MediatR;
 using MtgDecker.Application.Interfaces;
 
 namespace MtgDecker.Application.Decks;
 
 public record DeleteDeckCommand(Guid Id) : IRequest;
+
+public class DeleteDeckValidator : AbstractValidator<DeleteDeckCommand>
+{
+    public DeleteDeckValidator()
+    {
+        RuleFor(x => x.Id).NotEmpty();
+    }
+}
 
 public class DeleteDeckHandler : IRequestHandler<DeleteDeckCommand>
 {
@@ -16,6 +25,9 @@ public class DeleteDeckHandler : IRequestHandler<DeleteDeckCommand>
 
     public async Task Handle(DeleteDeckCommand request, CancellationToken cancellationToken)
     {
+        var deck = await _deckRepository.GetByIdAsync(request.Id, cancellationToken)
+            ?? throw new KeyNotFoundException($"Deck {request.Id} not found.");
+
         await _deckRepository.DeleteAsync(request.Id, cancellationToken);
     }
 }

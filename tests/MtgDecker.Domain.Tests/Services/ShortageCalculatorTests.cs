@@ -76,6 +76,46 @@ public class ShortageCalculatorTests
         shortages[0].Shortage.Should().Be(1);
     }
 
+    [Fact]
+    public void Calculate_CardInMultipleCategories_AggregatesNeeded()
+    {
+        // Card appears in MainDeck (qty 4) and Sideboard (qty 2), user owns 3.
+        // Total needed = 6, owned = 3, so shortage should be 3 in a single entry.
+        var oracleId = Guid.NewGuid().ToString();
+        var card = CreateCard("Lightning Bolt", oracleId);
+        var deck = CreateDeckWithEntries(card, mainDeckQty: 4, sideboardQty: 2);
+        var collection = new List<CollectionEntry>
+        {
+            new() { CardId = card.Id, Quantity = 3, UserId = deck.UserId }
+        };
+
+        var shortages = ShortageCalculator.Calculate(deck, collection, cardLookup: new[] { card });
+
+        shortages.Should().HaveCount(1);
+        shortages[0].CardName.Should().Be("Lightning Bolt");
+        shortages[0].Needed.Should().Be(6);
+        shortages[0].Owned.Should().Be(3);
+        shortages[0].Shortage.Should().Be(3);
+    }
+
+    [Fact]
+    public void Calculate_CardInMultipleCategories_NoShortageWhenOwnedEnough()
+    {
+        // Card appears in MainDeck (qty 4) and Sideboard (qty 2), user owns 6.
+        // Total needed = 6, owned = 6, so no shortage.
+        var oracleId = Guid.NewGuid().ToString();
+        var card = CreateCard("Lightning Bolt", oracleId);
+        var deck = CreateDeckWithEntries(card, mainDeckQty: 4, sideboardQty: 2);
+        var collection = new List<CollectionEntry>
+        {
+            new() { CardId = card.Id, Quantity = 6, UserId = deck.UserId }
+        };
+
+        var shortages = ShortageCalculator.Calculate(deck, collection, cardLookup: new[] { card });
+
+        shortages.Should().BeEmpty();
+    }
+
     private static Card CreateCard(string name, string oracleId)
     {
         return new Card
@@ -100,7 +140,21 @@ public class ShortageCalculatorTests
             Format = Format.Modern,
             UserId = Guid.NewGuid()
         };
-        deck.AddCard(card, quantity, DeckCategory.MainDeck);
+        deck.AddCard(card, quantity, DeckCategory.MainDeck, DateTime.UtcNow);
+        return deck;
+    }
+
+    private static Deck CreateDeckWithEntries(Card card, int mainDeckQty, int sideboardQty)
+    {
+        var deck = new Deck
+        {
+            Id = Guid.NewGuid(),
+            Name = "Test Deck",
+            Format = Format.Modern,
+            UserId = Guid.NewGuid()
+        };
+        deck.AddCard(card, mainDeckQty, DeckCategory.MainDeck, DateTime.UtcNow);
+        deck.AddCard(card, sideboardQty, DeckCategory.Sideboard, DateTime.UtcNow);
         return deck;
     }
 }

@@ -1,9 +1,18 @@
+using FluentValidation;
 using MediatR;
 using MtgDecker.Application.Interfaces;
 
 namespace MtgDecker.Application.Cards;
 
 public record SearchSetNamesQuery(string SearchText) : IRequest<List<SetInfo>>;
+
+public class SearchSetNamesValidator : AbstractValidator<SearchSetNamesQuery>
+{
+    public SearchSetNamesValidator()
+    {
+        RuleFor(x => x.SearchText).NotEmpty();
+    }
+}
 
 public record SetInfo(string SetCode, string SetName);
 
@@ -23,6 +32,14 @@ public class SearchSetNamesHandler : IRequestHandler<SearchSetNamesQuery, List<S
 }
 
 public record SearchTypeNamesQuery(string SearchText) : IRequest<List<string>>;
+
+public class SearchTypeNamesValidator : AbstractValidator<SearchTypeNamesQuery>
+{
+    public SearchTypeNamesValidator()
+    {
+        RuleFor(x => x.SearchText).NotEmpty();
+    }
+}
 
 public class SearchTypeNamesHandler : IRequestHandler<SearchTypeNamesQuery, List<string>>
 {

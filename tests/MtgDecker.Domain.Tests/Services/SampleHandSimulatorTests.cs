@@ -142,6 +142,21 @@ public class SampleHandSimulatorTests
         sim.LibraryCount.Should().Be(53);
     }
 
+    [Fact]
+    public void Constructor_WithSeededRandom_ProducesReproducibleResults()
+    {
+        var library = CreateLibrary(60);
+        var seed = 42;
+
+        var sim1 = new SampleHandSimulator(library, new Random(seed));
+        sim1.NewGame();
+
+        var sim2 = new SampleHandSimulator(library, new Random(seed));
+        sim2.NewGame();
+
+        sim1.Hand.Should().Equal(sim2.Hand);
+    }
+
     private static List<Guid> CreateLibrary(int count)
     {
         return Enumerable.Range(0, count).Select(_ => Guid.NewGuid()).ToList();

@@ -27,7 +27,7 @@ public class GetDeckShortagesQueryTests
         var card = new Card { Id = cardId, Name = "Lightning Bolt", OracleId = "oracle1", TypeLine = "Instant" };
 
         var deck = new Deck { Id = Guid.NewGuid(), Format = Format.Modern, UserId = userId };
-        deck.AddCard(card, 4, DeckCategory.MainDeck);
+        deck.AddCard(card, 4, DeckCategory.MainDeck, DateTime.UtcNow);
 
         var collection = new List<CollectionEntry>
         {
@@ -58,7 +58,7 @@ public class GetDeckShortagesQueryTests
         var card = new Card { Id = cardId, Name = "Lightning Bolt", OracleId = "oracle1", TypeLine = "Instant" };
 
         var deck = new Deck { Id = Guid.NewGuid(), Format = Format.Modern, UserId = userId };
-        deck.AddCard(card, 4, DeckCategory.MainDeck);
+        deck.AddCard(card, 4, DeckCategory.MainDeck, DateTime.UtcNow);
 
         var collection = new List<CollectionEntry>
         {

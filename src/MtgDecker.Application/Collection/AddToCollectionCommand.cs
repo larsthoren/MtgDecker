@@ -27,14 +27,19 @@ public class AddToCollectionValidator : AbstractValidator<AddToCollectionCommand
 public class AddToCollectionHandler : IRequestHandler<AddToCollectionCommand, CollectionEntry>
 {
     private readonly ICollectionRepository _collectionRepository;
+    private readonly ICardRepository _cardRepository;
 
-    public AddToCollectionHandler(ICollectionRepository collectionRepository)
+    public AddToCollectionHandler(ICollectionRepository collectionRepository, ICardRepository cardRepository)
     {
         _collectionRepository = collectionRepository;
+        _cardRepository = cardRepository;
     }
 
     public async Task<CollectionEntry> Handle(AddToCollectionCommand request, CancellationToken cancellationToken)
     {
+        var card = await _cardRepository.GetByIdAsync(request.CardId, cancellationToken)
+            ?? throw new KeyNotFoundException($"Card {request.CardId} not found.");
+
         var entry = new CollectionEntry
         {
             Id = Guid.NewGuid(),

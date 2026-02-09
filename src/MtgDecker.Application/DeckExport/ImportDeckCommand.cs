@@ -65,12 +65,19 @@ public class ImportDeckHandler : IRequestHandler<ImportDeckCommand, ImportDeckRe
             UpdatedAt = utcNow
         };
 
+        // Batch-fetch all card names in a single query to avoid N+1
+        var allNames = parsed.MainDeck.Concat(parsed.Sideboard)
+            .Select(e => e.CardName)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var cards = await _cardRepository.GetByNamesAsync(allNames, cancellationToken);
+        var cardsByName = cards.ToDictionary(c => c.Name, StringComparer.OrdinalIgnoreCase);
+
         var unresolved = new List<string>();
 
         foreach (var entry in parsed.MainDeck)
         {
-            var card = await _cardRepository.GetByNameAsync(entry.CardName, cancellationToken);
-            if (card == null)
+            if (!cardsByName.TryGetValue(entry.CardName, out var card))
             {
                 unresolved.Add(entry.CardName);
                 continue;
@@ -80,8 +87,7 @@ public class ImportDeckHandler : IRequestHandler<ImportDeckCommand, ImportDeckRe
 
         foreach (var entry in parsed.Sideboard)
         {
-            var card = await _cardRepository.GetByNameAsync(entry.CardName, cancellationToken);
-            if (card == null)
+            if (!cardsByName.TryGetValue(entry.CardName, out var card))
             {
                 unresolved.Add(entry.CardName);
                 continue;

@@ -202,23 +202,23 @@
 
     private async Task LoadOwnershipInfo()
     {
-        // Collection entries for this card
-        var allEntries = await Mediator.Send(
-            new MtgDecker.Application.Collection.SearchCollectionQuery(UserId));
-        _collectionEntries = allEntries.Where(e => e.CardId == Card.Id).ToList();
+        // Collection entries for this card - filter by card name to avoid loading all entries
+        var entries = await Mediator.Send(
+            new MtgDecker.Application.Collection.SearchCollectionQuery(UserId, Card.Name));
+        _collectionEntries = entries.Where(e => e.CardId == Card.Id).ToList();
         _collectionTotal = _collectionEntries.Sum(e => e.Quantity);
 
-        // Deck usage
+        // Deck usage - use the list from ListDecksQuery which includes Entries
+        // TODO: If ListDecksQuery is changed to not include Entries, this will need
+        // individual GetDeckQuery calls or a dedicated query for deck usage by card.
         _decks = await Mediator.Send(new MtgDecker.Application.Decks.ListDecksQuery(UserId));
         _deckUsage = new();
         foreach (var deck in _decks)
         {
-            var fullDeck = await Mediator.Send(new MtgDecker.Application.Decks.GetDeckQuery(deck.Id));
-            if (fullDeck == null) continue;
-            var entry = fullDeck.Entries.FirstOrDefault(e => e.CardId == Card.Id);
+            var entry = deck.Entries.FirstOrDefault(e => e.CardId == Card.Id);
             if (entry != null)
             {
-                _deckUsage.Add(new DeckUsageInfo(fullDeck.Name, fullDeck.Format.ToString(), entry.Quantity));
+                _deckUsage.Add(new DeckUsageInfo(deck.Name, deck.Format.ToString(), entry.Quantity));
             }
         }
     }

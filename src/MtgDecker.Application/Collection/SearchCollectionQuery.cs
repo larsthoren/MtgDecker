@@ -1,3 +1,4 @@
+using FluentValidation;
 using MediatR;
 using MtgDecker.Application.Interfaces;
 using MtgDecker.Domain.Entities;
@@ -5,6 +6,14 @@ using MtgDecker.Domain.Entities;
 namespace MtgDecker.Application.Collection;
 
 public record SearchCollectionQuery(Guid UserId, string? SearchText = null) : IRequest<List<CollectionEntry>>;
+
+public class SearchCollectionValidator : AbstractValidator<SearchCollectionQuery>
+{
+    public SearchCollectionValidator()
+    {
+        RuleFor(x => x.UserId).NotEmpty();
+    }
+}
 
 public class SearchCollectionHandler : IRequestHandler<SearchCollectionQuery, List<CollectionEntry>>
 {

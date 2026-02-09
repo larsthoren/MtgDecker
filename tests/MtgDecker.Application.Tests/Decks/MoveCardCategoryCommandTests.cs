@@ -24,9 +24,9 @@ public class MoveCardCategoryCommandTests
         var cardId = Guid.NewGuid();
         var card = new Card { Id = cardId, Name = "Lightning Bolt", TypeLine = "Instant" };
         var deck = new Deck { Id = Guid.NewGuid(), Name = "Test", Format = Format.Modern, UserId = Guid.NewGuid() };
-        deck.AddCard(card, 2, DeckCategory.Maybeboard);
+        deck.AddCard(card, 2, DeckCategory.Maybeboard, DateTime.UtcNow);
         _deckRepo.GetByIdAsync(deck.Id, Arg.Any<CancellationToken>()).Returns(deck);
-        _cardRepo.GetByIdsAsync(Arg.Any<IEnumerable<Guid>>(), Arg.Any<CancellationToken>()).Returns(new List<Card> { card });
+        _cardRepo.GetByIdAsync(cardId, Arg.Any<CancellationToken>()).Returns(card);
 
         var result = await _handler.Handle(
             new MoveCardCategoryCommand(deck.Id, cardId, DeckCategory.Maybeboard, DeckCategory.MainDeck),
@@ -54,7 +54,7 @@ public class MoveCardCategoryCommandTests
     {
         var deck = new Deck { Id = Guid.NewGuid(), Name = "Test", Format = Format.Modern, UserId = Guid.NewGuid() };
         _deckRepo.GetByIdAsync(deck.Id, Arg.Any<CancellationToken>()).Returns(deck);
-        _cardRepo.GetByIdsAsync(Arg.Any<IEnumerable<Guid>>(), Arg.Any<CancellationToken>()).Returns(new List<Card>());
+        _cardRepo.GetByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns((Card?)null);
 
         var act = () => _handler.Handle(
             new MoveCardCategoryCommand(deck.Id, Guid.NewGuid(), DeckCategory.Maybeboard, DeckCategory.MainDeck),

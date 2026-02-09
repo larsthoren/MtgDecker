@@ -10,23 +10,25 @@ namespace MtgDecker.Application.Tests.Decks;
 public class UpdateCardQuantityCommandTests
 {
     private readonly IDeckRepository _deckRepo = Substitute.For<IDeckRepository>();
+    private readonly ICardRepository _cardRepo = Substitute.For<ICardRepository>();
     private readonly UpdateCardQuantityHandler _handler;
 
     public UpdateCardQuantityCommandTests()
     {
-        _handler = new UpdateCardQuantityHandler(_deckRepo, TimeProvider.System);
+        _handler = new UpdateCardQuantityHandler(_deckRepo, _cardRepo, TimeProvider.System);
     }
 
     [Fact]
     public async Task Handle_UpdatesQuantityAndSaves()
     {
-        var cardId = Guid.NewGuid();
+        var card = new Card { Id = Guid.NewGuid(), Name = "Lightning Bolt", TypeLine = "Instant" };
         var deck = new Deck { Id = Guid.NewGuid(), Name = "Test", Format = Format.Modern, UserId = Guid.NewGuid() };
-        deck.AddCard(new Card { Id = cardId, Name = "Lightning Bolt", TypeLine = "Instant" }, 2, DeckCategory.MainDeck);
+        deck.AddCard(card, 2, DeckCategory.MainDeck, DateTime.UtcNow);
         _deckRepo.GetByIdAsync(deck.Id, Arg.Any<CancellationToken>()).Returns(deck);
+        _cardRepo.GetByIdAsync(card.Id, Arg.Any<CancellationToken>()).Returns(card);
 
         var result = await _handler.Handle(
-            new UpdateCardQuantityCommand(deck.Id, cardId, DeckCategory.MainDeck, 4),
+            new UpdateCardQuantityCommand(deck.Id, card.Id, DeckCategory.MainDeck, 4),
             CancellationToken.None);
 
         result.Entries[0].Quantity.Should().Be(4);
@@ -40,6 +42,20 @@ public class UpdateCardQuantityCommandTests
 
         var act = () => _handler.Handle(
             new UpdateCardQuantityCommand(Guid.NewGuid(), Guid.NewGuid(), DeckCategory.MainDeck, 1),
+            CancellationToken.None);
+
+        await act.Should().ThrowAsync<KeyNotFoundException>();
+    }
+
+    [Fact]
+    public async Task Handle_CardNotFound_Throws()
+    {
+        var deck = new Deck { Id = Guid.NewGuid(), Name = "Test", Format = Format.Modern, UserId = Guid.NewGuid() };
+        _deckRepo.GetByIdAsync(deck.Id, Arg.Any<CancellationToken>()).Returns(deck);
+        _cardRepo.GetByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns((Card?)null);
+
+        var act = () => _handler.Handle(
+            new UpdateCardQuantityCommand(deck.Id, Guid.NewGuid(), DeckCategory.MainDeck, 1),
             CancellationToken.None);
 
         await act.Should().ThrowAsync<KeyNotFoundException>();

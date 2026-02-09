@@ -27,8 +27,8 @@ public class ExportDeckQueryTests
         var sbCard = new Card { Id = sbCardId, Name = "Pyroblast", SetCode = "ice", CollectorNumber = "212", TypeLine = "Instant" };
 
         var deck = new Deck { Id = Guid.NewGuid(), Format = Format.Modern, UserId = Guid.NewGuid() };
-        deck.AddCard(card, 4, DeckCategory.MainDeck);
-        deck.AddCard(sbCard, 2, DeckCategory.Sideboard);
+        deck.AddCard(card, 4, DeckCategory.MainDeck, DateTime.UtcNow);
+        deck.AddCard(sbCard, 2, DeckCategory.Sideboard, DateTime.UtcNow);
 
         _deckRepo.GetByIdAsync(deck.Id, Arg.Any<CancellationToken>()).Returns(deck);
         _cardRepo.GetByIdsAsync(Arg.Any<IEnumerable<Guid>>(), Arg.Any<CancellationToken>())
@@ -47,7 +47,7 @@ public class ExportDeckQueryTests
         var card = new Card { Id = cardId, Name = "Lightning Bolt", SetCode = "lea", CollectorNumber = "161", TypeLine = "Instant" };
 
         var deck = new Deck { Id = Guid.NewGuid(), Format = Format.Modern, UserId = Guid.NewGuid() };
-        deck.AddCard(card, 4, DeckCategory.MainDeck);
+        deck.AddCard(card, 4, DeckCategory.MainDeck, DateTime.UtcNow);
 
         _deckRepo.GetByIdAsync(deck.Id, Arg.Any<CancellationToken>()).Returns(deck);
         _cardRepo.GetByIdsAsync(Arg.Any<IEnumerable<Guid>>(), Arg.Any<CancellationToken>())

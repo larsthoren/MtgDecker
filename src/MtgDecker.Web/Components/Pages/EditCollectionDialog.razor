@@ -1,4 +1,5 @@
 @inject IMediator Mediator
+@inject ISnackbar Snackbar
 
 <MudDialog>
     <TitleContent>
@@ -44,8 +45,15 @@
 
     private async Task Save()
     {
-        await Mediator.Send(new MtgDecker.Application.Collection.UpdateCollectionEntryCommand(
-            Entry.Id, _quantity, _isFoil, _condition));
-        MudDialog.Close(DialogResult.Ok(true));
+        try
+        {
+            await Mediator.Send(new MtgDecker.Application.Collection.UpdateCollectionEntryCommand(
+                Entry.Id, _quantity, _isFoil, _condition));
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to save changes: {ex.Message}", Severity.Error);
+        }
     }
 }

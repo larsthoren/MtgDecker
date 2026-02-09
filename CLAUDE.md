@@ -102,6 +102,14 @@ tests/
 - DTOs and filter types get their own files under Interfaces/.
 - Dark theme by default (MTG aesthetic), light theme toggle available.
 
+## Workflow
+
+- Always use superpowers skills when applicable (TDD, code review, executing plans, writing plans, brainstorming, systematic debugging, verification before completion, etc.).
+- Use `superpowers:requesting-code-review` after completing features or before merging.
+- Use `superpowers:test-driven-development` when implementing any feature or bugfix.
+- Use `superpowers:writing-plans` before multi-step implementation work.
+- Use `superpowers:brainstorming` before creative work like new features or design changes.
+
 ## Environment Notes
 
 - Windows with MSYS2/Git Bash shell
