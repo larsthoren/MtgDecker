@@ -49,4 +49,16 @@ public class GameStateTests
 
         state.GameLog.Should().ContainSingle().Which.Should().Be("Test message");
     }
+
+    [Fact]
+    public void Log_FiresOnStateChanged()
+    {
+        var state = new GameState(_player1, _player2);
+        bool fired = false;
+        state.OnStateChanged += () => fired = true;
+
+        state.Log("test message");
+
+        fired.Should().BeTrue();
+    }
 }

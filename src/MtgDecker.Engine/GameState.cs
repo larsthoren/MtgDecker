@@ -14,6 +14,8 @@ public class GameState
     public bool IsFirstTurn { get; set; }
     public List<string> GameLog { get; } = new();
 
+    public event Action? OnStateChanged;
+
     public GameState(Player player1, Player player2)
     {
         Player1 = player1;
@@ -27,5 +29,9 @@ public class GameState
     public Player GetOpponent(Player player) =>
         player == Player1 ? Player2 : Player1;
 
-    public void Log(string message) => GameLog.Add(message);
+    public void Log(string message)
+    {
+        GameLog.Add(message);
+        OnStateChanged?.Invoke();
+    }
 }
