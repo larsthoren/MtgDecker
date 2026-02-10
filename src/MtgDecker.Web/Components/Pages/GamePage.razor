@@ -1,0 +1,142 @@
+@page "/game/{GameId}"
+@rendermode InteractiveServer
+@using MtgDecker.Engine
+@using MtgDecker.Engine.Enums
+@using MtgDecker.Web.Components.Pages.Game
+@inject GameSessionManager SessionManager
+@inject IDialogService DialogService
+@implements IDisposable
+
+<PageTitle>Game @GameId - MtgDecker</PageTitle>
+
+@if (_session == null)
+{
+    <MudAlert Severity="Severity.Error" Class="ma-4">Game not found.</MudAlert>
+}
+else if (!_session.IsStarted && !_gameStarting)
+{
+    <MudContainer MaxWidth="MaxWidth.Small" Class="mt-4 text-center">
+        <MudText Typo="Typo.h5">Starting game...</MudText>
+        <MudProgressLinear Indeterminate="true" Class="mt-4" />
+    </MudContainer>
+}
+else if (_session.State != null)
+{
+    <GameBoard State="_session.State"
+               PlayerSeat="_playerSeat"
+               Handler="_session.GetHandler(_playerSeat)"
+               OnAction="HandleAction"
+               OnSurrender="HandleSurrender"
+               IsGameOver="_session.IsGameOver"
+               Winner="_session.Winner" />
+}
+
+@code {
+    [Parameter] public string GameId { get; set; } = "";
+
+    private GameSession? _session;
+    private int _playerSeat;
+    private bool _gameStarting;
+    private bool _mulliganDialogOpen;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _session = SessionManager.GetSession(GameId);
+        if (_session == null) return;
+
+        // Determine player seat based on session state
+        // The creator (P1) navigates here after P2 joins — they were waiting in lobby
+        // The joiner (P2) navigates here directly from JoinGame
+        // If the session is already started, the second navigator is P2
+        _playerSeat = _session.IsStarted ? 2 : 1;
+
+        _session.OnStateChanged += HandleStateChanged;
+
+        if (!_session.IsStarted)
+        {
+            _gameStarting = true;
+            await _session.StartAsync();
+        }
+
+        _ = WatchForMulliganAsync();
+    }
+
+    private async Task WatchForMulliganAsync()
+    {
+        var handler = _session!.GetHandler(_playerSeat);
+        if (handler == null) return;
+
+        // Wait for the engine to request mulligan decision
+        for (int i = 0; i < 100; i++) // max ~5 seconds
+        {
+            if (handler.IsWaitingForMulligan || _session.IsGameOver) break;
+            await Task.Delay(50);
+        }
+
+        if (handler.IsWaitingForMulligan)
+        {
+            await InvokeAsync(async () =>
+            {
+                await ShowMulliganDialog(0);
+            });
+        }
+    }
+
+    private async Task ShowMulliganDialog(int mulliganCount)
+    {
+        if (_mulliganDialogOpen) return;
+        _mulliganDialogOpen = true;
+
+        var handler = _session!.GetHandler(_playerSeat)!;
+        var player = _playerSeat == 1 ? _session.State!.Player1 : _session.State!.Player2;
+
+        var parameters = new DialogParameters<MulliganDialog>
+        {
+            { x => x.Hand, player.Hand.Cards },
+            { x => x.MulliganCount, mulliganCount },
+            { x => x.Handler, handler }
+        };
+
+        var options = new DialogOptions
+        {
+            CloseOnEscapeKey = false,
+            MaxWidth = MaxWidth.Medium,
+            BackdropClick = false
+        };
+
+        var dialog = await DialogService.ShowAsync<MulliganDialog>("Mulligan", parameters, options);
+        await dialog.Result;
+        _mulliganDialogOpen = false;
+
+        // Check if handler is waiting for another mulligan (player chose to mulligan)
+        await Task.Delay(100); // Let engine process
+        if (handler.IsWaitingForMulligan)
+        {
+            await ShowMulliganDialog(mulliganCount + 1);
+        }
+    }
+
+    private void HandleAction(GameAction action)
+    {
+        var handler = _session?.GetHandler(_playerSeat);
+        handler?.SubmitAction(action);
+    }
+
+    private void HandleSurrender()
+    {
+        _session?.Surrender(_playerSeat);
+    }
+
+    private void HandleStateChanged()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        if (_session != null)
+        {
+            _session.OnStateChanged -= HandleStateChanged;
+        }
+    }
+}

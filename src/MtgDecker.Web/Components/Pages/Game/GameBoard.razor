@@ -1,0 +1,89 @@
+@using MtgDecker.Engine
+@using MtgDecker.Engine.Enums
+@namespace MtgDecker.Web.Components.Pages.Game
+
+<div class="game-board">
+    @if (IsGameOver)
+    {
+        <div class="game-over-overlay">
+            <MudPaper Class="pa-6 text-center" Elevation="8">
+                <MudText Typo="Typo.h4" Class="mb-2">Game Over</MudText>
+                @if (Winner != null)
+                {
+                    <MudText Typo="Typo.h5" Color="Color.Secondary">@Winner wins!</MudText>
+                }
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mt-4"
+                           Href="/game/new">New Game</MudButton>
+            </MudPaper>
+        </div>
+    }
+
+    <div class="board-main">
+        @* Opponent zone (top) *@
+        <PlayerZone PlayerName="@OpponentPlayer.Name"
+                    Battlefield="@OpponentPlayer.Battlefield.Cards"
+                    Hand="@OpponentPlayer.Hand.Cards"
+                    Graveyard="@OpponentPlayer.Graveyard.Cards"
+                    IsOpponent="true"
+                    IsActivePlayer="@(State.ActivePlayer == OpponentPlayer)"
+                    CanAct="@HasPriority"
+                    PlayerId="@OpponentPlayer.Id"
+                    OnAction="OnAction" />
+
+        @* Turn bar (middle) *@
+        <MudPaper Class="turn-bar pa-2" Elevation="2">
+            <div class="turn-bar-content">
+                <MudText Typo="Typo.body2">
+                    Turn @State.TurnNumber — @State.ActivePlayer.Name's turn
+                </MudText>
+                <MudChip T="string" Size="Size.Small" Color="Color.Primary">@State.CurrentPhase</MudChip>
+                @if (HasPriority)
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Success">Your Priority</MudChip>
+                    <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary"
+                               OnClick="PassPriority">Pass Priority</MudButton>
+                }
+                else
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Default">Waiting...</MudChip>
+                }
+                <MudSpacer />
+                <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Error"
+                           OnClick="() => OnSurrender.InvokeAsync()">Surrender</MudButton>
+            </div>
+        </MudPaper>
+
+        @* Local player zone (bottom) *@
+        <PlayerZone PlayerName="@LocalPlayer.Name"
+                    Battlefield="@LocalPlayer.Battlefield.Cards"
+                    Hand="@LocalPlayer.Hand.Cards"
+                    Graveyard="@LocalPlayer.Graveyard.Cards"
+                    IsOpponent="false"
+                    IsActivePlayer="@(State.ActivePlayer == LocalPlayer)"
+                    CanAct="@HasPriority"
+                    PlayerId="@LocalPlayer.Id"
+                    OnAction="OnAction" />
+    </div>
+
+    @* Game log (right) *@
+    <GameLogPanel GameLog="@State.GameLog" />
+</div>
+
+@code {
+    [Parameter] public GameState State { get; set; } = default!;
+    [Parameter] public int PlayerSeat { get; set; }
+    [Parameter] public InteractiveDecisionHandler? Handler { get; set; }
+    [Parameter] public EventCallback<GameAction> OnAction { get; set; }
+    [Parameter] public EventCallback OnSurrender { get; set; }
+    [Parameter] public bool IsGameOver { get; set; }
+    [Parameter] public string? Winner { get; set; }
+
+    private Player LocalPlayer => PlayerSeat == 1 ? State.Player1 : State.Player2;
+    private Player OpponentPlayer => PlayerSeat == 1 ? State.Player2 : State.Player1;
+    private bool HasPriority => Handler?.IsWaitingForAction == true;
+
+    private async Task PassPriority()
+    {
+        await OnAction.InvokeAsync(GameAction.Pass(LocalPlayer.Id));
+    }
+}
