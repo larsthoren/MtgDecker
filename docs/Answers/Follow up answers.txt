@@ -1,0 +1,18 @@
+The first playable version, will reffer to it as v1
+
+Regarding Zones, lets focus on hand, battlefield and graveyard for v1. It's up to the players to keep track of stuff in v1. You can interact with cards in the graveyard and select return to battlefield or return to hand only if you cast a spell that does that.
+After v1 we probably move to v1.1, v1.2 and so on, when we reach v2 we have  probably implemented all zones fully.
+I think we should model them properly but maybe a bit barebone.
+
+2a.  I think we need Untap→Upkeep→Draw→Main1→Combat->Main2→End
+No need for combat substeps. I think baseline is with correct priority grants but that we have some type of setting for how it should behave.
+
+2b. Basically what you wrote, add tapping creatures for attacking.
+
+2c. yes
+2d. yes
+4a. yes
+4b. yes
+9a. Do we have to decide now? I think we can talk more about that once we move past v1?
+15a, yes without ui, another option is to start in the UI end but maybe that is a bad choice?
+12. Agree with you

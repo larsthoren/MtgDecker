@@ -1,0 +1,28 @@
+Answers to you questions. Please add the questions and answers to a file so they are not lost.
+1. The end goal is a full simulator with correct rules. I do realize that is almost unrealistic. I see us implementating it gradually. To start with I want to implement all phases, the stack, priority passing. Tapping lands for mana, all mana types. Declaring attackers and declaring blockers. I realize each one of these is a whole plan in itself.
+
+2. First milestone for playable is being able to draw a hand. London mulligan available. Priority passing between all phases. Turning lands and creatures sideways. But no counting of mana or life. No officially declaring attackers or blockers. These things we have to keep track of ourselfs at this step. Also no stack at this step.
+
+3. Maybe we wait with that one until stack is implemented. There could be draw a card button, if you click it opponent has to approve.
+
+4. Exactly as you said: My instinct: same repo, new projects (MtgDecker.Engine, MtgDecker.Engine.Tests), but the engine should NOT depend on
+  your Domain/Infrastructure layers. It needs its own lightweight card representation that's optimized for gameplay, not
+   database storage.
+
+5. This is a problem for when we move PAST what is defined in 2.
+
+6. UI lives in a new Blazor project once we start it. But we can go without UI until we reach the state of 2.
+
+7. 1on1, other than that does not matter in the beginning until we move past 2., but Legacy/Modern/Premodern at least later on.
+
+8. Question for much later.
+
+9. Mana is not the complicated part. It should eventually be fully implemented. In 2. we handle casting manually, just being able to tap lands in 2.
+
+10 and 11. Question for later.
+
+12-14 We need to have a discussion about these in particular one by one. But first save this document and you can ask me questions after that.
+
+15. I think we can be at 2. in two weeks from now? Obviously years if we want to achieve everything but that is not realistic so we will add bits and pieces along the way. Maybe we just implement the cards in X amount of decks. Maybe we just end up building a few cubes and implement those cards. We will see as we progress.
+
+16. I guess zones are reffering to phases? Or do you mean actual zones, like exile, graveyard etc? Here I will need your guidance.

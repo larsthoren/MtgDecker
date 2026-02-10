@@ -1,0 +1,88 @@
+Follow-ups on the new answers                                                                                                                                                                                                                                                                                              
+  Zones — Library is the 4th zone for v1. You said hand/battlefield/graveyard, but London mulligan and the draw step both need the library. So v1 actually has 4 zones: Library, Hand, Battlefield, Graveyard. Just want to confirm you agree that's the set.                                                                
+  Priority "configurable behavior" — what did you mean by this? You said "correct priority grants but some type of setting for how it should behave." This is important for the design. Did you mean something like:
+  - Full priority: Every phase stop, both players must explicitly pass (like MTGO). Realistic but tedious without meaningful actions.
+  - Auto-pass: Engine auto-passes priority for both players unless they have a reason to act. Since v1 has no stack/spells, this would mean priority is essentially skipped.
+  - Shortcut mode: Players can set "pass until my main phase" or "pass until end of turn" — like F2/F6 in MTGO.
+
+	a: no auto pass in v1 as that would just end turns. Full prio is probably easiest, you just click "go" and move to next phase. Maybe a button to end turn.
+
+  For v1 specifically, since there's no stack and no instants, priority passing is purely ceremonial. Every phase would just be: active player gets priority, passes, opponent passes, move on. Do you still want explicit pass-through of every phase, or would auto-advancing make more sense for v1 with a flag to enable
+  full stops later?
+  
+	a: that is fine. Idea is that you can still click an instant from your hand at any time. Since this is between friends you just declare what you are doing and we handle it manually in v1.
+
+  UI-first vs engine-first — quick take. You asked if starting from UI is a bad choice. Here's the tradeoff:
+  - Engine-first (recommended): You build correct game logic, validate it with tests, and the UI is just a view layer on top. Faster iteration, TDD-friendly, no UI bugs mixed in with logic bugs.
+  - UI-first: You'd get something visual faster, which is motivating. But you'd be wiring UI to game logic that doesn't exist yet, and you'd end up writing the engine anyway. Risk of the UI driving architectural decisions that don't serve the engine well.
+
+  My recommendation: engine-first for v1 with tests as the "UI." Then build the real UI as v1.1 or a parallel effort once the engine is solid. Does that sit right?
+
+a: lets do engine first
+
+  ---
+  Q13: Async/await for the game loop
+
+  Here's the question concretely. The priority system needs to wait for a player to decide what to do. In code that looks like:
+
+  // The engine asks "what do you want to do?"
+  GameAction action = await player.DecisionHandler.GetAction(gameState, legalActions);
+
+  That await means the game loop is async Task. This has implications:
+
+  1. For tests: No problem. TestDecisionHandler returns pre-scripted actions instantly. Tests are async Task methods — xUnit handles this fine.
+  2. For console app: No problem. ConsoleDecisionHandler reads from stdin with await Console.In.ReadLineAsync().
+  3. For Blazor Server: No problem. Blazor is already async. The handler would hook into component state and await a TaskCompletionSource that's completed when the user clicks a button.
+  4. For Claude AI: No problem. HTTP API calls are inherently async.
+
+  The only scenario where async is problematic is if you wanted a synchronous engine that could be called from tight loops (e.g., Monte Carlo simulations running millions of games). But that's a far-future concern, and we could add a SyncDecisionHandler adapter if needed.
+
+  My recommendation: Make the engine async from the start. It's the natural fit for an interactive game, it works everywhere we need it, and C# async/await is mature and well-tooled.
+
+  Do you agree, or do you have concerns about async?
+
+	a: agree
+	
+  ---
+  Q14: Testing strategy
+
+  Your existing project uses xUnit + FluentAssertions + NSubstitute. I'd use the same stack, with one addition: a TestDecisionHandler that takes a queue of pre-scripted actions.
+
+  Tests would read like MTG rules scenarios:
+
+  Test: "London mulligan draws 7, player keeps"
+  Given: A new game with two players, each with a 60-card deck
+  When: Game starts
+  Then: Each player has 7 cards in hand, 53 in library
+
+  Test: "London mulligan — mulligan once, put 1 on bottom"
+  Given: A new game, Player 1 scripted to mulligan then keep
+  When: Game starts
+  Then: Player 1 has 6 cards in hand, 54 in library
+
+  Test: "Untap step untaps all permanents"
+  Given: Player 1 has a tapped creature on battlefield
+  When: Player 1's untap step begins
+  Then: That creature is untapped
+
+  Test: "Draw step draws one card"
+  Given: Player 1 has 5 cards in hand, 50 in library
+  When: Player 1's draw step executes
+  Then: Player 1 has 6 cards in hand, 49 in library
+
+  Questions for you:
+
+  14a. Are you comfortable with the TestDecisionHandler approach — feeding scripted actions to the engine and asserting on resulting state?
+	
+	a: yes
+
+  14b. Do you want integration-style tests (create game → play multiple turns → assert final state), or purely unit tests (test each component in isolation with mocks), or both?
+
+	a: eventually but I think we can wait for this past v1
+
+  14c. Should we test at the GameEngine level (high-level: "start game, play turn"), at the component level (TurnStateMachine, PrioritySystem individually), or both?
+  
+  a: individually to start, both after v2
+  
+
+✻ Baked for 1m 22s                                                      
