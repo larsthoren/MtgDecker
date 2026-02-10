@@ -18,13 +18,14 @@ public class GameEngineActionExecutionTests
     }
 
     [Fact]
-    public void ExecuteAction_PlayCard_MovesFromHandToBattlefield()
+    public async Task ExecuteAction_PlayCard_MovesFromHandToBattlefield()
     {
         var engine = CreateEngine(out var state, out var p1);
-        var card = new GameCard { Name = "Forest", TypeLine = "Basic Land — Forest" };
+        // Use a non-land card without ManaCost to use sandbox path
+        var card = new GameCard { Name = "TestCard", TypeLine = "Creature" };
         p1.Hand.Add(card);
 
-        engine.ExecuteAction(GameAction.PlayCard(p1.Id, card.Id));
+        await engine.ExecuteAction(GameAction.PlayCard(p1.Id, card.Id));
 
         p1.Hand.Count.Should().Be(0);
         p1.Battlefield.Count.Should().Be(1);
@@ -32,77 +33,78 @@ public class GameEngineActionExecutionTests
     }
 
     [Fact]
-    public void ExecuteAction_PlayCard_LogsAction()
+    public async Task ExecuteAction_PlayCard_LogsAction()
     {
         var engine = CreateEngine(out var state, out var p1);
-        var card = new GameCard { Name = "Forest", TypeLine = "Basic Land — Forest" };
+        // Use a non-land card without ManaCost to use sandbox path
+        var card = new GameCard { Name = "TestCard", TypeLine = "Creature" };
         p1.Hand.Add(card);
 
-        engine.ExecuteAction(GameAction.PlayCard(p1.Id, card.Id));
+        await engine.ExecuteAction(GameAction.PlayCard(p1.Id, card.Id));
 
-        state.GameLog.Should().Contain(msg => msg.Contains("Alice") && msg.Contains("Forest"));
+        state.GameLog.Should().Contain(msg => msg.Contains("Alice") && msg.Contains("TestCard"));
     }
 
     [Fact]
-    public void ExecuteAction_TapCard_TapsUntappedCard()
+    public async Task ExecuteAction_TapCard_TapsUntappedCard()
     {
         var engine = CreateEngine(out _, out var p1);
         var card = new GameCard { Name = "Forest", TypeLine = "Basic Land — Forest" };
         p1.Battlefield.Add(card);
 
-        engine.ExecuteAction(GameAction.TapCard(p1.Id, card.Id));
+        await engine.ExecuteAction(GameAction.TapCard(p1.Id, card.Id));
 
         card.IsTapped.Should().BeTrue();
     }
 
     [Fact]
-    public void ExecuteAction_TapCard_IgnoresAlreadyTapped()
+    public async Task ExecuteAction_TapCard_IgnoresAlreadyTapped()
     {
         var engine = CreateEngine(out var state, out var p1);
         var card = new GameCard { Name = "Forest", TypeLine = "Basic Land", IsTapped = true };
         p1.Battlefield.Add(card);
         state.GameLog.Clear();
 
-        engine.ExecuteAction(GameAction.TapCard(p1.Id, card.Id));
+        await engine.ExecuteAction(GameAction.TapCard(p1.Id, card.Id));
 
         card.IsTapped.Should().BeTrue();
         state.GameLog.Should().BeEmpty();
     }
 
     [Fact]
-    public void ExecuteAction_UntapCard_UntapsTappedCard()
+    public async Task ExecuteAction_UntapCard_UntapsTappedCard()
     {
         var engine = CreateEngine(out _, out var p1);
         var card = new GameCard { Name = "Forest", TypeLine = "Basic Land", IsTapped = true };
         p1.Battlefield.Add(card);
 
-        engine.ExecuteAction(GameAction.UntapCard(p1.Id, card.Id));
+        await engine.ExecuteAction(GameAction.UntapCard(p1.Id, card.Id));
 
         card.IsTapped.Should().BeFalse();
     }
 
     [Fact]
-    public void ExecuteAction_UntapCard_IgnoresAlreadyUntapped()
+    public async Task ExecuteAction_UntapCard_IgnoresAlreadyUntapped()
     {
         var engine = CreateEngine(out var state, out var p1);
         var card = new GameCard { Name = "Forest", TypeLine = "Basic Land" };
         p1.Battlefield.Add(card);
         state.GameLog.Clear();
 
-        engine.ExecuteAction(GameAction.UntapCard(p1.Id, card.Id));
+        await engine.ExecuteAction(GameAction.UntapCard(p1.Id, card.Id));
 
         card.IsTapped.Should().BeFalse();
         state.GameLog.Should().BeEmpty();
     }
 
     [Fact]
-    public void ExecuteAction_MoveCard_MovesBetweenZones()
+    public async Task ExecuteAction_MoveCard_MovesBetweenZones()
     {
         var engine = CreateEngine(out _, out var p1);
         var card = new GameCard { Name = "Bear", TypeLine = "Creature — Bear" };
         p1.Battlefield.Add(card);
 
-        engine.ExecuteAction(GameAction.MoveCard(p1.Id, card.Id, ZoneType.Battlefield, ZoneType.Graveyard));
+        await engine.ExecuteAction(GameAction.MoveCard(p1.Id, card.Id, ZoneType.Battlefield, ZoneType.Graveyard));
 
         p1.Battlefield.Count.Should().Be(0);
         p1.Graveyard.Count.Should().Be(1);
@@ -110,14 +112,14 @@ public class GameEngineActionExecutionTests
     }
 
     [Fact]
-    public void ExecuteAction_UnknownPlayerId_Throws()
+    public async Task ExecuteAction_UnknownPlayerId_Throws()
     {
         var engine = CreateEngine(out _, out _);
         var unknownId = Guid.NewGuid();
 
         var act = () => engine.ExecuteAction(GameAction.PlayCard(unknownId, Guid.NewGuid()));
 
-        act.Should().Throw<InvalidOperationException>()
+        await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage($"*{unknownId}*");
     }
 }

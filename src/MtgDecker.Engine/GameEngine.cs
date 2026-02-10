@@ -1,4 +1,5 @@
 using MtgDecker.Engine.Enums;
+using MtgDecker.Engine.Mana;
 
 namespace MtgDecker.Engine;
 
@@ -26,6 +27,7 @@ public class GameEngine
     public async Task RunTurnAsync(CancellationToken ct = default)
     {
         _turnStateMachine.Reset();
+        _state.ActivePlayer.LandsPlayedThisTurn = 0;
         _state.Log($"Turn {_state.TurnNumber}: {_state.ActivePlayer.Name}'s turn.");
 
         do
@@ -43,6 +45,9 @@ public class GameEngine
 
             if (phase.GrantsPriority)
                 await RunPriorityAsync(ct);
+
+            _state.Player1.ManaPool.Clear();
+            _state.Player2.ManaPool.Clear();
 
         } while (_turnStateMachine.AdvancePhase() != null);
 
@@ -72,7 +77,7 @@ public class GameEngine
         }
     }
 
-    internal void ExecuteAction(GameAction action)
+    internal async Task ExecuteAction(GameAction action, CancellationToken ct = default)
     {
         if (action.PlayerId != _state.Player1.Id && action.PlayerId != _state.Player2.Id)
             throw new InvalidOperationException($"Unknown player ID: {action.PlayerId}");
@@ -82,9 +87,100 @@ public class GameEngine
         switch (action.Type)
         {
             case ActionType.PlayCard:
-                var playCard = player.Hand.RemoveById(action.CardId!.Value);
-                if (playCard != null)
+                var playCard = player.Hand.Cards.FirstOrDefault(c => c.Id == action.CardId);
+                if (playCard == null) break;
+
+                if (playCard.IsLand)
                 {
+                    // Part A: Land drop enforcement
+                    if (player.LandsPlayedThisTurn >= 1)
+                    {
+                        _state.Log($"{player.Name} cannot play another land this turn.");
+                        break;
+                    }
+                    player.Hand.RemoveById(playCard.Id);
+                    player.Battlefield.Add(playCard);
+                    player.LandsPlayedThisTurn++;
+                    player.ActionHistory.Push(action);
+                    _state.Log($"{player.Name} plays {playCard.Name} (land drop).");
+                }
+                else if (playCard.ManaCost != null)
+                {
+                    // Part B: Cast spell with mana payment
+                    if (!player.ManaPool.CanPay(playCard.ManaCost))
+                    {
+                        _state.Log($"{player.Name} cannot cast {playCard.Name} — not enough mana.");
+                        break;
+                    }
+
+                    var cost = playCard.ManaCost;
+
+                    // Calculate remaining pool after colored requirements
+                    var remaining = new Dictionary<ManaColor, int>();
+                    foreach (var kvp in player.ManaPool.Available)
+                    {
+                        var after = kvp.Value;
+                        if (cost.ColorRequirements.TryGetValue(kvp.Key, out var needed))
+                            after -= needed;
+                        if (after > 0)
+                            remaining[kvp.Key] = after;
+                    }
+
+                    // Deduct colored requirements
+                    foreach (var (color, required) in cost.ColorRequirements)
+                        player.ManaPool.Deduct(color, required);
+
+                    // Handle generic cost
+                    if (cost.GenericCost > 0)
+                    {
+                        int distinctColors = remaining.Count(kv => kv.Value > 0);
+                        int totalRemaining = remaining.Values.Sum();
+
+                        if (distinctColors <= 1 || totalRemaining == cost.GenericCost)
+                        {
+                            // Unambiguous: auto-pay
+                            var toPay = cost.GenericCost;
+                            foreach (var (color, amount) in remaining)
+                            {
+                                var take = Math.Min(amount, toPay);
+                                if (take > 0)
+                                {
+                                    player.ManaPool.Deduct(color, take);
+                                    toPay -= take;
+                                }
+                                if (toPay == 0) break;
+                            }
+                        }
+                        else
+                        {
+                            // Ambiguous: prompt player
+                            var genericPayment = await player.DecisionHandler
+                                .ChooseGenericPayment(cost.GenericCost, remaining, ct);
+                            foreach (var (color, amount) in genericPayment)
+                                player.ManaPool.Deduct(color, amount);
+                        }
+                    }
+
+                    // Move card to destination
+                    player.Hand.RemoveById(playCard.Id);
+                    bool isInstantOrSorcery = playCard.CardTypes.HasFlag(CardType.Instant)
+                                            || playCard.CardTypes.HasFlag(CardType.Sorcery);
+                    if (isInstantOrSorcery)
+                    {
+                        player.Graveyard.Add(playCard);
+                        _state.Log($"{player.Name} casts {playCard.Name} (→ graveyard).");
+                    }
+                    else
+                    {
+                        player.Battlefield.Add(playCard);
+                        _state.Log($"{player.Name} casts {playCard.Name}.");
+                    }
+                    player.ActionHistory.Push(action);
+                }
+                else
+                {
+                    // Part C: Sandbox — no ManaCost, not a land
+                    player.Hand.RemoveById(playCard.Id);
                     player.Battlefield.Add(playCard);
                     player.ActionHistory.Push(action);
                     _state.Log($"{player.Name} plays {playCard.Name}.");
@@ -97,7 +193,27 @@ public class GameEngine
                 {
                     tapTarget.IsTapped = true;
                     player.ActionHistory.Push(action);
-                    _state.Log($"{player.Name} taps {tapTarget.Name}.");
+
+                    if (tapTarget.ManaAbility != null)
+                    {
+                        var ability = tapTarget.ManaAbility;
+                        if (ability.Type == ManaAbilityType.Fixed)
+                        {
+                            player.ManaPool.Add(ability.FixedColor!.Value);
+                            _state.Log($"{player.Name} taps {tapTarget.Name} for {ability.FixedColor}.");
+                        }
+                        else if (ability.Type == ManaAbilityType.Choice)
+                        {
+                            var chosen = await player.DecisionHandler.ChooseManaColor(
+                                ability.ChoiceColors!, ct);
+                            player.ManaPool.Add(chosen);
+                            _state.Log($"{player.Name} taps {tapTarget.Name} for {chosen}.");
+                        }
+                    }
+                    else
+                    {
+                        _state.Log($"{player.Name} taps {tapTarget.Name}.");
+                    }
                 }
                 break;
 
@@ -200,7 +316,7 @@ public class GameEngine
             }
             else
             {
-                ExecuteAction(action);
+                await ExecuteAction(action, ct);
                 activePlayerPassed = false;
                 nonActivePlayerPassed = false;
                 _state.PriorityPlayer = _state.ActivePlayer;

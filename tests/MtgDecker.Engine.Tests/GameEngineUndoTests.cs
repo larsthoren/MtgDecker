@@ -18,12 +18,13 @@ public class GameEngineUndoTests
     }
 
     [Fact]
-    public void UndoPlayCard_ReturnsCardFromBattlefieldToHand()
+    public async Task UndoPlayCard_ReturnsCardFromBattlefieldToHand()
     {
         var engine = CreateEngine(out _, out var p1, out _);
-        var card = new GameCard { Name = "Forest", TypeLine = "Basic Land — Forest" };
+        // Use sandbox card (no ManaCost, not a land) to avoid mana/land-drop logic
+        var card = new GameCard { Name = "Widget", TypeLine = "Artifact" };
         p1.Hand.Add(card);
-        engine.ExecuteAction(GameAction.PlayCard(p1.Id, card.Id));
+        await engine.ExecuteAction(GameAction.PlayCard(p1.Id, card.Id));
 
         var result = engine.UndoLastAction(p1.Id);
 
@@ -34,12 +35,12 @@ public class GameEngineUndoTests
     }
 
     [Fact]
-    public void UndoTapCard_UntapsTheCard()
+    public async Task UndoTapCard_UntapsTheCard()
     {
         var engine = CreateEngine(out _, out var p1, out _);
         var card = new GameCard { Name = "Forest", TypeLine = "Basic Land — Forest" };
         p1.Battlefield.Add(card);
-        engine.ExecuteAction(GameAction.TapCard(p1.Id, card.Id));
+        await engine.ExecuteAction(GameAction.TapCard(p1.Id, card.Id));
 
         var result = engine.UndoLastAction(p1.Id);
 
@@ -48,12 +49,12 @@ public class GameEngineUndoTests
     }
 
     [Fact]
-    public void UndoUntapCard_RetapsTheCard()
+    public async Task UndoUntapCard_RetapsTheCard()
     {
         var engine = CreateEngine(out _, out var p1, out _);
         var card = new GameCard { Name = "Forest", TypeLine = "Basic Land — Forest", IsTapped = true };
         p1.Battlefield.Add(card);
-        engine.ExecuteAction(GameAction.UntapCard(p1.Id, card.Id));
+        await engine.ExecuteAction(GameAction.UntapCard(p1.Id, card.Id));
 
         var result = engine.UndoLastAction(p1.Id);
 
@@ -62,12 +63,12 @@ public class GameEngineUndoTests
     }
 
     [Fact]
-    public void UndoMoveCard_ReversesSourceAndDestination()
+    public async Task UndoMoveCard_ReversesSourceAndDestination()
     {
         var engine = CreateEngine(out _, out var p1, out _);
         var card = new GameCard { Name = "Bear", TypeLine = "Creature — Bear" };
         p1.Battlefield.Add(card);
-        engine.ExecuteAction(GameAction.MoveCard(p1.Id, card.Id, ZoneType.Battlefield, ZoneType.Graveyard));
+        await engine.ExecuteAction(GameAction.MoveCard(p1.Id, card.Id, ZoneType.Battlefield, ZoneType.Graveyard));
 
         var result = engine.UndoLastAction(p1.Id);
 
@@ -88,26 +89,26 @@ public class GameEngineUndoTests
     }
 
     [Fact]
-    public void Undo_LogsReversal_PlayCard()
+    public async Task Undo_LogsReversal_PlayCard()
     {
         var engine = CreateEngine(out var state, out var p1, out _);
-        var card = new GameCard { Name = "Forest", TypeLine = "Basic Land — Forest" };
+        var card = new GameCard { Name = "Widget", TypeLine = "Artifact" };
         p1.Hand.Add(card);
-        engine.ExecuteAction(GameAction.PlayCard(p1.Id, card.Id));
+        await engine.ExecuteAction(GameAction.PlayCard(p1.Id, card.Id));
         state.GameLog.Clear();
 
         engine.UndoLastAction(p1.Id);
 
-        state.GameLog.Should().Contain(l => l.Contains("undoes") && l.Contains("Forest"));
+        state.GameLog.Should().Contain(l => l.Contains("undoes") && l.Contains("Widget"));
     }
 
     [Fact]
-    public void Undo_LogsReversal_TapCard()
+    public async Task Undo_LogsReversal_TapCard()
     {
         var engine = CreateEngine(out var state, out var p1, out _);
         var card = new GameCard { Name = "Forest", TypeLine = "Basic Land — Forest" };
         p1.Battlefield.Add(card);
-        engine.ExecuteAction(GameAction.TapCard(p1.Id, card.Id));
+        await engine.ExecuteAction(GameAction.TapCard(p1.Id, card.Id));
         state.GameLog.Clear();
 
         engine.UndoLastAction(p1.Id);
@@ -116,12 +117,12 @@ public class GameEngineUndoTests
     }
 
     [Fact]
-    public void Undo_LogsReversal_MoveCard()
+    public async Task Undo_LogsReversal_MoveCard()
     {
         var engine = CreateEngine(out var state, out var p1, out _);
         var card = new GameCard { Name = "Bear", TypeLine = "Creature — Bear" };
         p1.Battlefield.Add(card);
-        engine.ExecuteAction(GameAction.MoveCard(p1.Id, card.Id, ZoneType.Battlefield, ZoneType.Graveyard));
+        await engine.ExecuteAction(GameAction.MoveCard(p1.Id, card.Id, ZoneType.Battlefield, ZoneType.Graveyard));
         state.GameLog.Clear();
 
         engine.UndoLastAction(p1.Id);
@@ -130,66 +131,68 @@ public class GameEngineUndoTests
     }
 
     [Fact]
-    public void MultipleUndos_ReverseInOrder()
+    public async Task MultipleUndos_ReverseInOrder()
     {
         var engine = CreateEngine(out _, out var p1, out _);
-        var card1 = new GameCard { Name = "Forest", TypeLine = "Basic Land — Forest" };
-        var card2 = new GameCard { Name = "Mountain", TypeLine = "Basic Land — Mountain" };
+        // Use non-land sandbox cards so both can be played without land-drop limit
+        var card1 = new GameCard { Name = "Widget1", TypeLine = "Artifact" };
+        var card2 = new GameCard { Name = "Widget2", TypeLine = "Artifact" };
         p1.Hand.Add(card1);
         p1.Hand.Add(card2);
 
-        engine.ExecuteAction(GameAction.PlayCard(p1.Id, card1.Id));
-        engine.ExecuteAction(GameAction.PlayCard(p1.Id, card2.Id));
+        await engine.ExecuteAction(GameAction.PlayCard(p1.Id, card1.Id));
+        await engine.ExecuteAction(GameAction.PlayCard(p1.Id, card2.Id));
 
-        // Undo Mountain first (LIFO)
+        // Undo Widget2 first (LIFO)
         engine.UndoLastAction(p1.Id).Should().BeTrue();
         p1.Battlefield.Count.Should().Be(1);
-        p1.Battlefield.Cards[0].Name.Should().Be("Forest");
+        p1.Battlefield.Cards[0].Name.Should().Be("Widget1");
         p1.Hand.Count.Should().Be(1);
-        p1.Hand.Cards[0].Name.Should().Be("Mountain");
+        p1.Hand.Cards[0].Name.Should().Be("Widget2");
 
-        // Undo Forest
+        // Undo Widget1
         engine.UndoLastAction(p1.Id).Should().BeTrue();
         p1.Battlefield.Count.Should().Be(0);
         p1.Hand.Count.Should().Be(2);
     }
 
     [Fact]
-    public void ActionHistory_PushedOnSuccessfulAction()
+    public async Task ActionHistory_PushedOnSuccessfulAction()
     {
         var engine = CreateEngine(out _, out var p1, out _);
-        var card = new GameCard { Name = "Forest", TypeLine = "Basic Land — Forest" };
+        var card = new GameCard { Name = "Widget", TypeLine = "Artifact" };
         p1.Hand.Add(card);
 
-        engine.ExecuteAction(GameAction.PlayCard(p1.Id, card.Id));
+        await engine.ExecuteAction(GameAction.PlayCard(p1.Id, card.Id));
 
         p1.ActionHistory.Count.Should().Be(1);
         p1.ActionHistory.Peek().Type.Should().Be(ActionType.PlayCard);
     }
 
     [Fact]
-    public void ActionHistory_NotPushedOnFailedAction()
+    public async Task ActionHistory_NotPushedOnFailedAction()
     {
         var engine = CreateEngine(out _, out var p1, out _);
         // Try to play a card that's not in hand
         var fakeId = Guid.NewGuid();
 
-        engine.ExecuteAction(GameAction.PlayCard(p1.Id, fakeId));
+        await engine.ExecuteAction(GameAction.PlayCard(p1.Id, fakeId));
 
         p1.ActionHistory.Count.Should().Be(0);
     }
 
     [Fact]
-    public void ActionHistory_PerPlayer_IndependentStacks()
+    public async Task ActionHistory_PerPlayer_IndependentStacks()
     {
         var engine = CreateEngine(out _, out var p1, out var p2);
-        var card1 = new GameCard { Name = "Forest", TypeLine = "Basic Land — Forest" };
-        var card2 = new GameCard { Name = "Mountain", TypeLine = "Basic Land — Mountain" };
+        // Use sandbox cards to avoid land-drop issues
+        var card1 = new GameCard { Name = "Widget1", TypeLine = "Artifact" };
+        var card2 = new GameCard { Name = "Widget2", TypeLine = "Artifact" };
         p1.Hand.Add(card1);
         p2.Hand.Add(card2);
 
-        engine.ExecuteAction(GameAction.PlayCard(p1.Id, card1.Id));
-        engine.ExecuteAction(GameAction.PlayCard(p2.Id, card2.Id));
+        await engine.ExecuteAction(GameAction.PlayCard(p1.Id, card1.Id));
+        await engine.ExecuteAction(GameAction.PlayCard(p2.Id, card2.Id));
 
         // Player 1 can undo their action even though Player 2 acted last
         engine.UndoLastAction(p1.Id).Should().BeTrue();
@@ -201,12 +204,12 @@ public class GameEngineUndoTests
     }
 
     [Fact]
-    public void Undo_PopOnlyOnSuccess_PlayCard()
+    public async Task Undo_PopOnlyOnSuccess_PlayCard()
     {
         var engine = CreateEngine(out _, out var p1, out _);
-        var card = new GameCard { Name = "Forest", TypeLine = "Basic Land — Forest" };
+        var card = new GameCard { Name = "Widget", TypeLine = "Artifact" };
         p1.Hand.Add(card);
-        engine.ExecuteAction(GameAction.PlayCard(p1.Id, card.Id));
+        await engine.ExecuteAction(GameAction.PlayCard(p1.Id, card.Id));
 
         // Manually remove the card from battlefield (simulating external interference)
         p1.Battlefield.RemoveById(card.Id);
@@ -218,12 +221,12 @@ public class GameEngineUndoTests
     }
 
     [Fact]
-    public void Undo_PopOnlyOnSuccess_MoveCard()
+    public async Task Undo_PopOnlyOnSuccess_MoveCard()
     {
         var engine = CreateEngine(out _, out var p1, out _);
         var card = new GameCard { Name = "Bear", TypeLine = "Creature — Bear" };
         p1.Battlefield.Add(card);
-        engine.ExecuteAction(GameAction.MoveCard(p1.Id, card.Id, ZoneType.Battlefield, ZoneType.Graveyard));
+        await engine.ExecuteAction(GameAction.MoveCard(p1.Id, card.Id, ZoneType.Battlefield, ZoneType.Graveyard));
 
         // Manually remove the card from graveyard
         p1.Graveyard.RemoveById(card.Id);
@@ -235,12 +238,12 @@ public class GameEngineUndoTests
     }
 
     [Fact]
-    public void Undo_PopOnlyOnSuccess_TapCard()
+    public async Task Undo_PopOnlyOnSuccess_TapCard()
     {
         var engine = CreateEngine(out _, out var p1, out _);
         var card = new GameCard { Name = "Forest", TypeLine = "Basic Land — Forest" };
         p1.Battlefield.Add(card);
-        engine.ExecuteAction(GameAction.TapCard(p1.Id, card.Id));
+        await engine.ExecuteAction(GameAction.TapCard(p1.Id, card.Id));
 
         // Manually remove the card from battlefield
         p1.Battlefield.RemoveById(card.Id);
@@ -252,14 +255,14 @@ public class GameEngineUndoTests
     }
 
     [Fact]
-    public void Undo_AfterTapThenUntap_UndoesInCorrectOrder()
+    public async Task Undo_AfterTapThenUntap_UndoesInCorrectOrder()
     {
         var engine = CreateEngine(out _, out var p1, out _);
         var card = new GameCard { Name = "Forest", TypeLine = "Basic Land — Forest" };
         p1.Battlefield.Add(card);
 
-        engine.ExecuteAction(GameAction.TapCard(p1.Id, card.Id));
-        engine.ExecuteAction(GameAction.UntapCard(p1.Id, card.Id));
+        await engine.ExecuteAction(GameAction.TapCard(p1.Id, card.Id));
+        await engine.ExecuteAction(GameAction.UntapCard(p1.Id, card.Id));
 
         // Undo untap → card should be tapped again
         engine.UndoLastAction(p1.Id).Should().BeTrue();
@@ -271,13 +274,13 @@ public class GameEngineUndoTests
     }
 
     [Fact]
-    public void Undo_MoveToExile_ReversesCorrectly()
+    public async Task Undo_MoveToExile_ReversesCorrectly()
     {
         var engine = CreateEngine(out _, out var p1, out _);
         var card = new GameCard { Name = "Bear", TypeLine = "Creature — Bear" };
         p1.Battlefield.Add(card);
 
-        engine.ExecuteAction(GameAction.MoveCard(p1.Id, card.Id, ZoneType.Battlefield, ZoneType.Exile));
+        await engine.ExecuteAction(GameAction.MoveCard(p1.Id, card.Id, ZoneType.Battlefield, ZoneType.Exile));
 
         engine.UndoLastAction(p1.Id).Should().BeTrue();
         p1.Exile.Count.Should().Be(0);

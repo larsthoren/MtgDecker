@@ -266,20 +266,37 @@ public class GameEngineIntegrationTests
     [Fact]
     public async Task MultipleActionsInSamePriorityWindow()
     {
-        var engine = CreateGame(out var state, out var p1Handler, out _);
+        // Use a no-land deck so both cards use sandbox path (no land-drop limit)
+        var p1Handler = new TestDecisionHandler();
+        var p2Handler = new TestDecisionHandler();
+        var p1 = new Player(Guid.NewGuid(), "Alice", p1Handler);
+        var p2 = new Player(Guid.NewGuid(), "Bob", p2Handler);
+
+        var deck = new DeckBuilder()
+            .AddCard("Grizzly Bears", 60, "Creature — Bear")
+            .Build();
+        var deck2 = new DeckBuilder()
+            .AddCard("Goblin Guide", 60, "Creature — Goblin")
+            .Build();
+
+        foreach (var card in deck) p1.Library.Add(card);
+        foreach (var card in deck2) p2.Library.Add(card);
+
+        var state = new GameState(p1, p2);
+        var engine = new GameEngine(state);
         await engine.StartGameAsync();
 
-        // P1 plays two cards in the same turn
-        var card1 = state.Player1.Hand.Cards[0];
-        var card2 = state.Player1.Hand.Cards[1];
-        p1Handler.EnqueueAction(GameAction.PlayCard(state.Player1.Id, card1.Id));
-        p1Handler.EnqueueAction(GameAction.PlayCard(state.Player1.Id, card2.Id));
+        // P1 plays two cards in the same turn (both creatures, sandbox mode)
+        var card1 = p1.Hand.Cards[0];
+        var card2 = p1.Hand.Cards[1];
+        p1Handler.EnqueueAction(GameAction.PlayCard(p1.Id, card1.Id));
+        p1Handler.EnqueueAction(GameAction.PlayCard(p1.Id, card2.Id));
 
         state.IsFirstTurn = true;
         await engine.RunTurnAsync();
 
-        state.Player1.Battlefield.Count.Should().Be(2);
-        state.Player1.Hand.Count.Should().Be(5);
+        p1.Battlefield.Count.Should().Be(2);
+        p1.Hand.Count.Should().Be(5);
     }
 
     [Fact]
