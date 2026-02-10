@@ -71,7 +71,9 @@ public class ImportDeckHandler : IRequestHandler<ImportDeckCommand, ImportDeckRe
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
         var cards = await _cardRepository.GetByNamesAsync(allNames, cancellationToken);
-        var cardsByName = cards.ToDictionary(c => c.Name, StringComparer.OrdinalIgnoreCase);
+        var cardsByName = cards
+            .GroupBy(c => c.Name, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
 
         var unresolved = new List<string>();
 
