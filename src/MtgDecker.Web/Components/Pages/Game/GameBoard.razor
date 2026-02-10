@@ -2,7 +2,7 @@
 @using MtgDecker.Engine.Enums
 @namespace MtgDecker.Web.Components.Pages.Game
 
-<div class="game-board">
+<div class="game-board" tabindex="0" @ref="_boardRef" @onkeydown="HandleKeyDown">
     @if (IsGameOver)
     {
         <div class="game-over-overlay">
@@ -48,6 +48,9 @@
                     <MudChip T="string" Size="Size.Small" Color="Color.Default">Waiting...</MudChip>
                 }
                 <MudSpacer />
+                <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Warning"
+                           StartIcon="@Icons.Material.Filled.Undo"
+                           OnClick="() => OnUndo.InvokeAsync()">Undo</MudButton>
                 <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Error"
                            OnClick="() => OnSurrender.InvokeAsync()">Surrender</MudButton>
             </div>
@@ -75,12 +78,30 @@
     [Parameter] public InteractiveDecisionHandler? Handler { get; set; }
     [Parameter] public EventCallback<GameAction> OnAction { get; set; }
     [Parameter] public EventCallback OnSurrender { get; set; }
+    [Parameter] public EventCallback OnUndo { get; set; }
     [Parameter] public bool IsGameOver { get; set; }
     [Parameter] public string? Winner { get; set; }
 
+    private ElementReference _boardRef;
     private Player LocalPlayer => PlayerSeat == 1 ? State.Player1 : State.Player2;
     private Player OpponentPlayer => PlayerSeat == 1 ? State.Player2 : State.Player1;
     private bool HasPriority => Handler?.IsWaitingForAction == true;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await _boardRef.FocusAsync();
+        }
+    }
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.CtrlKey && e.Key == "z")
+        {
+            await OnUndo.InvokeAsync();
+        }
+    }
 
     private async Task PassPriority()
     {

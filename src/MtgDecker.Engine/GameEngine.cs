@@ -86,6 +86,7 @@ public class GameEngine
                 if (playCard != null)
                 {
                     player.Battlefield.Add(playCard);
+                    _state.ActionHistory.Push(action);
                     _state.Log($"{player.Name} plays {playCard.Name}.");
                 }
                 break;
@@ -95,6 +96,7 @@ public class GameEngine
                 if (tapTarget != null && !tapTarget.IsTapped)
                 {
                     tapTarget.IsTapped = true;
+                    _state.ActionHistory.Push(action);
                     _state.Log($"{player.Name} taps {tapTarget.Name}.");
                 }
                 break;
@@ -104,6 +106,7 @@ public class GameEngine
                 if (untapTarget != null && untapTarget.IsTapped)
                 {
                     untapTarget.IsTapped = false;
+                    _state.ActionHistory.Push(action);
                     _state.Log($"{player.Name} untaps {untapTarget.Name}.");
                 }
                 break;
@@ -115,10 +118,65 @@ public class GameEngine
                 if (movedCard != null)
                 {
                     dest.Add(movedCard);
+                    _state.ActionHistory.Push(action);
                     _state.Log($"{player.Name} moves {movedCard.Name} from {action.SourceZone} to {action.DestinationZone}.");
                 }
                 break;
         }
+    }
+
+    public bool UndoLastAction(Guid playerId)
+    {
+        if (_state.ActionHistory.Count == 0) return false;
+
+        var action = _state.ActionHistory.Peek();
+        if (action.PlayerId != playerId) return false;
+
+        _state.ActionHistory.Pop();
+        var player = playerId == _state.Player1.Id ? _state.Player1 : _state.Player2;
+
+        switch (action.Type)
+        {
+            case ActionType.PlayCard:
+                var card = player.Battlefield.RemoveById(action.CardId!.Value);
+                if (card != null)
+                {
+                    player.Hand.Add(card);
+                    _state.Log($"{player.Name} undoes playing {card.Name}.");
+                }
+                break;
+
+            case ActionType.TapCard:
+                var tapTarget = player.Battlefield.Cards.FirstOrDefault(c => c.Id == action.CardId);
+                if (tapTarget != null)
+                {
+                    tapTarget.IsTapped = false;
+                    _state.Log($"{player.Name} undoes tapping {tapTarget.Name}.");
+                }
+                break;
+
+            case ActionType.UntapCard:
+                var untapTarget = player.Battlefield.Cards.FirstOrDefault(c => c.Id == action.CardId);
+                if (untapTarget != null)
+                {
+                    untapTarget.IsTapped = true;
+                    _state.Log($"{player.Name} undoes untapping {untapTarget.Name}.");
+                }
+                break;
+
+            case ActionType.MoveCard:
+                var dest = player.GetZone(action.DestinationZone!.Value);
+                var src = player.GetZone(action.SourceZone!.Value);
+                var movedCard = dest.RemoveById(action.CardId!.Value);
+                if (movedCard != null)
+                {
+                    src.Add(movedCard);
+                    _state.Log($"{player.Name} undoes moving {movedCard.Name}.");
+                }
+                break;
+        }
+
+        return true;
     }
 
     internal async Task RunPriorityAsync(CancellationToken ct = default)

@@ -18,6 +18,7 @@ public class GameSession : IDisposable
 
     private List<GameCard>? _player1Deck;
     private List<GameCard>? _player2Deck;
+    private GameEngine? _engine;
     private CancellationTokenSource? _cts;
     private readonly object _joinLock = new();
 
@@ -62,12 +63,12 @@ public class GameSession : IDisposable
 
         State = new GameState(p1, p2);
         State.OnStateChanged += () => OnStateChanged?.Invoke();
-        var engine = new GameEngine(State);
+        _engine = new GameEngine(State);
 
         IsStarted = true;
         _cts = new CancellationTokenSource();
 
-        _ = Task.Run(() => RunGameLoopAsync(engine, _cts.Token));
+        _ = Task.Run(() => RunGameLoopAsync(_engine, _cts.Token));
     }
 
     private async Task RunGameLoopAsync(GameEngine engine, CancellationToken ct)
@@ -102,6 +103,13 @@ public class GameSession : IDisposable
         Winner = playerSeat == 1 ? Player2Name : Player1Name;
         State.Log($"{(playerSeat == 1 ? Player1Name : Player2Name)} surrenders.");
         _cts?.Cancel();
+    }
+
+    public bool Undo(int playerSeat)
+    {
+        if (_engine == null || State == null) return false;
+        var playerId = playerSeat == 1 ? State.Player1.Id : State.Player2.Id;
+        return _engine.UndoLastAction(playerId);
     }
 
     public InteractiveDecisionHandler? GetHandler(int playerSeat) =>

@@ -72,18 +72,20 @@
         }
     </div>
 
-    @* Action Menu *@
+    @* Action Menu — positioned relative to selected card's zone *@
     @if (SelectedCard != null)
     {
-        <ActionMenu Visible="true"
-                    CardName="@SelectedCard.Name"
-                    CurrentZone="_selectedZone"
-                    IsOwnCard="@(!IsOpponent)"
-                    IsTapped="@SelectedCard.IsTapped"
-                    OnPlay="HandlePlay"
-                    OnTapToggle="HandleTapToggle"
-                    OnMoveTo="HandleMoveTo"
-                    OnClose="ClearSelection" />
+        <div style="position: relative; display: inline-block;">
+            <ActionMenu Visible="true"
+                        CardName="@SelectedCard.Name"
+                        CurrentZone="_selectedZone"
+                        IsOwnCard="@(!IsOpponent)"
+                        IsTapped="@SelectedCard.IsTapped"
+                        OnPlay="HandlePlay"
+                        OnTapToggle="HandleTapToggle"
+                        OnMoveTo="HandleMoveTo"
+                        OnClose="ClearSelection" />
+        </div>
     }
 </div>
 

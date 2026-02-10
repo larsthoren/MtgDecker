@@ -28,6 +28,7 @@ else if (_session.State != null)
                Handler="_session.GetHandler(_playerSeat)"
                OnAction="HandleAction"
                OnSurrender="HandleSurrender"
+               OnUndo="HandleUndo"
                IsGameOver="_session.IsGameOver"
                Winner="_session.Winner" />
 }
@@ -40,6 +41,7 @@ else if (_session.State != null)
     private int _playerSeat;
     private bool _gameStarting;
     private bool _mulliganDialogOpen;
+    private bool _componentRendered;
     private int _mulliganCount;
 
     protected override async Task OnInitializedAsync()
@@ -51,33 +53,48 @@ else if (_session.State != null)
 
         _session.OnStateChanged += HandleStateChanged;
 
-        var handler = _session.GetHandler(_playerSeat);
-        if (handler != null)
-        {
-            handler.OnWaitingForInput += HandleWaitingForInput;
-        }
-
         if (!_session.IsStarted)
         {
             _gameStarting = true;
             await _session.StartAsync();
         }
 
-        // If the handler is already waiting (we subscribed after it started), show dialog now
-        if (handler?.IsWaitingForMulligan == true)
+        // Subscribe AFTER StartAsync — handlers are created inside StartAsync
+        var handler = _session.GetHandler(_playerSeat);
+        if (handler != null)
         {
-            _ = InvokeAsync(async () => await ShowMulliganDialog(0));
+            handler.OnWaitingForInput += HandleWaitingForInput;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _componentRendered = true;
+            // Check if handler is already waiting (event fired before we subscribed or before first render)
+            var handler = _session?.GetHandler(_playerSeat);
+            if (handler?.IsWaitingForMulligan == true)
+            {
+                await ShowMulliganDialog(0);
+            }
         }
     }
 
     private void HandleWaitingForInput()
     {
+        if (!_componentRendered) return;
+
         var handler = _session!.GetHandler(_playerSeat);
         if (handler == null) return;
 
         if (handler.IsWaitingForMulligan)
         {
             _ = InvokeAsync(async () => await ShowMulliganDialog(_mulliganCount));
+        }
+        else if (handler.IsWaitingForAction)
+        {
+            InvokeAsync(StateHasChanged);
         }
     }
 
@@ -119,6 +136,11 @@ else if (_session.State != null)
     private void HandleSurrender()
     {
         _session?.Surrender(_playerSeat);
+    }
+
+    private void HandleUndo()
+    {
+        _session?.Undo(_playerSeat);
     }
 
     private void HandleStateChanged()
