@@ -5,10 +5,36 @@
 <div class="player-zone @(IsOpponent ? "opponent" : "local")">
     <div class="zone-header">
         <MudText Typo="Typo.subtitle2">@PlayerName</MudText>
+
+        @* Life counter *@
+        <div style="display: flex; align-items: center; gap: 4px; margin-left: 12px;">
+            <MudIconButton Icon="@Icons.Material.Filled.Remove" Size="Size.Small"
+                           OnClick="() => OnLifeAdjust.InvokeAsync(-1)" />
+            @if (_editingLife)
+            {
+                <MudTextField T="string" @bind-Value="_lifeDelta" Immediate="true"
+                              Style="width: 60px;" Variant="Variant.Outlined" Margin="Margin.Dense"
+                              OnKeyDown="HandleLifeKeyDown"
+                              AutoFocus="true" />
+            }
+            else
+            {
+                <MudChip T="string" Size="Size.Small" Color="Color.Error"
+                         Style="cursor: pointer; min-width: 40px; justify-content: center;"
+                         OnClick="StartEditLife">@Life</MudChip>
+            }
+            <MudIconButton Icon="@Icons.Material.Filled.Add" Size="Size.Small"
+                           OnClick="() => OnLifeAdjust.InvokeAsync(1)" />
+        </div>
+
         @if (IsActivePlayer)
         {
             <MudChip T="string" Size="Size.Small" Color="Color.Primary">Active</MudChip>
         }
+
+        <MudText Typo="Typo.caption" Class="ml-2" Style="opacity: 0.7;">
+            Library: @LibraryCount
+        </MudText>
     </div>
 
     @* Battlefield *@
@@ -72,6 +98,18 @@
         }
     </div>
 
+    @* Exile *@
+    <div class="zone graveyard">
+        <MudText Typo="Typo.caption">Exile (@Exile.Count)</MudText>
+        @if (Exile.Count > 0)
+        {
+            <CardDisplay Name="@Exile[^1].Name"
+                         ImageUrl="@Exile[^1].ImageUrl"
+                         Selected="@(SelectedCard?.Id == Exile[^1].Id)"
+                         OnClick="() => SelectCard(Exile[^1], ZoneType.Exile)" />
+        }
+    </div>
+
     @* Action Menu — positioned relative to selected card's zone *@
     @if (SelectedCard != null)
     {
@@ -94,6 +132,10 @@
     [Parameter] public IReadOnlyList<GameCard> Battlefield { get; set; } = Array.Empty<GameCard>();
     [Parameter] public IReadOnlyList<GameCard> Hand { get; set; } = Array.Empty<GameCard>();
     [Parameter] public IReadOnlyList<GameCard> Graveyard { get; set; } = Array.Empty<GameCard>();
+    [Parameter] public int Life { get; set; }
+    [Parameter] public int LibraryCount { get; set; }
+    [Parameter] public IReadOnlyList<GameCard> Exile { get; set; } = Array.Empty<GameCard>();
+    [Parameter] public EventCallback<int> OnLifeAdjust { get; set; }
     [Parameter] public bool IsOpponent { get; set; }
     [Parameter] public bool IsActivePlayer { get; set; }
     [Parameter] public bool CanAct { get; set; }
@@ -102,6 +144,8 @@
 
     private GameCard? SelectedCard;
     private ZoneType _selectedZone;
+    private bool _editingLife;
+    private string _lifeDelta = "";
 
     private void SelectCard(GameCard card, ZoneType zone)
     {
@@ -138,6 +182,25 @@
         await OnAction.InvokeAsync(
             GameAction.MoveCard(PlayerId, SelectedCard.Id, _selectedZone, destination));
         ClearSelection();
+    }
+
+    private void StartEditLife()
+    {
+        _editingLife = true;
+        _lifeDelta = "";
+    }
+
+    private async Task HandleLifeKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && int.TryParse(_lifeDelta, out var delta))
+        {
+            await OnLifeAdjust.InvokeAsync(delta);
+            _editingLife = false;
+        }
+        else if (e.Key == "Escape")
+        {
+            _editingLife = false;
+        }
     }
 
     private void ClearSelection()

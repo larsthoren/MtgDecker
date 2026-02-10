@@ -29,6 +29,7 @@ else if (_session.State != null)
                OnAction="HandleAction"
                OnSurrender="HandleSurrender"
                OnUndo="HandleUndo"
+               OnLifeAdjust="HandleLifeAdjust"
                IsGameOver="_session.IsGameOver"
                Winner="_session.Winner" />
 }
@@ -141,6 +142,11 @@ else if (_session.State != null)
     private void HandleUndo()
     {
         _session?.Undo(_playerSeat);
+    }
+
+    private void HandleLifeAdjust((int seat, int delta) args)
+    {
+        _session?.AdjustLife(args.seat, args.delta);
     }
 
     private void HandleStateChanged()

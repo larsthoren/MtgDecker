@@ -24,6 +24,10 @@
                     Battlefield="@OpponentPlayer.Battlefield.Cards"
                     Hand="@OpponentPlayer.Hand.Cards"
                     Graveyard="@OpponentPlayer.Graveyard.Cards"
+                    Life="@OpponentPlayer.Life"
+                    LibraryCount="@OpponentPlayer.Library.Count"
+                    Exile="@OpponentPlayer.Exile.Cards"
+                    OnLifeAdjust="(delta) => OnLifeAdjust.InvokeAsync((OpponentSeat, delta))"
                     IsOpponent="true"
                     IsActivePlayer="@(State.ActivePlayer == OpponentPlayer)"
                     CanAct="@HasPriority"
@@ -61,6 +65,10 @@
                     Battlefield="@LocalPlayer.Battlefield.Cards"
                     Hand="@LocalPlayer.Hand.Cards"
                     Graveyard="@LocalPlayer.Graveyard.Cards"
+                    Life="@LocalPlayer.Life"
+                    LibraryCount="@LocalPlayer.Library.Count"
+                    Exile="@LocalPlayer.Exile.Cards"
+                    OnLifeAdjust="(delta) => OnLifeAdjust.InvokeAsync((PlayerSeat, delta))"
                     IsOpponent="false"
                     IsActivePlayer="@(State.ActivePlayer == LocalPlayer)"
                     CanAct="@HasPriority"
@@ -79,12 +87,14 @@
     [Parameter] public EventCallback<GameAction> OnAction { get; set; }
     [Parameter] public EventCallback OnSurrender { get; set; }
     [Parameter] public EventCallback OnUndo { get; set; }
+    [Parameter] public EventCallback<(int seat, int delta)> OnLifeAdjust { get; set; }
     [Parameter] public bool IsGameOver { get; set; }
     [Parameter] public string? Winner { get; set; }
 
     private ElementReference _boardRef;
     private Player LocalPlayer => PlayerSeat == 1 ? State.Player1 : State.Player2;
     private Player OpponentPlayer => PlayerSeat == 1 ? State.Player2 : State.Player1;
+    private int OpponentSeat => PlayerSeat == 1 ? 2 : 1;
     private bool HasPriority => Handler?.IsWaitingForAction == true;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
