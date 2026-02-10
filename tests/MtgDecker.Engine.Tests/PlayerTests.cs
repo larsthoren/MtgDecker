@@ -18,6 +18,7 @@ public class PlayerTests
         player.Id.Should().Be(id);
         player.Name.Should().Be("Alice");
         player.DecisionHandler.Should().BeSameAs(handler);
+        player.Life.Should().Be(20);
     }
 
     [Fact]

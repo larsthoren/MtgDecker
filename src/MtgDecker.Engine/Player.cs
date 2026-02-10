@@ -13,6 +13,7 @@ public class Player
     public Zone Battlefield { get; }
     public Zone Graveyard { get; }
     public Zone Exile { get; }
+    public int Life { get; set; } = 20;
 
     public Player(Guid id, string name, IPlayerDecisionHandler decisionHandler)
     {
