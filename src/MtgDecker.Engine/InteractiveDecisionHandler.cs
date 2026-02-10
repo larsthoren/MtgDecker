@@ -1,4 +1,5 @@
 using MtgDecker.Engine.Enums;
+using MtgDecker.Engine.Mana;
 
 namespace MtgDecker.Engine;
 
@@ -7,10 +8,14 @@ public class InteractiveDecisionHandler : IPlayerDecisionHandler
     private TaskCompletionSource<GameAction>? _actionTcs;
     private TaskCompletionSource<MulliganDecision>? _mulliganTcs;
     private TaskCompletionSource<IReadOnlyList<GameCard>>? _bottomCardsTcs;
+    private TaskCompletionSource<ManaColor>? _manaColorTcs;
+    private TaskCompletionSource<Dictionary<ManaColor, int>>? _genericPaymentTcs;
 
     public bool IsWaitingForAction => _actionTcs is { Task.IsCompleted: false };
     public bool IsWaitingForMulligan => _mulliganTcs is { Task.IsCompleted: false };
     public bool IsWaitingForBottomCards => _bottomCardsTcs is { Task.IsCompleted: false };
+    public bool IsWaitingForManaColor => _manaColorTcs is { Task.IsCompleted: false };
+    public bool IsWaitingForGenericPayment => _genericPaymentTcs is { Task.IsCompleted: false };
 
     public event Action? OnWaitingForInput;
 
@@ -41,6 +46,24 @@ public class InteractiveDecisionHandler : IPlayerDecisionHandler
         return _bottomCardsTcs.Task;
     }
 
+    public Task<ManaColor> ChooseManaColor(IReadOnlyList<ManaColor> options, CancellationToken ct = default)
+    {
+        _manaColorTcs = new TaskCompletionSource<ManaColor>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var registration = ct.Register(() => _manaColorTcs.TrySetCanceled());
+        _manaColorTcs.Task.ContinueWith(_ => registration.Dispose(), TaskContinuationOptions.ExecuteSynchronously);
+        OnWaitingForInput?.Invoke();
+        return _manaColorTcs.Task;
+    }
+
+    public Task<Dictionary<ManaColor, int>> ChooseGenericPayment(int genericAmount, Dictionary<ManaColor, int> available, CancellationToken ct = default)
+    {
+        _genericPaymentTcs = new TaskCompletionSource<Dictionary<ManaColor, int>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var registration = ct.Register(() => _genericPaymentTcs.TrySetCanceled());
+        _genericPaymentTcs.Task.ContinueWith(_ => registration.Dispose(), TaskContinuationOptions.ExecuteSynchronously);
+        OnWaitingForInput?.Invoke();
+        return _genericPaymentTcs.Task;
+    }
+
     public void SubmitAction(GameAction action) =>
         _actionTcs?.TrySetResult(action);
 
@@ -59,4 +82,10 @@ public class InteractiveDecisionHandler : IPlayerDecisionHandler
             await Task.Delay(10);
         }
     }
+
+    public void SubmitManaColor(ManaColor color) =>
+        _manaColorTcs?.TrySetResult(color);
+
+    public void SubmitGenericPayment(Dictionary<ManaColor, int> payment) =>
+        _genericPaymentTcs?.TrySetResult(payment);
 }

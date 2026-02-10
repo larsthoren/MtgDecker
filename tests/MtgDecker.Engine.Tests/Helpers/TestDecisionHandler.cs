@@ -1,5 +1,6 @@
 using MtgDecker.Engine;
 using MtgDecker.Engine.Enums;
+using MtgDecker.Engine.Mana;
 
 namespace MtgDecker.Engine.Tests.Helpers;
 
@@ -8,6 +9,8 @@ public class TestDecisionHandler : IPlayerDecisionHandler
     private readonly Queue<GameAction> _actions = new();
     private readonly Queue<MulliganDecision> _mulliganDecisions = new();
     private readonly Queue<Func<IReadOnlyList<GameCard>, int, IReadOnlyList<GameCard>>> _bottomChoices = new();
+    private readonly Queue<ManaColor> _manaColorChoices = new();
+    private readonly Queue<Dictionary<ManaColor, int>> _genericPaymentChoices = new();
 
     public void EnqueueAction(GameAction action) => _actions.Enqueue(action);
 
@@ -15,6 +18,10 @@ public class TestDecisionHandler : IPlayerDecisionHandler
 
     public void EnqueueBottomChoice(Func<IReadOnlyList<GameCard>, int, IReadOnlyList<GameCard>> chooser) =>
         _bottomChoices.Enqueue(chooser);
+
+    public void EnqueueManaColor(ManaColor color) => _manaColorChoices.Enqueue(color);
+
+    public void EnqueueGenericPayment(Dictionary<ManaColor, int> payment) => _genericPaymentChoices.Enqueue(payment);
 
     public Task<GameAction> GetAction(GameState gameState, Guid playerId, CancellationToken ct = default)
     {
@@ -35,5 +42,33 @@ public class TestDecisionHandler : IPlayerDecisionHandler
         if (_bottomChoices.Count == 0)
             return Task.FromResult<IReadOnlyList<GameCard>>(hand.Take(count).ToList());
         return Task.FromResult(_bottomChoices.Dequeue()(hand, count));
+    }
+
+    public Task<ManaColor> ChooseManaColor(IReadOnlyList<ManaColor> options, CancellationToken ct = default)
+    {
+        if (_manaColorChoices.Count == 0)
+            return Task.FromResult(options[0]);
+        return Task.FromResult(_manaColorChoices.Dequeue());
+    }
+
+    public Task<Dictionary<ManaColor, int>> ChooseGenericPayment(int genericAmount, Dictionary<ManaColor, int> available, CancellationToken ct = default)
+    {
+        if (_genericPaymentChoices.Count == 0)
+        {
+            var payment = new Dictionary<ManaColor, int>();
+            var remaining = genericAmount;
+            foreach (var (color, amount) in available)
+            {
+                if (remaining <= 0) break;
+                var take = Math.Min(amount, remaining);
+                if (take > 0)
+                {
+                    payment[color] = take;
+                    remaining -= take;
+                }
+            }
+            return Task.FromResult(payment);
+        }
+        return Task.FromResult(_genericPaymentChoices.Dequeue());
     }
 }

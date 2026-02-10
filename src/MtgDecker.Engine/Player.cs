@@ -1,4 +1,5 @@
 using MtgDecker.Engine.Enums;
+using MtgDecker.Engine.Mana;
 
 namespace MtgDecker.Engine;
 
@@ -15,6 +16,8 @@ public class Player
     public Zone Exile { get; }
     public int Life { get; private set; } = 20;
     public Stack<GameAction> ActionHistory { get; } = new();
+    public ManaPool ManaPool { get; } = new();
+    public int LandsPlayedThisTurn { get; set; }
 
     public void AdjustLife(int delta)
     {
