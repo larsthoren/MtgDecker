@@ -5,6 +5,7 @@
 @using MtgDecker.Web.Components.Pages.Game
 @inject GameSessionManager SessionManager
 @inject IDialogService DialogService
+@inject NavigationManager Navigation
 @implements IDisposable
 
 <PageTitle>Game @GameId - MtgDecker</PageTitle>
@@ -33,6 +34,7 @@ else if (_session.State != null)
 
 @code {
     [Parameter] public string GameId { get; set; } = "";
+    [SupplyParameterFromQuery(Name = "seat")] public int? SeatParam { get; set; }
 
     private GameSession? _session;
     private int _playerSeat;
@@ -44,11 +46,7 @@ else if (_session.State != null)
         _session = SessionManager.GetSession(GameId);
         if (_session == null) return;
 
-        // Determine player seat based on session state
-        // The creator (P1) navigates here after P2 joins — they were waiting in lobby
-        // The joiner (P2) navigates here directly from JoinGame
-        // If the session is already started, the second navigator is P2
-        _playerSeat = _session.IsStarted ? 2 : 1;
+        _playerSeat = SeatParam ?? 1;
 
         _session.OnStateChanged += HandleStateChanged;
 
@@ -137,6 +135,11 @@ else if (_session.State != null)
         if (_session != null)
         {
             _session.OnStateChanged -= HandleStateChanged;
+            if (_session.IsGameOver)
+            {
+                SessionManager.RemoveSession(_session.GameId);
+                _session.Dispose();
+            }
         }
     }
 }

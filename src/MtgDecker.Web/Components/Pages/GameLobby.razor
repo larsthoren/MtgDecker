@@ -6,6 +6,7 @@
 @inject GameSessionManager SessionManager
 @inject IMediator Mediator
 @inject NavigationManager Navigation
+@implements IDisposable
 
 <PageTitle>Play Game - MtgDecker</PageTitle>
 
@@ -83,6 +84,8 @@
     private string? _joinGameId;
     private string? _gameId;
     private string? _errorMessage;
+    private int _mySeat;
+    private CancellationTokenSource _pollCts = new();
 
     // Hardcoded UserId matching existing app pattern
     private static readonly Guid UserId = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -103,8 +106,9 @@
         if (deck == null) return;
 
         var session = SessionManager.CreateGame();
-        session.JoinPlayer(_playerName, deck);
+        var seat = session.JoinPlayer(_playerName, deck);
         _gameId = session.GameId;
+        _mySeat = seat;
 
         // Poll for second player
         _ = WaitForOpponentAsync(session);
@@ -127,17 +131,27 @@
         var deck = await LoadGameDeck(_joinDeckId!.Value);
         if (deck == null) return;
 
-        session.JoinPlayer(_joinPlayerName, deck);
-        Navigation.NavigateTo($"/game/{session.GameId}");
+        var seat = session.JoinPlayer(_joinPlayerName, deck);
+        Navigation.NavigateTo($"/game/{session.GameId}?seat={seat}");
     }
 
     private async Task WaitForOpponentAsync(GameSession session)
     {
-        while (!session.IsFull)
+        try
         {
-            await Task.Delay(1000);
+            while (!session.IsFull)
+            {
+                await Task.Delay(1000, _pollCts.Token);
+            }
+            await InvokeAsync(() => Navigation.NavigateTo($"/game/{session.GameId}?seat={_mySeat}"));
         }
-        await InvokeAsync(() => Navigation.NavigateTo($"/game/{session.GameId}"));
+        catch (OperationCanceledException) { }
+    }
+
+    public void Dispose()
+    {
+        _pollCts.Cancel();
+        _pollCts.Dispose();
     }
 
     private async Task<List<GameCard>?> LoadGameDeck(Guid deckId)

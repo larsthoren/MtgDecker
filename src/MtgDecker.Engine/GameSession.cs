@@ -2,7 +2,7 @@ using MtgDecker.Engine.Enums;
 
 namespace MtgDecker.Engine;
 
-public class GameSession
+public class GameSession : IDisposable
 {
     public string GameId { get; }
     public GameState? State { get; private set; }
@@ -19,6 +19,7 @@ public class GameSession
     private List<GameCard>? _player1Deck;
     private List<GameCard>? _player2Deck;
     private CancellationTokenSource? _cts;
+    private readonly object _joinLock = new();
 
     public GameSession(string gameId)
     {
@@ -27,19 +28,22 @@ public class GameSession
 
     public int JoinPlayer(string playerName, List<GameCard> deck)
     {
-        if (Player1Name == null)
+        lock (_joinLock)
         {
-            Player1Name = playerName;
-            _player1Deck = deck;
-            return 1;
+            if (Player1Name == null)
+            {
+                Player1Name = playerName;
+                _player1Deck = deck;
+                return 1;
+            }
+            if (Player2Name == null)
+            {
+                Player2Name = playerName;
+                _player2Deck = deck;
+                return 2;
+            }
+            throw new InvalidOperationException("Game is full.");
         }
-        if (Player2Name == null)
-        {
-            Player2Name = playerName;
-            _player2Deck = deck;
-            return 2;
-        }
-        throw new InvalidOperationException("Game is full.");
     }
 
     public async Task StartAsync()
@@ -80,6 +84,11 @@ public class GameSession
             }
         }
         catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            State!.IsGameOver = true;
+            State.Log($"Game ended due to an unexpected error: {ex.Message}");
+        }
         finally
         {
             OnStateChanged?.Invoke();
@@ -97,4 +106,10 @@ public class GameSession
 
     public InteractiveDecisionHandler? GetHandler(int playerSeat) =>
         playerSeat == 1 ? Player1Handler : Player2Handler;
+
+    public void Dispose()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+    }
 }
