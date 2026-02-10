@@ -1,0 +1,100 @@
+using MtgDecker.Engine.Enums;
+
+namespace MtgDecker.Engine;
+
+public class GameSession
+{
+    public string GameId { get; }
+    public GameState? State { get; private set; }
+    public InteractiveDecisionHandler? Player1Handler { get; private set; }
+    public InteractiveDecisionHandler? Player2Handler { get; private set; }
+    public string? Player1Name { get; private set; }
+    public string? Player2Name { get; private set; }
+    public bool IsFull => Player1Name != null && Player2Name != null;
+    public bool IsStarted { get; private set; }
+    public bool IsGameOver => State?.IsGameOver ?? false;
+    public string? Winner { get; private set; }
+    public event Action? OnStateChanged;
+
+    private List<GameCard>? _player1Deck;
+    private List<GameCard>? _player2Deck;
+    private CancellationTokenSource? _cts;
+
+    public GameSession(string gameId)
+    {
+        GameId = gameId;
+    }
+
+    public int JoinPlayer(string playerName, List<GameCard> deck)
+    {
+        if (Player1Name == null)
+        {
+            Player1Name = playerName;
+            _player1Deck = deck;
+            return 1;
+        }
+        if (Player2Name == null)
+        {
+            Player2Name = playerName;
+            _player2Deck = deck;
+            return 2;
+        }
+        throw new InvalidOperationException("Game is full.");
+    }
+
+    public async Task StartAsync()
+    {
+        if (!IsFull)
+            throw new InvalidOperationException("Need two players to start.");
+
+        Player1Handler = new InteractiveDecisionHandler();
+        Player2Handler = new InteractiveDecisionHandler();
+
+        var p1 = new Player(Guid.NewGuid(), Player1Name!, Player1Handler);
+        var p2 = new Player(Guid.NewGuid(), Player2Name!, Player2Handler);
+
+        foreach (var card in _player1Deck!) p1.Library.Add(card);
+        foreach (var card in _player2Deck!) p2.Library.Add(card);
+
+        State = new GameState(p1, p2);
+        State.OnStateChanged += () => OnStateChanged?.Invoke();
+        var engine = new GameEngine(State);
+
+        IsStarted = true;
+        _cts = new CancellationTokenSource();
+
+        _ = Task.Run(() => RunGameLoopAsync(engine, _cts.Token));
+    }
+
+    private async Task RunGameLoopAsync(GameEngine engine, CancellationToken ct)
+    {
+        try
+        {
+            await engine.StartGameAsync(ct);
+            State!.IsFirstTurn = true;
+
+            while (!State.IsGameOver)
+            {
+                ct.ThrowIfCancellationRequested();
+                await engine.RunTurnAsync(ct);
+            }
+        }
+        catch (OperationCanceledException) { }
+        finally
+        {
+            OnStateChanged?.Invoke();
+        }
+    }
+
+    public void Surrender(int playerSeat)
+    {
+        if (State == null) return;
+        State.IsGameOver = true;
+        Winner = playerSeat == 1 ? Player2Name : Player1Name;
+        State.Log($"{(playerSeat == 1 ? Player1Name : Player2Name)} surrenders.");
+        _cts?.Cancel();
+    }
+
+    public InteractiveDecisionHandler? GetHandler(int playerSeat) =>
+        playerSeat == 1 ? Player1Handler : Player2Handler;
+}
