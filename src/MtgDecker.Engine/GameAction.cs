@@ -4,6 +4,8 @@ namespace MtgDecker.Engine;
 
 public class GameAction
 {
+    private GameAction() { }
+
     public ActionType Type { get; init; }
     public Guid PlayerId { get; init; }
     public Guid? CardId { get; init; }

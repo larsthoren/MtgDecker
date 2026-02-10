@@ -74,6 +74,9 @@ public class GameEngine
 
     internal void ExecuteAction(GameAction action)
     {
+        if (action.PlayerId != _state.Player1.Id && action.PlayerId != _state.Player2.Id)
+            throw new InvalidOperationException($"Unknown player ID: {action.PlayerId}");
+
         var player = action.PlayerId == _state.Player1.Id ? _state.Player1 : _state.Player2;
 
         switch (action.Type)
@@ -126,6 +129,8 @@ public class GameEngine
 
         while (true)
         {
+            ct.ThrowIfCancellationRequested();
+
             var action = await _state.PriorityPlayer.DecisionHandler
                 .GetAction(_state, _state.PriorityPlayer.Id, ct);
 
@@ -157,7 +162,9 @@ public class GameEngine
 
         DrawCards(player, 7);
 
-        while (true)
+        const int maxMulligans = 7;
+
+        while (mulliganCount < maxMulligans)
         {
             var decision = await player.DecisionHandler
                 .GetMulliganDecision(player.Hand.Cards, mulliganCount, ct);
@@ -177,7 +184,7 @@ public class GameEngine
                 }
 
                 _state.Log($"{player.Name} keeps hand of {player.Hand.Count} cards (mulliganed {mulliganCount} times).");
-                break;
+                return;
             }
 
             mulliganCount++;
@@ -185,6 +192,9 @@ public class GameEngine
             player.Library.Shuffle();
             DrawCards(player, 7);
         }
+
+        ReturnHandToLibrary(player);
+        _state.Log($"{player.Name} mulliganed to 0 cards.");
     }
 
     private void DrawCards(Player player, int count)

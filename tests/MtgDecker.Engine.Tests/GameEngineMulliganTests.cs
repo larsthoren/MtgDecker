@@ -92,4 +92,17 @@ public class GameEngineMulliganTests
 
         state.GameLog.Should().Contain(msg => msg.Contains("Alice") && msg.Contains("keeps"));
     }
+
+    [Fact]
+    public async Task RunMulliganAsync_MulliganSevenTimes_HandIsZero()
+    {
+        var engine = CreateEngineWithDecks(out var state, out var p1Handler, out _);
+        for (int i = 0; i < 7; i++)
+            p1Handler.EnqueueMulligan(MulliganDecision.Mulligan);
+
+        await engine.RunMulliganAsync(state.Player1);
+
+        state.Player1.Hand.Count.Should().Be(0);
+        state.GameLog.Should().Contain(msg => msg.Contains("mulliganed to 0"));
+    }
 }

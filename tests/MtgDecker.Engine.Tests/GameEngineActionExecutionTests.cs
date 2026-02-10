@@ -108,4 +108,16 @@ public class GameEngineActionExecutionTests
         p1.Graveyard.Count.Should().Be(1);
         p1.Graveyard.Cards[0].Should().BeSameAs(card);
     }
+
+    [Fact]
+    public void ExecuteAction_UnknownPlayerId_Throws()
+    {
+        var engine = CreateEngine(out _, out _);
+        var unknownId = Guid.NewGuid();
+
+        var act = () => engine.ExecuteAction(GameAction.PlayCard(unknownId, Guid.NewGuid()));
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage($"*{unknownId}*");
+    }
 }
