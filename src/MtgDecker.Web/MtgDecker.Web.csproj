@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\MtgDecker.Application\MtgDecker.Application.csproj" />
+    <ProjectReference Include="..\MtgDecker.Engine\MtgDecker.Engine.csproj" />
     <ProjectReference Include="..\MtgDecker.Infrastructure\MtgDecker.Infrastructure.csproj" />
   </ItemGroup>
 

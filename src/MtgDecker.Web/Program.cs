@@ -19,6 +19,9 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
     ?? throw new InvalidOperationException("Connection string 'DefaultConnection' is not configured.");
 builder.Services.AddInfrastructure(connectionString);
 
+// Game session manager
+builder.Services.AddSingleton<MtgDecker.Engine.GameSessionManager>();
+
 // In-memory log viewer
 var logStore = new InMemoryLogStore();
 builder.Services.AddSingleton(logStore);
