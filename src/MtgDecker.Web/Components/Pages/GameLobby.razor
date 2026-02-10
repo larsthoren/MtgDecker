@@ -1,0 +1,173 @@
+@page "/game/new"
+@page "/game/join/{GameId}"
+@rendermode InteractiveServer
+@using MtgDecker.Engine
+@using MtgDecker.Domain.Entities
+@inject GameSessionManager SessionManager
+@inject IMediator Mediator
+@inject NavigationManager Navigation
+
+<PageTitle>Play Game - MtgDecker</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="mt-4">
+    <MudText Typo="Typo.h4" Class="mb-4">Play Game</MudText>
+
+    @if (_errorMessage != null)
+    {
+        <MudAlert Severity="Severity.Error" Class="mb-4">@_errorMessage</MudAlert>
+    }
+
+    @if (_gameId == null)
+    {
+        @* Create or Join *@
+        <MudGrid>
+            <MudItem xs="12" md="6">
+                <MudPaper Class="pa-4">
+                    <MudText Typo="Typo.h6" Class="mb-3">Create New Game</MudText>
+                    <MudSelect T="Guid?" Label="Select Your Deck" @bind-Value="_selectedDeckId" Class="mb-3">
+                        @foreach (var deck in _decks)
+                        {
+                            <MudSelectItem T="Guid?" Value="@deck.Id">@deck.Name (@deck.Format)</MudSelectItem>
+                        }
+                    </MudSelect>
+                    <MudTextField @bind-Value="_playerName" Label="Your Name" Class="mb-3" />
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
+                               Disabled="@(_selectedDeckId == null || string.IsNullOrWhiteSpace(_playerName))"
+                               OnClick="CreateGame">Create Game</MudButton>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" md="6">
+                <MudPaper Class="pa-4">
+                    <MudText Typo="Typo.h6" Class="mb-3">Join Existing Game</MudText>
+                    <MudTextField @bind-Value="_joinGameId" Label="Game Code" Class="mb-3" />
+                    <MudSelect T="Guid?" Label="Select Your Deck" @bind-Value="_joinDeckId" Class="mb-3">
+                        @foreach (var deck in _decks)
+                        {
+                            <MudSelectItem T="Guid?" Value="@deck.Id">@deck.Name (@deck.Format)</MudSelectItem>
+                        }
+                    </MudSelect>
+                    <MudTextField @bind-Value="_joinPlayerName" Label="Your Name" Class="mb-3" />
+                    <MudButton Variant="Variant.Filled" Color="Color.Secondary" FullWidth="true"
+                               Disabled="@(string.IsNullOrWhiteSpace(_joinGameId) || _joinDeckId == null || string.IsNullOrWhiteSpace(_joinPlayerName))"
+                               OnClick="JoinGame">Join Game</MudButton>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    }
+    else
+    {
+        @* Waiting for opponent *@
+        <MudPaper Class="pa-6 text-center">
+            <MudText Typo="Typo.h5" Class="mb-2">Game Created!</MudText>
+            <MudText Typo="Typo.body1" Class="mb-4">Share this code with your opponent:</MudText>
+            <MudText Typo="Typo.h3" Color="Color.Secondary" Class="mb-4"
+                     Style="font-family: monospace; letter-spacing: 8px;">@_gameId</MudText>
+            <MudText Typo="Typo.body2" Class="mb-2">
+                Or share this link: @(Navigation.BaseUri)game/join/@_gameId
+            </MudText>
+            <MudProgressLinear Indeterminate="true" Class="mt-4" />
+            <MudText Typo="Typo.body2" Class="mt-2">Waiting for opponent to join...</MudText>
+        </MudPaper>
+    }
+</MudContainer>
+
+@code {
+    [Parameter] public string? GameId { get; set; }
+
+    private List<Deck> _decks = new();
+    private Guid? _selectedDeckId;
+    private Guid? _joinDeckId;
+    private string _playerName = "";
+    private string _joinPlayerName = "";
+    private string? _joinGameId;
+    private string? _gameId;
+    private string? _errorMessage;
+
+    // Hardcoded UserId matching existing app pattern
+    private static readonly Guid UserId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+
+    protected override async Task OnInitializedAsync()
+    {
+        _decks = await Mediator.Send(new MtgDecker.Application.Decks.ListDecksQuery(UserId));
+
+        if (GameId != null)
+        {
+            _joinGameId = GameId;
+        }
+    }
+
+    private async Task CreateGame()
+    {
+        var deck = await LoadGameDeck(_selectedDeckId!.Value);
+        if (deck == null) return;
+
+        var session = SessionManager.CreateGame();
+        session.JoinPlayer(_playerName, deck);
+        _gameId = session.GameId;
+
+        // Poll for second player
+        _ = WaitForOpponentAsync(session);
+    }
+
+    private async Task JoinGame()
+    {
+        var session = SessionManager.GetSession(_joinGameId!);
+        if (session == null)
+        {
+            _errorMessage = "Game not found.";
+            return;
+        }
+        if (session.IsFull)
+        {
+            _errorMessage = "Game is already full.";
+            return;
+        }
+
+        var deck = await LoadGameDeck(_joinDeckId!.Value);
+        if (deck == null) return;
+
+        session.JoinPlayer(_joinPlayerName, deck);
+        Navigation.NavigateTo($"/game/{session.GameId}");
+    }
+
+    private async Task WaitForOpponentAsync(GameSession session)
+    {
+        while (!session.IsFull)
+        {
+            await Task.Delay(1000);
+        }
+        await InvokeAsync(() => Navigation.NavigateTo($"/game/{session.GameId}"));
+    }
+
+    private async Task<List<GameCard>?> LoadGameDeck(Guid deckId)
+    {
+        var deck = await Mediator.Send(new MtgDecker.Application.Decks.GetDeckQuery(deckId));
+        if (deck == null)
+        {
+            _errorMessage = "Deck not found.";
+            return null;
+        }
+
+        var cardIds = deck.Entries.Select(e => e.CardId).Distinct().ToList();
+        var cards = await Mediator.Send(new MtgDecker.Application.Cards.GetCardsByIdsQuery(cardIds));
+        var cardMap = cards.ToDictionary(c => c.Id);
+
+        var gameCards = new List<GameCard>();
+        foreach (var entry in deck.Entries.Where(e => e.Category == MtgDecker.Domain.Enums.DeckCategory.MainDeck))
+        {
+            if (!cardMap.TryGetValue(entry.CardId, out var card)) continue;
+            for (int i = 0; i < entry.Quantity; i++)
+            {
+                gameCards.Add(new GameCard
+                {
+                    Name = card.Name,
+                    TypeLine = card.TypeLine,
+                    ImageUrl = card.ImageUriSmall ?? card.ImageUri
+                });
+            }
+        }
+
+        return gameCards;
+    }
+}
