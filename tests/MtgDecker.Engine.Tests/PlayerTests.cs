@@ -38,6 +38,18 @@ public class PlayerTests
         player.Exile.Count.Should().Be(0);
     }
 
+    [Fact]
+    public void AdjustLife_ChangesLifeTotal()
+    {
+        var player = new Player(Guid.NewGuid(), "Alice", Substitute.For<IPlayerDecisionHandler>());
+
+        player.AdjustLife(-5);
+        player.Life.Should().Be(15);
+
+        player.AdjustLife(3);
+        player.Life.Should().Be(18);
+    }
+
     [Theory]
     [InlineData(ZoneType.Library)]
     [InlineData(ZoneType.Hand)]

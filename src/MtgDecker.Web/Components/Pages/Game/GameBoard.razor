@@ -54,6 +54,7 @@
                 <MudSpacer />
                 <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Warning"
                            StartIcon="@Icons.Material.Filled.Undo"
+                           Disabled="@(LocalPlayer.ActionHistory.Count == 0)"
                            OnClick="() => OnUndo.InvokeAsync()">Undo</MudButton>
                 <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Error"
                            OnClick="() => OnSurrender.InvokeAsync()">Surrender</MudButton>
@@ -107,7 +108,7 @@
 
     private async Task HandleKeyDown(KeyboardEventArgs e)
     {
-        if (e.CtrlKey && e.Key == "z")
+        if (e.CtrlKey && e.Key == "z" && LocalPlayer.ActionHistory.Count > 0)
         {
             await OnUndo.InvokeAsync();
         }

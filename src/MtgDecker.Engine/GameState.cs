@@ -13,8 +13,6 @@ public class GameState
     public bool IsGameOver { get; set; }
     public bool IsFirstTurn { get; set; }
     public List<string> GameLog { get; } = new();
-    public Stack<GameAction> ActionHistory { get; } = new();
-
     public event Action? OnStateChanged;
 
     public GameState(Player player1, Player player2)

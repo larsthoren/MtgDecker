@@ -13,7 +13,13 @@ public class Player
     public Zone Battlefield { get; }
     public Zone Graveyard { get; }
     public Zone Exile { get; }
-    public int Life { get; set; } = 20;
+    public int Life { get; private set; } = 20;
+    public Stack<GameAction> ActionHistory { get; } = new();
+
+    public void AdjustLife(int delta)
+    {
+        Life += delta;
+    }
 
     public Player(Guid id, string name, IPlayerDecisionHandler decisionHandler)
     {

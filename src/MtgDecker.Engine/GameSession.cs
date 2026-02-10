@@ -21,6 +21,7 @@ public class GameSession : IDisposable
     private GameEngine? _engine;
     private CancellationTokenSource? _cts;
     private readonly object _joinLock = new();
+    private readonly object _stateLock = new();
 
     public GameSession(string gameId)
     {
@@ -98,34 +99,43 @@ public class GameSession : IDisposable
 
     public void Surrender(int playerSeat)
     {
-        if (State == null) return;
-        State.IsGameOver = true;
-        Winner = playerSeat == 1 ? Player2Name : Player1Name;
-        State.Log($"{(playerSeat == 1 ? Player1Name : Player2Name)} surrenders.");
-        _cts?.Cancel();
+        lock (_stateLock)
+        {
+            if (State == null) return;
+            State.IsGameOver = true;
+            Winner = playerSeat == 1 ? Player2Name : Player1Name;
+            State.Log($"{(playerSeat == 1 ? Player1Name : Player2Name)} surrenders.");
+            _cts?.Cancel();
+        }
     }
 
     public bool Undo(int playerSeat)
     {
-        if (_engine == null || State == null) return false;
-        var playerId = playerSeat == 1 ? State.Player1.Id : State.Player2.Id;
-        return _engine.UndoLastAction(playerId);
+        lock (_stateLock)
+        {
+            if (_engine == null || State == null) return false;
+            var playerId = playerSeat == 1 ? State.Player1.Id : State.Player2.Id;
+            return _engine.UndoLastAction(playerId);
+        }
     }
 
     public void AdjustLife(int playerSeat, int delta)
     {
-        if (State == null) return;
-        var player = playerSeat == 1 ? State.Player1 : State.Player2;
-        var oldLife = player.Life;
-        player.Life += delta;
-        State.Log($"{player.Name}'s life: {oldLife} \u2192 {player.Life}");
-
-        if (player.Life <= 0)
+        lock (_stateLock)
         {
-            State.IsGameOver = true;
-            Winner = State.GetOpponent(player).Name;
-            State.Log($"{player.Name} loses \u2014 life reached {player.Life}.");
-            _cts?.Cancel();
+            if (State == null) return;
+            var player = playerSeat == 1 ? State.Player1 : State.Player2;
+            var oldLife = player.Life;
+            player.AdjustLife(delta);
+            State.Log($"{player.Name}'s life: {oldLife} \u2192 {player.Life}");
+
+            if (player.Life <= 0)
+            {
+                State.IsGameOver = true;
+                Winner = State.GetOpponent(player).Name;
+                State.Log($"{player.Name} loses \u2014 life reached {player.Life}.");
+                _cts?.Cancel();
+            }
         }
     }
 

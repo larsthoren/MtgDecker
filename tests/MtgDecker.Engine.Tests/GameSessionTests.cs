@@ -199,6 +199,20 @@ public class GameSessionTests
     }
 
     [Fact]
+    public async Task AdjustLife_PositiveDelta_GainsLife()
+    {
+        var session = new GameSession("ABC123");
+        session.JoinPlayer("Alice", CreateDeck());
+        session.JoinPlayer("Bob", CreateDeck());
+        await session.StartAsync();
+
+        session.AdjustLife(1, 5);
+
+        session.State!.Player1.Life.Should().Be(25);
+        session.IsGameOver.Should().BeFalse();
+    }
+
+    [Fact]
     public async Task AdjustLife_LogsChange()
     {
         var session = new GameSession("ABC123");

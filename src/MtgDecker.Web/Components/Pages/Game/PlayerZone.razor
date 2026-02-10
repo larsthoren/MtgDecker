@@ -12,10 +12,12 @@
                            OnClick="() => OnLifeAdjust.InvokeAsync(-1)" />
             @if (_editingLife)
             {
-                <MudTextField T="string" @bind-Value="_lifeDelta" Immediate="true"
-                              Style="width: 60px;" Variant="Variant.Outlined" Margin="Margin.Dense"
-                              OnKeyDown="HandleLifeKeyDown"
-                              AutoFocus="true" />
+                <div @onkeydown:stopPropagation>
+                    <MudTextField T="string" @bind-Value="_lifeDelta" Immediate="true"
+                                  Style="width: 60px;" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                  OnKeyDown="HandleLifeKeyDown"
+                                  AutoFocus="true" />
+                </div>
             }
             else
             {
@@ -99,7 +101,7 @@
     </div>
 
     @* Exile *@
-    <div class="zone graveyard">
+    <div class="zone exile">
         <MudText Typo="Typo.caption">Exile (@Exile.Count)</MudText>
         @if (Exile.Count > 0)
         {
@@ -192,9 +194,12 @@
 
     private async Task HandleLifeKeyDown(KeyboardEventArgs e)
     {
-        if (e.Key == "Enter" && int.TryParse(_lifeDelta, out var delta))
+        if (e.Key == "Enter")
         {
-            await OnLifeAdjust.InvokeAsync(delta);
+            if (int.TryParse(_lifeDelta, out var delta))
+            {
+                await OnLifeAdjust.InvokeAsync(delta);
+            }
             _editingLife = false;
         }
         else if (e.Key == "Escape")
