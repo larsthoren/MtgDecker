@@ -12,11 +12,14 @@ public class InteractiveDecisionHandler : IPlayerDecisionHandler
     public bool IsWaitingForMulligan => _mulliganTcs is { Task.IsCompleted: false };
     public bool IsWaitingForBottomCards => _bottomCardsTcs is { Task.IsCompleted: false };
 
+    public event Action? OnWaitingForInput;
+
     public Task<GameAction> GetAction(GameState gameState, Guid playerId, CancellationToken ct = default)
     {
         _actionTcs = new TaskCompletionSource<GameAction>(TaskCreationOptions.RunContinuationsAsynchronously);
         var registration = ct.Register(() => _actionTcs.TrySetCanceled());
         _actionTcs.Task.ContinueWith(_ => registration.Dispose(), TaskContinuationOptions.ExecuteSynchronously);
+        OnWaitingForInput?.Invoke();
         return _actionTcs.Task;
     }
 
@@ -25,6 +28,7 @@ public class InteractiveDecisionHandler : IPlayerDecisionHandler
         _mulliganTcs = new TaskCompletionSource<MulliganDecision>(TaskCreationOptions.RunContinuationsAsynchronously);
         var registration = ct.Register(() => _mulliganTcs.TrySetCanceled());
         _mulliganTcs.Task.ContinueWith(_ => registration.Dispose(), TaskContinuationOptions.ExecuteSynchronously);
+        OnWaitingForInput?.Invoke();
         return _mulliganTcs.Task;
     }
 
@@ -33,6 +37,7 @@ public class InteractiveDecisionHandler : IPlayerDecisionHandler
         _bottomCardsTcs = new TaskCompletionSource<IReadOnlyList<GameCard>>(TaskCreationOptions.RunContinuationsAsynchronously);
         var registration = ct.Register(() => _bottomCardsTcs.TrySetCanceled());
         _bottomCardsTcs.Task.ContinueWith(_ => registration.Dispose(), TaskContinuationOptions.ExecuteSynchronously);
+        OnWaitingForInput?.Invoke();
         return _bottomCardsTcs.Task;
     }
 
@@ -42,6 +47,16 @@ public class InteractiveDecisionHandler : IPlayerDecisionHandler
     public void SubmitMulliganDecision(MulliganDecision decision) =>
         _mulliganTcs?.TrySetResult(decision);
 
-    public void SubmitBottomCards(IReadOnlyList<GameCard> cards) =>
-        _bottomCardsTcs?.TrySetResult(cards);
+    public async Task SubmitBottomCardsAsync(IReadOnlyList<GameCard> cards)
+    {
+        // The engine creates _bottomCardsTcs after processing the Keep decision.
+        // Due to RunContinuationsAsynchronously, there's a brief window where
+        // the TCS doesn't exist yet. Wait for it.
+        for (int i = 0; i < 50; i++)
+        {
+            if (_bottomCardsTcs?.TrySetResult(cards) == true)
+                return;
+            await Task.Delay(10);
+        }
+    }
 }

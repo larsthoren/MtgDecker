@@ -99,10 +99,10 @@
             _selectedBottom.Add(card);
     }
 
-    private void ConfirmBottomCards()
+    private async Task ConfirmBottomCards()
     {
         Handler.SubmitMulliganDecision(MulliganDecision.Keep);
-        Handler.SubmitBottomCards(_selectedBottom);
+        await Handler.SubmitBottomCardsAsync(_selectedBottom);
         MudDialog.Close();
     }
 }

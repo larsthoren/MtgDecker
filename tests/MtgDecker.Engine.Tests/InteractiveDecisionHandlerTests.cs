@@ -61,7 +61,7 @@ public class InteractiveDecisionHandlerTests
         task.IsCompleted.Should().BeFalse();
 
         var selected = new List<GameCard> { hand[0] };
-        handler.SubmitBottomCards(selected);
+        await handler.SubmitBottomCardsAsync(selected);
 
         var result = await task;
         result.Should().HaveCount(1);

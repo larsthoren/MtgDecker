@@ -40,6 +40,7 @@ else if (_session.State != null)
     private int _playerSeat;
     private bool _gameStarting;
     private bool _mulliganDialogOpen;
+    private int _mulliganCount;
 
     protected override async Task OnInitializedAsync()
     {
@@ -50,33 +51,33 @@ else if (_session.State != null)
 
         _session.OnStateChanged += HandleStateChanged;
 
+        var handler = _session.GetHandler(_playerSeat);
+        if (handler != null)
+        {
+            handler.OnWaitingForInput += HandleWaitingForInput;
+        }
+
         if (!_session.IsStarted)
         {
             _gameStarting = true;
             await _session.StartAsync();
         }
 
-        _ = WatchForMulliganAsync();
+        // If the handler is already waiting (we subscribed after it started), show dialog now
+        if (handler?.IsWaitingForMulligan == true)
+        {
+            _ = InvokeAsync(async () => await ShowMulliganDialog(0));
+        }
     }
 
-    private async Task WatchForMulliganAsync()
+    private void HandleWaitingForInput()
     {
         var handler = _session!.GetHandler(_playerSeat);
         if (handler == null) return;
 
-        // Wait for the engine to request mulligan decision
-        for (int i = 0; i < 100; i++) // max ~5 seconds
-        {
-            if (handler.IsWaitingForMulligan || _session.IsGameOver) break;
-            await Task.Delay(50);
-        }
-
         if (handler.IsWaitingForMulligan)
         {
-            await InvokeAsync(async () =>
-            {
-                await ShowMulliganDialog(0);
-            });
+            _ = InvokeAsync(async () => await ShowMulliganDialog(_mulliganCount));
         }
     }
 
@@ -105,13 +106,8 @@ else if (_session.State != null)
         var dialog = await DialogService.ShowAsync<MulliganDialog>("Mulligan", parameters, options);
         await dialog.Result;
         _mulliganDialogOpen = false;
-
-        // Check if handler is waiting for another mulligan (player chose to mulligan)
-        await Task.Delay(100); // Let engine process
-        if (handler.IsWaitingForMulligan)
-        {
-            await ShowMulliganDialog(mulliganCount + 1);
-        }
+        _mulliganCount = mulliganCount + 1;
+        // Next mulligan (if any) will be triggered by HandleWaitingForInput event
     }
 
     private void HandleAction(GameAction action)
@@ -135,6 +131,11 @@ else if (_session.State != null)
         if (_session != null)
         {
             _session.OnStateChanged -= HandleStateChanged;
+            var handler = _session.GetHandler(_playerSeat);
+            if (handler != null)
+            {
+                handler.OnWaitingForInput -= HandleWaitingForInput;
+            }
             if (_session.IsGameOver)
             {
                 SessionManager.RemoveSession(_session.GameId);
