@@ -112,6 +112,23 @@ public class GameSession : IDisposable
         return _engine.UndoLastAction(playerId);
     }
 
+    public void AdjustLife(int playerSeat, int delta)
+    {
+        if (State == null) return;
+        var player = playerSeat == 1 ? State.Player1 : State.Player2;
+        var oldLife = player.Life;
+        player.Life += delta;
+        State.Log($"{player.Name}'s life: {oldLife} \u2192 {player.Life}");
+
+        if (player.Life <= 0)
+        {
+            State.IsGameOver = true;
+            Winner = State.GetOpponent(player).Name;
+            State.Log($"{player.Name} loses \u2014 life reached {player.Life}.");
+            _cts?.Cancel();
+        }
+    }
+
     public InteractiveDecisionHandler? GetHandler(int playerSeat) =>
         playerSeat == 1 ? Player1Handler : Player2Handler;
 
