@@ -1,5 +1,7 @@
 using FluentAssertions;
 using MtgDecker.Engine;
+using MtgDecker.Engine.Enums;
+using MtgDecker.Engine.Mana;
 
 namespace MtgDecker.Engine.Tests;
 
@@ -66,5 +68,77 @@ public class GameCardTests
     {
         var card = new GameCard { Name = "Test", TypeLine = typeLine };
         card.IsCreature.Should().Be(expected);
+    }
+
+    [Fact]
+    public void Create_KnownCard_ResolvesManaCost()
+    {
+        var card = GameCard.Create("Goblin Lackey", "Creature — Goblin");
+
+        card.ManaCost.Should().NotBeNull();
+        card.ManaCost!.ConvertedManaCost.Should().Be(1);
+        card.ManaCost.ColorRequirements.Should().ContainKey(ManaColor.Red).WhoseValue.Should().Be(1);
+    }
+
+    [Fact]
+    public void Create_KnownCard_ResolvesManaAbility()
+    {
+        var card = GameCard.Create("Mountain", "Basic Land — Mountain");
+
+        card.ManaAbility.Should().NotBeNull();
+        card.ManaAbility!.Type.Should().Be(ManaAbilityType.Fixed);
+        card.ManaAbility.FixedColor.Should().Be(ManaColor.Red);
+    }
+
+    [Fact]
+    public void Create_KnownCard_ResolvesPowerToughness()
+    {
+        var card = GameCard.Create("Goblin Lackey", "Creature — Goblin");
+
+        card.Power.Should().Be(1);
+        card.Toughness.Should().Be(1);
+    }
+
+    [Fact]
+    public void Create_KnownCard_ResolvesCardTypes()
+    {
+        var card = GameCard.Create("Mountain", "Basic Land — Mountain");
+
+        card.CardTypes.Should().HaveFlag(CardType.Land);
+    }
+
+    [Fact]
+    public void Create_UnknownCard_LeavesPropertiesNull()
+    {
+        var card = GameCard.Create("Totally Unknown Card", "Artifact");
+
+        card.ManaCost.Should().BeNull();
+        card.ManaAbility.Should().BeNull();
+        card.Power.Should().BeNull();
+        card.Toughness.Should().BeNull();
+    }
+
+    [Fact]
+    public void Create_UnknownCard_CardTypesIsNone()
+    {
+        var card = GameCard.Create("Totally Unknown Card", "Artifact");
+
+        card.CardTypes.Should().Be(CardType.None);
+    }
+
+    [Fact]
+    public void IsLand_TrueForRegisteredLand()
+    {
+        var card = GameCard.Create("Mountain", "Basic Land — Mountain");
+
+        card.IsLand.Should().BeTrue();
+    }
+
+    [Fact]
+    public void IsLand_TrueForTypeLine_BackwardCompat()
+    {
+        var card = new GameCard { Name = "Some Custom Land", TypeLine = "Land" };
+
+        card.IsLand.Should().BeTrue();
     }
 }
