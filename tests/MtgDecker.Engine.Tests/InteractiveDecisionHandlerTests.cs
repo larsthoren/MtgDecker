@@ -1,0 +1,115 @@
+using FluentAssertions;
+using MtgDecker.Engine;
+using MtgDecker.Engine.Enums;
+using MtgDecker.Engine.Tests.Helpers;
+
+namespace MtgDecker.Engine.Tests;
+
+public class InteractiveDecisionHandlerTests
+{
+    private readonly GameState _state;
+    private readonly Guid _playerId = Guid.NewGuid();
+
+    public InteractiveDecisionHandlerTests()
+    {
+        var p1 = new Player(Guid.NewGuid(), "Alice", new TestDecisionHandler());
+        var p2 = new Player(Guid.NewGuid(), "Bob", new TestDecisionHandler());
+        _state = new GameState(p1, p2);
+    }
+
+    [Fact]
+    public async Task GetAction_WaitsUntilSubmitAction()
+    {
+        var handler = new InteractiveDecisionHandler();
+        var actionTask = handler.GetAction(_state, _playerId);
+
+        actionTask.IsCompleted.Should().BeFalse();
+
+        var pass = GameAction.Pass(_playerId);
+        handler.SubmitAction(pass);
+
+        var result = await actionTask;
+        result.Type.Should().Be(ActionType.PassPriority);
+    }
+
+    [Fact]
+    public async Task GetMulliganDecision_WaitsUntilSubmitMulligan()
+    {
+        var handler = new InteractiveDecisionHandler();
+        var hand = new List<GameCard> { new() { Name = "Forest" } };
+        var task = handler.GetMulliganDecision(hand, 0);
+
+        task.IsCompleted.Should().BeFalse();
+
+        handler.SubmitMulliganDecision(MulliganDecision.Keep);
+
+        var result = await task;
+        result.Should().Be(MulliganDecision.Keep);
+    }
+
+    [Fact]
+    public async Task ChooseCardsToBottom_WaitsUntilSubmitBottomCards()
+    {
+        var handler = new InteractiveDecisionHandler();
+        var hand = new List<GameCard>
+        {
+            new() { Name = "Forest" },
+            new() { Name = "Bear" }
+        };
+        var task = handler.ChooseCardsToBottom(hand, 1);
+
+        task.IsCompleted.Should().BeFalse();
+
+        var selected = new List<GameCard> { hand[0] };
+        handler.SubmitBottomCards(selected);
+
+        var result = await task;
+        result.Should().HaveCount(1);
+        result[0].Name.Should().Be("Forest");
+    }
+
+    [Fact]
+    public void IsWaitingForAction_TrueWhileAwaiting()
+    {
+        var handler = new InteractiveDecisionHandler();
+        handler.IsWaitingForAction.Should().BeFalse();
+
+        _ = handler.GetAction(_state, _playerId);
+
+        handler.IsWaitingForAction.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task IsWaitingForAction_FalseAfterSubmit()
+    {
+        var handler = new InteractiveDecisionHandler();
+        var task = handler.GetAction(_state, _playerId);
+
+        handler.SubmitAction(GameAction.Pass(_playerId));
+        await task;
+
+        handler.IsWaitingForAction.Should().BeFalse();
+    }
+
+    [Fact]
+    public void IsWaitingForMulligan_TrueWhileAwaiting()
+    {
+        var handler = new InteractiveDecisionHandler();
+        _ = handler.GetMulliganDecision(new List<GameCard>(), 0);
+
+        handler.IsWaitingForMulligan.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Cancellation_CancelsWaitingAction()
+    {
+        var handler = new InteractiveDecisionHandler();
+        using var cts = new CancellationTokenSource();
+        var task = handler.GetAction(_state, _playerId, cts.Token);
+
+        cts.Cancel();
+
+        Func<Task> act = async () => await task;
+        await act.Should().ThrowAsync<TaskCanceledException>();
+    }
+}
