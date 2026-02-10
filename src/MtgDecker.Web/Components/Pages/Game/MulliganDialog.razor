@@ -1,0 +1,108 @@
+@using MtgDecker.Engine
+@using MtgDecker.Engine.Enums
+@namespace MtgDecker.Web.Components.Pages.Game
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">Mulligan Decision</MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (_choosingBottomCards)
+        {
+            <MudText Typo="Typo.body2" Class="mb-2">
+                Select @_bottomCount card(s) to put on the bottom of your library.
+                Selected: @_selectedBottom.Count / @_bottomCount
+            </MudText>
+            <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                @foreach (var card in Hand)
+                {
+                    <div @onclick="() => ToggleBottomCard(card)"
+                         style="cursor: pointer; outline: @(_selectedBottom.Contains(card) ? "3px solid #C69B3C" : "none"); border-radius: 6px;">
+                        <CardDisplay Name="@card.Name" ImageUrl="@card.ImageUrl" Clickable="false" />
+                    </div>
+                }
+            </div>
+        }
+        else
+        {
+            <MudText Typo="Typo.body2" Class="mb-2">
+                @if (MulliganCount == 0)
+                {
+                    <span>Your opening hand (@Hand.Count cards):</span>
+                }
+                else
+                {
+                    <span>Mulligan #@MulliganCount — you drew 7, will keep @(7 - MulliganCount):</span>
+                }
+            </MudText>
+            <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                @foreach (var card in Hand)
+                {
+                    <CardDisplay Name="@card.Name" ImageUrl="@card.ImageUrl" Clickable="false" />
+                }
+            </div>
+        }
+    </DialogContent>
+    <DialogActions>
+        @if (_choosingBottomCards)
+        {
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       Disabled="@(_selectedBottom.Count != _bottomCount)"
+                       OnClick="ConfirmBottomCards">Confirm</MudButton>
+        }
+        else
+        {
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       OnClick="KeepHand">Keep</MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Warning"
+                       Disabled="@(MulliganCount >= 6)"
+                       OnClick="DoMulligan">Mulligan</MudButton>
+        }
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public IReadOnlyList<GameCard> Hand { get; set; } = Array.Empty<GameCard>();
+    [Parameter] public int MulliganCount { get; set; }
+    [Parameter] public InteractiveDecisionHandler Handler { get; set; } = default!;
+
+    private bool _choosingBottomCards;
+    private int _bottomCount;
+    private readonly List<GameCard> _selectedBottom = new();
+
+    private void KeepHand()
+    {
+        if (MulliganCount > 0)
+        {
+            _bottomCount = MulliganCount;
+            _choosingBottomCards = true;
+        }
+        else
+        {
+            Handler.SubmitMulliganDecision(MulliganDecision.Keep);
+            MudDialog.Close();
+        }
+    }
+
+    private void DoMulligan()
+    {
+        Handler.SubmitMulliganDecision(MulliganDecision.Mulligan);
+        MudDialog.Close();
+    }
+
+    private void ToggleBottomCard(GameCard card)
+    {
+        if (_selectedBottom.Contains(card))
+            _selectedBottom.Remove(card);
+        else if (_selectedBottom.Count < _bottomCount)
+            _selectedBottom.Add(card);
+    }
+
+    private void ConfirmBottomCards()
+    {
+        Handler.SubmitMulliganDecision(MulliganDecision.Keep);
+        Handler.SubmitBottomCards(_selectedBottom);
+        MudDialog.Close();
+    }
+}
