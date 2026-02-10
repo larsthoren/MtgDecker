@@ -1,0 +1,31 @@
+@using MtgDecker.Engine
+@namespace MtgDecker.Web.Components.Pages.Game
+
+<MudPaper Class="game-log-panel pa-3" Elevation="2">
+    <MudText Typo="Typo.subtitle2" Class="mb-2">Game Log</MudText>
+    <div class="log-entries" @ref="_logContainer">
+        @if (GameLog != null)
+        {
+            @foreach (var entry in GameLog)
+            {
+                <div class="log-entry">@entry</div>
+            }
+        }
+    </div>
+</MudPaper>
+
+@code {
+    [Parameter] public List<string>? GameLog { get; set; }
+
+    private ElementReference _logContainer;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (GameLog?.Count > 0)
+        {
+            await JS.InvokeVoidAsync("scrollToBottom", _logContainer);
+        }
+    }
+
+    [Inject] private IJSRuntime JS { get; set; } = default!;
+}
