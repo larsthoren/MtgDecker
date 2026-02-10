@@ -1,0 +1,57 @@
+@using MtgDecker.Engine
+@using MtgDecker.Engine.Enums
+@namespace MtgDecker.Web.Components.Pages.Game
+
+@if (Visible)
+{
+    <MudPaper Elevation="8" Class="action-menu pa-2">
+        <MudStack Spacing="1">
+            <MudText Typo="Typo.caption" Class="mb-1">@CardName</MudText>
+
+            @if (IsOwnCard && CurrentZone == ZoneType.Hand)
+            {
+                <MudButton Size="Size.Small" Variant="Variant.Text" FullWidth="true"
+                           StartIcon="@Icons.Material.Filled.PlayArrow"
+                           OnClick="() => OnPlay.InvokeAsync()">Play</MudButton>
+            }
+
+            @if (IsOwnCard && CurrentZone == ZoneType.Battlefield)
+            {
+                <MudButton Size="Size.Small" Variant="Variant.Text" FullWidth="true"
+                           StartIcon="@(IsTapped ? Icons.Material.Filled.Undo : Icons.Material.Filled.RotateRight)"
+                           OnClick="() => OnTapToggle.InvokeAsync()">
+                    @(IsTapped ? "Untap" : "Tap")
+                </MudButton>
+            }
+
+            <MudDivider Class="my-1" />
+            <MudText Typo="Typo.caption" Color="Color.Secondary">Move to...</MudText>
+
+            @foreach (var zone in AvailableZones)
+            {
+                <MudButton Size="Size.Small" Variant="Variant.Text" FullWidth="true"
+                           OnClick="() => OnMoveTo.InvokeAsync(zone)">@zone</MudButton>
+            }
+
+            <MudDivider Class="my-1" />
+            <MudButton Size="Size.Small" Variant="Variant.Text" FullWidth="true"
+                       Color="Color.Default"
+                       OnClick="() => OnClose.InvokeAsync()">Cancel</MudButton>
+        </MudStack>
+    </MudPaper>
+}
+
+@code {
+    [Parameter] public bool Visible { get; set; }
+    [Parameter] public string CardName { get; set; } = "";
+    [Parameter] public ZoneType CurrentZone { get; set; }
+    [Parameter] public bool IsOwnCard { get; set; }
+    [Parameter] public bool IsTapped { get; set; }
+    [Parameter] public EventCallback OnPlay { get; set; }
+    [Parameter] public EventCallback OnTapToggle { get; set; }
+    [Parameter] public EventCallback<ZoneType> OnMoveTo { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    private IEnumerable<ZoneType> AvailableZones =>
+        Enum.GetValues<ZoneType>().Where(z => z != CurrentZone);
+}
