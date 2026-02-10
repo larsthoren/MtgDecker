@@ -1,0 +1,37 @@
+@namespace MtgDecker.Web.Components.Pages.Game
+
+<div class="card-display @(Tapped ? "tapped" : "") @(Selected ? "selected" : "") @(Clickable ? "clickable" : "")"
+     @onclick="HandleClick">
+    @if (IsBack)
+    {
+        <div class="card-back">
+            <MudIcon Icon="@Icons.Material.Filled.Help" Size="Size.Large" />
+        </div>
+    }
+    else if (!string.IsNullOrEmpty(ImageUrl))
+    {
+        <img src="@ImageUrl" alt="@Name" loading="lazy" />
+    }
+    else
+    {
+        <div class="card-placeholder">
+            <MudText Typo="Typo.caption" Align="Align.Center">@Name</MudText>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public string? ImageUrl { get; set; }
+    [Parameter] public string Name { get; set; } = "";
+    [Parameter] public bool Tapped { get; set; }
+    [Parameter] public bool IsBack { get; set; }
+    [Parameter] public bool Selected { get; set; }
+    [Parameter] public bool Clickable { get; set; } = true;
+    [Parameter] public EventCallback OnClick { get; set; }
+
+    private async Task HandleClick()
+    {
+        if (Clickable)
+            await OnClick.InvokeAsync();
+    }
+}
