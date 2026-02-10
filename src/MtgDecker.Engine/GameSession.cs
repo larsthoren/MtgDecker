@@ -139,6 +139,21 @@ public class GameSession : IDisposable
         }
     }
 
+    public void DrawCard(int playerSeat)
+    {
+        lock (_stateLock)
+        {
+            if (State == null) return;
+            var player = playerSeat == 1 ? State.Player1 : State.Player2;
+            var card = player.Library.DrawFromTop();
+            if (card != null)
+            {
+                player.Hand.Add(card);
+                State.Log($"{player.Name} draws a card.");
+            }
+        }
+    }
+
     public InteractiveDecisionHandler? GetHandler(int playerSeat) =>
         playerSeat == 1 ? Player1Handler : Player2Handler;
 

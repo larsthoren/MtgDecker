@@ -213,6 +213,70 @@ public class GameSessionTests
     }
 
     [Fact]
+    public async Task DrawCard_MovesTopCardFromLibraryToHand()
+    {
+        var session = new GameSession("ABC123");
+        session.JoinPlayer("Alice", CreateDeck());
+        session.JoinPlayer("Bob", CreateDeck());
+        await session.StartAsync();
+
+        // Keep mulligans to get to playing state
+        session.Player1Handler!.SubmitMulliganDecision(MtgDecker.Engine.Enums.MulliganDecision.Keep);
+        await Task.Delay(50);
+        session.Player2Handler!.SubmitMulliganDecision(MtgDecker.Engine.Enums.MulliganDecision.Keep);
+        await Task.Delay(50);
+
+        var p1 = session.State!.Player1;
+        var handBefore = p1.Hand.Count;
+        var libBefore = p1.Library.Count;
+
+        session.DrawCard(1);
+
+        p1.Hand.Count.Should().Be(handBefore + 1);
+        p1.Library.Count.Should().Be(libBefore - 1);
+    }
+
+    [Fact]
+    public async Task DrawCard_EmptyLibrary_DoesNothing()
+    {
+        var session = new GameSession("ABC123");
+        session.JoinPlayer("Alice", CreateDeck(7)); // Exactly 7 cards — all drawn during mulligan
+        session.JoinPlayer("Bob", CreateDeck());
+        await session.StartAsync();
+
+        session.Player1Handler!.SubmitMulliganDecision(MtgDecker.Engine.Enums.MulliganDecision.Keep);
+        await Task.Delay(50);
+        session.Player2Handler!.SubmitMulliganDecision(MtgDecker.Engine.Enums.MulliganDecision.Keep);
+        await Task.Delay(50);
+
+        var p1 = session.State!.Player1;
+        p1.Library.Count.Should().Be(0);
+        var handBefore = p1.Hand.Count;
+
+        session.DrawCard(1);
+
+        p1.Hand.Count.Should().Be(handBefore);
+    }
+
+    [Fact]
+    public async Task DrawCard_LogsDraw()
+    {
+        var session = new GameSession("ABC123");
+        session.JoinPlayer("Alice", CreateDeck());
+        session.JoinPlayer("Bob", CreateDeck());
+        await session.StartAsync();
+
+        session.Player1Handler!.SubmitMulliganDecision(MtgDecker.Engine.Enums.MulliganDecision.Keep);
+        await Task.Delay(50);
+        session.Player2Handler!.SubmitMulliganDecision(MtgDecker.Engine.Enums.MulliganDecision.Keep);
+        await Task.Delay(50);
+
+        session.DrawCard(1);
+
+        session.State!.GameLog.Should().Contain(l => l.Contains("Alice") && l.Contains("draws"));
+    }
+
+    [Fact]
     public async Task AdjustLife_LogsChange()
     {
         var session = new GameSession("ABC123");

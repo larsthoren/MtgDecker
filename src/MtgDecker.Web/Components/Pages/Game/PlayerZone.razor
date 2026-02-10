@@ -37,6 +37,10 @@
         <MudText Typo="Typo.caption" Class="ml-2" Style="opacity: 0.7;">
             Library: @LibraryCount
         </MudText>
+        <MudIconButton Icon="@Icons.Material.Filled.BackHand" Size="Size.Small"
+                       Title="Draw a card"
+                       Disabled="@(LibraryCount == 0)"
+                       OnClick="() => OnDrawCard.InvokeAsync()" />
     </div>
 
     @* Battlefield *@
@@ -138,6 +142,7 @@
     [Parameter] public int LibraryCount { get; set; }
     [Parameter] public IReadOnlyList<GameCard> Exile { get; set; } = Array.Empty<GameCard>();
     [Parameter] public EventCallback<int> OnLifeAdjust { get; set; }
+    [Parameter] public EventCallback OnDrawCard { get; set; }
     [Parameter] public bool IsOpponent { get; set; }
     [Parameter] public bool IsActivePlayer { get; set; }
     [Parameter] public bool CanAct { get; set; }

@@ -30,6 +30,7 @@ else if (_session.State != null)
                OnSurrender="HandleSurrender"
                OnUndo="HandleUndo"
                OnLifeAdjust="HandleLifeAdjust"
+               OnDrawCard="HandleDrawCard"
                IsGameOver="_session.IsGameOver"
                Winner="_session.Winner" />
 }
@@ -147,6 +148,11 @@ else if (_session.State != null)
     private void HandleLifeAdjust((int seat, int delta) args)
     {
         _session?.AdjustLife(args.seat, args.delta);
+    }
+
+    private void HandleDrawCard(int seat)
+    {
+        _session?.DrawCard(seat);
     }
 
     private void HandleStateChanged()

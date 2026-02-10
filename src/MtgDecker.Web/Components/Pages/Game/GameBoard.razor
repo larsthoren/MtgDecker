@@ -28,6 +28,7 @@
                     LibraryCount="@OpponentPlayer.Library.Count"
                     Exile="@OpponentPlayer.Exile.Cards"
                     OnLifeAdjust="(delta) => OnLifeAdjust.InvokeAsync((OpponentSeat, delta))"
+                    OnDrawCard="() => OnDrawCard.InvokeAsync(OpponentSeat)"
                     IsOpponent="true"
                     IsActivePlayer="@(State.ActivePlayer == OpponentPlayer)"
                     CanAct="@HasPriority"
@@ -70,6 +71,7 @@
                     LibraryCount="@LocalPlayer.Library.Count"
                     Exile="@LocalPlayer.Exile.Cards"
                     OnLifeAdjust="(delta) => OnLifeAdjust.InvokeAsync((PlayerSeat, delta))"
+                    OnDrawCard="() => OnDrawCard.InvokeAsync(PlayerSeat)"
                     IsOpponent="false"
                     IsActivePlayer="@(State.ActivePlayer == LocalPlayer)"
                     CanAct="@HasPriority"
@@ -89,6 +91,7 @@
     [Parameter] public EventCallback OnSurrender { get; set; }
     [Parameter] public EventCallback OnUndo { get; set; }
     [Parameter] public EventCallback<(int seat, int delta)> OnLifeAdjust { get; set; }
+    [Parameter] public EventCallback<int> OnDrawCard { get; set; }
     [Parameter] public bool IsGameOver { get; set; }
     [Parameter] public string? Winner { get; set; }
 
