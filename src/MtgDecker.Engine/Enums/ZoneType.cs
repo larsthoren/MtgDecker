@@ -5,5 +5,6 @@ public enum ZoneType
     Library,
     Hand,
     Battlefield,
-    Graveyard
+    Graveyard,
+    Exile
 }

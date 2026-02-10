@@ -33,6 +33,8 @@ public class PlayerTests
         player.Battlefield.Count.Should().Be(0);
         player.Graveyard.Type.Should().Be(ZoneType.Graveyard);
         player.Graveyard.Count.Should().Be(0);
+        player.Exile.Type.Should().Be(ZoneType.Exile);
+        player.Exile.Count.Should().Be(0);
     }
 
     [Theory]
@@ -40,6 +42,7 @@ public class PlayerTests
     [InlineData(ZoneType.Hand)]
     [InlineData(ZoneType.Battlefield)]
     [InlineData(ZoneType.Graveyard)]
+    [InlineData(ZoneType.Exile)]
     public void GetZone_ReturnsCorrectZone(ZoneType type)
     {
         var player = new Player(Guid.NewGuid(), "Alice", Substitute.For<IPlayerDecisionHandler>());

@@ -12,6 +12,7 @@ public class Player
     public Zone Hand { get; }
     public Zone Battlefield { get; }
     public Zone Graveyard { get; }
+    public Zone Exile { get; }
 
     public Player(Guid id, string name, IPlayerDecisionHandler decisionHandler)
     {
@@ -22,6 +23,7 @@ public class Player
         Hand = new Zone(ZoneType.Hand);
         Battlefield = new Zone(ZoneType.Battlefield);
         Graveyard = new Zone(ZoneType.Graveyard);
+        Exile = new Zone(ZoneType.Exile);
     }
 
     public Zone GetZone(ZoneType type) => type switch
@@ -30,6 +32,7 @@ public class Player
         ZoneType.Hand => Hand,
         ZoneType.Battlefield => Battlefield,
         ZoneType.Graveyard => Graveyard,
+        ZoneType.Exile => Exile,
         _ => throw new ArgumentOutOfRangeException(nameof(type))
     };
 }
