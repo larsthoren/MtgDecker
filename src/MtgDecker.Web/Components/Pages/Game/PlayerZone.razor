@@ -1,0 +1,145 @@
+@using MtgDecker.Engine
+@using MtgDecker.Engine.Enums
+@namespace MtgDecker.Web.Components.Pages.Game
+
+<div class="player-zone @(IsOpponent ? "opponent" : "local")">
+    <div class="zone-header">
+        <MudText Typo="Typo.subtitle2">@PlayerName</MudText>
+        @if (IsActivePlayer)
+        {
+            <MudChip T="string" Size="Size.Small" Color="Color.Primary">Active</MudChip>
+        }
+    </div>
+
+    @* Battlefield *@
+    <div class="zone battlefield">
+        @foreach (var card in Battlefield)
+        {
+            <div style="position: relative; display: inline-block;">
+                <CardDisplay Name="@card.Name"
+                             ImageUrl="@card.ImageUrl"
+                             Tapped="@card.IsTapped"
+                             Selected="@(SelectedCard?.Id == card.Id)"
+                             OnClick="() => SelectCard(card, ZoneType.Battlefield)" />
+            </div>
+        }
+        @if (Battlefield.Count == 0)
+        {
+            <MudText Typo="Typo.caption" Class="empty-zone">Battlefield</MudText>
+        }
+    </div>
+
+    @* Hand *@
+    <div class="zone hand">
+        @if (IsOpponent)
+        {
+            @for (int i = 0; i < Hand.Count; i++)
+            {
+                var index = i;
+                <CardDisplay Name="Card" IsBack="true" Clickable="@CanAct"
+                             OnClick="() => SelectCard(Hand[index], ZoneType.Hand)" />
+            }
+        }
+        else
+        {
+            @foreach (var card in Hand)
+            {
+                <CardDisplay Name="@card.Name"
+                             ImageUrl="@card.ImageUrl"
+                             Selected="@(SelectedCard?.Id == card.Id)"
+                             OnClick="() => SelectCard(card, ZoneType.Hand)" />
+            }
+        }
+        @if (Hand.Count == 0)
+        {
+            <MudText Typo="Typo.caption" Class="empty-zone">Hand (empty)</MudText>
+        }
+        else if (IsOpponent)
+        {
+            <MudText Typo="Typo.caption" Class="ml-2">@Hand.Count cards</MudText>
+        }
+    </div>
+
+    @* Graveyard *@
+    <div class="zone graveyard">
+        <MudText Typo="Typo.caption">Graveyard (@Graveyard.Count)</MudText>
+        @if (Graveyard.Count > 0)
+        {
+            <CardDisplay Name="@Graveyard[^1].Name"
+                         ImageUrl="@Graveyard[^1].ImageUrl"
+                         Selected="@(SelectedCard?.Id == Graveyard[^1].Id)"
+                         OnClick="() => SelectCard(Graveyard[^1], ZoneType.Graveyard)" />
+        }
+    </div>
+
+    @* Action Menu *@
+    @if (SelectedCard != null)
+    {
+        <ActionMenu Visible="true"
+                    CardName="@SelectedCard.Name"
+                    CurrentZone="_selectedZone"
+                    IsOwnCard="@(!IsOpponent)"
+                    IsTapped="@SelectedCard.IsTapped"
+                    OnPlay="HandlePlay"
+                    OnTapToggle="HandleTapToggle"
+                    OnMoveTo="HandleMoveTo"
+                    OnClose="ClearSelection" />
+    }
+</div>
+
+@code {
+    [Parameter] public string PlayerName { get; set; } = "";
+    [Parameter] public IReadOnlyList<GameCard> Battlefield { get; set; } = Array.Empty<GameCard>();
+    [Parameter] public IReadOnlyList<GameCard> Hand { get; set; } = Array.Empty<GameCard>();
+    [Parameter] public IReadOnlyList<GameCard> Graveyard { get; set; } = Array.Empty<GameCard>();
+    [Parameter] public bool IsOpponent { get; set; }
+    [Parameter] public bool IsActivePlayer { get; set; }
+    [Parameter] public bool CanAct { get; set; }
+    [Parameter] public Guid PlayerId { get; set; }
+    [Parameter] public EventCallback<GameAction> OnAction { get; set; }
+
+    private GameCard? SelectedCard;
+    private ZoneType _selectedZone;
+
+    private void SelectCard(GameCard card, ZoneType zone)
+    {
+        if (!CanAct && !IsOpponent) return;
+        if (SelectedCard?.Id == card.Id)
+        {
+            ClearSelection();
+            return;
+        }
+        SelectedCard = card;
+        _selectedZone = zone;
+    }
+
+    private async Task HandlePlay()
+    {
+        if (SelectedCard == null) return;
+        await OnAction.InvokeAsync(GameAction.PlayCard(PlayerId, SelectedCard.Id));
+        ClearSelection();
+    }
+
+    private async Task HandleTapToggle()
+    {
+        if (SelectedCard == null) return;
+        var action = SelectedCard.IsTapped
+            ? GameAction.UntapCard(PlayerId, SelectedCard.Id)
+            : GameAction.TapCard(PlayerId, SelectedCard.Id);
+        await OnAction.InvokeAsync(action);
+        ClearSelection();
+    }
+
+    private async Task HandleMoveTo(ZoneType destination)
+    {
+        if (SelectedCard == null) return;
+        await OnAction.InvokeAsync(
+            GameAction.MoveCard(PlayerId, SelectedCard.Id, _selectedZone, destination));
+        ClearSelection();
+    }
+
+    private void ClearSelection()
+    {
+        SelectedCard = null;
+    }
+}

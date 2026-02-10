@@ -1,0 +1,47 @@
+.player-zone {
+    padding: 8px;
+}
+
+.zone-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.zone {
+    min-height: 60px;
+    padding: 4px;
+    margin-bottom: 4px;
+}
+
+.battlefield {
+    min-height: 160px;
+    border: 1px dashed rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 8px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+}
+
+.hand {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.graveyard {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.empty-zone {
+    opacity: 0.3;
+    padding: 40px;
+}
+
+.opponent .battlefield {
+    border-color: rgba(255, 100, 100, 0.15);
+}
