@@ -173,4 +173,35 @@ public class InteractiveDecisionHandlerTests
 
         handler.IsWaitingForGenericPayment.Should().BeFalse();
     }
+
+    [Fact]
+    public async Task ChooseManaColor_ExposesManaColorOptions()
+    {
+        var handler = new InteractiveDecisionHandler();
+        var options = new List<ManaColor> { ManaColor.Red, ManaColor.Green };
+
+        // Start the choice (will block until resolved)
+        var task = handler.ChooseManaColor(options);
+
+        handler.IsWaitingForManaColor.Should().BeTrue();
+        handler.ManaColorOptions.Should().BeEquivalentTo(options);
+
+        // Resolve it
+        handler.SubmitManaColor(ManaColor.Red);
+        var result = await task;
+        result.Should().Be(ManaColor.Red);
+    }
+
+    [Fact]
+    public async Task ChooseManaColor_ClearsOptionsAfterSubmission()
+    {
+        var handler = new InteractiveDecisionHandler();
+        var options = new List<ManaColor> { ManaColor.Red, ManaColor.Green };
+
+        var task = handler.ChooseManaColor(options);
+        handler.SubmitManaColor(ManaColor.Green);
+        await task;
+
+        handler.ManaColorOptions.Should().BeNull();
+    }
 }

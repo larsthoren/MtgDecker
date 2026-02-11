@@ -18,6 +18,7 @@ public class InteractiveDecisionHandler : IPlayerDecisionHandler
     public bool IsWaitingForBottomCards => _bottomCardsTcs is { Task.IsCompleted: false };
     public bool IsWaitingForManaColor => _manaColorTcs is { Task.IsCompleted: false };
     public bool IsWaitingForGenericPayment => _genericPaymentTcs is { Task.IsCompleted: false };
+    public IReadOnlyList<ManaColor>? ManaColorOptions { get; private set; }
 
     public event Action? OnWaitingForInput;
 
@@ -50,6 +51,7 @@ public class InteractiveDecisionHandler : IPlayerDecisionHandler
 
     public Task<ManaColor> ChooseManaColor(IReadOnlyList<ManaColor> options, CancellationToken ct = default)
     {
+        ManaColorOptions = options;
         _manaColorTcs = new TaskCompletionSource<ManaColor>(TaskCreationOptions.RunContinuationsAsynchronously);
         var registration = ct.Register(() => _manaColorTcs.TrySetCanceled());
         _manaColorTcs.Task.ContinueWith(_ => registration.Dispose(), TaskContinuationOptions.ExecuteSynchronously);
@@ -90,8 +92,11 @@ public class InteractiveDecisionHandler : IPlayerDecisionHandler
         }
     }
 
-    public void SubmitManaColor(ManaColor color) =>
+    public void SubmitManaColor(ManaColor color)
+    {
+        ManaColorOptions = null;
         _manaColorTcs?.TrySetResult(color);
+    }
 
     public void SubmitGenericPayment(Dictionary<ManaColor, int> payment) =>
         _genericPaymentTcs?.TrySetResult(payment);
