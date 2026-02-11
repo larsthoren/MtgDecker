@@ -1,5 +1,6 @@
 using System.Collections.Frozen;
 using System.Diagnostics.CodeAnalysis;
+using MtgDecker.Engine.Effects;
 using MtgDecker.Engine.Enums;
 using MtgDecker.Engine.Mana;
 
@@ -27,7 +28,8 @@ public static class CardDefinitions
             ["Goblin Sharpshooter"] = new(ManaCost.Parse("{2}{R}"), null, 1, 1, CardType.Creature),
             ["Goblin Tinkerer"] = new(ManaCost.Parse("{1}{R}"), null, 1, 1, CardType.Creature),
             ["Skirk Prospector"] = new(ManaCost.Parse("{R}"), null, 1, 1, CardType.Creature),
-            ["Naturalize"] = new(ManaCost.Parse("{1}{G}"), null, null, null, CardType.Instant),
+            ["Naturalize"] = new(ManaCost.Parse("{1}{G}"), null, null, null, CardType.Instant,
+                TargetFilter.EnchantmentOrArtifact(), new NaturalizeEffect()),
 
             // === Goblins lands ===
             ["Mountain"] = new(null, ManaAbility.Fixed(ManaColor.Red), null, null, CardType.Land),
@@ -39,7 +41,8 @@ public static class CardDefinitions
 
             // === Enchantress deck ===
             ["Argothian Enchantress"] = new(ManaCost.Parse("{1}{G}"), null, 0, 1, CardType.Creature | CardType.Enchantment),
-            ["Swords to Plowshares"] = new(ManaCost.Parse("{W}"), null, null, null, CardType.Instant),
+            ["Swords to Plowshares"] = new(ManaCost.Parse("{W}"), null, null, null, CardType.Instant,
+                TargetFilter.Creature(), new SwordsToPlowsharesEffect()),
             ["Replenish"] = new(ManaCost.Parse("{3}{W}"), null, null, null, CardType.Sorcery),
             ["Enchantress's Presence"] = new(ManaCost.Parse("{2}{G}"), null, null, null, CardType.Enchantment),
             ["Wild Growth"] = new(ManaCost.Parse("{G}"), null, null, null, CardType.Enchantment),

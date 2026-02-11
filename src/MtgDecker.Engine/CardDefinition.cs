@@ -8,5 +8,7 @@ public record CardDefinition(
     ManaAbility? ManaAbility,
     int? Power,
     int? Toughness,
-    CardType CardTypes
+    CardType CardTypes,
+    TargetFilter? TargetFilter = null,
+    SpellEffect? Effect = null
 );

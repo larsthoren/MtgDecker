@@ -6,5 +6,6 @@ public enum ActionType
     PlayCard,
     TapCard,
     UntapCard,
-    MoveCard
+    MoveCard,
+    CastSpell
 }

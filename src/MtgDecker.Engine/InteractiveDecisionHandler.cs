@@ -15,6 +15,7 @@ public class InteractiveDecisionHandler : IPlayerDecisionHandler
     private TaskCompletionSource<IReadOnlyList<Guid>>? _attackersTcs;
     private TaskCompletionSource<Dictionary<Guid, Guid>>? _blockersTcs;
     private TaskCompletionSource<IReadOnlyList<Guid>>? _blockerOrderTcs;
+    private TaskCompletionSource<TargetInfo>? _targetTcs;
 
     public bool IsWaitingForAction => _actionTcs is { Task.IsCompleted: false };
     public bool IsWaitingForMulligan => _mulliganTcs is { Task.IsCompleted: false };
@@ -24,6 +25,9 @@ public class InteractiveDecisionHandler : IPlayerDecisionHandler
     public bool IsWaitingForAttackers => _attackersTcs is { Task.IsCompleted: false };
     public bool IsWaitingForBlockers => _blockersTcs is { Task.IsCompleted: false };
     public bool IsWaitingForBlockerOrder => _blockerOrderTcs is { Task.IsCompleted: false };
+    public bool IsWaitingForTarget => _targetTcs is { Task.IsCompleted: false };
+    public string? TargetingSpellName { get; private set; }
+    public IReadOnlyList<GameCard>? EligibleTargets { get; private set; }
     public IReadOnlyList<ManaColor>? ManaColorOptions { get; private set; }
     public IReadOnlyList<GameCard>? EligibleAttackers { get; private set; }
     public IReadOnlyList<GameCard>? EligibleBlockers { get; private set; }
@@ -146,6 +150,24 @@ public class InteractiveDecisionHandler : IPlayerDecisionHandler
         _blockerOrderTcs.Task.ContinueWith(_ => registration.Dispose(), TaskContinuationOptions.ExecuteSynchronously);
         OnWaitingForInput?.Invoke();
         return _blockerOrderTcs.Task;
+    }
+
+    public Task<TargetInfo> ChooseTarget(string spellName, IReadOnlyList<GameCard> eligibleTargets, Guid defaultOwnerId = default, CancellationToken ct = default)
+    {
+        TargetingSpellName = spellName;
+        EligibleTargets = eligibleTargets;
+        _targetTcs = new TaskCompletionSource<TargetInfo>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var registration = ct.Register(() => { TargetingSpellName = null; EligibleTargets = null; _targetTcs.TrySetCanceled(); });
+        _targetTcs.Task.ContinueWith(_ => registration.Dispose(), TaskContinuationOptions.ExecuteSynchronously);
+        OnWaitingForInput?.Invoke();
+        return _targetTcs.Task;
+    }
+
+    public void SubmitTarget(TargetInfo target)
+    {
+        TargetingSpellName = null;
+        EligibleTargets = null;
+        _targetTcs?.TrySetResult(target);
     }
 
     public void SubmitAttackers(IReadOnlyList<Guid> attackerIds)

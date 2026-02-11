@@ -55,4 +55,12 @@ public class GameAction
         SourceZone = from,
         DestinationZone = to
     };
+
+    public static GameAction CastSpell(Guid playerId, Guid cardId) => new()
+    {
+        Type = ActionType.CastSpell,
+        PlayerId = playerId,
+        CardId = cardId,
+        SourceZone = ZoneType.Hand
+    };
 }
