@@ -53,7 +53,11 @@ public class InteractiveDecisionHandler : IPlayerDecisionHandler
     {
         ManaColorOptions = options;
         _manaColorTcs = new TaskCompletionSource<ManaColor>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var registration = ct.Register(() => _manaColorTcs.TrySetCanceled());
+        var registration = ct.Register(() =>
+        {
+            ManaColorOptions = null;
+            _manaColorTcs.TrySetCanceled();
+        });
         _manaColorTcs.Task.ContinueWith(_ => registration.Dispose(), TaskContinuationOptions.ExecuteSynchronously);
         OnWaitingForInput?.Invoke();
         return _manaColorTcs.Task;
