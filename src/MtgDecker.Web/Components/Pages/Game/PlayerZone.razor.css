@@ -45,3 +45,29 @@
 .opponent .battlefield {
     border-color: rgba(255, 100, 100, 0.15);
 }
+
+.mana-pool-display {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: 8px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.mana-entry {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.mana-symbol {
+    width: 20px;
+    height: 20px;
+}
+
+.mana-count {
+    font-size: 0.85rem;
+    font-weight: 600;
+}

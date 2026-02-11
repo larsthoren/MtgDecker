@@ -1,5 +1,6 @@
 @using MtgDecker.Engine
 @using MtgDecker.Engine.Enums
+@using MtgDecker.Engine.Mana
 @namespace MtgDecker.Web.Components.Pages.Game
 
 <div class="player-zone @(IsOpponent ? "opponent" : "local")">
@@ -41,6 +42,22 @@
                        Title="Draw a card"
                        Disabled="@(LibraryCount == 0)"
                        OnClick="() => OnDrawCard.InvokeAsync()" />
+        @if (ManaPool != null && ManaPool.Total > 0)
+        {
+            <div class="mana-pool-display">
+                @foreach (var (color, symbol) in ManaOrder)
+                {
+                    @if (ManaPool[color] > 0)
+                    {
+                        <span class="mana-entry">
+                            <img src="https://svgs.scryfall.io/card-symbols/@(symbol).svg"
+                                 alt="@color" class="mana-symbol" />
+                            <span class="mana-count">@ManaPool[color]</span>
+                        </span>
+                    }
+                }
+            </div>
+        }
     </div>
 
     @* Battlefield *@
@@ -148,6 +165,7 @@
     [Parameter] public bool CanAct { get; set; }
     [Parameter] public Guid PlayerId { get; set; }
     [Parameter] public EventCallback<GameAction> OnAction { get; set; }
+    [Parameter] public ManaPool? ManaPool { get; set; }
 
     private GameCard? SelectedCard;
     private ZoneType _selectedZone;
@@ -217,4 +235,14 @@
     {
         SelectedCard = null;
     }
+
+    private static readonly (ManaColor color, string symbol)[] ManaOrder = new[]
+    {
+        (ManaColor.White, "W"),
+        (ManaColor.Blue, "U"),
+        (ManaColor.Black, "B"),
+        (ManaColor.Red, "R"),
+        (ManaColor.Green, "G"),
+        (ManaColor.Colorless, "C")
+    };
 }
