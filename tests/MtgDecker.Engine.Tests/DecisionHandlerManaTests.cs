@@ -35,7 +35,7 @@ public class DecisionHandlerManaTests
     }
 
     [Fact]
-    public async Task InteractiveHandler_ChooseGenericPayment_WaitsForSubmit()
+    public async Task InteractiveHandler_ChooseGenericPayment_AutoPaysImmediately()
     {
         var handler = new InteractiveDecisionHandler();
         var available = new Dictionary<ManaColor, int>
@@ -46,12 +46,15 @@ public class DecisionHandlerManaTests
 
         var task = handler.ChooseGenericPayment(2, available);
 
-        task.IsCompleted.Should().BeFalse();
-        handler.IsWaitingForGenericPayment.Should().BeTrue();
+        task.IsCompleted.Should().BeTrue();
+        handler.IsWaitingForGenericPayment.Should().BeFalse();
+
+        var result = await task;
+        result.Values.Sum().Should().Be(2);
     }
 
     [Fact]
-    public async Task InteractiveHandler_SubmitGenericPayment_CompletesTask()
+    public async Task InteractiveHandler_ChooseGenericPayment_PrefersLargestPool()
     {
         var handler = new InteractiveDecisionHandler();
         var available = new Dictionary<ManaColor, int>
@@ -59,18 +62,11 @@ public class DecisionHandlerManaTests
             { ManaColor.Red, 2 },
             { ManaColor.Green, 1 }
         };
-        var payment = new Dictionary<ManaColor, int>
-        {
-            { ManaColor.Red, 1 },
-            { ManaColor.Green, 1 }
-        };
 
-        var task = handler.ChooseGenericPayment(2, available);
-        handler.SubmitGenericPayment(payment);
+        var result = await handler.ChooseGenericPayment(2, available);
 
-        var result = await task;
-        result.Should().BeEquivalentTo(payment);
-        handler.IsWaitingForGenericPayment.Should().BeFalse();
+        result[ManaColor.Red].Should().Be(2);
+        result.Should().NotContainKey(ManaColor.Green);
     }
 
     [Fact]

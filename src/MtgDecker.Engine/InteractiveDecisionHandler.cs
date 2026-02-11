@@ -9,7 +9,9 @@ public class InteractiveDecisionHandler : IPlayerDecisionHandler
     private TaskCompletionSource<MulliganDecision>? _mulliganTcs;
     private TaskCompletionSource<IReadOnlyList<GameCard>>? _bottomCardsTcs;
     private TaskCompletionSource<ManaColor>? _manaColorTcs;
+#pragma warning disable CS0649 // Left for potential future interactive generic payment UI
     private TaskCompletionSource<Dictionary<ManaColor, int>>? _genericPaymentTcs;
+#pragma warning restore CS0649
 
     public bool IsWaitingForAction => _actionTcs is { Task.IsCompleted: false };
     public bool IsWaitingForMulligan => _mulliganTcs is { Task.IsCompleted: false };
@@ -57,11 +59,16 @@ public class InteractiveDecisionHandler : IPlayerDecisionHandler
 
     public Task<Dictionary<ManaColor, int>> ChooseGenericPayment(int genericAmount, Dictionary<ManaColor, int> available, CancellationToken ct = default)
     {
-        _genericPaymentTcs = new TaskCompletionSource<Dictionary<ManaColor, int>>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var registration = ct.Register(() => _genericPaymentTcs.TrySetCanceled());
-        _genericPaymentTcs.Task.ContinueWith(_ => registration.Dispose(), TaskContinuationOptions.ExecuteSynchronously);
-        OnWaitingForInput?.Invoke();
-        return _genericPaymentTcs.Task;
+        var payment = new Dictionary<ManaColor, int>();
+        var remaining = genericAmount;
+        foreach (var (color, amount) in available.OrderByDescending(kv => kv.Value))
+        {
+            if (remaining <= 0) break;
+            var take = Math.Min(amount, remaining);
+            payment[color] = take;
+            remaining -= take;
+        }
+        return Task.FromResult(payment);
     }
 
     public void SubmitAction(GameAction action) =>

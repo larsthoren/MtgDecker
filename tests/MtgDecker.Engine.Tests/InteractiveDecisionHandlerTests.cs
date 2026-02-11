@@ -112,4 +112,65 @@ public class InteractiveDecisionHandlerTests
         Func<Task> act = async () => await task;
         await act.Should().ThrowAsync<TaskCanceledException>();
     }
+
+    [Fact]
+    public async Task ChooseGenericPayment_AutoPays_FromLargestPoolFirst()
+    {
+        var handler = new InteractiveDecisionHandler();
+        var available = new Dictionary<ManaColor, int>
+        {
+            { ManaColor.Red, 1 },
+            { ManaColor.Green, 3 }
+        };
+
+        var result = await handler.ChooseGenericPayment(2, available);
+
+        result[ManaColor.Green].Should().Be(2);
+        result.Should().NotContainKey(ManaColor.Red);
+    }
+
+    [Fact]
+    public async Task ChooseGenericPayment_AutoPays_SplitsAcrossColors()
+    {
+        var handler = new InteractiveDecisionHandler();
+        var available = new Dictionary<ManaColor, int>
+        {
+            { ManaColor.Red, 1 },
+            { ManaColor.Green, 1 }
+        };
+
+        var result = await handler.ChooseGenericPayment(2, available);
+
+        result.Values.Sum().Should().Be(2);
+    }
+
+    [Fact]
+    public async Task ChooseGenericPayment_DoesNotBlockOnTaskCompletionSource()
+    {
+        var handler = new InteractiveDecisionHandler();
+        var available = new Dictionary<ManaColor, int>
+        {
+            { ManaColor.Red, 2 }
+        };
+
+        var task = handler.ChooseGenericPayment(1, available);
+        task.IsCompleted.Should().BeTrue();
+
+        var result = await task;
+        result[ManaColor.Red].Should().Be(1);
+    }
+
+    [Fact]
+    public async Task ChooseGenericPayment_IsNotWaitingAfterCall()
+    {
+        var handler = new InteractiveDecisionHandler();
+        var available = new Dictionary<ManaColor, int>
+        {
+            { ManaColor.Red, 2 }
+        };
+
+        await handler.ChooseGenericPayment(1, available);
+
+        handler.IsWaitingForGenericPayment.Should().BeFalse();
+    }
 }
