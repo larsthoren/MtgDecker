@@ -141,6 +141,55 @@
         </div>
     }
 
+    @* Card choice prompt (tutor effects) *@
+    @if (IsWaitingForCardChoice && CardChoiceOptions != null && !IsOpponent)
+    {
+        <div class="card-choice-prompt">
+            <MudText Typo="Typo.body2" Class="mb-2">@CardChoicePrompt</MudText>
+            <div class="card-choice-grid">
+                @foreach (var card in CardChoiceOptions)
+                {
+                    var isSelected = _selectedChoiceId == card.Id;
+                    <div class="card-choice-item @(isSelected ? "selected" : "")"
+                         @onclick="() => ToggleCardChoice(card.Id)">
+                        <CardDisplay ImageUrl="@card.ImageUrl" Name="@card.Name" Clickable="true" />
+                    </div>
+                }
+            </div>
+            <div class="card-choice-actions">
+                @if (CardChoiceOptional)
+                {
+                    <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="() => SubmitCardChoice(null)">Skip</MudButton>
+                }
+                <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary"
+                           Disabled="@(_selectedChoiceId == null)" OnClick="() => SubmitCardChoice(_selectedChoiceId)">Choose</MudButton>
+            </div>
+        </div>
+    }
+
+    @* Reveal cards prompt (Ringleader effects) *@
+    @if (IsWaitingForRevealAck && RevealedCards != null && !IsOpponent)
+    {
+        <div class="reveal-prompt">
+            <MudText Typo="Typo.body2" Class="mb-2">@RevealPrompt</MudText>
+            <div class="card-choice-grid">
+                @foreach (var card in RevealedCards)
+                {
+                    var isKept = KeptCards?.Any(k => k.Id == card.Id) == true;
+                    <div class="card-choice-item @(isKept ? "kept" : "not-kept")">
+                        <CardDisplay ImageUrl="@card.ImageUrl" Name="@card.Name" Clickable="false" />
+                        @if (isKept)
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Success">To Hand</MudChip>
+                        }
+                    </div>
+                }
+            </div>
+            <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" Class="mt-2"
+                       OnClick="AcknowledgeReveal">OK</MudButton>
+        </div>
+    }
+
     @* Battlefield *@
     <div class="zone battlefield">
         @foreach (var card in Battlefield)
@@ -277,6 +326,18 @@
     [Parameter] public IReadOnlyList<ManaColor>? ManaColorOptions { get; set; }
     [Parameter] public EventCallback<ManaColor> OnManaColorChosen { get; set; }
 
+    // Trigger effect parameters
+    [Parameter] public bool IsWaitingForCardChoice { get; set; }
+    [Parameter] public IReadOnlyList<GameCard>? CardChoiceOptions { get; set; }
+    [Parameter] public string? CardChoicePrompt { get; set; }
+    [Parameter] public bool CardChoiceOptional { get; set; }
+    [Parameter] public EventCallback<Guid?> OnCardChosen { get; set; }
+    [Parameter] public bool IsWaitingForRevealAck { get; set; }
+    [Parameter] public IReadOnlyList<GameCard>? RevealedCards { get; set; }
+    [Parameter] public IReadOnlyList<GameCard>? KeptCards { get; set; }
+    [Parameter] public string? RevealPrompt { get; set; }
+    [Parameter] public EventCallback OnRevealAcknowledged { get; set; }
+
     // Combat parameters
     [Parameter] public bool IsWaitingForAttackers { get; set; }
     [Parameter] public IReadOnlyList<GameCard>? EligibleAttackers { get; set; }
@@ -396,6 +457,25 @@
         }
         await OnBlockerOrderChosen.InvokeAsync(_blockerOrder.ToList());
         _blockerOrder.Clear();
+    }
+
+    // Card choice state
+    private Guid? _selectedChoiceId;
+
+    private void ToggleCardChoice(Guid cardId)
+    {
+        _selectedChoiceId = _selectedChoiceId == cardId ? null : cardId;
+    }
+
+    private async Task SubmitCardChoice(Guid? cardId)
+    {
+        _selectedChoiceId = null;
+        await OnCardChosen.InvokeAsync(cardId);
+    }
+
+    private async Task AcknowledgeReveal()
+    {
+        await OnRevealAcknowledged.InvokeAsync();
     }
 
     private bool IsCardBlocking(Guid cardId) =>

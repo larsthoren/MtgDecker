@@ -122,3 +122,45 @@
     0%, 100% { opacity: 1; }
     50% { opacity: 0.7; }
 }
+
+/* Trigger effect styles */
+.card-choice-prompt, .reveal-prompt {
+    padding: 8px 12px;
+    background: rgba(100, 200, 100, 0.1);
+    border: 1px solid rgba(100, 200, 100, 0.3);
+    border-radius: 8px;
+    margin-bottom: 8px;
+}
+
+.card-choice-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 8px 0;
+}
+
+.card-choice-item {
+    position: relative;
+    cursor: pointer;
+    border: 2px solid transparent;
+    border-radius: 8px;
+    padding: 4px;
+}
+
+.card-choice-item.selected {
+    border-color: var(--mud-palette-primary);
+}
+
+.card-choice-item.kept {
+    border-color: var(--mud-palette-success);
+}
+
+.card-choice-item.not-kept {
+    opacity: 0.5;
+}
+
+.card-choice-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+}
