@@ -511,6 +511,8 @@ public class GameEngine
         {
             player.Battlefield.RemoveById(card.Id);
             player.Graveyard.Add(card);
+            if (card.IsToken)
+                player.Graveyard.RemoveById(card.Id);
             card.DamageMarked = 0;
             _state.Log($"{card.Name} dies.");
         }

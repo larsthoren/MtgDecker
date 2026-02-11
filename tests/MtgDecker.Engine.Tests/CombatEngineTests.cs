@@ -268,4 +268,26 @@ public class CombatEngineTests
 
         state.Player2.Life.Should().Be(20, "non-creature cannot attack");
     }
+
+    [Fact]
+    public async Task TokenDeath_RemovedFromGame()
+    {
+        var (engine, state, p1Handler, p2Handler) = CreateSetup();
+        await engine.StartGameAsync();
+
+        var token = new GameCard { Name = "Goblin", Power = 1, Toughness = 1, CardTypes = CardType.Creature, IsToken = true, TurnEnteredBattlefield = 0 };
+        state.Player1.Battlefield.Add(token);
+
+        var blocker = new GameCard { Name = "Bear", Power = 2, Toughness = 2, CardTypes = CardType.Creature, TurnEnteredBattlefield = 0 };
+        state.Player2.Battlefield.Add(blocker);
+
+        p1Handler.EnqueueAttackers(new List<Guid> { token.Id });
+        p2Handler.EnqueueBlockers(new Dictionary<Guid, Guid> { { blocker.Id, token.Id } });
+
+        await engine.RunCombatAsync(CancellationToken.None);
+
+        // Token should not be in graveyard — tokens cease to exist
+        state.Player1.Graveyard.Cards.Should().NotContain(c => c.Id == token.Id);
+        state.Player1.Battlefield.Cards.Should().NotContain(c => c.Id == token.Id);
+    }
 }
