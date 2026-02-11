@@ -22,7 +22,7 @@
     @if (Power.HasValue && Toughness.HasValue)
     {
         <div class="pt-badge @(DamageMarked > 0 ? "damaged" : "")">
-            @Power/@(Toughness.Value - DamageMarked)
+            @Power/@(Math.Max(0, Toughness.Value - DamageMarked))
         </div>
     }
 

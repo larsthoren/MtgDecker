@@ -4,7 +4,8 @@ public class CombatState
 {
     public Guid AttackingPlayerId { get; }
     public Guid DefendingPlayerId { get; }
-    public List<Guid> Attackers { get; } = new();
+    private readonly List<Guid> _attackers = new();
+    public IReadOnlyList<Guid> Attackers => _attackers;
 
     private readonly Dictionary<Guid, List<Guid>> _blockerAssignments = new(); // attackerId -> blockerIds
     private readonly Dictionary<Guid, List<Guid>> _blockerOrder = new(); // attackerId -> ordered blockerIds
@@ -17,15 +18,16 @@ public class CombatState
 
     public void DeclareAttacker(Guid cardId)
     {
-        if (!Attackers.Contains(cardId))
-            Attackers.Add(cardId);
+        if (!_attackers.Contains(cardId))
+            _attackers.Add(cardId);
     }
 
     public void DeclareBlocker(Guid blockerId, Guid attackerId)
     {
         if (!_blockerAssignments.ContainsKey(attackerId))
             _blockerAssignments[attackerId] = new List<Guid>();
-        _blockerAssignments[attackerId].Add(blockerId);
+        if (!_blockerAssignments[attackerId].Contains(blockerId))
+            _blockerAssignments[attackerId].Add(blockerId);
     }
 
     public IReadOnlyList<Guid> GetBlockers(Guid attackerId) =>

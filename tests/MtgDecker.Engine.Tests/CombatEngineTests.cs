@@ -236,7 +236,7 @@ public class CombatEngineTests
     }
 
     [Fact]
-    public async Task CombatStep_ProgresessCorrectly()
+    public async Task CombatStep_ProgressesCorrectly()
     {
         var (engine, state, p1Handler, p2Handler) = CreateSetup();
         await engine.StartGameAsync();

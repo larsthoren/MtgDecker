@@ -157,7 +157,7 @@
                              DamageMarked="@card.DamageMarked"
                              IsAttacking="@(_selectedAttackers.Contains(card.Id) || CombatState?.Attackers.Contains(card.Id) == true)"
                              IsBlocking="@(_blockerAssignments.ContainsKey(card.Id) || IsCardBlocking(card.Id))"
-                             Clickable="@(isEligibleAttacker || isEligibleBlocker || true)"
+                             Clickable="true"
                              OnClick="async () => await HandleBattlefieldClick(card, isEligibleAttacker, isEligibleBlocker)" />
             </div>
         }
