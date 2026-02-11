@@ -69,7 +69,7 @@
                              ImageUrl="@card.ImageUrl"
                              Tapped="@card.IsTapped"
                              Selected="@(SelectedCard?.Id == card.Id)"
-                             OnClick="() => SelectCard(card, ZoneType.Battlefield)" />
+                             OnClick="async () => await SelectCard(card, ZoneType.Battlefield)" />
             </div>
         }
         @if (Battlefield.Count == 0)
@@ -86,7 +86,7 @@
             {
                 var index = i;
                 <CardDisplay Name="Card" IsBack="true" Clickable="@CanAct"
-                             OnClick="() => SelectCard(Hand[index], ZoneType.Hand)" />
+                             OnClick="async () => await SelectCard(Hand[index], ZoneType.Hand)" />
             }
         }
         else
@@ -96,7 +96,7 @@
                 <CardDisplay Name="@card.Name"
                              ImageUrl="@card.ImageUrl"
                              Selected="@(SelectedCard?.Id == card.Id)"
-                             OnClick="() => SelectCard(card, ZoneType.Hand)" />
+                             OnClick="async () => await SelectCard(card, ZoneType.Hand)" />
             }
         }
         @if (Hand.Count == 0)
@@ -117,7 +117,7 @@
             <CardDisplay Name="@Graveyard[^1].Name"
                          ImageUrl="@Graveyard[^1].ImageUrl"
                          Selected="@(SelectedCard?.Id == Graveyard[^1].Id)"
-                         OnClick="() => SelectCard(Graveyard[^1], ZoneType.Graveyard)" />
+                         OnClick="async () => await SelectCard(Graveyard[^1], ZoneType.Graveyard)" />
         }
     </div>
 
@@ -129,7 +129,7 @@
             <CardDisplay Name="@Exile[^1].Name"
                          ImageUrl="@Exile[^1].ImageUrl"
                          Selected="@(SelectedCard?.Id == Exile[^1].Id)"
-                         OnClick="() => SelectCard(Exile[^1], ZoneType.Exile)" />
+                         OnClick="async () => await SelectCard(Exile[^1], ZoneType.Exile)" />
         }
     </div>
 
@@ -146,6 +146,26 @@
                         OnTapToggle="HandleTapToggle"
                         OnMoveTo="HandleMoveTo"
                         OnClose="ClearSelection" />
+        </div>
+    }
+
+    @if (IsWaitingForManaColor && ManaColorOptions != null && !IsOpponent)
+    {
+        <div class="mana-color-picker">
+            <MudText Typo="Typo.caption" Class="mb-1">Choose mana color:</MudText>
+            <div class="mana-choice-buttons">
+                @foreach (var color in ManaColorOptions)
+                {
+                    var symbol = ManaOrder.First(m => m.color == color).symbol;
+                    <MudIconButton Class="mana-choice-btn"
+                                   OnClick="async () => await OnManaColorChosen.InvokeAsync(color)">
+                        <img src="https://svgs.scryfall.io/card-symbols/@(symbol).svg"
+                             alt="@color" style="width: 32px; height: 32px;" />
+                    </MudIconButton>
+                }
+                <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Default"
+                           OnClick="ClearSelection">Cancel</MudButton>
+            </div>
         </div>
     }
 </div>
@@ -166,15 +186,30 @@
     [Parameter] public Guid PlayerId { get; set; }
     [Parameter] public EventCallback<GameAction> OnAction { get; set; }
     [Parameter] public ManaPool? ManaPool { get; set; }
+    [Parameter] public bool IsWaitingForManaColor { get; set; }
+    [Parameter] public IReadOnlyList<ManaColor>? ManaColorOptions { get; set; }
+    [Parameter] public EventCallback<ManaColor> OnManaColorChosen { get; set; }
 
     private GameCard? SelectedCard;
     private ZoneType _selectedZone;
     private bool _editingLife;
     private string _lifeDelta = "";
 
-    private void SelectCard(GameCard card, ZoneType zone)
+    private async Task SelectCard(GameCard card, ZoneType zone)
     {
         if (!CanAct && !IsOpponent) return;
+
+        if (zone == ZoneType.Battlefield && !IsOpponent && !card.IsTapped && card.IsLand && card.ManaAbility != null)
+        {
+            // Fast-tap: dispatch TapCard immediately for any untapped land with mana ability
+            // For fixed abilities, engine resolves instantly
+            // For choice abilities, engine blocks and color picker will appear
+            await OnAction.InvokeAsync(GameAction.TapCard(PlayerId, card.Id));
+            ClearSelection();
+            return;
+        }
+
+        // Default: toggle action menu
         if (SelectedCard?.Id == card.Id)
         {
             ClearSelection();

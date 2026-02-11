@@ -32,7 +32,8 @@ else if (_session.State != null)
                OnLifeAdjust="HandleLifeAdjust"
                OnDrawCard="HandleDrawCard"
                IsGameOver="_session.IsGameOver"
-               Winner="_session.Winner" />
+               Winner="_session.Winner"
+               OnManaColorChosen="HandleManaColorChosen" />
 }
 
 @code {
@@ -98,6 +99,10 @@ else if (_session.State != null)
         {
             InvokeAsync(StateHasChanged);
         }
+        else if (handler.IsWaitingForManaColor)
+        {
+            InvokeAsync(StateHasChanged);
+        }
     }
 
     private async Task ShowMulliganDialog(int mulliganCount)
@@ -127,6 +132,12 @@ else if (_session.State != null)
         _mulliganDialogOpen = false;
         _mulliganCount = mulliganCount + 1;
         // Next mulligan (if any) will be triggered by HandleWaitingForInput event
+    }
+
+    private void HandleManaColorChosen(ManaColor color)
+    {
+        var handler = _session?.GetHandler(_playerSeat);
+        handler?.SubmitManaColor(color);
     }
 
     private void HandleAction(GameAction action)

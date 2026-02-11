@@ -78,7 +78,10 @@
                     IsActivePlayer="@(State.ActivePlayer == LocalPlayer)"
                     CanAct="@HasPriority"
                     PlayerId="@LocalPlayer.Id"
-                    OnAction="OnAction" />
+                    OnAction="OnAction"
+                    IsWaitingForManaColor="@IsWaitingForManaColor"
+                    ManaColorOptions="@ManaColorOptions"
+                    OnManaColorChosen="HandleManaColorChosen" />
     </div>
 
     @* Game log (right) *@
@@ -96,12 +99,15 @@
     [Parameter] public EventCallback<int> OnDrawCard { get; set; }
     [Parameter] public bool IsGameOver { get; set; }
     [Parameter] public string? Winner { get; set; }
+    [Parameter] public EventCallback<ManaColor> OnManaColorChosen { get; set; }
 
     private ElementReference _boardRef;
     private Player LocalPlayer => PlayerSeat == 1 ? State.Player1 : State.Player2;
     private Player OpponentPlayer => PlayerSeat == 1 ? State.Player2 : State.Player1;
     private int OpponentSeat => PlayerSeat == 1 ? 2 : 1;
     private bool HasPriority => Handler?.IsWaitingForAction == true;
+    private bool IsWaitingForManaColor => Handler?.IsWaitingForManaColor == true;
+    private IReadOnlyList<ManaColor>? ManaColorOptions => Handler?.ManaColorOptions;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -122,5 +128,10 @@
     private async Task PassPriority()
     {
         await OnAction.InvokeAsync(GameAction.Pass(LocalPlayer.Id));
+    }
+
+    private async Task HandleManaColorChosen(ManaColor color)
+    {
+        await OnManaColorChosen.InvokeAsync(color);
     }
 }

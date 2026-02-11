@@ -71,3 +71,28 @@
     font-size: 0.85rem;
     font-weight: 600;
 }
+
+.mana-color-picker {
+    display: inline-block;
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    margin: 4px;
+}
+
+.mana-choice-buttons {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.mana-choice-btn {
+    padding: 4px !important;
+    min-width: 40px !important;
+    border-radius: 50% !important;
+}
+
+.mana-choice-btn:hover {
+    background: rgba(255, 255, 255, 0.15) !important;
+}
