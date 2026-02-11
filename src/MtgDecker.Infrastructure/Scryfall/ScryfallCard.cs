@@ -46,6 +46,12 @@ public class ScryfallCard
     [JsonPropertyName("layout")]
     public string? Layout { get; set; }
 
+    [JsonPropertyName("power")]
+    public string? Power { get; set; }
+
+    [JsonPropertyName("toughness")]
+    public string? Toughness { get; set; }
+
     [JsonPropertyName("image_uris")]
     public ScryfallImageUris? ImageUris { get; set; }
 

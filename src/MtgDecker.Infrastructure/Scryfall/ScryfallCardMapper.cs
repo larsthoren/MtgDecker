@@ -25,6 +25,8 @@ public static class ScryfallCardMapper
             SetName = source.SetName,
             CollectorNumber = source.CollectorNumber,
             Layout = source.Layout,
+            Power = source.Power ?? source.CardFaces?.FirstOrDefault()?.Power,
+            Toughness = source.Toughness ?? source.CardFaces?.FirstOrDefault()?.Toughness,
             ImageUri = source.ImageUris?.Normal,
             ImageUriSmall = source.ImageUris?.Small,
             ImageUriArtCrop = source.ImageUris?.ArtCrop,

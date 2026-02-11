@@ -24,6 +24,8 @@ public class Card
     public string? ImageUriSmall { get; set; }
     public string? ImageUriArtCrop { get; set; }
     public string? Layout { get; set; }
+    public string? Power { get; set; }
+    public string? Toughness { get; set; }
 
     public decimal? PriceUsd { get; set; }
     public decimal? PriceUsdFoil { get; set; }
