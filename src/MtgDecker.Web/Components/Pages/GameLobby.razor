@@ -173,12 +173,7 @@
             if (!cardMap.TryGetValue(entry.CardId, out var card)) continue;
             for (int i = 0; i < entry.Quantity; i++)
             {
-                gameCards.Add(new GameCard
-                {
-                    Name = card.Name,
-                    TypeLine = card.TypeLine,
-                    ImageUrl = card.ImageUriSmall ?? card.ImageUri
-                });
+                gameCards.Add(GameCard.Create(card.Name, card.TypeLine, card.ImageUriSmall ?? card.ImageUri));
             }
         }
 
