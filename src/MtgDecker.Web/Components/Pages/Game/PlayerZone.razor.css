@@ -96,3 +96,29 @@
 .mana-choice-btn:hover {
     background: rgba(255, 255, 255, 0.15) !important;
 }
+
+/* Combat styles */
+.combat-prompt {
+    padding: 8px 12px;
+    background: rgba(255, 68, 68, 0.1);
+    border: 1px solid rgba(255, 68, 68, 0.3);
+    border-radius: 8px;
+    margin-bottom: 8px;
+}
+
+.blocker-prompt .attacker-targets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin: 8px 0;
+}
+
+.target-highlight {
+    cursor: pointer;
+    animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}

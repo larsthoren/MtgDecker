@@ -25,6 +25,18 @@
     border-radius: 8px;
 }
 
+.card-display.attacking {
+    outline: 3px solid #ff4444;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(255, 68, 68, 0.5);
+}
+
+.card-display.blocking {
+    outline: 3px solid #4488ff;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(68, 136, 255, 0.5);
+}
+
 .card-display img {
     width: 100%;
     border-radius: 6px;
@@ -52,4 +64,40 @@
     justify-content: center;
     padding: 8px;
     border: 1px solid #444;
+}
+
+.pt-badge {
+    position: absolute;
+    bottom: 4px;
+    right: 4px;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.pt-badge.damaged {
+    color: #ff4444;
+}
+
+.combat-indicator {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    padding: 2px 4px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: bold;
+}
+
+.attacking-indicator {
+    background: rgba(255, 68, 68, 0.9);
+    color: white;
+}
+
+.blocking-indicator {
+    background: rgba(68, 136, 255, 0.9);
+    color: white;
 }

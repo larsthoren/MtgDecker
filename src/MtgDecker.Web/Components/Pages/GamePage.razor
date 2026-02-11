@@ -33,7 +33,10 @@ else if (_session.State != null)
                OnDrawCard="HandleDrawCard"
                IsGameOver="_session.IsGameOver"
                Winner="_session.Winner"
-               OnManaColorChosen="HandleManaColorChosen" />
+               OnManaColorChosen="HandleManaColorChosen"
+               OnAttackersChosen="HandleAttackersChosen"
+               OnBlockersChosen="HandleBlockersChosen"
+               OnBlockerOrderChosen="HandleBlockerOrderChosen" />
 }
 
 @code {
@@ -103,6 +106,10 @@ else if (_session.State != null)
         {
             InvokeAsync(StateHasChanged);
         }
+        else if (handler.IsWaitingForAttackers || handler.IsWaitingForBlockers || handler.IsWaitingForBlockerOrder)
+        {
+            InvokeAsync(StateHasChanged);
+        }
     }
 
     private async Task ShowMulliganDialog(int mulliganCount)
@@ -138,6 +145,24 @@ else if (_session.State != null)
     {
         var handler = _session?.GetHandler(_playerSeat);
         handler?.SubmitManaColor(color);
+    }
+
+    private void HandleAttackersChosen(IReadOnlyList<Guid> attackerIds)
+    {
+        var handler = _session?.GetHandler(_playerSeat);
+        handler?.SubmitAttackers(attackerIds);
+    }
+
+    private void HandleBlockersChosen(Dictionary<Guid, Guid> assignments)
+    {
+        var handler = _session?.GetHandler(_playerSeat);
+        handler?.SubmitBlockers(assignments);
+    }
+
+    private void HandleBlockerOrderChosen(IReadOnlyList<Guid> orderedBlockerIds)
+    {
+        var handler = _session?.GetHandler(_playerSeat);
+        handler?.SubmitBlockerOrder(orderedBlockerIds);
     }
 
     private void HandleAction(GameAction action)

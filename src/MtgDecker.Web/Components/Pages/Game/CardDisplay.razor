@@ -1,6 +1,6 @@
 @namespace MtgDecker.Web.Components.Pages.Game
 
-<div class="card-display @(Tapped ? "tapped" : "") @(Selected ? "selected" : "") @(Clickable ? "clickable" : "")"
+<div class="card-display @(Tapped ? "tapped" : "") @(Selected ? "selected" : "") @(Clickable ? "clickable" : "") @(IsAttacking ? "attacking" : "") @(IsBlocking ? "blocking" : "")"
      @onclick="HandleClick">
     @if (IsBack)
     {
@@ -18,6 +18,22 @@
             <MudText Typo="Typo.caption" Align="Align.Center">@Name</MudText>
         </div>
     }
+
+    @if (Power.HasValue && Toughness.HasValue)
+    {
+        <div class="pt-badge @(DamageMarked > 0 ? "damaged" : "")">
+            @Power/@(Toughness.Value - DamageMarked)
+        </div>
+    }
+
+    @if (IsAttacking)
+    {
+        <div class="combat-indicator attacking-indicator">ATK</div>
+    }
+    @if (IsBlocking)
+    {
+        <div class="combat-indicator blocking-indicator">BLK</div>
+    }
 </div>
 
 @code {
@@ -28,6 +44,11 @@
     [Parameter] public bool Selected { get; set; }
     [Parameter] public bool Clickable { get; set; } = true;
     [Parameter] public EventCallback OnClick { get; set; }
+    [Parameter] public int? Power { get; set; }
+    [Parameter] public int? Toughness { get; set; }
+    [Parameter] public int DamageMarked { get; set; }
+    [Parameter] public bool IsAttacking { get; set; }
+    [Parameter] public bool IsBlocking { get; set; }
 
     private async Task HandleClick()
     {

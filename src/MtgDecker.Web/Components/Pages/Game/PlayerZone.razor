@@ -60,16 +60,105 @@
         }
     </div>
 
+    @* Attacker declaration prompt *@
+    @if (IsWaitingForAttackers && !IsOpponent)
+    {
+        <div class="combat-prompt">
+            <MudText Typo="Typo.subtitle1">Declare Attackers</MudText>
+            <MudText Typo="Typo.body2" Class="mb-2">Click creatures to attack with, then confirm.</MudText>
+            <MudButtonGroup>
+                <MudButton Variant="Variant.Filled" Color="Color.Error" OnClick="ConfirmAttackers"
+                           Disabled="@(_selectedAttackers.Count == 0)">
+                    Attack (@_selectedAttackers.Count)
+                </MudButton>
+                <MudButton Variant="Variant.Outlined" OnClick="SkipAttack">Skip</MudButton>
+            </MudButtonGroup>
+        </div>
+    }
+
+    @* Blocker declaration prompt *@
+    @if (IsWaitingForBlockers && !IsOpponent)
+    {
+        <div class="combat-prompt blocker-prompt">
+            <MudText Typo="Typo.subtitle1">Declare Blockers</MudText>
+            <MudText Typo="Typo.body2" Class="mb-2">
+                @if (_selectedBlocker == null)
+                {
+                    @("Click a creature to block with, then click an attacker to assign it.")
+                }
+                else
+                {
+                    @("Now click an attacking creature to block.")
+                }
+            </MudText>
+
+            @if (CurrentAttackers != null)
+            {
+                <div class="attacker-targets">
+                    <MudText Typo="Typo.caption">Attackers:</MudText>
+                    @foreach (var attacker in CurrentAttackers)
+                    {
+                        <MudChip T="string" Color="Color.Error"
+                                 OnClick="@(() => AssignBlockerToAttacker(attacker.Id))"
+                                 Class="@(_selectedBlocker != null ? "target-highlight" : "")">
+                            @attacker.Name (@attacker.Power/@attacker.Toughness)
+                        </MudChip>
+                    }
+                </div>
+            }
+
+            <MudButtonGroup Class="mt-2">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ConfirmBlockers">
+                    Confirm Blocks (@_blockerAssignments.Count)
+                </MudButton>
+                <MudButton Variant="Variant.Outlined" OnClick="SkipBlocking">No Blocks</MudButton>
+            </MudButtonGroup>
+        </div>
+    }
+
+    @* Blocker ordering prompt *@
+    @if (IsWaitingForBlockerOrder && !IsOpponent && BlockersToOrder != null)
+    {
+        <div class="combat-prompt">
+            <MudText Typo="Typo.subtitle1">Order Blockers</MudText>
+            <MudText Typo="Typo.body2" Class="mb-2">Click blockers in damage order (first to receive damage first).</MudText>
+
+            <div class="blocker-order-list">
+                @foreach (var blocker in BlockersToOrder)
+                {
+                    var orderIndex = _blockerOrder.IndexOf(blocker.Id);
+                    <MudChip T="string" Color="@(orderIndex >= 0 ? Color.Primary : Color.Default)"
+                             OnClick="@(() => AddToBlockerOrder(blocker.Id))">
+                        @if (orderIndex >= 0) { @($"#{orderIndex + 1} ") }
+                        @blocker.Name (@blocker.Power/@blocker.Toughness)
+                    </MudChip>
+                }
+            </div>
+
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ConfirmBlockerOrder" Class="mt-2">
+                Confirm Order
+            </MudButton>
+        </div>
+    }
+
     @* Battlefield *@
     <div class="zone battlefield">
         @foreach (var card in Battlefield)
         {
+            var isEligibleAttacker = IsWaitingForAttackers && EligibleAttackers?.Any(c => c.Id == card.Id) == true;
+            var isEligibleBlocker = IsWaitingForBlockers && EligibleBlockers?.Any(c => c.Id == card.Id) == true;
             <div style="position: relative; display: inline-block;">
                 <CardDisplay Name="@card.Name"
                              ImageUrl="@card.ImageUrl"
                              Tapped="@card.IsTapped"
                              Selected="@(SelectedCard?.Id == card.Id)"
-                             OnClick="async () => await SelectCard(card, ZoneType.Battlefield)" />
+                             Power="@card.Power"
+                             Toughness="@card.Toughness"
+                             DamageMarked="@card.DamageMarked"
+                             IsAttacking="@(_selectedAttackers.Contains(card.Id) || CombatState?.Attackers.Contains(card.Id) == true)"
+                             IsBlocking="@(_blockerAssignments.ContainsKey(card.Id) || IsCardBlocking(card.Id))"
+                             Clickable="@(isEligibleAttacker || isEligibleBlocker || true)"
+                             OnClick="async () => await HandleBattlefieldClick(card, isEligibleAttacker, isEligibleBlocker)" />
             </div>
         }
         @if (Battlefield.Count == 0)
@@ -188,10 +277,129 @@
     [Parameter] public IReadOnlyList<ManaColor>? ManaColorOptions { get; set; }
     [Parameter] public EventCallback<ManaColor> OnManaColorChosen { get; set; }
 
+    // Combat parameters
+    [Parameter] public bool IsWaitingForAttackers { get; set; }
+    [Parameter] public IReadOnlyList<GameCard>? EligibleAttackers { get; set; }
+    [Parameter] public EventCallback<IReadOnlyList<Guid>> OnAttackersChosen { get; set; }
+    [Parameter] public CombatState? CombatState { get; set; }
+    [Parameter] public bool IsWaitingForBlockers { get; set; }
+    [Parameter] public IReadOnlyList<GameCard>? EligibleBlockers { get; set; }
+    [Parameter] public IReadOnlyList<GameCard>? CurrentAttackers { get; set; }
+    [Parameter] public EventCallback<Dictionary<Guid, Guid>> OnBlockersChosen { get; set; }
+    [Parameter] public bool IsWaitingForBlockerOrder { get; set; }
+    [Parameter] public Guid? OrderingAttackerId { get; set; }
+    [Parameter] public IReadOnlyList<GameCard>? BlockersToOrder { get; set; }
+    [Parameter] public EventCallback<IReadOnlyList<Guid>> OnBlockerOrderChosen { get; set; }
+
     private GameCard? SelectedCard;
     private ZoneType _selectedZone;
     private bool _editingLife;
     private string _lifeDelta = "";
+
+    // Combat selection state
+    private HashSet<Guid> _selectedAttackers = new();
+    private Dictionary<Guid, Guid> _blockerAssignments = new(); // blockerId -> attackerId
+    private Guid? _selectedBlocker;
+    private List<Guid> _blockerOrder = new();
+
+    private async Task HandleBattlefieldClick(GameCard card, bool isEligibleAttacker, bool isEligibleBlocker)
+    {
+        if (IsWaitingForAttackers && isEligibleAttacker)
+        {
+            ToggleAttacker(card.Id);
+            return;
+        }
+
+        if (IsWaitingForBlockers && isEligibleBlocker)
+        {
+            SelectBlocker(card.Id);
+            return;
+        }
+
+        await SelectCard(card, ZoneType.Battlefield);
+    }
+
+    // Attacker selection
+    private void ToggleAttacker(Guid cardId)
+    {
+        if (_selectedAttackers.Contains(cardId))
+            _selectedAttackers.Remove(cardId);
+        else
+            _selectedAttackers.Add(cardId);
+    }
+
+    private async Task ConfirmAttackers()
+    {
+        await OnAttackersChosen.InvokeAsync(_selectedAttackers.ToList());
+        _selectedAttackers.Clear();
+    }
+
+    private async Task SkipAttack()
+    {
+        await OnAttackersChosen.InvokeAsync(Array.Empty<Guid>());
+        _selectedAttackers.Clear();
+    }
+
+    // Blocker selection
+    private void SelectBlocker(Guid cardId)
+    {
+        if (_blockerAssignments.ContainsKey(cardId))
+        {
+            _blockerAssignments.Remove(cardId);
+            _selectedBlocker = null;
+        }
+        else
+        {
+            _selectedBlocker = cardId;
+        }
+    }
+
+    private void AssignBlockerToAttacker(Guid attackerId)
+    {
+        if (_selectedBlocker.HasValue)
+        {
+            _blockerAssignments[_selectedBlocker.Value] = attackerId;
+            _selectedBlocker = null;
+        }
+    }
+
+    private async Task ConfirmBlockers()
+    {
+        await OnBlockersChosen.InvokeAsync(new Dictionary<Guid, Guid>(_blockerAssignments));
+        _blockerAssignments.Clear();
+        _selectedBlocker = null;
+    }
+
+    private async Task SkipBlocking()
+    {
+        await OnBlockersChosen.InvokeAsync(new Dictionary<Guid, Guid>());
+        _blockerAssignments.Clear();
+        _selectedBlocker = null;
+    }
+
+    // Blocker ordering
+    private void AddToBlockerOrder(Guid blockerId)
+    {
+        if (!_blockerOrder.Contains(blockerId))
+            _blockerOrder.Add(blockerId);
+    }
+
+    private async Task ConfirmBlockerOrder()
+    {
+        if (BlockersToOrder != null)
+        {
+            foreach (var b in BlockersToOrder)
+            {
+                if (!_blockerOrder.Contains(b.Id))
+                    _blockerOrder.Add(b.Id);
+            }
+        }
+        await OnBlockerOrderChosen.InvokeAsync(_blockerOrder.ToList());
+        _blockerOrder.Clear();
+    }
+
+    private bool IsCardBlocking(Guid cardId) =>
+        CombatState?.Attackers.Any(a => CombatState.GetBlockers(a).Contains(cardId)) == true;
 
     private async Task SelectCard(GameCard card, ZoneType zone)
     {
@@ -199,15 +407,11 @@
 
         if (zone == ZoneType.Battlefield && !IsOpponent && !card.IsTapped && card.IsLand && card.ManaAbility != null)
         {
-            // Fast-tap: dispatch TapCard immediately for any untapped land with mana ability
-            // For fixed abilities, engine resolves instantly
-            // For choice abilities, engine blocks and color picker will appear
             await OnAction.InvokeAsync(GameAction.TapCard(PlayerId, card.Id));
             ClearSelection();
             return;
         }
 
-        // Default: toggle action menu
         if (SelectedCard?.Id == card.Id)
         {
             ClearSelection();

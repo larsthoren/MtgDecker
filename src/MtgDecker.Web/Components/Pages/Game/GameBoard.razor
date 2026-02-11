@@ -34,7 +34,8 @@
                     IsActivePlayer="@(State.ActivePlayer == OpponentPlayer)"
                     CanAct="@HasPriority"
                     PlayerId="@OpponentPlayer.Id"
-                    OnAction="OnAction" />
+                    OnAction="OnAction"
+                    CombatState="@State.Combat" />
 
         @* Turn bar (middle) *@
         <MudPaper Class="turn-bar pa-2" Elevation="2">
@@ -43,13 +44,17 @@
                     Turn @State.TurnNumber — @State.ActivePlayer.Name's turn
                 </MudText>
                 <MudChip T="string" Size="Size.Small" Color="Color.Primary">@State.CurrentPhase</MudChip>
+                @if (State.CurrentPhase == Phase.Combat && State.CombatStep != CombatStep.None)
+                {
+                    <MudChip T="string" Color="Color.Error" Size="Size.Small">@FormatCombatStep(State.CombatStep)</MudChip>
+                }
                 @if (HasPriority)
                 {
                     <MudChip T="string" Size="Size.Small" Color="Color.Success">Your Priority</MudChip>
                     <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary"
                                OnClick="PassPriority">Pass Priority</MudButton>
                 }
-                else
+                else if (!IsWaitingForCombat)
                 {
                     <MudChip T="string" Size="Size.Small" Color="Color.Default">Waiting...</MudChip>
                 }
@@ -81,7 +86,19 @@
                     OnAction="OnAction"
                     IsWaitingForManaColor="@IsWaitingForManaColor"
                     ManaColorOptions="@ManaColorOptions"
-                    OnManaColorChosen="HandleManaColorChosen" />
+                    OnManaColorChosen="HandleManaColorChosen"
+                    IsWaitingForAttackers="@(IsLocalActive && Handler?.IsWaitingForAttackers == true)"
+                    EligibleAttackers="@(IsLocalActive ? Handler?.EligibleAttackers : null)"
+                    OnAttackersChosen="OnAttackersChosen"
+                    CombatState="@State.Combat"
+                    IsWaitingForBlockers="@(IsLocalDefending && Handler?.IsWaitingForBlockers == true)"
+                    EligibleBlockers="@(IsLocalDefending ? Handler?.EligibleBlockers : null)"
+                    CurrentAttackers="@(IsLocalDefending ? Handler?.CurrentAttackers : null)"
+                    OnBlockersChosen="OnBlockersChosen"
+                    IsWaitingForBlockerOrder="@(IsLocalActive && Handler?.IsWaitingForBlockerOrder == true)"
+                    OrderingAttackerId="@(Handler?.OrderingAttackerId)"
+                    BlockersToOrder="@(IsLocalActive ? Handler?.BlockersToOrder : null)"
+                    OnBlockerOrderChosen="OnBlockerOrderChosen" />
     </div>
 
     @* Game log (right) *@
@@ -100,6 +117,9 @@
     [Parameter] public bool IsGameOver { get; set; }
     [Parameter] public string? Winner { get; set; }
     [Parameter] public EventCallback<ManaColor> OnManaColorChosen { get; set; }
+    [Parameter] public EventCallback<IReadOnlyList<Guid>> OnAttackersChosen { get; set; }
+    [Parameter] public EventCallback<Dictionary<Guid, Guid>> OnBlockersChosen { get; set; }
+    [Parameter] public EventCallback<IReadOnlyList<Guid>> OnBlockerOrderChosen { get; set; }
 
     private ElementReference _boardRef;
     private Player LocalPlayer => PlayerSeat == 1 ? State.Player1 : State.Player2;
@@ -108,6 +128,12 @@
     private bool HasPriority => Handler?.IsWaitingForAction == true;
     private bool IsWaitingForManaColor => Handler?.IsWaitingForManaColor == true;
     private IReadOnlyList<ManaColor>? ManaColorOptions => Handler?.ManaColorOptions;
+    private bool IsLocalActive => State.ActivePlayer == LocalPlayer;
+    private bool IsLocalDefending => State.ActivePlayer == OpponentPlayer;
+    private bool IsWaitingForCombat =>
+        Handler?.IsWaitingForAttackers == true ||
+        Handler?.IsWaitingForBlockers == true ||
+        Handler?.IsWaitingForBlockerOrder == true;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -134,4 +160,14 @@
     {
         await OnManaColorChosen.InvokeAsync(color);
     }
+
+    private string FormatCombatStep(CombatStep step) => step switch
+    {
+        CombatStep.BeginCombat => "Begin Combat",
+        CombatStep.DeclareAttackers => "Declare Attackers",
+        CombatStep.DeclareBlockers => "Declare Blockers",
+        CombatStep.CombatDamage => "Combat Damage",
+        CombatStep.EndCombat => "End Combat",
+        _ => ""
+    };
 }
