@@ -273,6 +273,13 @@ public class GameEngine
         }
     }
 
+    public bool CanCastSorcery(Guid playerId)
+    {
+        return _state.ActivePlayer.Id == playerId
+            && (_state.CurrentPhase == Phase.MainPhase1 || _state.CurrentPhase == Phase.MainPhase2)
+            && _state.Stack.Count == 0;
+    }
+
     public bool UndoLastAction(Guid playerId)
     {
         var player = playerId == _state.Player1.Id ? _state.Player1 : _state.Player2;
