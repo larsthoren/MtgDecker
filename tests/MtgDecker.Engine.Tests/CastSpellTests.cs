@@ -268,4 +268,33 @@ public class CastSpellTests
 
         state.Player1.Battlefield.Cards.Should().Contain(c => c.Id == widget.Id);
     }
+
+    // === Task 3: Generic payment validation ===
+
+    [Fact]
+    public async Task CastSpell_InvalidGenericPayment_FallsBackToAutoPay()
+    {
+        var (engine, state, handler) = CreateSetup();
+        await engine.StartGameAsync();
+
+        // Goblin Piledriver costs {1}{R}
+        var piledriver = GameCard.Create("Goblin Piledriver", "Creature — Goblin");
+        state.Player1.Hand.Add(piledriver);
+        state.Player1.ManaPool.Add(ManaColor.Red, 2);
+        state.Player1.ManaPool.Add(ManaColor.Green, 1);
+
+        // Enqueue an invalid payment: sum doesn't equal GenericCost (1)
+        handler.EnqueueGenericPayment(new Dictionary<ManaColor, int>
+        {
+            { ManaColor.Red, 2 },  // Paying 2 for generic cost of 1 — invalid
+            { ManaColor.Green, 1 } // Total 3 instead of 1
+        });
+
+        await engine.ExecuteAction(GameAction.PlayCard(state.Player1.Id, piledriver.Id));
+
+        // Card should still be cast (auto-pay fallback)
+        state.Player1.Battlefield.Cards.Should().Contain(c => c.Name == "Goblin Piledriver");
+        // Total mana should be correct: started with 3, spent {1}{R} = 2
+        state.Player1.ManaPool.Total.Should().Be(1);
+    }
 }

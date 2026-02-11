@@ -101,6 +101,8 @@ public class GameEngine
                     player.Hand.RemoveById(playCard.Id);
                     player.Battlefield.Add(playCard);
                     player.LandsPlayedThisTurn++;
+                    action.IsLandDrop = true;
+                    action.DestinationZone = ZoneType.Battlefield;
                     player.ActionHistory.Push(action);
                     _state.Log($"{player.Name} plays {playCard.Name} (land drop).");
                 }
@@ -135,10 +137,31 @@ public class GameEngine
                     {
                         int distinctColors = remaining.Count(kv => kv.Value > 0);
                         int totalRemaining = remaining.Values.Sum();
+                        bool useAutoPay = distinctColors <= 1 || totalRemaining == cost.GenericCost;
 
-                        if (distinctColors <= 1 || totalRemaining == cost.GenericCost)
+                        if (!useAutoPay)
                         {
-                            // Unambiguous: auto-pay
+                            // Ambiguous: prompt player
+                            var genericPayment = await player.DecisionHandler
+                                .ChooseGenericPayment(cost.GenericCost, remaining, ct);
+
+                            // Validate payment: sum must equal generic cost, amounts must not exceed available
+                            bool valid = genericPayment.Values.Sum() == cost.GenericCost
+                                && genericPayment.All(kv => remaining.TryGetValue(kv.Key, out var avail) && kv.Value <= avail);
+
+                            if (valid)
+                            {
+                                foreach (var (color, amount) in genericPayment)
+                                    player.ManaPool.Deduct(color, amount);
+                            }
+                            else
+                            {
+                                useAutoPay = true;
+                            }
+                        }
+
+                        if (useAutoPay)
+                        {
                             var toPay = cost.GenericCost;
                             foreach (var (color, amount) in remaining)
                             {
@@ -151,14 +174,6 @@ public class GameEngine
                                 if (toPay == 0) break;
                             }
                         }
-                        else
-                        {
-                            // Ambiguous: prompt player
-                            var genericPayment = await player.DecisionHandler
-                                .ChooseGenericPayment(cost.GenericCost, remaining, ct);
-                            foreach (var (color, amount) in genericPayment)
-                                player.ManaPool.Deduct(color, amount);
-                        }
                     }
 
                     // Move card to destination
@@ -168,13 +183,16 @@ public class GameEngine
                     if (isInstantOrSorcery)
                     {
                         player.Graveyard.Add(playCard);
+                        action.DestinationZone = ZoneType.Graveyard;
                         _state.Log($"{player.Name} casts {playCard.Name} (→ graveyard).");
                     }
                     else
                     {
                         player.Battlefield.Add(playCard);
+                        action.DestinationZone = ZoneType.Battlefield;
                         _state.Log($"{player.Name} casts {playCard.Name}.");
                     }
+                    action.ManaCostPaid = cost;
                     player.ActionHistory.Push(action);
                 }
                 else
@@ -200,6 +218,7 @@ public class GameEngine
                         if (ability.Type == ManaAbilityType.Fixed)
                         {
                             player.ManaPool.Add(ability.FixedColor!.Value);
+                            action.ManaProduced = ability.FixedColor!.Value;
                             _state.Log($"{player.Name} taps {tapTarget.Name} for {ability.FixedColor}.");
                         }
                         else if (ability.Type == ManaAbilityType.Choice)
@@ -207,6 +226,7 @@ public class GameEngine
                             var chosen = await player.DecisionHandler.ChooseManaColor(
                                 ability.ChoiceColors!, ct);
                             player.ManaPool.Add(chosen);
+                            action.ManaProduced = chosen;
                             _state.Log($"{player.Name} taps {tapTarget.Name} for {chosen}.");
                         }
                     }
@@ -252,10 +272,21 @@ public class GameEngine
         switch (action.Type)
         {
             case ActionType.PlayCard:
-                var card = player.Battlefield.RemoveById(action.CardId!.Value);
+                var destZone = action.DestinationZone == ZoneType.Graveyard
+                    ? player.Graveyard : player.Battlefield;
+                var card = destZone.RemoveById(action.CardId!.Value);
                 if (card == null) return false;
                 player.ActionHistory.Pop();
                 player.Hand.Add(card);
+                if (action.IsLandDrop)
+                    player.LandsPlayedThisTurn--;
+                if (action.ManaCostPaid != null)
+                {
+                    foreach (var (color, amount) in action.ManaCostPaid.ColorRequirements)
+                        player.ManaPool.Add(color, amount);
+                    if (action.ManaCostPaid.GenericCost > 0)
+                        player.ManaPool.Add(ManaColor.Colorless, action.ManaCostPaid.GenericCost);
+                }
                 _state.Log($"{player.Name} undoes playing {card.Name}.");
                 break;
 
@@ -264,6 +295,8 @@ public class GameEngine
                 if (tapTarget == null) return false;
                 player.ActionHistory.Pop();
                 tapTarget.IsTapped = false;
+                if (action.ManaProduced.HasValue)
+                    player.ManaPool.Deduct(action.ManaProduced.Value, 1);
                 _state.Log($"{player.Name} undoes tapping {tapTarget.Name}.");
                 break;
 

@@ -1,4 +1,5 @@
 using MtgDecker.Engine.Enums;
+using MtgDecker.Engine.Mana;
 
 namespace MtgDecker.Engine;
 
@@ -10,7 +11,12 @@ public class GameAction
     public Guid PlayerId { get; init; }
     public Guid? CardId { get; init; }
     public ZoneType? SourceZone { get; init; }
-    public ZoneType? DestinationZone { get; init; }
+    public ZoneType? DestinationZone { get; set; }
+
+    // Undo metadata — set by GameEngine during ExecuteAction
+    public ManaColor? ManaProduced { get; set; }
+    public ManaCost? ManaCostPaid { get; set; }
+    public bool IsLandDrop { get; set; }
 
     public static GameAction Pass(Guid playerId) => new()
     {
