@@ -1,0 +1,62 @@
+@using MtgDecker.Engine
+@namespace MtgDecker.Web.Components.Pages.Game
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">@Prompt</MudText>
+    </TitleContent>
+    <DialogContent>
+        <div class="card-selection-grid">
+            @foreach (var card in Cards)
+            {
+                var isKept = KeptCards?.Any(k => k.Id == card.Id) == true;
+                var isSelected = _selectedCardId == card.Id;
+                <div class="card-selection-item @(isKept ? "kept" : "") @(!isKept && IsRevealMode ? "not-kept" : "") @(isSelected ? "selected" : "")"
+                     @onclick="() => HandleCardClick(card)">
+                    <CardDisplay ImageUrl="@card.ImageUrl"
+                                 Name="@card.Name"
+                                 Clickable="@(!IsRevealMode)" />
+                    @if (isKept)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Success" Class="kept-badge">Kept</MudChip>
+                    }
+                </div>
+            }
+        </div>
+    </DialogContent>
+    <DialogActions>
+        @if (IsRevealMode)
+        {
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       OnClick="() => MudDialog.Close(DialogResult.Ok(default(Guid?)))">OK</MudButton>
+        }
+        else
+        {
+            @if (Optional)
+            {
+                <MudButton Variant="Variant.Outlined"
+                           OnClick="() => MudDialog.Close(DialogResult.Ok(default(Guid?)))">Skip</MudButton>
+            }
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       Disabled="@(_selectedCardId == null)"
+                       OnClick="() => MudDialog.Close(DialogResult.Ok(_selectedCardId))">Choose</MudButton>
+        }
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public IReadOnlyList<GameCard> Cards { get; set; } = [];
+    [Parameter] public IReadOnlyList<GameCard>? KeptCards { get; set; }
+    [Parameter] public string Prompt { get; set; } = "";
+    [Parameter] public bool Optional { get; set; }
+    [Parameter] public bool IsRevealMode { get; set; }
+
+    private Guid? _selectedCardId;
+
+    private void HandleCardClick(GameCard card)
+    {
+        if (IsRevealMode) return;
+        _selectedCardId = _selectedCardId == card.Id ? null : card.Id;
+    }
+}
