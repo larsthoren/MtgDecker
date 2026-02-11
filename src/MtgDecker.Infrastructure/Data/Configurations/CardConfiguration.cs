@@ -26,6 +26,8 @@ public class CardConfiguration : IEntityTypeConfiguration<Card>
         builder.Property(c => c.ImageUriSmall).HasMaxLength(500);
         builder.Property(c => c.ImageUriArtCrop).HasMaxLength(500);
         builder.Property(c => c.Layout).HasMaxLength(30);
+        builder.Property(c => c.Power).HasMaxLength(10);
+        builder.Property(c => c.Toughness).HasMaxLength(10);
 
         builder.Property(c => c.PriceUsd).HasColumnType("decimal(10,2)");
         builder.Property(c => c.PriceUsdFoil).HasColumnType("decimal(10,2)");
