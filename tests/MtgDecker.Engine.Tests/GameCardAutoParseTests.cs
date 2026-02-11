@@ -1,6 +1,7 @@
 using FluentAssertions;
 using MtgDecker.Engine.Enums;
 using MtgDecker.Engine.Mana;
+using MtgDecker.Engine.Triggers;
 
 namespace MtgDecker.Engine.Tests;
 
@@ -124,5 +125,13 @@ public class GameCardAutoParseTests
     {
         var card = new GameCard { Name = "Goblin Token", IsToken = true };
         card.IsToken.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Create_Registry_GetsSubtypesAndTriggersFromDefinition()
+    {
+        var card = GameCard.Create("Goblin Lackey");
+        card.Subtypes.Should().NotBeNull();
+        card.Triggers.Should().NotBeNull();
     }
 }
