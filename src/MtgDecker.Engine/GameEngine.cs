@@ -677,7 +677,17 @@ public class GameEngine
                     nonActivePlayerPassed = true;
 
                 if (activePlayerPassed && nonActivePlayerPassed)
+                {
+                    if (_state.Stack.Count > 0)
+                    {
+                        ResolveTopOfStack();
+                        _state.PriorityPlayer = _state.ActivePlayer;
+                        activePlayerPassed = false;
+                        nonActivePlayerPassed = false;
+                        continue;
+                    }
                     return;
+                }
 
                 _state.PriorityPlayer = _state.GetOpponent(_state.PriorityPlayer);
             }
@@ -687,6 +697,58 @@ public class GameEngine
                 activePlayerPassed = false;
                 nonActivePlayerPassed = false;
                 _state.PriorityPlayer = _state.ActivePlayer;
+            }
+        }
+    }
+
+    private void ResolveTopOfStack()
+    {
+        if (_state.Stack.Count == 0) return;
+
+        var top = _state.Stack[^1];
+        _state.Stack.RemoveAt(_state.Stack.Count - 1);
+        var controller = top.ControllerId == _state.Player1.Id ? _state.Player1 : _state.Player2;
+
+        _state.Log($"Resolving {top.Card.Name}.");
+
+        if (CardDefinitions.TryGet(top.Card.Name, out var def) && def.Effect != null)
+        {
+            if (top.Targets.Count > 0)
+            {
+                var allTargetsLegal = true;
+                foreach (var target in top.Targets)
+                {
+                    var targetOwner = target.PlayerId == _state.Player1.Id ? _state.Player1 : _state.Player2;
+                    var targetZone = targetOwner.GetZone(target.Zone);
+                    if (!targetZone.Contains(target.CardId))
+                    {
+                        allTargetsLegal = false;
+                        break;
+                    }
+                }
+
+                if (!allTargetsLegal)
+                {
+                    _state.Log($"{top.Card.Name} fizzles (illegal target).");
+                    controller.Graveyard.Add(top.Card);
+                    return;
+                }
+            }
+
+            def.Effect.Resolve(_state, top);
+            controller.Graveyard.Add(top.Card);
+        }
+        else
+        {
+            if (top.Card.IsCreature || top.Card.CardTypes.HasFlag(CardType.Enchantment)
+                || top.Card.CardTypes.HasFlag(CardType.Artifact))
+            {
+                top.Card.TurnEnteredBattlefield = _state.TurnNumber;
+                controller.Battlefield.Add(top.Card);
+            }
+            else
+            {
+                controller.Graveyard.Add(top.Card);
             }
         }
     }
