@@ -11,12 +11,19 @@ public class GameCard
     public string? ImageUrl { get; init; }
     public bool IsTapped { get; set; }
 
-    // Resolved from CardDefinitions registry
+    // Resolved from CardDefinitions registry or auto-parsed
     public ManaCost? ManaCost { get; set; }
     public ManaAbility? ManaAbility { get; set; }
     public int? Power { get; set; }
     public int? Toughness { get; set; }
     public CardType CardTypes { get; set; } = CardType.None;
+
+    // Combat tracking
+    public int? TurnEnteredBattlefield { get; set; }
+    public int DamageMarked { get; set; }
+
+    public bool HasSummoningSickness(int currentTurn) =>
+        IsCreature && TurnEnteredBattlefield.HasValue && TurnEnteredBattlefield.Value >= currentTurn;
 
     // Backward-compatible: check both CardTypes flags and TypeLine
     public bool IsLand =>
@@ -27,6 +34,7 @@ public class GameCard
         CardTypes.HasFlag(CardType.Creature) ||
         TypeLine.Contains("Creature", StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>Original factory: uses CardDefinitions registry only.</summary>
     public static GameCard Create(string name, string typeLine = "", string? imageUrl = null)
     {
         var card = new GameCard { Name = name, TypeLine = typeLine, ImageUrl = imageUrl };
@@ -39,5 +47,61 @@ public class GameCard
             card.CardTypes = def.CardTypes;
         }
         return card;
+    }
+
+    /// <summary>
+    /// Enhanced factory: auto-parses card data from raw strings (Scryfall DB fields).
+    /// Falls back to CardDefinitions for ManaAbility on non-basic lands.
+    /// </summary>
+    public static GameCard Create(string name, string typeLine, string? imageUrl,
+        string? manaCost, string? power, string? toughness)
+    {
+        var card = new GameCard { Name = name, TypeLine = typeLine, ImageUrl = imageUrl };
+
+        // CardDefinitions registry takes full precedence if the card is registered
+        if (CardDefinitions.TryGet(name, out var def))
+        {
+            card.ManaCost = def.ManaCost;
+            card.ManaAbility = def.ManaAbility;
+            card.Power = def.Power;
+            card.Toughness = def.Toughness;
+            card.CardTypes = def.CardTypes;
+            return card;
+        }
+
+        // Auto-parse from raw data
+        card.CardTypes = CardTypeParser.Parse(typeLine);
+
+        if (!string.IsNullOrWhiteSpace(manaCost))
+            card.ManaCost = ManaCost.Parse(manaCost);
+
+        if (int.TryParse(power, out var p))
+            card.Power = p;
+        if (int.TryParse(toughness, out var t))
+            card.Toughness = t;
+
+        // Auto-detect mana ability for basic lands
+        card.ManaAbility = DetectBasicLandManaAbility(typeLine);
+
+        return card;
+    }
+
+    private static ManaAbility? DetectBasicLandManaAbility(string typeLine)
+    {
+        if (!typeLine.Contains("Basic Land", StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        if (typeLine.Contains("Plains", StringComparison.OrdinalIgnoreCase))
+            return ManaAbility.Fixed(ManaColor.White);
+        if (typeLine.Contains("Island", StringComparison.OrdinalIgnoreCase))
+            return ManaAbility.Fixed(ManaColor.Blue);
+        if (typeLine.Contains("Swamp", StringComparison.OrdinalIgnoreCase))
+            return ManaAbility.Fixed(ManaColor.Black);
+        if (typeLine.Contains("Mountain", StringComparison.OrdinalIgnoreCase))
+            return ManaAbility.Fixed(ManaColor.Red);
+        if (typeLine.Contains("Forest", StringComparison.OrdinalIgnoreCase))
+            return ManaAbility.Fixed(ManaColor.Green);
+
+        return null;
     }
 }

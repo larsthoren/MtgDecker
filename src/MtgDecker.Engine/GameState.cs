@@ -12,6 +12,8 @@ public class GameState
     public int TurnNumber { get; set; }
     public bool IsGameOver { get; set; }
     public bool IsFirstTurn { get; set; }
+    public CombatStep CombatStep { get; set; } = CombatStep.None;
+    public CombatState? Combat { get; set; }
     public List<string> GameLog { get; } = new();
     public event Action? OnStateChanged;
 

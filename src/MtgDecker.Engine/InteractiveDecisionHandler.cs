@@ -12,13 +12,24 @@ public class InteractiveDecisionHandler : IPlayerDecisionHandler
 #pragma warning disable CS0649 // Left for potential future interactive generic payment UI
     private TaskCompletionSource<Dictionary<ManaColor, int>>? _genericPaymentTcs;
 #pragma warning restore CS0649
+    private TaskCompletionSource<IReadOnlyList<Guid>>? _attackersTcs;
+    private TaskCompletionSource<Dictionary<Guid, Guid>>? _blockersTcs;
+    private TaskCompletionSource<IReadOnlyList<Guid>>? _blockerOrderTcs;
 
     public bool IsWaitingForAction => _actionTcs is { Task.IsCompleted: false };
     public bool IsWaitingForMulligan => _mulliganTcs is { Task.IsCompleted: false };
     public bool IsWaitingForBottomCards => _bottomCardsTcs is { Task.IsCompleted: false };
     public bool IsWaitingForManaColor => _manaColorTcs is { Task.IsCompleted: false };
     public bool IsWaitingForGenericPayment => _genericPaymentTcs is { Task.IsCompleted: false };
+    public bool IsWaitingForAttackers => _attackersTcs is { Task.IsCompleted: false };
+    public bool IsWaitingForBlockers => _blockersTcs is { Task.IsCompleted: false };
+    public bool IsWaitingForBlockerOrder => _blockerOrderTcs is { Task.IsCompleted: false };
     public IReadOnlyList<ManaColor>? ManaColorOptions { get; private set; }
+    public IReadOnlyList<GameCard>? EligibleAttackers { get; private set; }
+    public IReadOnlyList<GameCard>? EligibleBlockers { get; private set; }
+    public IReadOnlyList<GameCard>? CurrentAttackers { get; private set; }
+    public Guid? OrderingAttackerId { get; private set; }
+    public IReadOnlyList<GameCard>? BlockersToOrder { get; private set; }
 
     public event Action? OnWaitingForInput;
 
@@ -104,4 +115,56 @@ public class InteractiveDecisionHandler : IPlayerDecisionHandler
 
     public void SubmitGenericPayment(Dictionary<ManaColor, int> payment) =>
         _genericPaymentTcs?.TrySetResult(payment);
+
+    public Task<IReadOnlyList<Guid>> ChooseAttackers(IReadOnlyList<GameCard> eligibleAttackers, CancellationToken ct = default)
+    {
+        EligibleAttackers = eligibleAttackers;
+        _attackersTcs = new TaskCompletionSource<IReadOnlyList<Guid>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var registration = ct.Register(() => { EligibleAttackers = null; _attackersTcs.TrySetCanceled(); });
+        _attackersTcs.Task.ContinueWith(_ => registration.Dispose(), TaskContinuationOptions.ExecuteSynchronously);
+        OnWaitingForInput?.Invoke();
+        return _attackersTcs.Task;
+    }
+
+    public Task<Dictionary<Guid, Guid>> ChooseBlockers(IReadOnlyList<GameCard> eligibleBlockers, IReadOnlyList<GameCard> attackers, CancellationToken ct = default)
+    {
+        EligibleBlockers = eligibleBlockers;
+        CurrentAttackers = attackers;
+        _blockersTcs = new TaskCompletionSource<Dictionary<Guid, Guid>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var registration = ct.Register(() => { EligibleBlockers = null; CurrentAttackers = null; _blockersTcs.TrySetCanceled(); });
+        _blockersTcs.Task.ContinueWith(_ => registration.Dispose(), TaskContinuationOptions.ExecuteSynchronously);
+        OnWaitingForInput?.Invoke();
+        return _blockersTcs.Task;
+    }
+
+    public Task<IReadOnlyList<Guid>> OrderBlockers(Guid attackerId, IReadOnlyList<GameCard> blockers, CancellationToken ct = default)
+    {
+        OrderingAttackerId = attackerId;
+        BlockersToOrder = blockers;
+        _blockerOrderTcs = new TaskCompletionSource<IReadOnlyList<Guid>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var registration = ct.Register(() => { OrderingAttackerId = null; BlockersToOrder = null; _blockerOrderTcs.TrySetCanceled(); });
+        _blockerOrderTcs.Task.ContinueWith(_ => registration.Dispose(), TaskContinuationOptions.ExecuteSynchronously);
+        OnWaitingForInput?.Invoke();
+        return _blockerOrderTcs.Task;
+    }
+
+    public void SubmitAttackers(IReadOnlyList<Guid> attackerIds)
+    {
+        EligibleAttackers = null;
+        _attackersTcs?.TrySetResult(attackerIds);
+    }
+
+    public void SubmitBlockers(Dictionary<Guid, Guid> assignments)
+    {
+        EligibleBlockers = null;
+        CurrentAttackers = null;
+        _blockersTcs?.TrySetResult(assignments);
+    }
+
+    public void SubmitBlockerOrder(IReadOnlyList<Guid> orderedBlockerIds)
+    {
+        OrderingAttackerId = null;
+        BlockersToOrder = null;
+        _blockerOrderTcs?.TrySetResult(orderedBlockerIds);
+    }
 }

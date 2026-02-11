@@ -43,13 +43,22 @@ public class GameEngine
                     ExecuteTurnBasedAction(phase.Phase);
             }
 
-            if (phase.GrantsPriority)
+            if (phase.Phase == Phase.Combat)
+            {
+                await RunCombatAsync(ct);
+            }
+            else if (phase.GrantsPriority)
+            {
                 await RunPriorityAsync(ct);
+            }
 
             _state.Player1.ManaPool.Clear();
             _state.Player2.ManaPool.Clear();
 
         } while (_turnStateMachine.AdvancePhase() != null);
+
+        // Clear damage at end of turn
+        ClearDamage();
 
         _state.IsFirstTurn = false;
         _state.TurnNumber++;
@@ -100,6 +109,7 @@ public class GameEngine
                     }
                     player.Hand.RemoveById(playCard.Id);
                     player.Battlefield.Add(playCard);
+                    playCard.TurnEnteredBattlefield = _state.TurnNumber;
                     player.LandsPlayedThisTurn++;
                     action.IsLandDrop = true;
                     action.DestinationZone = ZoneType.Battlefield;
@@ -189,6 +199,7 @@ public class GameEngine
                     else
                     {
                         player.Battlefield.Add(playCard);
+                        playCard.TurnEnteredBattlefield = _state.TurnNumber;
                         action.DestinationZone = ZoneType.Battlefield;
                         _state.Log($"{player.Name} casts {playCard.Name}.");
                     }
@@ -200,6 +211,7 @@ public class GameEngine
                     // Part C: Sandbox — no ManaCost, not a land
                     player.Hand.RemoveById(playCard.Id);
                     player.Battlefield.Add(playCard);
+                    playCard.TurnEnteredBattlefield = _state.TurnNumber;
                     player.ActionHistory.Push(action);
                     _state.Log($"{player.Name} plays {playCard.Name}.");
                 }
@@ -320,6 +332,192 @@ public class GameEngine
         }
 
         return true;
+    }
+
+    public async Task RunCombatAsync(CancellationToken ct)
+    {
+        var attacker = _state.ActivePlayer;
+        var defender = _state.GetOpponent(attacker);
+
+        // Begin Combat
+        _state.CombatStep = CombatStep.BeginCombat;
+        _state.Combat = new CombatState(attacker.Id, defender.Id);
+        _state.Log("Beginning of combat.");
+
+        // Declare Attackers
+        _state.CombatStep = CombatStep.DeclareAttackers;
+
+        var eligibleAttackers = attacker.Battlefield.Cards
+            .Where(c => c.IsCreature && !c.IsTapped && !c.HasSummoningSickness(_state.TurnNumber))
+            .ToList();
+
+        if (eligibleAttackers.Count == 0)
+        {
+            _state.Log("No eligible attackers.");
+            _state.CombatStep = CombatStep.None;
+            _state.Combat = null;
+            return;
+        }
+
+        var chosenAttackerIds = await attacker.DecisionHandler.ChooseAttackers(eligibleAttackers, ct);
+
+        // Filter to only valid attackers
+        var validAttackerIds = chosenAttackerIds
+            .Where(id => eligibleAttackers.Any(c => c.Id == id))
+            .ToList();
+
+        if (validAttackerIds.Count == 0)
+        {
+            _state.Log("No attackers declared.");
+            _state.CombatStep = CombatStep.None;
+            _state.Combat = null;
+            return;
+        }
+
+        // Tap attackers and register them
+        foreach (var attackerId in validAttackerIds)
+        {
+            var card = attacker.Battlefield.Cards.First(c => c.Id == attackerId);
+            card.IsTapped = true;
+            _state.Combat.DeclareAttacker(attackerId);
+            _state.Log($"{attacker.Name} attacks with {card.Name} ({card.Power}/{card.Toughness}).");
+        }
+
+        // Declare Blockers
+        _state.CombatStep = CombatStep.DeclareBlockers;
+
+        var attackerCards = validAttackerIds
+            .Select(id => attacker.Battlefield.Cards.First(c => c.Id == id))
+            .ToList();
+
+        var eligibleBlockers = defender.Battlefield.Cards
+            .Where(c => c.IsCreature && !c.IsTapped)
+            .ToList();
+
+        if (eligibleBlockers.Count > 0)
+        {
+            var blockerAssignments = await defender.DecisionHandler.ChooseBlockers(eligibleBlockers, attackerCards, ct);
+
+            // Validate and register blocker assignments
+            foreach (var (blockerId, attackerCardId) in blockerAssignments)
+            {
+                if (eligibleBlockers.Any(c => c.Id == blockerId) && validAttackerIds.Contains(attackerCardId))
+                {
+                    _state.Combat.DeclareBlocker(blockerId, attackerCardId);
+                    var blockerCard = defender.Battlefield.Cards.First(c => c.Id == blockerId);
+                    var attackerCard = attacker.Battlefield.Cards.First(c => c.Id == attackerCardId);
+                    _state.Log($"{defender.Name} blocks {attackerCard.Name} with {blockerCard.Name}.");
+                }
+            }
+        }
+
+        // Order blockers for multi-block scenarios
+        foreach (var attackerId in validAttackerIds)
+        {
+            var blockers = _state.Combat.GetBlockers(attackerId);
+            if (blockers.Count > 1)
+            {
+                var blockerCards = blockers
+                    .Select(id => defender.Battlefield.Cards.First(c => c.Id == id))
+                    .ToList();
+
+                var orderedIds = await attacker.DecisionHandler.OrderBlockers(attackerId, blockerCards, ct);
+                _state.Combat.SetBlockerOrder(attackerId, orderedIds.ToList());
+            }
+        }
+
+        // Combat Damage
+        _state.CombatStep = CombatStep.CombatDamage;
+        ResolveCombatDamage(attacker, defender);
+
+        // Process deaths (state-based actions)
+        ProcessCombatDeaths(attacker);
+        ProcessCombatDeaths(defender);
+
+        // End Combat
+        _state.CombatStep = CombatStep.EndCombat;
+        _state.Log("End of combat.");
+
+        _state.CombatStep = CombatStep.None;
+        _state.Combat = null;
+    }
+
+    private void ResolveCombatDamage(Player attacker, Player defender)
+    {
+        foreach (var attackerId in _state.Combat!.Attackers)
+        {
+            var attackerCard = attacker.Battlefield.Cards.FirstOrDefault(c => c.Id == attackerId);
+            if (attackerCard == null) continue;
+
+            if (!_state.Combat.IsBlocked(attackerId))
+            {
+                // Unblocked: deal damage to defending player
+                var damage = attackerCard.Power ?? 0;
+                if (damage > 0)
+                {
+                    defender.AdjustLife(-damage);
+                    _state.Log($"{attackerCard.Name} deals {damage} damage to {defender.Name}. ({defender.Life} life)");
+                }
+            }
+            else
+            {
+                // Blocked: deal damage to blockers in order, receive damage from all blockers
+                var blockerOrder = _state.Combat.GetBlockerOrder(attackerId);
+                var remainingDamage = attackerCard.Power ?? 0;
+
+                foreach (var blockerId in blockerOrder)
+                {
+                    var blockerCard = defender.Battlefield.Cards.FirstOrDefault(c => c.Id == blockerId);
+                    if (blockerCard == null || remainingDamage <= 0) continue;
+
+                    // Assign lethal damage to this blocker, then move on
+                    var lethal = (blockerCard.Toughness ?? 0) - blockerCard.DamageMarked;
+                    var assigned = Math.Min(remainingDamage, Math.Max(lethal, 0));
+                    if (assigned == 0 && remainingDamage > 0)
+                        assigned = Math.Min(remainingDamage, 1); // Assign at least 1 if we have remaining damage
+                    blockerCard.DamageMarked += assigned;
+                    remainingDamage -= assigned;
+                    _state.Log($"{attackerCard.Name} deals {assigned} damage to {blockerCard.Name}.");
+                }
+
+                // All blockers deal damage to attacker simultaneously
+                foreach (var blockerId in blockerOrder)
+                {
+                    var blockerCard = defender.Battlefield.Cards.FirstOrDefault(c => c.Id == blockerId);
+                    if (blockerCard == null) continue;
+
+                    var blockerDamage = blockerCard.Power ?? 0;
+                    if (blockerDamage > 0)
+                    {
+                        attackerCard.DamageMarked += blockerDamage;
+                        _state.Log($"{blockerCard.Name} deals {blockerDamage} damage to {attackerCard.Name}.");
+                    }
+                }
+            }
+        }
+    }
+
+    private void ProcessCombatDeaths(Player player)
+    {
+        var dead = player.Battlefield.Cards
+            .Where(c => c.IsCreature && c.Toughness.HasValue && c.DamageMarked >= c.Toughness.Value)
+            .ToList();
+
+        foreach (var card in dead)
+        {
+            player.Battlefield.RemoveById(card.Id);
+            player.Graveyard.Add(card);
+            card.DamageMarked = 0;
+            _state.Log($"{card.Name} dies.");
+        }
+    }
+
+    public void ClearDamage()
+    {
+        foreach (var card in _state.Player1.Battlefield.Cards)
+            card.DamageMarked = 0;
+        foreach (var card in _state.Player2.Battlefield.Cards)
+            card.DamageMarked = 0;
     }
 
     internal async Task RunPriorityAsync(CancellationToken ct = default)
