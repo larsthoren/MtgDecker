@@ -465,6 +465,18 @@ public class GameEngine
                 src.Add(movedCard);
                 _state.Log($"{player.Name} undoes moving {movedCard.Name}.");
                 break;
+
+            case ActionType.CastSpell:
+                var stackIdx = _state.Stack.FindLastIndex(s => s.Card.Id == action.CardId);
+                if (stackIdx < 0) return false;
+                var removedStack = _state.Stack[stackIdx];
+                _state.Stack.RemoveAt(stackIdx);
+                player.ActionHistory.Pop();
+                player.Hand.Add(removedStack.Card);
+                foreach (var (color, amount) in removedStack.ManaPaid)
+                    player.ManaPool.Add(color, amount);
+                _state.Log($"{player.Name} undoes casting {removedStack.Card.Name}.");
+                break;
         }
 
         return true;
