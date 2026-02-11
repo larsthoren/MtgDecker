@@ -33,6 +33,13 @@ public class Zone
         return card;
     }
 
+    public IReadOnlyList<GameCard> PeekTop(int count)
+    {
+        if (_cards.Count == 0 || count <= 0) return [];
+        var take = Math.Min(count, _cards.Count);
+        return _cards.Skip(_cards.Count - take).Reverse().ToList();
+    }
+
     public void Shuffle()
     {
         var rng = Random.Shared;
