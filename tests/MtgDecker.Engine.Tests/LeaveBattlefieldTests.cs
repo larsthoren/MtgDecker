@@ -91,4 +91,70 @@ public class LeaveBattlefieldTests
         var condition = TriggerCondition.SelfLeavesBattlefield;
         condition.Should().BeDefined();
     }
+
+    [Fact]
+    public async Task UpkeepCostSacrifice_FiresLTBTriggers()
+    {
+        var handler = new TestDecisionHandler();
+        var state = new GameState(
+            new Player(Guid.NewGuid(), "P1", handler),
+            new Player(Guid.NewGuid(), "P2", handler));
+
+        var source = new GameCard { Name = "Test Enchantment", CardTypes = CardType.Enchantment };
+        state.Player1.Battlefield.Add(source);
+
+        // Player has no cards in hand — UpkeepCostEffect will sacrifice the source
+        GameCard? callbackCard = null;
+        var effect = new UpkeepCostEffect();
+        var context = new EffectContext(state, state.Player1, source, handler)
+        {
+            FireLeaveBattlefieldTriggers = card =>
+            {
+                callbackCard = card;
+                return Task.CompletedTask;
+            },
+        };
+
+        await effect.Execute(context);
+
+        callbackCard.Should().NotBeNull("LTB callback should fire when source is sacrificed");
+        callbackCard!.Id.Should().Be(source.Id, "LTB callback should receive the sacrificed card");
+        state.Player1.Battlefield.Contains(source.Id).Should().BeFalse("source should be gone from battlefield");
+        state.Player1.Graveyard.Contains(source.Id).Should().BeTrue("source should be in graveyard");
+    }
+
+    [Fact]
+    public async Task ExileCreature_FiresLTBTriggers()
+    {
+        var handler = new TestDecisionHandler();
+        var state = new GameState(
+            new Player(Guid.NewGuid(), "P1", handler),
+            new Player(Guid.NewGuid(), "P2", handler));
+
+        var wave = new GameCard { Name = "Parallax Wave", CardTypes = CardType.Enchantment };
+        state.Player1.Battlefield.Add(wave);
+
+        var creature = new GameCard { Name = "Test Creature", CardTypes = CardType.Creature, BasePower = 2, BaseToughness = 2 };
+        state.Player2.Battlefield.Add(creature);
+
+        GameCard? callbackCard = null;
+        var effect = new ExileCreatureEffect();
+        var context = new EffectContext(state, state.Player1, wave, handler)
+        {
+            Target = creature,
+            FireLeaveBattlefieldTriggers = card =>
+            {
+                callbackCard = card;
+                return Task.CompletedTask;
+            },
+        };
+
+        await effect.Execute(context);
+
+        callbackCard.Should().NotBeNull("LTB callback should fire when creature is exiled");
+        callbackCard!.Id.Should().Be(creature.Id, "LTB callback should receive the exiled creature");
+        state.Player2.Battlefield.Contains(creature.Id).Should().BeFalse("creature should be gone from battlefield");
+        state.Player2.Exile.Contains(creature.Id).Should().BeTrue("creature should be in exile");
+        wave.ExiledCardIds.Should().Contain(creature.Id, "wave should track the exiled card");
+    }
 }

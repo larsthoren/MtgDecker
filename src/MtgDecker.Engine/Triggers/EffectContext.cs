@@ -4,4 +4,5 @@ public record EffectContext(GameState State, Player Controller, GameCard Source,
 {
     public GameCard? Target { get; init; }
     public Guid? TargetPlayerId { get; init; }
+    public Func<GameCard, Task>? FireLeaveBattlefieldTriggers { get; init; }
 }

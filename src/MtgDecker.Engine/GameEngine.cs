@@ -333,7 +333,15 @@ public class GameEngine
                         {
                             if (trigger.Condition == TriggerCondition.AttachedPermanentTapped)
                             {
-                                var ctx = new EffectContext(_state, player, aura, player.DecisionHandler);
+                                var ctx = new EffectContext(_state, player, aura, player.DecisionHandler)
+                                {
+                                    FireLeaveBattlefieldTriggers = async card =>
+                                    {
+                                        var ctrl = _state.Player1.Battlefield.Contains(card.Id) ? _state.Player1
+                                            : _state.Player2.Battlefield.Contains(card.Id) ? _state.Player2 : null;
+                                        if (ctrl != null) await FireLeaveBattlefieldTriggersAsync(card, ctrl, ct);
+                                    },
+                                };
                                 await trigger.Effect.Execute(ctx);
                             }
                         }
@@ -705,6 +713,12 @@ public class GameEngine
                 {
                     Target = effectTarget,
                     TargetPlayerId = action.TargetPlayerId,
+                    FireLeaveBattlefieldTriggers = async card =>
+                    {
+                        var ctrl = _state.Player1.Battlefield.Contains(card.Id) ? _state.Player1
+                            : _state.Player2.Battlefield.Contains(card.Id) ? _state.Player2 : null;
+                        if (ctrl != null) await FireLeaveBattlefieldTriggersAsync(card, ctrl, ct);
+                    },
                 };
 
                 await ability.Effect.Execute(effectContext, ct);
@@ -1642,6 +1656,12 @@ public class GameEngine
             {
                 Target = triggered.Target,
                 TargetPlayerId = triggered.TargetPlayerId,
+                FireLeaveBattlefieldTriggers = async card =>
+                {
+                    var ctrl = _state.Player1.Battlefield.Contains(card.Id) ? _state.Player1
+                        : _state.Player2.Battlefield.Contains(card.Id) ? _state.Player2 : null;
+                    if (ctrl != null) await FireLeaveBattlefieldTriggersAsync(card, ctrl, ct);
+                },
             };
             await triggered.Effect.Execute(context, ct);
             await OnBoardChangedAsync(ct);

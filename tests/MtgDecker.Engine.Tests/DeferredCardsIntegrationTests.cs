@@ -127,4 +127,63 @@ public class DeferredCardsIntegrationTests
         wave.ExiledCardIds.Should().Contain(bear.Id);
         wave.ExiledCardIds.Should().Contain(angel.Id);
     }
+
+    [Fact]
+    public async Task ParallaxWave_FullLifecycle_DestroyWave_ReturnsExiledCreatures()
+    {
+        var handler = new TestDecisionHandler();
+        var state = new GameState(
+            new Player(Guid.NewGuid(), "P1", handler),
+            new Player(Guid.NewGuid(), "P2", handler));
+
+        var engine = new GameEngine(state);
+
+        // Parallax Wave with 5 fade counters on P1's battlefield
+        var wave = GameCard.Create("Parallax Wave", "Enchantment");
+        wave.AddCounters(CounterType.Fade, 5);
+        state.Player1.Battlefield.Add(wave);
+
+        // P2 has 2 creatures
+        var bear = new GameCard
+        {
+            Name = "Grizzly Bears", CardTypes = CardType.Creature,
+            BasePower = 2, BaseToughness = 2
+        };
+        var angel = new GameCard
+        {
+            Name = "Serra Angel", CardTypes = CardType.Creature,
+            BasePower = 4, BaseToughness = 4
+        };
+        state.Player2.Battlefield.Add(bear);
+        state.Player2.Battlefield.Add(angel);
+
+        // Exile both creatures via Wave activations
+        await engine.ExecuteAction(
+            GameAction.ActivateAbility(state.Player1.Id, wave.Id, targetId: bear.Id));
+        await engine.ExecuteAction(
+            GameAction.ActivateAbility(state.Player1.Id, wave.Id, targetId: angel.Id));
+
+        state.Player2.Exile.Contains(bear.Id).Should().BeTrue("bear should be in exile");
+        state.Player2.Exile.Contains(angel.Id).Should().BeTrue("angel should be in exile");
+
+        // Destroy Wave: fire LTB triggers, then move to graveyard
+        await engine.FireLeaveBattlefieldTriggersAsync(wave, state.Player1, default);
+        state.Player1.Battlefield.RemoveById(wave.Id);
+        state.Player1.Graveyard.Add(wave);
+
+        // The LTB trigger (ReturnExiledCardsEffect) should be on the stack
+        state.Stack.OfType<TriggeredAbilityStackObject>()
+            .Should().ContainSingle(t => t.Effect.GetType() == typeof(Engine.Triggers.Effects.ReturnExiledCardsEffect),
+                "Wave's LTB trigger should be on the stack");
+
+        // Resolve the stack — ReturnExiledCardsEffect returns both creatures
+        await engine.ResolveAllTriggersAsync();
+
+        // Both creatures should be back on their owner's battlefield
+        state.Player2.Battlefield.Contains(bear.Id).Should().BeTrue("bear should return to battlefield");
+        state.Player2.Battlefield.Contains(angel.Id).Should().BeTrue("angel should return to battlefield");
+        state.Player2.Exile.Contains(bear.Id).Should().BeFalse("bear should no longer be in exile");
+        state.Player2.Exile.Contains(angel.Id).Should().BeFalse("angel should no longer be in exile");
+        wave.ExiledCardIds.Should().BeEmpty("wave should have cleared its tracked exile list");
+    }
 }

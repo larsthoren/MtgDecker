@@ -25,6 +25,8 @@ public class UpkeepCostEffect : IEffect
         }
 
         // No cards in hand or player declined — sacrifice the source
+        if (context.FireLeaveBattlefieldTriggers != null)
+            await context.FireLeaveBattlefieldTriggers(source);
         controller.Battlefield.RemoveById(source.Id);
         controller.Graveyard.Add(source);
         context.State.Log($"{source.Name} is sacrificed (no discard).");
