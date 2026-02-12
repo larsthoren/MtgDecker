@@ -287,6 +287,26 @@
         </div>
     }
 
+    @if (IsWaitingForTarget && EligibleTargets != null && !IsOpponent)
+    {
+        <div class="target-picker">
+            <MudPaper Class="pa-2 my-1" Outlined="true" Style="background-color: rgba(255,165,0,0.15);">
+                <MudText Typo="Typo.body2" Class="mb-1">Choose target for @TargetingSpellName:</MudText>
+                @foreach (var target in EligibleTargets)
+                {
+                    <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Warning"
+                               Class="ma-1" OnClick="@(() => SelectTarget(target))">
+                        @target.Name
+                        @if (target.Power.HasValue)
+                        {
+                            <span> (@target.Power/@target.Toughness)</span>
+                        }
+                    </MudButton>
+                }
+            </MudPaper>
+        </div>
+    }
+
     @if (IsWaitingForManaColor && ManaColorOptions != null && !IsOpponent)
     {
         <div class="mana-color-picker">
@@ -351,6 +371,13 @@
     [Parameter] public Guid? OrderingAttackerId { get; set; }
     [Parameter] public IReadOnlyList<GameCard>? BlockersToOrder { get; set; }
     [Parameter] public EventCallback<IReadOnlyList<Guid>> OnBlockerOrderChosen { get; set; }
+
+    // Target picker parameters
+    [Parameter] public bool IsWaitingForTarget { get; set; }
+    [Parameter] public string? TargetingSpellName { get; set; }
+    [Parameter] public IReadOnlyList<GameCard>? EligibleTargets { get; set; }
+    [Parameter] public EventCallback<TargetInfo> OnTargetSelected { get; set; }
+    [Parameter] public Guid OpponentId { get; set; }
 
     private GameCard? SelectedCard;
     private ZoneType _selectedZone;
@@ -459,6 +486,14 @@
         _blockerOrder.Clear();
     }
 
+    // Target selection
+    private async Task SelectTarget(GameCard card)
+    {
+        // Check if card is on our battlefield to determine the owner
+        var ownerId = Battlefield.Any(c => c.Id == card.Id) ? PlayerId : OpponentId;
+        await OnTargetSelected.InvokeAsync(new TargetInfo(card.Id, ownerId, ZoneType.Battlefield));
+    }
+
     // Card choice state
     private Guid? _selectedChoiceId;
 
@@ -504,7 +539,17 @@
     private async Task HandlePlay()
     {
         if (SelectedCard == null) return;
-        await OnAction.InvokeAsync(GameAction.PlayCard(PlayerId, SelectedCard.Id));
+
+        // Lands always use PlayCard (they don't use the stack)
+        // Non-lands use CastSpell (they go on the stack and require mana)
+        if (SelectedCard.IsLand)
+        {
+            await OnAction.InvokeAsync(GameAction.PlayCard(PlayerId, SelectedCard.Id));
+        }
+        else
+        {
+            await OnAction.InvokeAsync(GameAction.CastSpell(PlayerId, SelectedCard.Id));
+        }
         ClearSelection();
     }
 

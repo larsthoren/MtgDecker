@@ -274,7 +274,143 @@ public class GameEngine
                     _state.Log($"{player.Name} moves {movedCard.Name} from {action.SourceZone} to {action.DestinationZone}.");
                 }
                 break;
+
+            case ActionType.CastSpell:
+            {
+                var castPlayer = action.PlayerId == _state.Player1.Id ? _state.Player1 : _state.Player2;
+                var castCard = castPlayer.Hand.Cards.FirstOrDefault(c => c.Id == action.CardId);
+                if (castCard == null)
+                {
+                    _state.Log("Card not found in hand.");
+                    return;
+                }
+
+                if (!CardDefinitions.TryGet(castCard.Name, out var def) || def.ManaCost == null)
+                {
+                    _state.Log($"Cannot cast {castCard.Name} — no registered mana cost.");
+                    return;
+                }
+
+                bool isInstant = def.CardTypes.HasFlag(CardType.Instant);
+                if (!isInstant && !CanCastSorcery(castPlayer.Id))
+                {
+                    _state.Log($"Cannot cast {castCard.Name} at this time (sorcery-speed only).");
+                    return;
+                }
+
+                var pool = castPlayer.ManaPool;
+                if (!pool.CanPay(def.ManaCost))
+                {
+                    _state.Log($"Not enough mana to cast {castCard.Name}.");
+                    return;
+                }
+
+                var targets = new List<TargetInfo>();
+                if (def.TargetFilter != null)
+                {
+                    var eligible = new List<GameCard>();
+                    var opponent = _state.GetOpponent(castPlayer);
+                    foreach (var c in castPlayer.Battlefield.Cards)
+                        if (def.TargetFilter.IsLegal(c, ZoneType.Battlefield))
+                            eligible.Add(c);
+                    foreach (var c in opponent.Battlefield.Cards)
+                        if (def.TargetFilter.IsLegal(c, ZoneType.Battlefield))
+                            eligible.Add(c);
+
+                    if (eligible.Count == 0)
+                    {
+                        _state.Log($"No legal targets for {castCard.Name}.");
+                        return;
+                    }
+
+                    var target = await castPlayer.DecisionHandler.ChooseTarget(
+                        castCard.Name, eligible, opponent.Id, ct);
+                    targets.Add(target);
+                }
+
+                // Calculate remaining pool after colored requirements for generic payment
+                var remaining = new Dictionary<ManaColor, int>();
+                foreach (var kvp in pool.Available)
+                {
+                    var after = kvp.Value;
+                    if (def.ManaCost.ColorRequirements.TryGetValue(kvp.Key, out var needed))
+                        after -= needed;
+                    if (after > 0)
+                        remaining[kvp.Key] = after;
+                }
+
+                // Deduct colored requirements
+                var manaPaid = new Dictionary<ManaColor, int>();
+                foreach (var (color, amount) in def.ManaCost.ColorRequirements)
+                {
+                    pool.Deduct(color, amount);
+                    manaPaid[color] = amount;
+                }
+
+                // Handle generic cost
+                if (def.ManaCost.GenericCost > 0)
+                {
+                    int distinctColors = remaining.Count(kv => kv.Value > 0);
+                    int totalRemaining = remaining.Values.Sum();
+                    bool useAutoPay = distinctColors <= 1 || totalRemaining == def.ManaCost.GenericCost;
+
+                    if (!useAutoPay)
+                    {
+                        var genericPayment = await castPlayer.DecisionHandler
+                            .ChooseGenericPayment(def.ManaCost.GenericCost, remaining, ct);
+
+                        bool valid = genericPayment.Values.Sum() == def.ManaCost.GenericCost
+                            && genericPayment.All(kv => remaining.TryGetValue(kv.Key, out var avail) && kv.Value <= avail);
+
+                        if (valid)
+                        {
+                            foreach (var (color, amount) in genericPayment)
+                            {
+                                pool.Deduct(color, amount);
+                                manaPaid[color] = manaPaid.GetValueOrDefault(color) + amount;
+                            }
+                        }
+                        else
+                        {
+                            useAutoPay = true;
+                        }
+                    }
+
+                    if (useAutoPay)
+                    {
+                        var toPay = def.ManaCost.GenericCost;
+                        foreach (var (color, amount) in remaining)
+                        {
+                            var take = Math.Min(amount, toPay);
+                            if (take > 0)
+                            {
+                                pool.Deduct(color, take);
+                                manaPaid[color] = manaPaid.GetValueOrDefault(color) + take;
+                                toPay -= take;
+                            }
+                            if (toPay == 0) break;
+                        }
+                    }
+                }
+
+                castPlayer.Hand.RemoveById(castCard.Id);
+                var stackObj = new StackObject(castCard, castPlayer.Id, manaPaid, targets, _state.Stack.Count);
+                _state.Stack.Add(stackObj);
+
+                action.ManaCostPaid = def.ManaCost;
+                castPlayer.ActionHistory.Push(action);
+
+                _state.Log($"{castPlayer.Name} casts {castCard.Name}.");
+                break;
+            }
         }
+    }
+
+    public bool CanCastSorcery(Guid playerId)
+    {
+        return _state.ActivePlayer.Id == playerId
+            && (_state.CurrentPhase == Phase.MainPhase1 || _state.CurrentPhase == Phase.MainPhase2)
+            && _state.Stack.Count == 0;
     }
 
     public bool UndoLastAction(Guid playerId)
@@ -332,6 +468,18 @@ public class GameEngine
                 var src = player.GetZone(action.SourceZone!.Value);
                 src.Add(movedCard);
                 _state.Log($"{player.Name} undoes moving {movedCard.Name}.");
+                break;
+
+            case ActionType.CastSpell:
+                var stackIdx = _state.Stack.FindLastIndex(s => s.Card.Id == action.CardId);
+                if (stackIdx < 0) return false;
+                var removedStack = _state.Stack[stackIdx];
+                _state.Stack.RemoveAt(stackIdx);
+                player.ActionHistory.Pop();
+                player.Hand.Add(removedStack.Card);
+                foreach (var (color, amount) in removedStack.ManaPaid)
+                    player.ManaPool.Add(color, amount);
+                _state.Log($"{player.Name} undoes casting {removedStack.Card.Name}.");
                 break;
         }
 
@@ -564,7 +712,17 @@ public class GameEngine
                     nonActivePlayerPassed = true;
 
                 if (activePlayerPassed && nonActivePlayerPassed)
+                {
+                    if (_state.Stack.Count > 0)
+                    {
+                        ResolveTopOfStack();
+                        _state.PriorityPlayer = _state.ActivePlayer;
+                        activePlayerPassed = false;
+                        nonActivePlayerPassed = false;
+                        continue;
+                    }
                     return;
+                }
 
                 _state.PriorityPlayer = _state.GetOpponent(_state.PriorityPlayer);
             }
@@ -574,6 +732,58 @@ public class GameEngine
                 activePlayerPassed = false;
                 nonActivePlayerPassed = false;
                 _state.PriorityPlayer = _state.ActivePlayer;
+            }
+        }
+    }
+
+    private void ResolveTopOfStack()
+    {
+        if (_state.Stack.Count == 0) return;
+
+        var top = _state.Stack[^1];
+        _state.Stack.RemoveAt(_state.Stack.Count - 1);
+        var controller = top.ControllerId == _state.Player1.Id ? _state.Player1 : _state.Player2;
+
+        _state.Log($"Resolving {top.Card.Name}.");
+
+        if (CardDefinitions.TryGet(top.Card.Name, out var def) && def.Effect != null)
+        {
+            if (top.Targets.Count > 0)
+            {
+                var allTargetsLegal = true;
+                foreach (var target in top.Targets)
+                {
+                    var targetOwner = target.PlayerId == _state.Player1.Id ? _state.Player1 : _state.Player2;
+                    var targetZone = targetOwner.GetZone(target.Zone);
+                    if (!targetZone.Contains(target.CardId))
+                    {
+                        allTargetsLegal = false;
+                        break;
+                    }
+                }
+
+                if (!allTargetsLegal)
+                {
+                    _state.Log($"{top.Card.Name} fizzles (illegal target).");
+                    controller.Graveyard.Add(top.Card);
+                    return;
+                }
+            }
+
+            def.Effect.Resolve(_state, top);
+            controller.Graveyard.Add(top.Card);
+        }
+        else
+        {
+            if (top.Card.IsCreature || top.Card.CardTypes.HasFlag(CardType.Enchantment)
+                || top.Card.CardTypes.HasFlag(CardType.Artifact))
+            {
+                top.Card.TurnEnteredBattlefield = _state.TurnNumber;
+                controller.Battlefield.Add(top.Card);
+            }
+            else
+            {
+                controller.Graveyard.Add(top.Card);
             }
         }
     }

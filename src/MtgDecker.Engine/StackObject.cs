@@ -1,0 +1,23 @@
+using MtgDecker.Engine.Enums;
+using MtgDecker.Engine.Mana;
+
+namespace MtgDecker.Engine;
+
+public class StackObject
+{
+    public Guid Id { get; } = Guid.NewGuid();
+    public GameCard Card { get; }
+    public Guid ControllerId { get; }
+    public IReadOnlyDictionary<ManaColor, int> ManaPaid { get; }
+    public IReadOnlyList<TargetInfo> Targets { get; }
+    public int Timestamp { get; }
+
+    public StackObject(GameCard card, Guid controllerId, Dictionary<ManaColor, int> manaPaid, List<TargetInfo> targets, int timestamp)
+    {
+        Card = card;
+        ControllerId = controllerId;
+        ManaPaid = manaPaid;
+        Targets = targets.AsReadOnly();
+        Timestamp = timestamp;
+    }
+}

@@ -68,6 +68,9 @@
             </div>
         </MudPaper>
 
+        @* Stack display (between turn bar and local player) *@
+        <StackDisplay Stack="@State.Stack" />
+
         @* Local player zone (bottom) *@
         <PlayerZone PlayerName="@LocalPlayer.Name"
                     Battlefield="@LocalPlayer.Battlefield.Cards"
@@ -87,6 +90,11 @@
                     IsWaitingForManaColor="@IsWaitingForManaColor"
                     ManaColorOptions="@ManaColorOptions"
                     OnManaColorChosen="HandleManaColorChosen"
+                    IsWaitingForTarget="@(Handler?.IsWaitingForTarget == true)"
+                    TargetingSpellName="@Handler?.TargetingSpellName"
+                    EligibleTargets="@Handler?.EligibleTargets"
+                    OnTargetSelected="HandleTargetSelected"
+                    OpponentId="@OpponentPlayer.Id"
                     IsWaitingForAttackers="@(IsLocalActive && Handler?.IsWaitingForAttackers == true)"
                     EligibleAttackers="@(IsLocalActive ? Handler?.EligibleAttackers : null)"
                     OnAttackersChosen="OnAttackersChosen"
@@ -173,6 +181,11 @@
     private async Task HandleManaColorChosen(ManaColor color)
     {
         await OnManaColorChosen.InvokeAsync(color);
+    }
+
+    private void HandleTargetSelected(TargetInfo target)
+    {
+        Handler?.SubmitTarget(target);
     }
 
     private string FormatCombatStep(CombatStep step) => step switch

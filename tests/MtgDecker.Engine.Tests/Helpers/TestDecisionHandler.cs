@@ -14,6 +14,7 @@ public class TestDecisionHandler : IPlayerDecisionHandler
     private readonly Queue<IReadOnlyList<Guid>> _attackerQueue = new();
     private readonly Queue<Dictionary<Guid, Guid>> _blockerQueue = new();
     private readonly Queue<IReadOnlyList<Guid>> _blockerOrderQueue = new();
+    private readonly Queue<TargetInfo> _targetQueue = new();
     private readonly Queue<Guid?> _cardChoiceQueue = new();
 
     public void EnqueueAction(GameAction action) => _actions.Enqueue(action);
@@ -30,6 +31,7 @@ public class TestDecisionHandler : IPlayerDecisionHandler
     public void EnqueueAttackers(IReadOnlyList<Guid> attackerIds) => _attackerQueue.Enqueue(attackerIds);
     public void EnqueueBlockers(Dictionary<Guid, Guid> assignments) => _blockerQueue.Enqueue(assignments);
     public void EnqueueBlockerOrder(IReadOnlyList<Guid> order) => _blockerOrderQueue.Enqueue(order);
+    public void EnqueueTarget(TargetInfo target) => _targetQueue.Enqueue(target);
     public void EnqueueCardChoice(Guid? cardId) => _cardChoiceQueue.Enqueue(cardId);
 
     public Task<GameAction> GetAction(GameState gameState, Guid playerId, CancellationToken ct = default)
@@ -89,6 +91,14 @@ public class TestDecisionHandler : IPlayerDecisionHandler
 
     public Task<IReadOnlyList<Guid>> OrderBlockers(Guid attackerId, IReadOnlyList<GameCard> blockers, CancellationToken ct = default)
         => Task.FromResult(_blockerOrderQueue.Count > 0 ? _blockerOrderQueue.Dequeue() : (IReadOnlyList<Guid>)blockers.Select(b => b.Id).ToList());
+
+    public Task<TargetInfo> ChooseTarget(string spellName, IReadOnlyList<GameCard> eligibleTargets, Guid defaultOwnerId = default, CancellationToken ct = default)
+    {
+        if (_targetQueue.Count > 0)
+            return Task.FromResult(_targetQueue.Dequeue());
+        var card = eligibleTargets[0];
+        return Task.FromResult(new TargetInfo(card.Id, defaultOwnerId, Enums.ZoneType.Battlefield));
+    }
 
     public Task<Guid?> ChooseCard(IReadOnlyList<GameCard> options, string prompt,
         bool optional = false, CancellationToken ct = default)
