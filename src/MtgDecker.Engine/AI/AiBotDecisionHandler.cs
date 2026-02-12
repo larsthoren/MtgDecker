@@ -11,9 +11,10 @@ namespace MtgDecker.Engine.AI;
 public class AiBotDecisionHandler : IPlayerDecisionHandler
 {
     /// <summary>
-    /// Selects an action using a land-first, greedy-cast heuristic.
+    /// Selects an action using a land-first, tap-lands, greedy-cast heuristic.
     /// Only acts during main phases. Prioritizes playing a land (if available
-    /// and land drop unused), then casts the most expensive affordable spell.
+    /// and land drop unused), then taps untapped lands with mana abilities,
+    /// then casts the most expensive affordable spell.
     /// </summary>
     public Task<GameAction> GetAction(GameState gameState, Guid playerId, CancellationToken ct = default)
     {
@@ -34,7 +35,19 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
                 return Task.FromResult(GameAction.PlayCard(playerId, land.Id));
         }
 
-        // Priority 2: Cast most expensive affordable spell
+        // Priority 2: Tap an untapped land with a mana ability to build up mana pool
+        var untappedLand = player.Battlefield.Cards
+            .FirstOrDefault(c => c.IsLand && !c.IsTapped && c.ManaAbility != null);
+
+        if (untappedLand != null)
+        {
+            // Only tap if there's a spell in hand we could eventually cast
+            var hasSpellInHand = hand.Any(c => !c.IsLand && c.ManaCost != null);
+            if (hasSpellInHand)
+                return Task.FromResult(GameAction.TapCard(playerId, untappedLand.Id));
+        }
+
+        // Priority 3: Cast most expensive affordable spell
         var castable = hand
             .Where(c => !c.IsLand && c.ManaCost != null && player.ManaPool.CanPay(c.ManaCost))
             .OrderByDescending(c => c.ManaCost!.ConvertedManaCost)
