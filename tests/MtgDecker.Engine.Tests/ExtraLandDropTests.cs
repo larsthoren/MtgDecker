@@ -25,7 +25,10 @@ public class ExtraLandDropTests
         state.CurrentPhase = Phase.MainPhase1;
         var engine = new GameEngine(state);
 
-        p1.MaxLandDrops = 2;
+        // Use Exploration to grant extra land drop (RecalculateState resets MaxLandDrops)
+        var exploration = GameCard.Create("Exploration", "Enchantment");
+        p1.Battlefield.Add(exploration);
+        engine.RecalculateState();
 
         var land1 = new GameCard { Name = "Forest", CardTypes = CardType.Land };
         var land2 = new GameCard { Name = "Mountain", CardTypes = CardType.Land };
@@ -35,7 +38,7 @@ public class ExtraLandDropTests
         await engine.ExecuteAction(GameAction.PlayCard(p1.Id, land1.Id));
         await engine.ExecuteAction(GameAction.PlayCard(p1.Id, land2.Id));
 
-        p1.Battlefield.Cards.Should().HaveCount(2);
+        p1.Battlefield.Cards.Should().HaveCount(3); // exploration + 2 lands
         p1.LandsPlayedThisTurn.Should().Be(2);
     }
 
@@ -49,7 +52,10 @@ public class ExtraLandDropTests
         state.CurrentPhase = Phase.MainPhase1;
         var engine = new GameEngine(state);
 
-        p1.MaxLandDrops = 2;
+        // Use Exploration to grant extra land drop (RecalculateState resets MaxLandDrops)
+        var exploration = GameCard.Create("Exploration", "Enchantment");
+        p1.Battlefield.Add(exploration);
+        engine.RecalculateState();
 
         var land1 = new GameCard { Name = "F1", CardTypes = CardType.Land };
         var land2 = new GameCard { Name = "F2", CardTypes = CardType.Land };
@@ -62,7 +68,7 @@ public class ExtraLandDropTests
         await engine.ExecuteAction(GameAction.PlayCard(p1.Id, land2.Id));
         await engine.ExecuteAction(GameAction.PlayCard(p1.Id, land3.Id));
 
-        p1.Battlefield.Cards.Should().HaveCount(2);
+        p1.Battlefield.Cards.Should().HaveCount(3); // exploration + 2 lands
         p1.Hand.Cards.Should().HaveCount(1);
     }
 

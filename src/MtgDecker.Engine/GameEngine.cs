@@ -129,6 +129,7 @@ public class GameEngine
                     player.ActionHistory.Push(action);
                     _state.Log($"{player.Name} plays {playCard.Name} (land drop).");
                     await ProcessTriggersAsync(GameEvent.EnterBattlefield, playCard, player, ct);
+                    await OnBoardChangedAsync(ct);
                 }
                 else if (playCard.ManaCost != null)
                 {
@@ -227,6 +228,7 @@ public class GameEngine
                         action.DestinationZone = ZoneType.Battlefield;
                         _state.Log($"{player.Name} casts {playCard.Name}.");
                         await ProcessTriggersAsync(GameEvent.EnterBattlefield, playCard, player, ct);
+                        await OnBoardChangedAsync(ct);
                     }
                     action.ManaCostPaid = cost;
                     player.ActionHistory.Push(action);
@@ -240,6 +242,7 @@ public class GameEngine
                     player.ActionHistory.Push(action);
                     _state.Log($"{player.Name} plays {playCard.Name}.");
                     await ProcessTriggersAsync(GameEvent.EnterBattlefield, playCard, player, ct);
+                    await OnBoardChangedAsync(ct);
                 }
                 break;
 
@@ -334,6 +337,7 @@ public class GameEngine
                             land.TurnEnteredBattlefield = _state.TurnNumber;
                             _state.Log($"{player.Name} fetches {land.Name}.");
                             await ProcessTriggersAsync(GameEvent.EnterBattlefield, land, player, ct);
+                            await OnBoardChangedAsync(ct);
                         }
                     }
                 }
@@ -668,8 +672,8 @@ public class GameEngine
         ProcessCombatDeaths(attacker);
         ProcessCombatDeaths(defender);
 
-        // Check if any player lost due to combat damage
-        await CheckStateBasedActionsAsync(ct);
+        // Recalculate effects and check if any player lost due to combat damage
+        await OnBoardChangedAsync(ct);
 
         // End Combat
         _state.CombatStep = CombatStep.EndCombat;
@@ -845,6 +849,12 @@ public class GameEngine
         }
     }
 
+    internal async Task OnBoardChangedAsync(CancellationToken ct = default)
+    {
+        RecalculateState();
+        await CheckStateBasedActionsAsync(ct);
+    }
+
     internal async Task CheckStateBasedActionsAsync(CancellationToken ct = default)
     {
         if (_state.IsGameOver) return;
@@ -941,7 +951,7 @@ public class GameEngine
                 {
                     if (_state.Stack.Count > 0)
                     {
-                        ResolveTopOfStack();
+                        await ResolveTopOfStackAsync(ct);
                         _state.PriorityPlayer = _state.ActivePlayer;
                         activePlayerPassed = false;
                         nonActivePlayerPassed = false;
@@ -962,7 +972,7 @@ public class GameEngine
         }
     }
 
-    private void ResolveTopOfStack()
+    private async Task ResolveTopOfStackAsync(CancellationToken ct = default)
     {
         if (_state.Stack.Count == 0) return;
 
@@ -998,6 +1008,7 @@ public class GameEngine
 
             def.Effect.Resolve(_state, top);
             controller.Graveyard.Add(top.Card);
+            await OnBoardChangedAsync(ct);
         }
         else
         {
@@ -1006,6 +1017,7 @@ public class GameEngine
             {
                 top.Card.TurnEnteredBattlefield = _state.TurnNumber;
                 controller.Battlefield.Add(top.Card);
+                await OnBoardChangedAsync(ct);
             }
             else
             {
