@@ -805,9 +805,18 @@ public class GameEngine
             {
                 if (eligibleBlockers.Any(c => c.Id == blockerId) && validAttackerIds.Contains(attackerCardId))
                 {
+                    var attackerCard = attacker.Battlefield.Cards.First(c => c.Id == attackerCardId);
+
+                    // Mountainwalk: cannot be blocked if defender controls a Mountain
+                    if (attackerCard.ActiveKeywords.Contains(Keyword.Mountainwalk)
+                        && defender.Battlefield.Cards.Any(c => c.Subtypes.Contains("Mountain")))
+                    {
+                        _state.Log($"{attackerCard.Name} has mountainwalk — cannot be blocked.");
+                        continue;
+                    }
+
                     _state.Combat.DeclareBlocker(blockerId, attackerCardId);
                     var blockerCard = defender.Battlefield.Cards.First(c => c.Id == blockerId);
-                    var attackerCard = attacker.Battlefield.Cards.First(c => c.Id == attackerCardId);
                     _state.Log($"{defender.Name} blocks {attackerCard.Name} with {blockerCard.Name}.");
                 }
             }
