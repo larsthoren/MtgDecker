@@ -377,6 +377,25 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
                 continue;
             }
 
+            // ExileCreatureEffect heuristic: exile the biggest opponent threat
+            if (ability.Effect is ExileCreatureEffect)
+            {
+                // Check counter availability
+                if (cost.RemoveCounterType.HasValue
+                    && permanent.GetCounters(cost.RemoveCounterType.Value) <= 0)
+                    continue;
+
+                var biggestThreat = opponent.Battlefield.Cards
+                    .Where(c => c.IsCreature)
+                    .OrderByDescending(c => c.Power ?? 0)
+                    .FirstOrDefault();
+
+                if (biggestThreat != null)
+                    return GameAction.ActivateAbility(player.Id, permanent.Id, targetId: biggestThreat.Id);
+
+                continue;
+            }
+
             // AddManaEffect heuristic: activate if sacrificing enables casting a spell
             if (ability.Effect is AddManaEffect)
             {
