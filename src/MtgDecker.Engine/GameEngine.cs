@@ -44,6 +44,8 @@ public class GameEngine
                     ExecuteTurnBasedAction(phase.Phase);
             }
 
+            if (_state.IsGameOver) return;
+
             if (phase.Phase == Phase.Combat)
             {
                 await RunCombatAsync(ct);
@@ -52,6 +54,8 @@ public class GameEngine
             {
                 await RunPriorityAsync(ct);
             }
+
+            if (_state.IsGameOver) return;
 
             _state.Player1.ManaPool.Clear();
             _state.Player2.ManaPool.Clear();
@@ -446,6 +450,9 @@ public class GameEngine
         ProcessCombatDeaths(attacker);
         ProcessCombatDeaths(defender);
 
+        // Check if any player lost due to combat damage
+        CheckStateBasedActions();
+
         // End Combat
         _state.CombatStep = CombatStep.EndCombat;
         _state.Log("End of combat.");
@@ -533,6 +540,33 @@ public class GameEngine
             card.DamageMarked = 0;
         foreach (var card in _state.Player2.Battlefield.Cards)
             card.DamageMarked = 0;
+    }
+
+    internal void CheckStateBasedActions()
+    {
+        if (_state.IsGameOver) return;
+
+        bool p1Dead = _state.Player1.Life <= 0;
+        bool p2Dead = _state.Player2.Life <= 0;
+
+        if (p1Dead && p2Dead)
+        {
+            _state.IsGameOver = true;
+            _state.Winner = null; // draw
+            _state.Log($"Both players lose — {_state.Player1.Name} ({_state.Player1.Life} life) and {_state.Player2.Name} ({_state.Player2.Life} life).");
+        }
+        else if (p1Dead)
+        {
+            _state.IsGameOver = true;
+            _state.Winner = _state.Player2.Name;
+            _state.Log($"{_state.Player1.Name} loses — life reached {_state.Player1.Life}.");
+        }
+        else if (p2Dead)
+        {
+            _state.IsGameOver = true;
+            _state.Winner = _state.Player1.Name;
+            _state.Log($"{_state.Player2.Name} loses — life reached {_state.Player2.Life}.");
+        }
     }
 
     private async Task ProcessTriggersAsync(GameEvent evt, GameCard source, Player controller, CancellationToken ct)
