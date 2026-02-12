@@ -599,7 +599,7 @@ public class GameEngine
         ProcessCombatDeaths(defender);
 
         // Check if any player lost due to combat damage
-        CheckStateBasedActions();
+        await CheckStateBasedActionsAsync(ct);
 
         // End Combat
         _state.CombatStep = CombatStep.EndCombat;
@@ -775,7 +775,7 @@ public class GameEngine
         }
     }
 
-    internal void CheckStateBasedActions()
+    internal async Task CheckStateBasedActionsAsync(CancellationToken ct = default)
     {
         if (_state.IsGameOver) return;
 
@@ -799,6 +799,35 @@ public class GameEngine
             _state.IsGameOver = true;
             _state.Winner = _state.Player1.Name;
             _state.Log($"{_state.Player2.Name} loses — life reached {_state.Player2.Life}.");
+        }
+
+        // Legendary rule (MTG 704.5j)
+        await CheckLegendaryRuleAsync(_state.Player1, ct);
+        await CheckLegendaryRuleAsync(_state.Player2, ct);
+    }
+
+    private async Task CheckLegendaryRuleAsync(Player player, CancellationToken ct)
+    {
+        var legendaries = player.Battlefield.Cards
+            .Where(c => c.IsLegendary)
+            .GroupBy(c => c.Name)
+            .Where(g => g.Count() > 1)
+            .ToList();
+
+        foreach (var group in legendaries)
+        {
+            var duplicates = group.ToList();
+            var chosenId = await player.DecisionHandler.ChooseCard(
+                duplicates,
+                $"Choose which {duplicates[0].Name} to keep (legendary rule)",
+                optional: false, ct);
+
+            foreach (var card in duplicates.Where(c => c.Id != chosenId))
+            {
+                player.Battlefield.RemoveById(card.Id);
+                player.Graveyard.Add(card);
+                _state.Log($"{card.Name} is put into graveyard (legendary rule).");
+            }
         }
     }
 

@@ -87,7 +87,13 @@ public class GameCard
                 FetchAbility = def.FetchAbility,
             };
         }
-        return new GameCard { Name = name, TypeLine = typeLine, ImageUrl = imageUrl };
+        return new GameCard
+        {
+            Name = name,
+            TypeLine = typeLine,
+            ImageUrl = imageUrl,
+            IsLegendary = typeLine.Contains("Legendary", StringComparison.OrdinalIgnoreCase),
+        };
     }
 
     /// <summary>
@@ -125,7 +131,8 @@ public class GameCard
             TypeLine = typeLine,
             ImageUrl = imageUrl,
             CardTypes = parsed.Types,
-            Subtypes = parsed.Subtypes
+            Subtypes = parsed.Subtypes,
+            IsLegendary = typeLine.Contains("Legendary", StringComparison.OrdinalIgnoreCase),
         };
 
         if (!string.IsNullOrWhiteSpace(manaCost))

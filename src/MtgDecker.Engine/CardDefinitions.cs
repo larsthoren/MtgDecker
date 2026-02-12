@@ -102,7 +102,7 @@ public static class CardDefinitions
             ["Plains"] = new(null, ManaAbility.Fixed(ManaColor.White), null, null, CardType.Land),
             ["Brushland"] = new(null, ManaAbility.Choice(ManaColor.Colorless, ManaColor.Green, ManaColor.White), null, null, CardType.Land),
             ["Windswept Heath"] = new(null, null, null, null, CardType.Land),
-            ["Serra's Sanctum"] = new(null, null, null, null, CardType.Land),
+            ["Serra's Sanctum"] = new(null, null, null, null, CardType.Land) { IsLegendary = true },
         };
 
         Registry = cards.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
