@@ -84,6 +84,20 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
         if (castable != null)
             return Task.FromResult(GameAction.PlayCard(playerId, castable.Id));
 
+        // Priority 5: Cycling — if a card can be cycled but not cast, cycle it
+        foreach (var card in hand)
+        {
+            if (CardDefinitions.TryGet(card.Name, out var cycleDef) && cycleDef.CyclingCost != null)
+            {
+                if (player.ManaPool.CanPay(cycleDef.CyclingCost))
+                {
+                    // Only cycle if we can't afford to cast it
+                    if (card.ManaCost == null || !player.ManaPool.CanPay(card.ManaCost))
+                        return Task.FromResult(GameAction.Cycle(playerId, card.Id));
+                }
+            }
+        }
+
         return Task.FromResult(GameAction.Pass(playerId));
     }
 
