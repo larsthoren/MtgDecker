@@ -63,4 +63,11 @@ public class GameAction
         CardId = cardId,
         SourceZone = ZoneType.Hand
     };
+
+    public static GameAction ActivateFetch(Guid playerId, Guid cardId) => new()
+    {
+        Type = ActionType.ActivateFetch,
+        PlayerId = playerId,
+        CardId = cardId
+    };
 }

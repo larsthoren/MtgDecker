@@ -287,6 +287,56 @@ public class GameEngine
                 }
                 break;
 
+            case ActionType.ActivateFetch:
+            {
+                var fetchLand = player.Battlefield.Cards.FirstOrDefault(c => c.Id == action.CardId);
+                if (fetchLand == null) break;
+
+                var fetchDef = CardDefinitions.TryGet(fetchLand.Name, out var fd) ? fd : null;
+                var fetchAbility = fetchDef?.FetchAbility ?? fetchLand.FetchAbility;
+                if (fetchAbility == null) break;
+
+                // Pay costs: 1 life + sacrifice
+                player.AdjustLife(-1);
+                player.Battlefield.RemoveById(fetchLand.Id);
+                player.Graveyard.Add(fetchLand);
+                _state.Log($"{player.Name} sacrifices {fetchLand.Name}, pays 1 life ({player.Life}).");
+
+                // Search library for matching land
+                var searchTypes = fetchAbility.SearchTypes;
+                var eligible = player.Library.Cards
+                    .Where(c => c.IsLand && searchTypes.Any(t =>
+                        c.Subtypes.Contains(t) || c.Name.Equals(t, StringComparison.OrdinalIgnoreCase)))
+                    .ToList();
+
+                if (eligible.Count > 0)
+                {
+                    var chosenId = await player.DecisionHandler.ChooseCard(
+                        eligible, $"Search for a land ({string.Join(" or ", searchTypes)})",
+                        optional: true, ct);
+
+                    if (chosenId != null)
+                    {
+                        var land = player.Library.RemoveById(chosenId.Value);
+                        if (land != null)
+                        {
+                            player.Battlefield.Add(land);
+                            land.TurnEnteredBattlefield = _state.TurnNumber;
+                            _state.Log($"{player.Name} fetches {land.Name}.");
+                            await ProcessTriggersAsync(GameEvent.EnterBattlefield, land, player, ct);
+                        }
+                    }
+                }
+                else
+                {
+                    _state.Log($"{player.Name} finds no matching land.");
+                }
+
+                player.Library.Shuffle();
+                player.ActionHistory.Push(action);
+                break;
+            }
+
             case ActionType.CastSpell:
             {
                 var castPlayer = action.PlayerId == _state.Player1.Id ? _state.Player1 : _state.Player2;

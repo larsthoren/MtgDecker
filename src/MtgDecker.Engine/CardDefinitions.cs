@@ -67,10 +67,10 @@ public static class CardDefinitions
                 TargetFilter.EnchantmentOrArtifact(), new NaturalizeEffect()),
 
             // === Goblins lands ===
-            ["Mountain"] = new(null, ManaAbility.Fixed(ManaColor.Red), null, null, CardType.Land),
-            ["Forest"] = new(null, ManaAbility.Fixed(ManaColor.Green), null, null, CardType.Land),
+            ["Mountain"] = new(null, ManaAbility.Fixed(ManaColor.Red), null, null, CardType.Land) { Subtypes = ["Mountain"] },
+            ["Forest"] = new(null, ManaAbility.Fixed(ManaColor.Green), null, null, CardType.Land) { Subtypes = ["Forest"] },
             ["Karplusan Forest"] = new(null, ManaAbility.Choice(ManaColor.Colorless, ManaColor.Red, ManaColor.Green), null, null, CardType.Land),
-            ["Wooded Foothills"] = new(null, null, null, null, CardType.Land),
+            ["Wooded Foothills"] = new(null, null, null, null, CardType.Land) { FetchAbility = new FetchAbility(["Mountain", "Forest"]) },
             ["Rishadan Port"] = new(null, null, null, null, CardType.Land),
             ["Wasteland"] = new(null, null, null, null, CardType.Land),
 
@@ -99,9 +99,9 @@ public static class CardDefinitions
             ["Sylvan Library"] = new(ManaCost.Parse("{1}{G}"), null, null, null, CardType.Enchantment),
 
             // === Enchantress lands ===
-            ["Plains"] = new(null, ManaAbility.Fixed(ManaColor.White), null, null, CardType.Land),
+            ["Plains"] = new(null, ManaAbility.Fixed(ManaColor.White), null, null, CardType.Land) { Subtypes = ["Plains"] },
             ["Brushland"] = new(null, ManaAbility.Choice(ManaColor.Colorless, ManaColor.Green, ManaColor.White), null, null, CardType.Land),
-            ["Windswept Heath"] = new(null, null, null, null, CardType.Land),
+            ["Windswept Heath"] = new(null, null, null, null, CardType.Land) { FetchAbility = new FetchAbility(["Plains", "Forest"]) },
             ["Serra's Sanctum"] = new(null, null, null, null, CardType.Land) { IsLegendary = true },
         };
 
