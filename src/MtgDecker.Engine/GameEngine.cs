@@ -702,9 +702,9 @@ public class GameEngine
                 break;
 
             case ActionType.CastSpell:
-                var stackIdx = _state.Stack.FindLastIndex(s => s.Card.Id == action.CardId);
+                var stackIdx = _state.Stack.FindLastIndex(s => s is StackObject so && so.Card.Id == action.CardId);
                 if (stackIdx < 0) return false;
-                var removedStack = _state.Stack[stackIdx];
+                var removedStack = (StackObject)_state.Stack[stackIdx];
                 _state.Stack.RemoveAt(stackIdx);
                 player.ActionHistory.Pop();
                 player.Hand.Add(removedStack.Card);
@@ -1325,48 +1325,64 @@ public class GameEngine
         _state.Stack.RemoveAt(_state.Stack.Count - 1);
         var controller = top.ControllerId == _state.Player1.Id ? _state.Player1 : _state.Player2;
 
-        _state.Log($"Resolving {top.Card.Name}.");
-
-        if (CardDefinitions.TryGet(top.Card.Name, out var def) && def.Effect != null)
+        if (top is TriggeredAbilityStackObject triggered)
         {
-            if (top.Targets.Count > 0)
+            _state.Log($"Resolving triggered ability: {triggered.Source.Name} — {triggered.Effect.GetType().Name.Replace("Effect", "")}");
+            var context = new EffectContext(_state, controller, triggered.Source, controller.DecisionHandler)
             {
-                var allTargetsLegal = true;
-                foreach (var target in top.Targets)
+                Target = triggered.Target,
+                TargetPlayerId = triggered.TargetPlayerId,
+            };
+            await triggered.Effect.Execute(context, ct);
+            await OnBoardChangedAsync(ct);
+            return;
+        }
+
+        if (top is StackObject spell)
+        {
+            _state.Log($"Resolving {spell.Card.Name}.");
+
+            if (CardDefinitions.TryGet(spell.Card.Name, out var def) && def.Effect != null)
+            {
+                if (spell.Targets.Count > 0)
                 {
-                    var targetOwner = target.PlayerId == _state.Player1.Id ? _state.Player1 : _state.Player2;
-                    var targetZone = targetOwner.GetZone(target.Zone);
-                    if (!targetZone.Contains(target.CardId))
+                    var allTargetsLegal = true;
+                    foreach (var target in spell.Targets)
                     {
-                        allTargetsLegal = false;
-                        break;
+                        var targetOwner = target.PlayerId == _state.Player1.Id ? _state.Player1 : _state.Player2;
+                        var targetZone = targetOwner.GetZone(target.Zone);
+                        if (!targetZone.Contains(target.CardId))
+                        {
+                            allTargetsLegal = false;
+                            break;
+                        }
+                    }
+
+                    if (!allTargetsLegal)
+                    {
+                        _state.Log($"{spell.Card.Name} fizzles (illegal target).");
+                        controller.Graveyard.Add(spell.Card);
+                        return;
                     }
                 }
 
-                if (!allTargetsLegal)
-                {
-                    _state.Log($"{top.Card.Name} fizzles (illegal target).");
-                    controller.Graveyard.Add(top.Card);
-                    return;
-                }
-            }
-
-            def.Effect.Resolve(_state, top);
-            controller.Graveyard.Add(top.Card);
-            await OnBoardChangedAsync(ct);
-        }
-        else
-        {
-            if (top.Card.IsCreature || top.Card.CardTypes.HasFlag(CardType.Enchantment)
-                || top.Card.CardTypes.HasFlag(CardType.Artifact))
-            {
-                top.Card.TurnEnteredBattlefield = _state.TurnNumber;
-                controller.Battlefield.Add(top.Card);
+                def.Effect.Resolve(_state, spell);
+                controller.Graveyard.Add(spell.Card);
                 await OnBoardChangedAsync(ct);
             }
             else
             {
-                controller.Graveyard.Add(top.Card);
+                if (spell.Card.IsCreature || spell.Card.CardTypes.HasFlag(CardType.Enchantment)
+                    || spell.Card.CardTypes.HasFlag(CardType.Artifact))
+                {
+                    spell.Card.TurnEnteredBattlefield = _state.TurnNumber;
+                    controller.Battlefield.Add(spell.Card);
+                    await OnBoardChangedAsync(ct);
+                }
+                else
+                {
+                    controller.Graveyard.Add(spell.Card);
+                }
             }
         }
     }
