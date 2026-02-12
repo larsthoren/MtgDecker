@@ -127,6 +127,7 @@ public static class CardDefinitions
             {
                 Subtypes = ["Aura"],
                 AuraTarget = AuraTarget.Land,
+                Triggers = [new Trigger(GameEvent.TapForMana, TriggerCondition.AttachedPermanentTapped, new AddBonusManaEffect(ManaColor.Green))],
             },
             ["Exploration"] = new(ManaCost.Parse("{G}"), null, null, null, CardType.Enchantment)
             {

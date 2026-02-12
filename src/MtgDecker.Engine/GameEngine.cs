@@ -238,6 +238,10 @@ public class GameEngine
                         playCard.TurnEnteredBattlefield = _state.TurnNumber;
                         action.DestinationZone = ZoneType.Battlefield;
                         _state.Log($"{player.Name} casts {playCard.Name}.");
+
+                        // Aura attachment: prompt for target after entering battlefield
+                        await TryAttachAuraAsync(playCard, player, ct);
+
                         await QueueSelfTriggersOnStackAsync(GameEvent.EnterBattlefield, playCard, player, ct);
                         await OnBoardChangedAsync(ct);
                     }
@@ -254,6 +258,10 @@ public class GameEngine
                     playCard.TurnEnteredBattlefield = _state.TurnNumber;
                     player.ActionHistory.Push(action);
                     _state.Log($"{player.Name} plays {playCard.Name}.");
+
+                    // Aura attachment: prompt for target after entering battlefield
+                    await TryAttachAuraAsync(playCard, player, ct);
+
                     await QueueSelfTriggersOnStackAsync(GameEvent.EnterBattlefield, playCard, player, ct);
                     await OnBoardChangedAsync(ct);
                 }
@@ -300,6 +308,23 @@ public class GameEngine
                     else
                     {
                         _state.Log($"{player.Name} taps {tapTarget.Name}.");
+                    }
+
+                    // Fire mana triggers from auras attached to this permanent (immediate — mana abilities don't use stack)
+                    foreach (var aura in player.Battlefield.Cards.Where(c => c.AttachedTo == tapTarget.Id).ToList())
+                    {
+                        var auraTriggers = aura.Triggers.Count > 0
+                            ? aura.Triggers
+                            : (CardDefinitions.TryGet(aura.Name, out var auraDef2) ? auraDef2.Triggers : []);
+
+                        foreach (var trigger in auraTriggers)
+                        {
+                            if (trigger.Condition == TriggerCondition.AttachedPermanentTapped)
+                            {
+                                var ctx = new EffectContext(_state, player, aura, player.DecisionHandler);
+                                await trigger.Effect.Execute(ctx);
+                            }
+                        }
                     }
                 }
                 break;
@@ -652,6 +677,40 @@ public class GameEngine
     }
 
     private bool HasShroud(GameCard card) => card.ActiveKeywords.Contains(Keyword.Shroud);
+
+    private async Task TryAttachAuraAsync(GameCard playCard, Player player, CancellationToken ct)
+    {
+        if (!CardDefinitions.TryGet(playCard.Name, out var auraDef) || !auraDef.AuraTarget.HasValue)
+            return;
+
+        var eligible = player.Battlefield.Cards.Concat(
+            _state.GetOpponent(player).Battlefield.Cards)
+            .Where(c => c.Id != playCard.Id) // Don't target itself
+            .Where(c => auraDef.AuraTarget switch
+            {
+                AuraTarget.Land => c.IsLand,
+                AuraTarget.Creature => c.IsCreature,
+                AuraTarget.Permanent => true,
+                _ => false,
+            })
+            .Where(c => !HasShroud(c))
+            .ToList();
+
+        if (eligible.Count > 0)
+        {
+            var chosenId = await player.DecisionHandler.ChooseCard(
+                eligible, $"Choose a target for {playCard.Name}", optional: false, ct);
+            if (chosenId.HasValue)
+                playCard.AttachedTo = chosenId.Value;
+        }
+
+        if (!playCard.AttachedTo.HasValue)
+        {
+            player.Battlefield.RemoveById(playCard.Id);
+            player.Graveyard.Add(playCard);
+            _state.Log($"{playCard.Name} has no valid target — goes to graveyard.");
+        }
+    }
 
     public bool CanCastSorcery(Guid playerId)
     {
@@ -1161,6 +1220,24 @@ public class GameEngine
                     await QueueBoardTriggersOnStackAsync(GameEvent.Dies, deadCard, ct);
             }
 
+            // Aura detachment (MTG 704.5m) — aura goes to graveyard if enchanted permanent is gone
+            foreach (var p in new[] { _state.Player1, _state.Player2 })
+            {
+                var auras = p.Battlefield.Cards.Where(c => c.AttachedTo.HasValue).ToList();
+                foreach (var aura in auras)
+                {
+                    var targetExists = _state.Player1.Battlefield.Contains(aura.AttachedTo!.Value)
+                        || _state.Player2.Battlefield.Contains(aura.AttachedTo!.Value);
+                    if (!targetExists)
+                    {
+                        p.Battlefield.RemoveById(aura.Id);
+                        p.Graveyard.Add(aura);
+                        _state.Log($"{aura.Name} falls off (enchanted permanent left battlefield).");
+                        anyActionTaken = true;
+                    }
+                }
+            }
+
             // If anything changed, recalculate effects before looping
             if (anyActionTaken)
                 RecalculateState();
@@ -1454,6 +1531,10 @@ public class GameEngine
                 {
                     spell.Card.TurnEnteredBattlefield = _state.TurnNumber;
                     controller.Battlefield.Add(spell.Card);
+
+                    // Aura attachment on stack resolution
+                    await TryAttachAuraAsync(spell.Card, controller, ct);
+
                     await OnBoardChangedAsync(ct);
                 }
                 else
