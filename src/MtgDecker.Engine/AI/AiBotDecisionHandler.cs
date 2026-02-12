@@ -11,10 +11,11 @@ namespace MtgDecker.Engine.AI;
 public class AiBotDecisionHandler : IPlayerDecisionHandler
 {
     /// <summary>
-    /// Selects an action using a land-first, tap-lands, greedy-cast heuristic.
+    /// Selects an action using a land-first, fetch, tap-lands, greedy-cast heuristic.
     /// Only acts during main phases. Prioritizes playing a land (if available
-    /// and land drop unused), then taps untapped lands with mana abilities,
-    /// then casts the most expensive affordable spell.
+    /// and land drop unused), then activates fetch lands if spells are in hand,
+    /// then taps untapped lands with mana abilities, then casts the most expensive
+    /// affordable spell.
     /// </summary>
     public Task<GameAction> GetAction(GameState gameState, Guid playerId, CancellationToken ct = default)
     {
@@ -35,7 +36,17 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
                 return Task.FromResult(GameAction.PlayCard(playerId, land.Id));
         }
 
-        // Priority 2: Tap an untapped land with a mana ability to build up mana pool
+        // Priority 2: Activate a fetch land if we have spells to cast
+        var fetchLand = player.Battlefield.Cards
+            .FirstOrDefault(c => !c.IsTapped && c.FetchAbility != null);
+        if (fetchLand != null)
+        {
+            var hasSpellInHand = hand.Any(c => !c.IsLand && c.ManaCost != null);
+            if (hasSpellInHand)
+                return Task.FromResult(GameAction.ActivateFetch(playerId, fetchLand.Id));
+        }
+
+        // Priority 3: Tap an untapped land with a mana ability to build up mana pool
         var untappedLand = player.Battlefield.Cards
             .FirstOrDefault(c => c.IsLand && !c.IsTapped && c.ManaAbility != null);
 
@@ -47,7 +58,7 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
                 return Task.FromResult(GameAction.TapCard(playerId, untappedLand.Id));
         }
 
-        // Priority 3: Cast most expensive affordable spell
+        // Priority 4: Cast most expensive affordable spell
         var castable = hand
             .Where(c => !c.IsLand && c.ManaCost != null && player.ManaPool.CanPay(c.ManaCost))
             .OrderByDescending(c => c.ManaCost!.ConvertedManaCost)
