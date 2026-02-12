@@ -27,12 +27,15 @@ public class ActivatedTriggeredIntegrationTests
 
         // Tap Sharpshooter to kill bird1
         await engine.ExecuteAction(GameAction.ActivateAbility(p1.Id, shooter.Id, targetId: bird1.Id));
+        // Triggers now queue on the stack — resolve them so the untap trigger fires
+        await engine.ResolveAllTriggersAsync();
 
         // bird1 should die from SBA, triggering AnyCreatureDies -> untap Sharpshooter
         shooter.IsTapped.Should().BeFalse("Sharpshooter should untap when bird1 dies");
 
         // Now tap again to kill bird2
         await engine.ExecuteAction(GameAction.ActivateAbility(p1.Id, shooter.Id, targetId: bird2.Id));
+        await engine.ResolveAllTriggersAsync();
 
         shooter.IsTapped.Should().BeFalse("Sharpshooter should untap when bird2 dies");
         p2.Battlefield.Cards.Should().BeEmpty();
@@ -60,6 +63,8 @@ public class ActivatedTriggeredIntegrationTests
         p1.ManaPool.Add(ManaColor.Green);
 
         await engine.ExecuteAction(GameAction.PlayCard(p1.Id, enchantment.Id));
+        // Triggers now queue on the stack — resolve them so the draw trigger fires
+        await engine.ResolveAllTriggersAsync();
 
         // Enchantress should have triggered and drawn a card
         p1.Hand.Cards.Should().Contain(c => c.Name == "DrawnCard");

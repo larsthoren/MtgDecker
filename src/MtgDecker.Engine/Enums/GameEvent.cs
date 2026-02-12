@@ -11,4 +11,6 @@ public enum GameEvent
     DrawCard,
     Upkeep,
     EndStep,
+    TapForMana,
+    Cycle,
 }

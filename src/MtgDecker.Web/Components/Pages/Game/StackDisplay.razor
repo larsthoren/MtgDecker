@@ -12,10 +12,17 @@
             var item = Stack[i];
             var isTop = i == Stack.Count - 1;
             <MudChip T="string" Color="@(isTop ? Color.Secondary : Color.Default)" Size="Size.Small" Class="ma-1">
-                @item.Card.Name
-                @if (item.Targets.Count > 0)
+                @if (item is StackObject spell)
                 {
-                    <MudText Typo="Typo.caption"> → target</MudText>
+                    @spell.Card.Name
+                    @if (spell.Targets.Count > 0)
+                    {
+                        <MudText Typo="Typo.caption"> → target</MudText>
+                    }
+                }
+                else if (item is TriggeredAbilityStackObject triggered)
+                {
+                    @($"{triggered.Source.Name} (trigger)")
                 }
             </MudChip>
         }
@@ -23,5 +30,5 @@
 }
 
 @code {
-    [Parameter] public List<StackObject> Stack { get; set; } = new();
+    [Parameter] public List<IStackObject> Stack { get; set; } = new();
 }

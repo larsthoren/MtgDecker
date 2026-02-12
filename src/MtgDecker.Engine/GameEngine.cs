@@ -49,7 +49,7 @@ public class GameEngine
             // Fire upkeep triggers (e.g., Mirri's Guile, Sylvan Library)
             if (phase.Phase == Phase.Upkeep)
             {
-                await ProcessBoardTriggersAsync(GameEvent.Upkeep, null, ct);
+                await QueueBoardTriggersOnStackAsync(GameEvent.Upkeep, null, ct);
             }
 
             if (phase.Phase == Phase.Combat)
@@ -69,7 +69,9 @@ public class GameEngine
         } while (_turnStateMachine.AdvancePhase() != null);
 
         // Process delayed triggers at end step (e.g., Goblin Pyromancer destroys all Goblins)
-        await ProcessDelayedTriggersAsync(GameEvent.EndStep, ct);
+        await QueueDelayedTriggersOnStackAsync(GameEvent.EndStep, ct);
+        if (_state.Stack.Count > 0)
+            await ResolveAllTriggersAsync(ct);
 
         // Clear end-of-turn effects and recalculate
         StripEndOfTurnEffects();
@@ -141,19 +143,15 @@ public class GameEngine
                     action.DestinationZone = ZoneType.Battlefield;
                     player.ActionHistory.Push(action);
                     _state.Log($"{player.Name} plays {playCard.Name} (land drop).");
-                    await ProcessTriggersAsync(GameEvent.EnterBattlefield, playCard, player, ct);
+                    await QueueSelfTriggersOnStackAsync(GameEvent.EnterBattlefield, playCard, player, ct);
                     await OnBoardChangedAsync(ct);
                 }
                 else if (playCard.ManaCost != null)
                 {
                     // Part B: Cast spell with mana payment
-                    // Apply cost reduction from continuous effects
+                    // Apply cost modification from continuous effects
                     var effectiveCost = playCard.ManaCost;
-                    var costReduction = _state.ActiveEffects
-                        .Where(e => e.Type == ContinuousEffectType.ModifyCost
-                               && e.CostApplies != null
-                               && e.CostApplies(playCard))
-                        .Sum(e => e.CostMod);
+                    var costReduction = ComputeCostModification(playCard, player);
                     if (costReduction != 0)
                         effectiveCost = effectiveCost.WithGenericReduction(-costReduction);
 
@@ -240,11 +238,15 @@ public class GameEngine
                         playCard.TurnEnteredBattlefield = _state.TurnNumber;
                         action.DestinationZone = ZoneType.Battlefield;
                         _state.Log($"{player.Name} casts {playCard.Name}.");
-                        await ProcessTriggersAsync(GameEvent.EnterBattlefield, playCard, player, ct);
+
+                        // Aura attachment: prompt for target after entering battlefield
+                        await TryAttachAuraAsync(playCard, player, ct);
+
+                        await QueueSelfTriggersOnStackAsync(GameEvent.EnterBattlefield, playCard, player, ct);
                         await OnBoardChangedAsync(ct);
                     }
                     // Fire SpellCast board triggers (e.g., enchantress draw on enchantment cast)
-                    await ProcessBoardTriggersAsync(GameEvent.SpellCast, playCard, ct);
+                    await QueueBoardTriggersOnStackAsync(GameEvent.SpellCast, playCard, ct);
                     action.ManaCostPaid = cost;
                     player.ActionHistory.Push(action);
                 }
@@ -256,7 +258,11 @@ public class GameEngine
                     playCard.TurnEnteredBattlefield = _state.TurnNumber;
                     player.ActionHistory.Push(action);
                     _state.Log($"{player.Name} plays {playCard.Name}.");
-                    await ProcessTriggersAsync(GameEvent.EnterBattlefield, playCard, player, ct);
+
+                    // Aura attachment: prompt for target after entering battlefield
+                    await TryAttachAuraAsync(playCard, player, ct);
+
+                    await QueueSelfTriggersOnStackAsync(GameEvent.EnterBattlefield, playCard, player, ct);
                     await OnBoardChangedAsync(ct);
                 }
                 break;
@@ -285,10 +291,40 @@ public class GameEngine
                             action.ManaProduced = chosen;
                             _state.Log($"{player.Name} taps {tapTarget.Name} for {chosen}.");
                         }
+                        else if (ability.Type == ManaAbilityType.Dynamic)
+                        {
+                            var amount = ability.CountFunc!(player);
+                            if (amount > 0)
+                            {
+                                player.ManaPool.Add(ability.DynamicColor!.Value, amount);
+                                _state.Log($"{player.Name} taps {tapTarget.Name} for {amount} {ability.DynamicColor}.");
+                            }
+                            else
+                            {
+                                _state.Log($"{player.Name} taps {tapTarget.Name} (produces no mana).");
+                            }
+                        }
                     }
                     else
                     {
                         _state.Log($"{player.Name} taps {tapTarget.Name}.");
+                    }
+
+                    // Fire mana triggers from auras attached to this permanent (immediate — mana abilities don't use stack)
+                    foreach (var aura in player.Battlefield.Cards.Where(c => c.AttachedTo == tapTarget.Id).ToList())
+                    {
+                        var auraTriggers = aura.Triggers.Count > 0
+                            ? aura.Triggers
+                            : (CardDefinitions.TryGet(aura.Name, out var auraDef2) ? auraDef2.Triggers : []);
+
+                        foreach (var trigger in auraTriggers)
+                        {
+                            if (trigger.Condition == TriggerCondition.AttachedPermanentTapped)
+                            {
+                                var ctx = new EffectContext(_state, player, aura, player.DecisionHandler);
+                                await trigger.Effect.Execute(ctx);
+                            }
+                        }
                     }
                 }
                 break;
@@ -351,7 +387,7 @@ public class GameEngine
                             player.Battlefield.Add(land);
                             land.TurnEnteredBattlefield = _state.TurnNumber;
                             _state.Log($"{player.Name} fetches {land.Name}.");
-                            await ProcessTriggersAsync(GameEvent.EnterBattlefield, land, player, ct);
+                            await QueueSelfTriggersOnStackAsync(GameEvent.EnterBattlefield, land, player, ct);
                             await OnBoardChangedAsync(ct);
                         }
                     }
@@ -389,13 +425,9 @@ public class GameEngine
                     return;
                 }
 
-                // Apply cost reduction from continuous effects
+                // Apply cost modification from continuous effects
                 var castEffectiveCost = def.ManaCost;
-                var castCostReduction = _state.ActiveEffects
-                    .Where(e => e.Type == ContinuousEffectType.ModifyCost
-                           && e.CostApplies != null
-                           && e.CostApplies(castCard))
-                    .Sum(e => e.CostMod);
+                var castCostReduction = ComputeCostModification(castCard, castPlayer);
                 if (castCostReduction != 0)
                     castEffectiveCost = castEffectiveCost.WithGenericReduction(-castCostReduction);
 
@@ -412,10 +444,10 @@ public class GameEngine
                     var eligible = new List<GameCard>();
                     var opponent = _state.GetOpponent(castPlayer);
                     foreach (var c in castPlayer.Battlefield.Cards)
-                        if (def.TargetFilter.IsLegal(c, ZoneType.Battlefield))
+                        if (def.TargetFilter.IsLegal(c, ZoneType.Battlefield) && !HasShroud(c))
                             eligible.Add(c);
                     foreach (var c in opponent.Battlefield.Cards)
-                        if (def.TargetFilter.IsLegal(c, ZoneType.Battlefield))
+                        if (def.TargetFilter.IsLegal(c, ZoneType.Battlefield) && !HasShroud(c))
                             eligible.Add(c);
 
                     if (eligible.Count == 0)
@@ -621,6 +653,13 @@ public class GameEngine
                                 ?? _state.Player2.Battlefield.Cards.FirstOrDefault(c => c.Id == action.TargetCardId.Value);
                 }
 
+                // Shroud check: cannot target a permanent with shroud
+                if (effectTarget != null && HasShroud(effectTarget))
+                {
+                    _state.Log($"{effectTarget.Name} has shroud — cannot be targeted.");
+                    break;
+                }
+
                 // Build context and execute effect
                 var effectContext = new EffectContext(_state, player, abilitySource, player.DecisionHandler)
                 {
@@ -634,6 +673,82 @@ public class GameEngine
                 player.ActionHistory.Push(action);
                 break;
             }
+
+            case ActionType.Cycle:
+            {
+                var cycleCard = player.Hand.Cards.FirstOrDefault(c => c.Id == action.CardId);
+                if (cycleCard == null) break;
+
+                if (!CardDefinitions.TryGet(cycleCard.Name, out var cycleDef) || cycleDef.CyclingCost == null)
+                {
+                    _state.Log($"{cycleCard.Name} cannot be cycled.");
+                    break;
+                }
+
+                var cyclingCost = cycleDef.CyclingCost;
+                if (!player.ManaPool.CanPay(cyclingCost))
+                {
+                    _state.Log($"Cannot cycle {cycleCard.Name} — not enough mana.");
+                    break;
+                }
+
+                // Pay mana using ManaPool.Pay (handles colored + generic)
+                player.ManaPool.Pay(cyclingCost);
+
+                // Discard to graveyard
+                player.Hand.RemoveById(cycleCard.Id);
+                player.Graveyard.Add(cycleCard);
+
+                // Draw a card
+                DrawCards(player, 1);
+                _state.Log($"{player.Name} cycles {cycleCard.Name}.");
+
+                // Queue cycling triggers on stack
+                foreach (var trigger in cycleDef.CyclingTriggers)
+                {
+                    _state.Log($"{cycleCard.Name} triggers: {trigger.Effect.GetType().Name.Replace("Effect", "")}");
+                    _state.Stack.Add(new TriggeredAbilityStackObject(cycleCard, player.Id, trigger.Effect));
+                }
+
+                player.ActionHistory.Push(action);
+                break;
+            }
+        }
+    }
+
+    private bool HasShroud(GameCard card) => card.ActiveKeywords.Contains(Keyword.Shroud);
+
+    private async Task TryAttachAuraAsync(GameCard playCard, Player player, CancellationToken ct)
+    {
+        if (!CardDefinitions.TryGet(playCard.Name, out var auraDef) || !auraDef.AuraTarget.HasValue)
+            return;
+
+        var eligible = player.Battlefield.Cards.Concat(
+            _state.GetOpponent(player).Battlefield.Cards)
+            .Where(c => c.Id != playCard.Id) // Don't target itself
+            .Where(c => auraDef.AuraTarget switch
+            {
+                AuraTarget.Land => c.IsLand,
+                AuraTarget.Creature => c.IsCreature,
+                AuraTarget.Permanent => true,
+                _ => false,
+            })
+            .Where(c => !HasShroud(c))
+            .ToList();
+
+        if (eligible.Count > 0)
+        {
+            var chosenId = await player.DecisionHandler.ChooseCard(
+                eligible, $"Choose a target for {playCard.Name}", optional: false, ct);
+            if (chosenId.HasValue)
+                playCard.AttachedTo = chosenId.Value;
+        }
+
+        if (!playCard.AttachedTo.HasValue)
+        {
+            player.Battlefield.RemoveById(playCard.Id);
+            player.Graveyard.Add(playCard);
+            _state.Log($"{playCard.Name} has no valid target — goes to graveyard.");
         }
     }
 
@@ -702,9 +817,9 @@ public class GameEngine
                 break;
 
             case ActionType.CastSpell:
-                var stackIdx = _state.Stack.FindLastIndex(s => s.Card.Id == action.CardId);
+                var stackIdx = _state.Stack.FindLastIndex(s => s is StackObject so && so.Card.Id == action.CardId);
                 if (stackIdx < 0) return false;
-                var removedStack = _state.Stack[stackIdx];
+                var removedStack = (StackObject)_state.Stack[stackIdx];
                 _state.Stack.RemoveAt(stackIdx);
                 player.ActionHistory.Pop();
                 player.Hand.Add(removedStack.Card);
@@ -712,6 +827,10 @@ public class GameEngine
                     player.ManaPool.Add(color, amount);
                 _state.Log($"{player.Name} undoes casting {removedStack.Card.Name}.");
                 break;
+
+            case ActionType.Cycle:
+                _state.Log("Cycling cannot be undone.");
+                return false;
         }
 
         return true;
@@ -771,8 +890,12 @@ public class GameEngine
         {
             var card = attacker.Battlefield.Cards.FirstOrDefault(c => c.Id == attackerId);
             if (card != null)
-                await ProcessAttackTriggersAsync(card, ct);
+                await QueueAttackTriggersOnStackAsync(card, ct);
         }
+
+        // Priority round after attack triggers
+        if (_state.Stack.Count > 0)
+            await RunPriorityAsync(ct);
 
         // Declare Blockers
         _state.CombatStep = CombatStep.DeclareBlockers;
@@ -794,9 +917,18 @@ public class GameEngine
             {
                 if (eligibleBlockers.Any(c => c.Id == blockerId) && validAttackerIds.Contains(attackerCardId))
                 {
+                    var attackerCard = attacker.Battlefield.Cards.First(c => c.Id == attackerCardId);
+
+                    // Mountainwalk: cannot be blocked if defender controls a Mountain
+                    if (attackerCard.ActiveKeywords.Contains(Keyword.Mountainwalk)
+                        && defender.Battlefield.Cards.Any(c => c.Subtypes.Contains("Mountain")))
+                    {
+                        _state.Log($"{attackerCard.Name} has mountainwalk — cannot be blocked.");
+                        continue;
+                    }
+
                     _state.Combat.DeclareBlocker(blockerId, attackerCardId);
                     var blockerCard = defender.Battlefield.Cards.First(c => c.Id == blockerId);
-                    var attackerCard = attacker.Battlefield.Cards.First(c => c.Id == attackerCardId);
                     _state.Log($"{defender.Name} blocks {attackerCard.Name} with {blockerCard.Name}.");
                 }
             }
@@ -824,8 +956,12 @@ public class GameEngine
         // Fire CombatDamageDealt triggers for unblocked attackers that dealt damage to the player
         foreach (var unblockedAttacker in unblocked)
         {
-            await ProcessBoardTriggersAsync(GameEvent.CombatDamageDealt, unblockedAttacker, ct);
+            await QueueBoardTriggersOnStackAsync(GameEvent.CombatDamageDealt, unblockedAttacker, ct);
         }
+
+        // Priority round after combat damage triggers
+        if (_state.Stack.Count > 0)
+            await RunPriorityAsync(ct);
 
         // Process deaths (state-based actions)
         var deadFromAttacker = ProcessCombatDeaths(attacker);
@@ -834,8 +970,12 @@ public class GameEngine
         // Fire Dies triggers for each creature that died
         foreach (var deadCard in deadFromAttacker.Concat(deadFromDefender))
         {
-            await ProcessBoardTriggersAsync(GameEvent.Dies, deadCard, ct);
+            await QueueBoardTriggersOnStackAsync(GameEvent.Dies, deadCard, ct);
         }
+
+        // Priority round after dies triggers
+        if (_state.Stack.Count > 0)
+            await RunPriorityAsync(ct);
 
         // Recalculate effects and check if any player lost due to combat damage
         await OnBoardChangedAsync(ct);
@@ -1011,8 +1151,13 @@ public class GameEngine
 
     private void ApplyKeywordEffect(ContinuousEffect effect, Player player)
     {
+        // ControllerOnly: skip if the source is not on this player's battlefield
+        if (effect.ControllerOnly && !player.Battlefield.Contains(effect.SourceId))
+            return;
+
         foreach (var card in player.Battlefield.Cards)
         {
+            if (effect.ExcludeSelf && card.Id == effect.SourceId) continue;
             if (!effect.Applies(card, player)) continue;
             if (effect.GrantedKeyword.HasValue)
                 card.ActiveKeywords.Add(effect.GrantedKeyword.Value);
@@ -1030,6 +1175,28 @@ public class GameEngine
                 _state.ActiveEffects.Add(effect);
             }
         }
+    }
+
+    internal int ComputeCostModification(GameCard card, Player caster)
+    {
+        return _state.ActiveEffects
+            .Where(e => e.Type == ContinuousEffectType.ModifyCost
+                   && e.CostApplies != null
+                   && e.CostApplies(card)
+                   && IsCostEffectApplicable(e, caster))
+            .Sum(e => e.CostMod);
+    }
+
+    private bool IsCostEffectApplicable(ContinuousEffect effect, Player caster)
+    {
+        if (!effect.CostAppliesToOpponent) return true;
+
+        // For opponent-only effects, find who controls the source
+        var effectController = _state.Player1.Battlefield.Contains(effect.SourceId) ? _state.Player1
+            : _state.Player2.Battlefield.Contains(effect.SourceId) ? _state.Player2 : null;
+
+        // Only apply if the caster is the opponent (not the controller)
+        return effectController != null && effectController.Id != caster.Id;
     }
 
     internal async Task OnBoardChangedAsync(CancellationToken ct = default)
@@ -1094,7 +1261,25 @@ public class GameEngine
                 anyActionTaken = true;
                 // Fire Dies triggers for each creature that died from lethal damage
                 foreach (var deadCard in lethalDamageDeaths)
-                    await ProcessBoardTriggersAsync(GameEvent.Dies, deadCard, ct);
+                    await QueueBoardTriggersOnStackAsync(GameEvent.Dies, deadCard, ct);
+            }
+
+            // Aura detachment (MTG 704.5m) — aura goes to graveyard if enchanted permanent is gone
+            foreach (var p in new[] { _state.Player1, _state.Player2 })
+            {
+                var auras = p.Battlefield.Cards.Where(c => c.AttachedTo.HasValue).ToList();
+                foreach (var aura in auras)
+                {
+                    var targetExists = _state.Player1.Battlefield.Contains(aura.AttachedTo!.Value)
+                        || _state.Player2.Battlefield.Contains(aura.AttachedTo!.Value);
+                    if (!targetExists)
+                    {
+                        p.Battlefield.RemoveById(aura.Id);
+                        p.Graveyard.Add(aura);
+                        _state.Log($"{aura.Name} falls off (enchanted permanent left battlefield).");
+                        anyActionTaken = true;
+                    }
+                }
             }
 
             // If anything changed, recalculate effects before looping
@@ -1168,96 +1353,90 @@ public class GameEngine
         }
     }
 
-    private async Task ProcessTriggersAsync(GameEvent evt, GameCard source, Player controller, CancellationToken ct)
+    /// <summary>Queues Self triggers for a specific card onto the stack.</summary>
+    internal async Task QueueSelfTriggersOnStackAsync(GameEvent evt, GameCard source, Player controller, CancellationToken ct = default)
     {
         if (source.Triggers.Count == 0) return;
 
         foreach (var trigger in source.Triggers)
         {
             if (trigger.Event != evt) continue;
-            if (trigger.Condition == TriggerCondition.Self)
-            {
-                var ability = new TriggeredAbility(source, controller, trigger);
-                _state.Log($"{source.Name} triggers: {trigger.Effect.GetType().Name.Replace("Effect", "")}");
-                await ability.ResolveAsync(_state, ct);
-            }
+            if (trigger.Condition != TriggerCondition.Self) continue;
+
+            _state.Log($"{source.Name} triggers: {trigger.Effect.GetType().Name.Replace("Effect", "")}");
+            _state.Stack.Add(new TriggeredAbilityStackObject(source, controller.Id, trigger.Effect));
         }
     }
 
-    internal async Task ProcessBoardTriggersAsync(GameEvent evt, GameCard? relevantCard, CancellationToken ct)
+    /// <summary>Queues board-wide triggers onto the stack with APNAP ordering.</summary>
+    internal async Task QueueBoardTriggersOnStackAsync(GameEvent evt, GameCard? relevantCard, CancellationToken ct = default)
     {
-        foreach (var player in new[] { _state.Player1, _state.Player2 })
+        var activePlayer = _state.ActivePlayer;
+        var nonActivePlayer = _state.GetOpponent(activePlayer);
+
+        var activeTriggers = CollectBoardTriggers(evt, relevantCard, activePlayer);
+        var nonActiveTriggers = CollectBoardTriggers(evt, relevantCard, nonActivePlayer);
+
+        // Active player's triggers go on stack first (resolve last — correct per APNAP)
+        foreach (var t in activeTriggers)
+            _state.Stack.Add(t);
+        // Non-active player's triggers on top (resolve first via LIFO)
+        foreach (var t in nonActiveTriggers)
+            _state.Stack.Add(t);
+    }
+
+    private List<TriggeredAbilityStackObject> CollectBoardTriggers(GameEvent evt, GameCard? relevantCard, Player player)
+    {
+        var result = new List<TriggeredAbilityStackObject>();
+        var permanents = player.Battlefield.Cards.ToList();
+
+        foreach (var permanent in permanents)
         {
-            // Snapshot the battlefield to avoid modification during iteration
-            var permanents = player.Battlefield.Cards.ToList();
-            foreach (var permanent in permanents)
+            var triggers = permanent.Triggers.Count > 0
+                ? permanent.Triggers
+                : (CardDefinitions.TryGet(permanent.Name, out var def) ? def.Triggers : []);
+            if (triggers.Count == 0) continue;
+
+            foreach (var trigger in triggers)
             {
-                // Use triggers from the card instance (which includes CardDefinition triggers
-                // if created via GameCard.Create), falling back to CardDefinitions registry
-                var triggers = permanent.Triggers.Count > 0
-                    ? permanent.Triggers
-                    : (CardDefinitions.TryGet(permanent.Name, out var def) ? def.Triggers : []);
-                if (triggers.Count == 0) continue;
+                if (trigger.Event != evt) continue;
+                if (trigger.Condition == TriggerCondition.Self) continue;
 
-                foreach (var trigger in triggers)
+                bool matches = trigger.Condition switch
                 {
-                    if (trigger.Event != evt) continue;
-                    if (trigger.Condition == TriggerCondition.Self) continue; // Handled by ProcessTriggersAsync
+                    TriggerCondition.AnyCreatureDies =>
+                        evt == GameEvent.Dies && relevantCard != null && relevantCard.IsCreature,
+                    TriggerCondition.ControllerCastsEnchantment =>
+                        evt == GameEvent.SpellCast
+                        && relevantCard != null
+                        && relevantCard.CardTypes.HasFlag(CardType.Enchantment)
+                        && _state.ActivePlayer == player,
+                    TriggerCondition.SelfDealsCombatDamage =>
+                        evt == GameEvent.CombatDamageDealt
+                        && relevantCard != null
+                        && relevantCard.Id == permanent.Id,
+                    TriggerCondition.Upkeep =>
+                        evt == GameEvent.Upkeep
+                        && _state.ActivePlayer == player,
+                    TriggerCondition.SelfAttacks => false,
+                    _ => false,
+                };
 
-                    bool matches = trigger.Condition switch
-                    {
-                        TriggerCondition.AnyCreatureDies =>
-                            evt == GameEvent.Dies && relevantCard != null && relevantCard.IsCreature,
-
-                        TriggerCondition.ControllerCastsEnchantment =>
-                            evt == GameEvent.SpellCast
-                            && relevantCard != null
-                            && relevantCard.CardTypes.HasFlag(CardType.Enchantment)
-                            && _state.ActivePlayer == player,
-
-                        TriggerCondition.SelfDealsCombatDamage =>
-                            evt == GameEvent.CombatDamageDealt
-                            && relevantCard != null
-                            && relevantCard.Id == permanent.Id,
-
-                        TriggerCondition.SelfAttacks =>
-                            false, // Handled by ProcessAttackTriggersAsync
-
-                        TriggerCondition.Upkeep =>
-                            evt == GameEvent.Upkeep
-                            && _state.ActivePlayer == player,
-
-                        _ => false,
-                    };
-
-                    if (matches)
-                    {
-                        var context = new EffectContext(_state, player, permanent, player.DecisionHandler);
-                        _state.Log($"{permanent.Name} triggers: {trigger.Effect.GetType().Name.Replace("Effect", "")}");
-                        await trigger.Effect.Execute(context, ct);
-                    }
+                if (matches)
+                {
+                    _state.Log($"{permanent.Name} triggers: {trigger.Effect.GetType().Name.Replace("Effect", "")}");
+                    result.Add(new TriggeredAbilityStackObject(permanent, player.Id, trigger.Effect));
                 }
             }
         }
+
+        return result;
     }
 
-    private async Task ProcessDelayedTriggersAsync(GameEvent evt, CancellationToken ct)
-    {
-        var toFire = _state.DelayedTriggers.Where(d => d.FireOn == evt).ToList();
-        foreach (var delayed in toFire)
-        {
-            var controller = delayed.ControllerId == _state.Player1.Id ? _state.Player1 : _state.Player2;
-            var context = new EffectContext(_state, controller, new GameCard { Name = "Delayed Trigger" }, controller.DecisionHandler);
-            await delayed.Effect.Execute(context, ct);
-            _state.DelayedTriggers.Remove(delayed);
-        }
-    }
-
-    private async Task ProcessAttackTriggersAsync(GameCard attacker, CancellationToken ct)
+    /// <summary>Queues attack triggers onto the stack.</summary>
+    internal async Task QueueAttackTriggersOnStackAsync(GameCard attacker, CancellationToken ct = default)
     {
         var player = _state.ActivePlayer;
-
-        // Check the card's own triggers first, then fall back to CardDefinitions
         var triggers = attacker.Triggers.Count > 0
             ? attacker.Triggers
             : (CardDefinitions.TryGet(attacker.Name, out var def) ? def.Triggers : []);
@@ -1266,10 +1445,29 @@ public class GameEngine
         {
             if (trigger.Condition != TriggerCondition.SelfAttacks) continue;
 
-            var context = new EffectContext(_state, player, attacker, player.DecisionHandler);
             _state.Log($"{attacker.Name} triggers: {trigger.Effect.GetType().Name.Replace("Effect", "")}");
-            await trigger.Effect.Execute(context, ct);
+            _state.Stack.Add(new TriggeredAbilityStackObject(attacker, player.Id, trigger.Effect));
         }
+    }
+
+    /// <summary>Queues delayed triggers onto the stack and removes them.</summary>
+    internal async Task QueueDelayedTriggersOnStackAsync(GameEvent evt, CancellationToken ct = default)
+    {
+        var toFire = _state.DelayedTriggers.Where(d => d.FireOn == evt).ToList();
+        foreach (var delayed in toFire)
+        {
+            var controller = delayed.ControllerId == _state.Player1.Id ? _state.Player1 : _state.Player2;
+            var source = new GameCard { Name = "Delayed Trigger" };
+            _state.Stack.Add(new TriggeredAbilityStackObject(source, controller.Id, delayed.Effect));
+            _state.DelayedTriggers.Remove(delayed);
+        }
+    }
+
+    /// <summary>Resolves all items on the stack (for testing).</summary>
+    internal async Task ResolveAllTriggersAsync(CancellationToken ct = default)
+    {
+        while (_state.Stack.Count > 0)
+            await ResolveTopOfStackAsync(ct);
     }
 
     internal async Task RunPriorityAsync(CancellationToken ct = default)
@@ -1325,48 +1523,68 @@ public class GameEngine
         _state.Stack.RemoveAt(_state.Stack.Count - 1);
         var controller = top.ControllerId == _state.Player1.Id ? _state.Player1 : _state.Player2;
 
-        _state.Log($"Resolving {top.Card.Name}.");
-
-        if (CardDefinitions.TryGet(top.Card.Name, out var def) && def.Effect != null)
+        if (top is TriggeredAbilityStackObject triggered)
         {
-            if (top.Targets.Count > 0)
+            _state.Log($"Resolving triggered ability: {triggered.Source.Name} — {triggered.Effect.GetType().Name.Replace("Effect", "")}");
+            var context = new EffectContext(_state, controller, triggered.Source, controller.DecisionHandler)
             {
-                var allTargetsLegal = true;
-                foreach (var target in top.Targets)
+                Target = triggered.Target,
+                TargetPlayerId = triggered.TargetPlayerId,
+            };
+            await triggered.Effect.Execute(context, ct);
+            await OnBoardChangedAsync(ct);
+            return;
+        }
+
+        if (top is StackObject spell)
+        {
+            _state.Log($"Resolving {spell.Card.Name}.");
+
+            if (CardDefinitions.TryGet(spell.Card.Name, out var def) && def.Effect != null)
+            {
+                if (spell.Targets.Count > 0)
                 {
-                    var targetOwner = target.PlayerId == _state.Player1.Id ? _state.Player1 : _state.Player2;
-                    var targetZone = targetOwner.GetZone(target.Zone);
-                    if (!targetZone.Contains(target.CardId))
+                    var allTargetsLegal = true;
+                    foreach (var target in spell.Targets)
                     {
-                        allTargetsLegal = false;
-                        break;
+                        var targetOwner = target.PlayerId == _state.Player1.Id ? _state.Player1 : _state.Player2;
+                        var targetZone = targetOwner.GetZone(target.Zone);
+                        if (!targetZone.Contains(target.CardId))
+                        {
+                            allTargetsLegal = false;
+                            break;
+                        }
+                    }
+
+                    if (!allTargetsLegal)
+                    {
+                        _state.Log($"{spell.Card.Name} fizzles (illegal target).");
+                        controller.Graveyard.Add(spell.Card);
+                        return;
                     }
                 }
 
-                if (!allTargetsLegal)
-                {
-                    _state.Log($"{top.Card.Name} fizzles (illegal target).");
-                    controller.Graveyard.Add(top.Card);
-                    return;
-                }
-            }
-
-            def.Effect.Resolve(_state, top);
-            controller.Graveyard.Add(top.Card);
-            await OnBoardChangedAsync(ct);
-        }
-        else
-        {
-            if (top.Card.IsCreature || top.Card.CardTypes.HasFlag(CardType.Enchantment)
-                || top.Card.CardTypes.HasFlag(CardType.Artifact))
-            {
-                top.Card.TurnEnteredBattlefield = _state.TurnNumber;
-                controller.Battlefield.Add(top.Card);
+                def.Effect.Resolve(_state, spell);
+                controller.Graveyard.Add(spell.Card);
                 await OnBoardChangedAsync(ct);
             }
             else
             {
-                controller.Graveyard.Add(top.Card);
+                if (spell.Card.IsCreature || spell.Card.CardTypes.HasFlag(CardType.Enchantment)
+                    || spell.Card.CardTypes.HasFlag(CardType.Artifact))
+                {
+                    spell.Card.TurnEnteredBattlefield = _state.TurnNumber;
+                    controller.Battlefield.Add(spell.Card);
+
+                    // Aura attachment on stack resolution
+                    await TryAttachAuraAsync(spell.Card, controller, ct);
+
+                    await OnBoardChangedAsync(ct);
+                }
+                else
+                {
+                    controller.Graveyard.Add(spell.Card);
+                }
             }
         }
     }

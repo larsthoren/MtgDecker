@@ -8,4 +8,5 @@ public enum TriggerCondition
     SelfDealsCombatDamage,
     SelfAttacks,
     Upkeep,
+    AttachedPermanentTapped,
 }

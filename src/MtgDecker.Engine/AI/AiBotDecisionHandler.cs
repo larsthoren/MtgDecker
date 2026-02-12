@@ -65,17 +65,13 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
                 return Task.FromResult(GameAction.TapCard(playerId, untappedLand.Id));
         }
 
-        // Priority 4: Cast most expensive affordable spell (accounting for cost reduction)
+        // Priority 4: Cast most expensive affordable spell (accounting for cost modification)
         var castable = hand
             .Where(c => !c.IsLand && c.ManaCost != null)
             .Select(c =>
             {
                 var cost = c.ManaCost!;
-                var reduction = gameState.ActiveEffects
-                    .Where(e => e.Type == ContinuousEffectType.ModifyCost
-                           && e.CostApplies != null
-                           && e.CostApplies(c))
-                    .Sum(e => e.CostMod);
+                var reduction = ComputeCostModification(gameState, c, player);
                 if (reduction != 0)
                     cost = cost.WithGenericReduction(-reduction);
                 return (Card: c, EffectiveCost: cost);
@@ -87,6 +83,20 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
 
         if (castable != null)
             return Task.FromResult(GameAction.PlayCard(playerId, castable.Id));
+
+        // Priority 5: Cycling — if a card can be cycled but not cast, cycle it
+        foreach (var card in hand)
+        {
+            if (CardDefinitions.TryGet(card.Name, out var cycleDef) && cycleDef.CyclingCost != null)
+            {
+                if (player.ManaPool.CanPay(cycleDef.CyclingCost))
+                {
+                    // Only cycle if we can't afford to cast it
+                    if (card.ManaCost == null || !player.ManaPool.CanPay(card.ManaCost))
+                        return Task.FromResult(GameAction.Cycle(playerId, card.Id));
+                }
+            }
+        }
 
         return Task.FromResult(GameAction.Pass(playerId));
     }
@@ -377,12 +387,8 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
                     .Any(c =>
                     {
                         var spellCost = c.ManaCost!;
-                        // Apply cost reduction
-                        var reduction = gameState.ActiveEffects
-                            .Where(e => e.Type == ContinuousEffectType.ModifyCost
-                                   && e.CostApplies != null
-                                   && e.CostApplies(c))
-                            .Sum(e => e.CostMod);
+                        // Apply cost modification
+                        var reduction = ComputeCostModification(gameState, c, player);
                         if (reduction != 0)
                             spellCost = spellCost.WithGenericReduction(-reduction);
 
@@ -402,4 +408,23 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
         return null;
     }
 
+    private static int ComputeCostModification(GameState gameState, GameCard card, Player caster)
+    {
+        return gameState.ActiveEffects
+            .Where(e => e.Type == ContinuousEffectType.ModifyCost
+                   && e.CostApplies != null
+                   && e.CostApplies(card)
+                   && IsCostEffectApplicable(gameState, e, caster))
+            .Sum(e => e.CostMod);
+    }
+
+    private static bool IsCostEffectApplicable(GameState gameState, ContinuousEffect effect, Player caster)
+    {
+        if (!effect.CostAppliesToOpponent) return true;
+
+        var effectController = gameState.Player1.Battlefield.Contains(effect.SourceId) ? gameState.Player1
+            : gameState.Player2.Battlefield.Contains(effect.SourceId) ? gameState.Player2 : null;
+
+        return effectController != null && effectController.Id != caster.Id;
+    }
 }

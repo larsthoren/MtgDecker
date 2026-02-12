@@ -41,7 +41,8 @@ public class CastSpellStackTests
         await engine.ExecuteAction(GameAction.CastSpell(state.Player1.Id, swords.Id));
 
         state.Stack.Should().HaveCount(1);
-        state.Stack[0].Card.Should().Be(swords);
+        state.Stack[0].Should().BeOfType<StackObject>()
+            .Which.Card.Should().Be(swords);
         state.Stack[0].ControllerId.Should().Be(state.Player1.Id);
         state.Player1.Hand.Cards.Should().NotContain(c => c.Id == swords.Id);
         state.Player1.ManaPool.Total.Should().Be(0);
@@ -64,7 +65,8 @@ public class CastSpellStackTests
 
         await engine.ExecuteAction(GameAction.CastSpell(state.Player1.Id, swords.Id));
 
-        state.Stack[0].Targets.Should().ContainSingle()
+        state.Stack[0].Should().BeOfType<StackObject>()
+            .Which.Targets.Should().ContainSingle()
             .Which.CardId.Should().Be(creature.Id);
     }
 
@@ -157,7 +159,8 @@ public class CastSpellStackTests
         await engine.ExecuteAction(GameAction.CastSpell(state.Player1.Id, goblin.Id));
 
         state.Stack.Should().HaveCount(1);
-        state.Stack[0].Card.Name.Should().Be("Mogg Fanatic");
+        state.Stack[0].Should().BeOfType<StackObject>()
+            .Which.Card.Name.Should().Be("Mogg Fanatic");
         state.Player1.Hand.Cards.Should().NotContain(c => c.Id == goblin.Id);
     }
 }

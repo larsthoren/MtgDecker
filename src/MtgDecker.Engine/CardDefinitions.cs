@@ -55,7 +55,12 @@ public static class CardDefinitions
                 Subtypes = ["Goblin"],
                 ActivatedAbility = new(new ActivatedAbilityCost(SacrificeSelf: true), new DealDamageEffect(1), c => c.IsCreature, CanTargetPlayer: true),
             },
-            ["Gempalm Incinerator"] = new(ManaCost.Parse("{1}{R}"), null, 2, 1, CardType.Creature) { Subtypes = ["Goblin"] },
+            ["Gempalm Incinerator"] = new(ManaCost.Parse("{1}{R}"), null, 2, 1, CardType.Creature)
+            {
+                Subtypes = ["Goblin"],
+                CyclingCost = ManaCost.Parse("{1}{R}"),
+                CyclingTriggers = [new Trigger(GameEvent.Cycle, TriggerCondition.Self, new GempalmIncineratorEffect())],
+            },
             ["Siege-Gang Commander"] = new(ManaCost.Parse("{3}{R}{R}"), null, 2, 2, CardType.Creature)
             {
                 Subtypes = ["Goblin"],
@@ -118,12 +123,18 @@ public static class CardDefinitions
             },
             ["Swords to Plowshares"] = new(ManaCost.Parse("{W}"), null, null, null, CardType.Instant,
                 TargetFilter.Creature(), new SwordsToPlowsharesEffect()),
-            ["Replenish"] = new(ManaCost.Parse("{3}{W}"), null, null, null, CardType.Sorcery),
+            ["Replenish"] = new(ManaCost.Parse("{3}{W}"), null, null, null, CardType.Sorcery,
+                null, new ReplenishEffect()),
             ["Enchantress's Presence"] = new(ManaCost.Parse("{2}{G}"), null, null, null, CardType.Enchantment)
             {
                 Triggers = [new Trigger(GameEvent.SpellCast, TriggerCondition.ControllerCastsEnchantment, new DrawCardEffect())],
             },
-            ["Wild Growth"] = new(ManaCost.Parse("{G}"), null, null, null, CardType.Enchantment) { Subtypes = ["Aura"] },
+            ["Wild Growth"] = new(ManaCost.Parse("{G}"), null, null, null, CardType.Enchantment)
+            {
+                Subtypes = ["Aura"],
+                AuraTarget = AuraTarget.Land,
+                Triggers = [new Trigger(GameEvent.TapForMana, TriggerCondition.AttachedPermanentTapped, new AddBonusManaEffect(ManaColor.Green))],
+            },
             ["Exploration"] = new(ManaCost.Parse("{G}"), null, null, null, CardType.Enchantment)
             {
                 ContinuousEffects =
@@ -140,9 +151,29 @@ public static class CardDefinitions
             ["Parallax Wave"] = new(ManaCost.Parse("{2}{W}{W}"), null, null, null, CardType.Enchantment),
             ["Sterling Grove"] = new(ManaCost.Parse("{G}{W}"), null, null, null, CardType.Enchantment)
             {
+                ContinuousEffects =
+                [
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
+                        (card, _) => card.CardTypes.HasFlag(CardType.Enchantment),
+                        GrantedKeyword: Keyword.Shroud,
+                        ExcludeSelf: true,
+                        ControllerOnly: true),
+                ],
                 ActivatedAbility = new(new ActivatedAbilityCost(SacrificeSelf: true, ManaCost: ManaCost.Parse("{1}")), new SearchLibraryByTypeEffect(CardType.Enchantment)),
             },
-            ["Aura of Silence"] = new(ManaCost.Parse("{1}{W}{W}"), null, null, null, CardType.Enchantment),
+            ["Aura of Silence"] = new(ManaCost.Parse("{1}{W}{W}"), null, null, null, CardType.Enchantment)
+            {
+                ContinuousEffects =
+                [
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.ModifyCost,
+                        (_, _) => true, CostMod: 2,
+                        CostApplies: c => c.CardTypes.HasFlag(CardType.Artifact) || c.CardTypes.HasFlag(CardType.Enchantment),
+                        CostAppliesToOpponent: true),
+                ],
+                ActivatedAbility = new(new ActivatedAbilityCost(SacrificeSelf: true),
+                    new DestroyTargetEffect(),
+                    c => c.CardTypes.HasFlag(CardType.Artifact) || c.CardTypes.HasFlag(CardType.Enchantment)),
+            },
             ["Seal of Cleansing"] = new(ManaCost.Parse("{1}{W}"), null, null, null, CardType.Enchantment)
             {
                 ActivatedAbility = new(new ActivatedAbilityCost(SacrificeSelf: true), new DestroyTargetEffect(), c => c.CardTypes.HasFlag(CardType.Enchantment) || c.CardTypes.HasFlag(CardType.Artifact)),
@@ -157,7 +188,9 @@ public static class CardDefinitions
             ["Plains"] = new(null, ManaAbility.Fixed(ManaColor.White), null, null, CardType.Land) { Subtypes = ["Plains"] },
             ["Brushland"] = new(null, ManaAbility.Choice(ManaColor.Colorless, ManaColor.Green, ManaColor.White), null, null, CardType.Land),
             ["Windswept Heath"] = new(null, null, null, null, CardType.Land) { FetchAbility = new FetchAbility(["Plains", "Forest"]) },
-            ["Serra's Sanctum"] = new(null, null, null, null, CardType.Land) { IsLegendary = true },
+            ["Serra's Sanctum"] = new(null, ManaAbility.Dynamic(ManaColor.White,
+                p => p.Battlefield.Cards.Count(c => c.CardTypes.HasFlag(CardType.Enchantment))),
+                null, null, CardType.Land) { IsLegendary = true },
         };
 
         Registry = cards.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);

@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Text;
 using System.Text.RegularExpressions;
 using MtgDecker.Engine.Enums;
 
@@ -61,6 +62,34 @@ public sealed partial class ManaCost
         var newGeneric = Math.Max(0, GenericCost - reduction);
         var colorReqs = new Dictionary<ManaColor, int>(ColorRequirements);
         return new ManaCost(colorReqs, newGeneric);
+    }
+
+    private static readonly Dictionary<ManaColor, string> ColorToSymbol = new()
+    {
+        [ManaColor.White] = "W",
+        [ManaColor.Blue] = "U",
+        [ManaColor.Black] = "B",
+        [ManaColor.Red] = "R",
+        [ManaColor.Green] = "G",
+        [ManaColor.Colorless] = "C",
+    };
+
+    public override string ToString()
+    {
+        var sb = new StringBuilder();
+        if (GenericCost > 0)
+            sb.Append($"{{{GenericCost}}}");
+        // Use WUBRG ordering for deterministic output
+        foreach (var color in new[] { ManaColor.White, ManaColor.Blue, ManaColor.Black, ManaColor.Red, ManaColor.Green, ManaColor.Colorless })
+        {
+            if (ColorRequirements.TryGetValue(color, out var count))
+            {
+                var symbol = ColorToSymbol[color];
+                for (int i = 0; i < count; i++)
+                    sb.Append($"{{{symbol}}}");
+            }
+        }
+        return sb.Length > 0 ? sb.ToString() : "{0}";
     }
 
     [GeneratedRegex(@"\{([^}]+)\}")]

@@ -130,7 +130,9 @@ public class CostModificationTests
         await engine.ExecuteAction(GameAction.CastSpell(p1.Id, ringleader.Id));
 
         // Should be on the stack (cast successfully)
-        state.Stack.Should().ContainSingle(s => s.Card.Name == "Goblin Ringleader");
+        state.Stack.Should().ContainSingle()
+            .Which.Should().BeOfType<StackObject>()
+            .Which.Card.Name.Should().Be("Goblin Ringleader");
     }
 
     [Fact]
