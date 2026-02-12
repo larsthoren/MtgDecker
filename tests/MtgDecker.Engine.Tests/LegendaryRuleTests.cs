@@ -96,4 +96,60 @@ public class LegendaryRuleTests
         var card = GameCard.Create("Serra's Sanctum", "Legendary Land");
         card.IsLegendary.Should().BeTrue();
     }
+
+    [Fact]
+    public async Task SBA_Loop_Kills_Zero_Toughness_Creature()
+    {
+        var p1 = new Player(Guid.NewGuid(), "P1", new TestDecisionHandler());
+        var p2 = new Player(Guid.NewGuid(), "P2", new TestDecisionHandler());
+        var state = new GameState(p1, p2);
+        var engine = new GameEngine(state);
+
+        // A creature with 0 base toughness (kept alive by a buff)
+        var weakling = new GameCard
+        {
+            Name = "Weakling", BasePower = 1, BaseToughness = 0,
+            CardTypes = CardType.Creature
+        };
+        weakling.EffectiveToughness = 1; // buffed to survive
+        p1.Battlefield.Add(weakling);
+
+        // RecalculateState will reset EffectiveToughness to null (no active effects)
+        // Then SBA should detect toughness <= 0 and kill it
+        await engine.OnBoardChangedAsync();
+
+        p1.Battlefield.Cards.Should().BeEmpty();
+        p1.Graveyard.Cards.Should().Contain(c => c.Name == "Weakling");
+    }
+
+    [Fact]
+    public async Task Legendary_Rule_Then_Recalculate_Runs_Clean()
+    {
+        var handler = new TestDecisionHandler();
+        var p1 = new Player(Guid.NewGuid(), "P1", handler);
+        var p2 = new Player(Guid.NewGuid(), "P2", new TestDecisionHandler());
+        var state = new GameState(p1, p2);
+        var engine = new GameEngine(state);
+
+        var sanctum1 = new GameCard
+        {
+            Name = "Serra's Sanctum", CardTypes = CardType.Land, IsLegendary = true
+        };
+        var sanctum2 = new GameCard
+        {
+            Name = "Serra's Sanctum", CardTypes = CardType.Land, IsLegendary = true
+        };
+
+        p1.Battlefield.Add(sanctum1);
+        p1.Battlefield.Add(sanctum2);
+
+        handler.EnqueueCardChoice(sanctum1.Id);
+
+        await engine.CheckStateBasedActionsAsync();
+
+        // After legendary rule, only 1 sanctum remains
+        p1.Battlefield.Cards.Should().HaveCount(1);
+        // Effects should have been recalculated (no crash, clean state)
+        state.ActiveEffects.Should().BeEmpty(); // no effects from lands
+    }
 }

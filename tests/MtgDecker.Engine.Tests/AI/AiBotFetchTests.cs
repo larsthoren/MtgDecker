@@ -125,4 +125,38 @@ public class AiBotFetchTests
         action.Type.Should().Be(ActionType.ActivateFetch);
         action.CardId.Should().Be(fetch.Id);
     }
+
+    [Fact]
+    public async Task Bot_Casts_Spell_With_Cost_Reduction()
+    {
+        var bot = new AiBotDecisionHandler();
+        var p1 = new Player(Guid.NewGuid(), "Bot", bot);
+        var p2 = new Player(Guid.NewGuid(), "Opp", new AiBotDecisionHandler());
+        var state = new GameState(p1, p2);
+        state.CurrentPhase = Phase.MainPhase1;
+
+        // Warchief on battlefield — Goblins cost {1} less
+        var warchief = GameCard.Create("Goblin Warchief", "Creature — Goblin");
+        p1.Battlefield.Add(warchief);
+
+        var engine = new GameEngine(state);
+        engine.RecalculateState();
+
+        // Goblin Ringleader costs {3}{R}, reduced to {2}{R} with Warchief
+        var ringleader = GameCard.Create("Goblin Ringleader", "Creature — Goblin");
+        p1.Hand.Add(ringleader);
+
+        // Only 3 mana: 2 colorless + 1 red (enough for {2}{R} but not {3}{R})
+        p1.ManaPool.Add(ManaColor.Red);
+        p1.ManaPool.Add(ManaColor.Colorless);
+        p1.ManaPool.Add(ManaColor.Colorless);
+
+        // Land drop already used (so bot won't try to play a land)
+        p1.LandsPlayedThisTurn = 1;
+
+        var action = await bot.GetAction(state, p1.Id);
+        // Bot should try to cast the Ringleader (with cost reduction, it can afford it)
+        action.Type.Should().Be(ActionType.PlayCard);
+        action.CardId.Should().Be(ringleader.Id);
+    }
 }

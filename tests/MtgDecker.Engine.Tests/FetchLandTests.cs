@@ -106,6 +106,30 @@ public class FetchLandTests
     }
 
     [Fact]
+    public async Task Fetch_Land_Cannot_Activate_When_Tapped()
+    {
+        var handler = new TestDecisionHandler();
+        var p1 = new Player(Guid.NewGuid(), "P1", handler);
+        var p2 = new Player(Guid.NewGuid(), "P2", new TestDecisionHandler());
+        var state = new GameState(p1, p2);
+        state.CurrentPhase = Phase.MainPhase1;
+        var engine = new GameEngine(state);
+
+        var fetch = GameCard.Create("Wooded Foothills", "Land");
+        fetch.IsTapped = true; // already tapped
+        p1.Battlefield.Add(fetch);
+
+        var mountain = GameCard.Create("Mountain", "Basic Land \u2014 Mountain");
+        p1.Library.Add(mountain);
+
+        await engine.ExecuteAction(GameAction.ActivateFetch(p1.Id, fetch.Id));
+
+        // Should NOT have activated — fetch land is still on battlefield, no life lost
+        p1.Battlefield.Cards.Should().Contain(c => c.Name == "Wooded Foothills");
+        p1.Life.Should().Be(20);
+    }
+
+    [Fact]
     public void Basic_Lands_Have_Subtypes_In_CardDefinitions()
     {
         var mountain = GameCard.Create("Mountain", "Basic Land \u2014 Mountain");

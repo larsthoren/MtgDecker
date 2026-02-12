@@ -307,7 +307,7 @@ public class GameEngine
             case ActionType.ActivateFetch:
             {
                 var fetchLand = player.Battlefield.Cards.FirstOrDefault(c => c.Id == action.CardId);
-                if (fetchLand == null) break;
+                if (fetchLand == null || fetchLand.IsTapped) break;
 
                 var fetchDef = CardDefinitions.TryGet(fetchLand.Name, out var fd) ? fd : null;
                 var fetchAbility = fetchDef?.FetchAbility ?? fetchLand.FetchAbility;
@@ -866,42 +866,67 @@ public class GameEngine
 
     internal async Task CheckStateBasedActionsAsync(CancellationToken ct = default)
     {
-        if (_state.IsGameOver) return;
-
-        bool p1Dead = _state.Player1.Life <= 0;
-        bool p2Dead = _state.Player2.Life <= 0;
-
-        if (p1Dead && p2Dead)
+        // SBAs loop until no more actions are taken (MTG 704.3)
+        bool anyActionTaken;
+        do
         {
-            _state.IsGameOver = true;
-            _state.Winner = null; // draw
-            _state.Log($"Both players lose — {_state.Player1.Name} ({_state.Player1.Life} life) and {_state.Player2.Name} ({_state.Player2.Life} life).");
-        }
-        else if (p1Dead)
-        {
-            _state.IsGameOver = true;
-            _state.Winner = _state.Player2.Name;
-            _state.Log($"{_state.Player1.Name} loses — life reached {_state.Player1.Life}.");
-        }
-        else if (p2Dead)
-        {
-            _state.IsGameOver = true;
-            _state.Winner = _state.Player1.Name;
-            _state.Log($"{_state.Player2.Name} loses — life reached {_state.Player2.Life}.");
-        }
+            if (_state.IsGameOver) return;
+            anyActionTaken = false;
 
-        // Legendary rule (MTG 704.5j)
-        await CheckLegendaryRuleAsync(_state.Player1, ct);
-        await CheckLegendaryRuleAsync(_state.Player2, ct);
+            // Life check (MTG 704.5a)
+            bool p1Dead = _state.Player1.Life <= 0;
+            bool p2Dead = _state.Player2.Life <= 0;
+
+            if (p1Dead && p2Dead)
+            {
+                _state.IsGameOver = true;
+                _state.Winner = null; // draw
+                _state.Log($"Both players lose — {_state.Player1.Name} ({_state.Player1.Life} life) and {_state.Player2.Name} ({_state.Player2.Life} life).");
+                return;
+            }
+            else if (p1Dead)
+            {
+                _state.IsGameOver = true;
+                _state.Winner = _state.Player2.Name;
+                _state.Log($"{_state.Player1.Name} loses — life reached {_state.Player1.Life}.");
+                return;
+            }
+            else if (p2Dead)
+            {
+                _state.IsGameOver = true;
+                _state.Winner = _state.Player1.Name;
+                _state.Log($"{_state.Player2.Name} loses — life reached {_state.Player2.Life}.");
+                return;
+            }
+
+            // Legendary rule (MTG 704.5j)
+            bool legendaryP1 = await CheckLegendaryRuleAsync(_state.Player1, ct);
+            bool legendaryP2 = await CheckLegendaryRuleAsync(_state.Player2, ct);
+            if (legendaryP1 || legendaryP2)
+                anyActionTaken = true;
+
+            // Zero-or-less toughness (MTG 704.5f)
+            bool lethalP1 = CheckLethalToughness(_state.Player1);
+            bool lethalP2 = CheckLethalToughness(_state.Player2);
+            if (lethalP1 || lethalP2)
+                anyActionTaken = true;
+
+            // If anything changed, recalculate effects before looping
+            if (anyActionTaken)
+                RecalculateState();
+
+        } while (anyActionTaken);
     }
 
-    private async Task CheckLegendaryRuleAsync(Player player, CancellationToken ct)
+    private async Task<bool> CheckLegendaryRuleAsync(Player player, CancellationToken ct)
     {
         var legendaries = player.Battlefield.Cards
             .Where(c => c.IsLegendary)
             .GroupBy(c => c.Name)
             .Where(g => g.Count() > 1)
             .ToList();
+
+        if (legendaries.Count == 0) return false;
 
         foreach (var group in legendaries)
         {
@@ -918,6 +943,24 @@ public class GameEngine
                 _state.Log($"{card.Name} is put into graveyard (legendary rule).");
             }
         }
+
+        return true;
+    }
+
+    private bool CheckLethalToughness(Player player)
+    {
+        var dead = player.Battlefield.Cards
+            .Where(c => c.IsCreature && (c.Toughness ?? 1) <= 0)
+            .ToList();
+
+        foreach (var card in dead)
+        {
+            player.Battlefield.RemoveById(card.Id);
+            player.Graveyard.Add(card);
+            _state.Log($"{card.Name} dies (0 toughness).");
+        }
+
+        return dead.Count > 0;
     }
 
     private async Task ProcessTriggersAsync(GameEvent evt, GameCard source, Player controller, CancellationToken ct)

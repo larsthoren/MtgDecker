@@ -58,10 +58,24 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
                 return Task.FromResult(GameAction.TapCard(playerId, untappedLand.Id));
         }
 
-        // Priority 4: Cast most expensive affordable spell
+        // Priority 4: Cast most expensive affordable spell (accounting for cost reduction)
         var castable = hand
-            .Where(c => !c.IsLand && c.ManaCost != null && player.ManaPool.CanPay(c.ManaCost))
-            .OrderByDescending(c => c.ManaCost!.ConvertedManaCost)
+            .Where(c => !c.IsLand && c.ManaCost != null)
+            .Select(c =>
+            {
+                var cost = c.ManaCost!;
+                var reduction = gameState.ActiveEffects
+                    .Where(e => e.Type == ContinuousEffectType.ModifyCost
+                           && e.CostApplies != null
+                           && e.CostApplies(c))
+                    .Sum(e => e.CostMod);
+                if (reduction != 0)
+                    cost = cost.WithGenericReduction(-reduction);
+                return (Card: c, EffectiveCost: cost);
+            })
+            .Where(x => player.ManaPool.CanPay(x.EffectiveCost))
+            .OrderByDescending(x => x.Card.ManaCost!.ConvertedManaCost)
+            .Select(x => x.Card)
             .FirstOrDefault();
 
         if (castable != null)
