@@ -195,9 +195,9 @@ public class AiBotMulliganTests
     }
 
     [Fact]
-    public async Task GetAction_ReturnsPass_Stub()
+    public async Task GetAction_NonMainPhase_ReturnsPass()
     {
-        // Stub: returns Pass for now (Task 5 implements real logic)
+        // Default phase is Untap, so GetAction should pass
         var p1 = new Player(Guid.NewGuid(), "Bot", _bot);
         var p2 = new Player(Guid.NewGuid(), "Opponent", _bot);
         var state = new GameState(p1, p2);

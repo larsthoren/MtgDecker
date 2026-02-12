@@ -5,16 +5,44 @@ namespace MtgDecker.Engine.AI;
 
 /// <summary>
 /// Heuristic AI bot that makes automated decisions for game play.
-/// Implements mulligan logic, mana payment, and card selection heuristics.
-/// Combat and action selection are stubs pending Tasks 5-6.
+/// Implements mulligan logic, mana payment, action selection, and card choice heuristics.
+/// Combat decisions (attackers/blockers) are stubs pending Task 6.
 /// </summary>
 public class AiBotDecisionHandler : IPlayerDecisionHandler
 {
     /// <summary>
-    /// Stub: returns Pass. Real logic implemented in Task 5.
+    /// Selects an action using a land-first, greedy-cast heuristic.
+    /// Only acts during main phases. Prioritizes playing a land (if available
+    /// and land drop unused), then casts the most expensive affordable spell.
     /// </summary>
     public Task<GameAction> GetAction(GameState gameState, Guid playerId, CancellationToken ct = default)
     {
+        if (gameState.CurrentPhase != Phase.MainPhase1 && gameState.CurrentPhase != Phase.MainPhase2)
+            return Task.FromResult(GameAction.Pass(playerId));
+
+        var player = gameState.Player1.Id == playerId ? gameState.Player1 : gameState.Player2;
+        var hand = player.Hand.Cards;
+
+        if (hand.Count == 0)
+            return Task.FromResult(GameAction.Pass(playerId));
+
+        // Priority 1: Play a land
+        if (player.LandsPlayedThisTurn == 0)
+        {
+            var land = hand.FirstOrDefault(c => c.IsLand);
+            if (land != null)
+                return Task.FromResult(GameAction.PlayCard(playerId, land.Id));
+        }
+
+        // Priority 2: Cast most expensive affordable spell
+        var castable = hand
+            .Where(c => !c.IsLand && c.ManaCost != null && player.ManaPool.CanPay(c.ManaCost))
+            .OrderByDescending(c => c.ManaCost!.ConvertedManaCost)
+            .FirstOrDefault();
+
+        if (castable != null)
+            return Task.FromResult(GameAction.PlayCard(playerId, castable.Id));
+
         return Task.FromResult(GameAction.Pass(playerId));
     }
 
