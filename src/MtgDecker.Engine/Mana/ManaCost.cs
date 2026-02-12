@@ -56,6 +56,13 @@ public sealed partial class ManaCost
         return new ManaCost(colorRequirements, genericCost);
     }
 
+    public ManaCost WithGenericReduction(int reduction)
+    {
+        var newGeneric = Math.Max(0, GenericCost - reduction);
+        var colorReqs = new Dictionary<ManaColor, int>(ColorRequirements);
+        return new ManaCost(colorReqs, newGeneric);
+    }
+
     [GeneratedRegex(@"\{([^}]+)\}")]
     private static partial Regex ManaSymbolRegex();
 }

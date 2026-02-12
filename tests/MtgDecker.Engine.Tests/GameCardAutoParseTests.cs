@@ -110,7 +110,7 @@ public class GameCardAutoParseTests
     public void Create_Registry_GetsSubtypes_WhenDefined()
     {
         var card = GameCard.Create("Mountain");
-        card.Subtypes.Should().BeEmpty();
+        card.Subtypes.Should().Contain("Mountain");
     }
 
     [Fact]

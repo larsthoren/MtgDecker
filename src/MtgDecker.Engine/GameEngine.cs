@@ -62,6 +62,10 @@ public class GameEngine
 
         } while (_turnStateMachine.AdvancePhase() != null);
 
+        // Clear end-of-turn effects and recalculate
+        StripEndOfTurnEffects();
+        RecalculateState();
+
         // Clear damage at end of turn
         ClearDamage();
 
@@ -115,7 +119,7 @@ public class GameEngine
                 if (playCard.IsLand)
                 {
                     // Part A: Land drop enforcement
-                    if (player.LandsPlayedThisTurn >= 1)
+                    if (player.LandsPlayedThisTurn >= player.MaxLandDrops)
                     {
                         _state.Log($"{player.Name} cannot play another land this turn.");
                         break;
@@ -129,17 +133,28 @@ public class GameEngine
                     player.ActionHistory.Push(action);
                     _state.Log($"{player.Name} plays {playCard.Name} (land drop).");
                     await ProcessTriggersAsync(GameEvent.EnterBattlefield, playCard, player, ct);
+                    await OnBoardChangedAsync(ct);
                 }
                 else if (playCard.ManaCost != null)
                 {
                     // Part B: Cast spell with mana payment
-                    if (!player.ManaPool.CanPay(playCard.ManaCost))
+                    // Apply cost reduction from continuous effects
+                    var effectiveCost = playCard.ManaCost;
+                    var costReduction = _state.ActiveEffects
+                        .Where(e => e.Type == ContinuousEffectType.ModifyCost
+                               && e.CostApplies != null
+                               && e.CostApplies(playCard))
+                        .Sum(e => e.CostMod);
+                    if (costReduction != 0)
+                        effectiveCost = effectiveCost.WithGenericReduction(-costReduction);
+
+                    if (!player.ManaPool.CanPay(effectiveCost))
                     {
                         _state.Log($"{player.Name} cannot cast {playCard.Name} — not enough mana.");
                         break;
                     }
 
-                    var cost = playCard.ManaCost;
+                    var cost = effectiveCost;
 
                     // Calculate remaining pool after colored requirements
                     var remaining = new Dictionary<ManaColor, int>();
@@ -217,6 +232,7 @@ public class GameEngine
                         action.DestinationZone = ZoneType.Battlefield;
                         _state.Log($"{player.Name} casts {playCard.Name}.");
                         await ProcessTriggersAsync(GameEvent.EnterBattlefield, playCard, player, ct);
+                        await OnBoardChangedAsync(ct);
                     }
                     action.ManaCostPaid = cost;
                     player.ActionHistory.Push(action);
@@ -230,6 +246,7 @@ public class GameEngine
                     player.ActionHistory.Push(action);
                     _state.Log($"{player.Name} plays {playCard.Name}.");
                     await ProcessTriggersAsync(GameEvent.EnterBattlefield, playCard, player, ct);
+                    await OnBoardChangedAsync(ct);
                 }
                 break;
 
@@ -287,6 +304,57 @@ public class GameEngine
                 }
                 break;
 
+            case ActionType.ActivateFetch:
+            {
+                var fetchLand = player.Battlefield.Cards.FirstOrDefault(c => c.Id == action.CardId);
+                if (fetchLand == null || fetchLand.IsTapped) break;
+
+                var fetchDef = CardDefinitions.TryGet(fetchLand.Name, out var fd) ? fd : null;
+                var fetchAbility = fetchDef?.FetchAbility ?? fetchLand.FetchAbility;
+                if (fetchAbility == null) break;
+
+                // Pay costs: 1 life + sacrifice
+                player.AdjustLife(-1);
+                player.Battlefield.RemoveById(fetchLand.Id);
+                player.Graveyard.Add(fetchLand);
+                _state.Log($"{player.Name} sacrifices {fetchLand.Name}, pays 1 life ({player.Life}).");
+
+                // Search library for matching land
+                var searchTypes = fetchAbility.SearchTypes;
+                var eligible = player.Library.Cards
+                    .Where(c => c.IsLand && searchTypes.Any(t =>
+                        c.Subtypes.Contains(t) || c.Name.Equals(t, StringComparison.OrdinalIgnoreCase)))
+                    .ToList();
+
+                if (eligible.Count > 0)
+                {
+                    var chosenId = await player.DecisionHandler.ChooseCard(
+                        eligible, $"Search for a land ({string.Join(" or ", searchTypes)})",
+                        optional: true, ct);
+
+                    if (chosenId != null)
+                    {
+                        var land = player.Library.RemoveById(chosenId.Value);
+                        if (land != null)
+                        {
+                            player.Battlefield.Add(land);
+                            land.TurnEnteredBattlefield = _state.TurnNumber;
+                            _state.Log($"{player.Name} fetches {land.Name}.");
+                            await ProcessTriggersAsync(GameEvent.EnterBattlefield, land, player, ct);
+                            await OnBoardChangedAsync(ct);
+                        }
+                    }
+                }
+                else
+                {
+                    _state.Log($"{player.Name} finds no matching land.");
+                }
+
+                player.Library.Shuffle();
+                player.ActionHistory.Push(action);
+                break;
+            }
+
             case ActionType.CastSpell:
             {
                 var castPlayer = action.PlayerId == _state.Player1.Id ? _state.Player1 : _state.Player2;
@@ -310,8 +378,18 @@ public class GameEngine
                     return;
                 }
 
+                // Apply cost reduction from continuous effects
+                var castEffectiveCost = def.ManaCost;
+                var castCostReduction = _state.ActiveEffects
+                    .Where(e => e.Type == ContinuousEffectType.ModifyCost
+                           && e.CostApplies != null
+                           && e.CostApplies(castCard))
+                    .Sum(e => e.CostMod);
+                if (castCostReduction != 0)
+                    castEffectiveCost = castEffectiveCost.WithGenericReduction(-castCostReduction);
+
                 var pool = castPlayer.ManaPool;
-                if (!pool.CanPay(def.ManaCost))
+                if (!pool.CanPay(castEffectiveCost))
                 {
                     _state.Log($"Not enough mana to cast {castCard.Name}.");
                     return;
@@ -345,7 +423,7 @@ public class GameEngine
                 foreach (var kvp in pool.Available)
                 {
                     var after = kvp.Value;
-                    if (def.ManaCost.ColorRequirements.TryGetValue(kvp.Key, out var needed))
+                    if (castEffectiveCost.ColorRequirements.TryGetValue(kvp.Key, out var needed))
                         after -= needed;
                     if (after > 0)
                         remaining[kvp.Key] = after;
@@ -353,25 +431,25 @@ public class GameEngine
 
                 // Deduct colored requirements
                 var manaPaid = new Dictionary<ManaColor, int>();
-                foreach (var (color, amount) in def.ManaCost.ColorRequirements)
+                foreach (var (color, amount) in castEffectiveCost.ColorRequirements)
                 {
                     pool.Deduct(color, amount);
                     manaPaid[color] = amount;
                 }
 
                 // Handle generic cost
-                if (def.ManaCost.GenericCost > 0)
+                if (castEffectiveCost.GenericCost > 0)
                 {
                     int distinctColors = remaining.Count(kv => kv.Value > 0);
                     int totalRemaining = remaining.Values.Sum();
-                    bool useAutoPay = distinctColors <= 1 || totalRemaining == def.ManaCost.GenericCost;
+                    bool useAutoPay = distinctColors <= 1 || totalRemaining == castEffectiveCost.GenericCost;
 
                     if (!useAutoPay)
                     {
                         var genericPayment = await castPlayer.DecisionHandler
-                            .ChooseGenericPayment(def.ManaCost.GenericCost, remaining, ct);
+                            .ChooseGenericPayment(castEffectiveCost.GenericCost, remaining, ct);
 
-                        bool valid = genericPayment.Values.Sum() == def.ManaCost.GenericCost
+                        bool valid = genericPayment.Values.Sum() == castEffectiveCost.GenericCost
                             && genericPayment.All(kv => remaining.TryGetValue(kv.Key, out var avail) && kv.Value <= avail);
 
                         if (valid)
@@ -390,7 +468,7 @@ public class GameEngine
 
                     if (useAutoPay)
                     {
-                        var toPay = def.ManaCost.GenericCost;
+                        var toPay = castEffectiveCost.GenericCost;
                         foreach (var (color, amount) in remaining)
                         {
                             var take = Math.Min(amount, toPay);
@@ -409,7 +487,7 @@ public class GameEngine
                 var stackObj = new StackObject(castCard, castPlayer.Id, manaPaid, targets, _state.Stack.Count);
                 _state.Stack.Add(stackObj);
 
-                action.ManaCostPaid = def.ManaCost;
+                action.ManaCostPaid = castEffectiveCost;
                 castPlayer.ActionHistory.Push(action);
 
                 _state.Log($"{castPlayer.Name} casts {castCard.Name}.");
@@ -598,8 +676,8 @@ public class GameEngine
         ProcessCombatDeaths(attacker);
         ProcessCombatDeaths(defender);
 
-        // Check if any player lost due to combat damage
-        CheckStateBasedActions();
+        // Recalculate effects and check if any player lost due to combat damage
+        await OnBoardChangedAsync(ct);
 
         // End Combat
         _state.CombatStep = CombatStep.EndCombat;
@@ -690,31 +768,199 @@ public class GameEngine
             card.DamageMarked = 0;
     }
 
-    internal void CheckStateBasedActions()
+    public void StripEndOfTurnEffects()
     {
-        if (_state.IsGameOver) return;
+        _state.ActiveEffects.RemoveAll(e => e.UntilEndOfTurn);
+    }
 
-        bool p1Dead = _state.Player1.Life <= 0;
-        bool p2Dead = _state.Player2.Life <= 0;
+    public void RecalculateState()
+    {
+        // Preserve temporary (UntilEndOfTurn) effects before rebuild
+        var tempEffects = _state.ActiveEffects.Where(e => e.UntilEndOfTurn).ToList();
 
-        if (p1Dead && p2Dead)
+        // Rebuild ActiveEffects from CardDefinitions on the battlefield
+        _state.ActiveEffects.Clear();
+        RebuildActiveEffects(_state.Player1);
+        RebuildActiveEffects(_state.Player2);
+
+        // Re-add temporary effects
+        _state.ActiveEffects.AddRange(tempEffects);
+
+        // Reset all effective values for both players
+        foreach (var player in new[] { _state.Player1, _state.Player2 })
         {
-            _state.IsGameOver = true;
-            _state.Winner = null; // draw
-            _state.Log($"Both players lose — {_state.Player1.Name} ({_state.Player1.Life} life) and {_state.Player2.Name} ({_state.Player2.Life} life).");
+            foreach (var card in player.Battlefield.Cards)
+            {
+                card.EffectivePower = null;
+                card.EffectiveToughness = null;
+                card.ActiveKeywords.Clear();
+            }
+            player.MaxLandDrops = 1;
         }
-        else if (p1Dead)
+
+        // Apply effects
+        foreach (var effect in _state.ActiveEffects)
         {
-            _state.IsGameOver = true;
-            _state.Winner = _state.Player2.Name;
-            _state.Log($"{_state.Player1.Name} loses — life reached {_state.Player1.Life}.");
+            switch (effect.Type)
+            {
+                case ContinuousEffectType.ModifyPowerToughness:
+                    ApplyPowerToughnessEffect(effect, _state.Player1);
+                    ApplyPowerToughnessEffect(effect, _state.Player2);
+                    break;
+
+                case ContinuousEffectType.GrantKeyword:
+                    ApplyKeywordEffect(effect, _state.Player1);
+                    ApplyKeywordEffect(effect, _state.Player2);
+                    break;
+
+                case ContinuousEffectType.ExtraLandDrop:
+                    // Applies to the controller of the source
+                    var sourceOwner = _state.Player1.Battlefield.Cards.Any(c => c.Id == effect.SourceId)
+                        ? _state.Player1 : _state.Player2;
+                    sourceOwner.MaxLandDrops += effect.ExtraLandDrops;
+                    break;
+            }
         }
-        else if (p2Dead)
+    }
+
+    private void ApplyPowerToughnessEffect(ContinuousEffect effect, Player player)
+    {
+        foreach (var card in player.Battlefield.Cards)
         {
-            _state.IsGameOver = true;
-            _state.Winner = _state.Player1.Name;
-            _state.Log($"{_state.Player2.Name} loses — life reached {_state.Player2.Life}.");
+            if (card.Id == effect.SourceId) continue; // lords don't buff themselves
+            if (!effect.Applies(card, player)) continue;
+
+            card.EffectivePower = (card.EffectivePower ?? card.BasePower ?? 0) + effect.PowerMod;
+            card.EffectiveToughness = (card.EffectiveToughness ?? card.BaseToughness ?? 0) + effect.ToughnessMod;
         }
+    }
+
+    private void ApplyKeywordEffect(ContinuousEffect effect, Player player)
+    {
+        foreach (var card in player.Battlefield.Cards)
+        {
+            if (!effect.Applies(card, player)) continue;
+            if (effect.GrantedKeyword.HasValue)
+                card.ActiveKeywords.Add(effect.GrantedKeyword.Value);
+        }
+    }
+
+    private void RebuildActiveEffects(Player player)
+    {
+        foreach (var card in player.Battlefield.Cards)
+        {
+            if (!CardDefinitions.TryGet(card.Name, out var def)) continue;
+            foreach (var templateEffect in def.ContinuousEffects)
+            {
+                var effect = templateEffect with { SourceId = card.Id };
+                _state.ActiveEffects.Add(effect);
+            }
+        }
+    }
+
+    internal async Task OnBoardChangedAsync(CancellationToken ct = default)
+    {
+        RecalculateState();
+        await CheckStateBasedActionsAsync(ct);
+    }
+
+    internal async Task CheckStateBasedActionsAsync(CancellationToken ct = default)
+    {
+        // SBAs loop until no more actions are taken (MTG 704.3)
+        bool anyActionTaken;
+        do
+        {
+            if (_state.IsGameOver) return;
+            anyActionTaken = false;
+
+            // Life check (MTG 704.5a)
+            bool p1Dead = _state.Player1.Life <= 0;
+            bool p2Dead = _state.Player2.Life <= 0;
+
+            if (p1Dead && p2Dead)
+            {
+                _state.IsGameOver = true;
+                _state.Winner = null; // draw
+                _state.Log($"Both players lose — {_state.Player1.Name} ({_state.Player1.Life} life) and {_state.Player2.Name} ({_state.Player2.Life} life).");
+                return;
+            }
+            else if (p1Dead)
+            {
+                _state.IsGameOver = true;
+                _state.Winner = _state.Player2.Name;
+                _state.Log($"{_state.Player1.Name} loses — life reached {_state.Player1.Life}.");
+                return;
+            }
+            else if (p2Dead)
+            {
+                _state.IsGameOver = true;
+                _state.Winner = _state.Player1.Name;
+                _state.Log($"{_state.Player2.Name} loses — life reached {_state.Player2.Life}.");
+                return;
+            }
+
+            // Legendary rule (MTG 704.5j)
+            bool legendaryP1 = await CheckLegendaryRuleAsync(_state.Player1, ct);
+            bool legendaryP2 = await CheckLegendaryRuleAsync(_state.Player2, ct);
+            if (legendaryP1 || legendaryP2)
+                anyActionTaken = true;
+
+            // Zero-or-less toughness (MTG 704.5f)
+            bool lethalP1 = CheckLethalToughness(_state.Player1);
+            bool lethalP2 = CheckLethalToughness(_state.Player2);
+            if (lethalP1 || lethalP2)
+                anyActionTaken = true;
+
+            // If anything changed, recalculate effects before looping
+            if (anyActionTaken)
+                RecalculateState();
+
+        } while (anyActionTaken);
+    }
+
+    private async Task<bool> CheckLegendaryRuleAsync(Player player, CancellationToken ct)
+    {
+        var legendaries = player.Battlefield.Cards
+            .Where(c => c.IsLegendary)
+            .GroupBy(c => c.Name)
+            .Where(g => g.Count() > 1)
+            .ToList();
+
+        if (legendaries.Count == 0) return false;
+
+        foreach (var group in legendaries)
+        {
+            var duplicates = group.ToList();
+            var chosenId = await player.DecisionHandler.ChooseCard(
+                duplicates,
+                $"Choose which {duplicates[0].Name} to keep (legendary rule)",
+                optional: false, ct);
+
+            foreach (var card in duplicates.Where(c => c.Id != chosenId))
+            {
+                player.Battlefield.RemoveById(card.Id);
+                player.Graveyard.Add(card);
+                _state.Log($"{card.Name} is put into graveyard (legendary rule).");
+            }
+        }
+
+        return true;
+    }
+
+    private bool CheckLethalToughness(Player player)
+    {
+        var dead = player.Battlefield.Cards
+            .Where(c => c.IsCreature && (c.Toughness ?? 1) <= 0)
+            .ToList();
+
+        foreach (var card in dead)
+        {
+            player.Battlefield.RemoveById(card.Id);
+            player.Graveyard.Add(card);
+            _state.Log($"{card.Name} dies (0 toughness).");
+        }
+
+        return dead.Count > 0;
     }
 
     private async Task ProcessTriggersAsync(GameEvent evt, GameCard source, Player controller, CancellationToken ct)
@@ -757,7 +1003,7 @@ public class GameEngine
                 {
                     if (_state.Stack.Count > 0)
                     {
-                        ResolveTopOfStack();
+                        await ResolveTopOfStackAsync(ct);
                         _state.PriorityPlayer = _state.ActivePlayer;
                         activePlayerPassed = false;
                         nonActivePlayerPassed = false;
@@ -778,7 +1024,7 @@ public class GameEngine
         }
     }
 
-    private void ResolveTopOfStack()
+    private async Task ResolveTopOfStackAsync(CancellationToken ct = default)
     {
         if (_state.Stack.Count == 0) return;
 
@@ -814,6 +1060,7 @@ public class GameEngine
 
             def.Effect.Resolve(_state, top);
             controller.Graveyard.Add(top.Card);
+            await OnBoardChangedAsync(ct);
         }
         else
         {
@@ -822,6 +1069,7 @@ public class GameEngine
             {
                 top.Card.TurnEnteredBattlefield = _state.TurnNumber;
                 controller.Battlefield.Add(top.Card);
+                await OnBoardChangedAsync(ct);
             }
             else
             {

@@ -18,6 +18,7 @@ public class Player
     public Stack<GameAction> ActionHistory { get; } = new();
     public ManaPool ManaPool { get; } = new();
     public int LandsPlayedThisTurn { get; set; }
+    public int MaxLandDrops { get; set; } = 1;
 
     public void AdjustLife(int delta)
     {
