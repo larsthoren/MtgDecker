@@ -1084,6 +1084,18 @@ public class GameEngine
             if (lethalP1 || lethalP2)
                 anyActionTaken = true;
 
+            // Lethal damage (MTG 704.5g) — creatures with damage >= toughness die
+            var lethalDamageDeaths = new List<GameCard>();
+            CheckLethalDamage(_state.Player1, lethalDamageDeaths);
+            CheckLethalDamage(_state.Player2, lethalDamageDeaths);
+            if (lethalDamageDeaths.Count > 0)
+            {
+                anyActionTaken = true;
+                // Fire Dies triggers for each creature that died from lethal damage
+                foreach (var deadCard in lethalDamageDeaths)
+                    await ProcessBoardTriggersAsync(GameEvent.Dies, deadCard, ct);
+            }
+
             // If anything changed, recalculate effects before looping
             if (anyActionTaken)
                 RecalculateState();
@@ -1134,6 +1146,25 @@ public class GameEngine
         }
 
         return dead.Count > 0;
+    }
+
+    private void CheckLethalDamage(Player player, List<GameCard> deaths)
+    {
+        var dead = player.Battlefield.Cards
+            .Where(c => c.IsCreature && c.Toughness.HasValue && c.DamageMarked >= c.Toughness.Value && c.Toughness.Value > 0)
+            .ToList();
+
+        foreach (var card in dead)
+        {
+            player.Battlefield.RemoveById(card.Id);
+            // MTG rules: tokens go to graveyard then cease to exist (SBA 704.5d)
+            player.Graveyard.Add(card);
+            if (card.IsToken)
+                player.Graveyard.RemoveById(card.Id);
+            card.DamageMarked = 0;
+            _state.Log($"{card.Name} dies (lethal damage).");
+            deaths.Add(card);
+        }
     }
 
     private async Task ProcessTriggersAsync(GameEvent evt, GameCard source, Player controller, CancellationToken ct)

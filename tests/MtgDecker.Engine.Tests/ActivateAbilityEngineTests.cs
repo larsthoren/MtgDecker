@@ -72,7 +72,8 @@ public class ActivateAbilityEngineTests
         var sharpshooter = GameCard.Create("Goblin Sharpshooter");
         p1.Battlefield.Add(sharpshooter);
 
-        var target = new GameCard { Name = "Elf", CardTypes = CardType.Creature, BasePower = 1, BaseToughness = 1 };
+        // Use a creature with toughness > 1 so it survives and doesn't trigger untap
+        var target = new GameCard { Name = "Bear", CardTypes = CardType.Creature, BasePower = 2, BaseToughness = 3 };
         p2.Battlefield.Add(target);
 
         var action = GameAction.ActivateAbility(p1.Id, sharpshooter.Id, targetId: target.Id);
@@ -181,7 +182,8 @@ public class ActivateAbilityEngineTests
         // Choose goblin token as sacrifice
         h1.EnqueueCardChoice(goblinToken.Id);
 
-        var target = new GameCard { Name = "Bird", CardTypes = CardType.Creature, BasePower = 1, BaseToughness = 1 };
+        // Use a creature with toughness > 2 so it survives the damage and we can verify DamageMarked
+        var target = new GameCard { Name = "Bear", CardTypes = CardType.Creature, BasePower = 2, BaseToughness = 3 };
         p2.Battlefield.Add(target);
 
         var action = GameAction.ActivateAbility(p1.Id, sgc.Id, targetId: target.Id);
