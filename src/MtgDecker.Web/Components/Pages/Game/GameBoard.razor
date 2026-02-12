@@ -68,6 +68,9 @@
             </div>
         </MudPaper>
 
+        @* Stack display (between turn bar and local player) *@
+        <StackDisplay Stack="@State.Stack" />
+
         @* Local player zone (bottom) *@
         <PlayerZone PlayerName="@LocalPlayer.Name"
                     Battlefield="@LocalPlayer.Battlefield.Cards"

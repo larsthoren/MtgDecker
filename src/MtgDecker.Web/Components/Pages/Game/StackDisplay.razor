@@ -1,0 +1,27 @@
+@using MtgDecker.Engine
+@namespace MtgDecker.Web.Components.Pages.Game
+
+@if (Stack.Count > 0)
+{
+    <MudPaper Class="pa-2 my-1" Outlined="true" Style="background-color: rgba(128,0,128,0.1);">
+        <MudText Typo="Typo.caption" Class="mb-1">
+            <MudIcon Icon="@Icons.Material.Filled.Layers" Size="Size.Small" /> Stack (@Stack.Count)
+        </MudText>
+        @for (int i = Stack.Count - 1; i >= 0; i--)
+        {
+            var item = Stack[i];
+            var isTop = i == Stack.Count - 1;
+            <MudChip T="string" Color="@(isTop ? Color.Secondary : Color.Default)" Size="Size.Small" Class="ma-1">
+                @item.Card.Name
+                @if (item.Targets.Count > 0)
+                {
+                    <MudText Typo="Typo.caption"> → target</MudText>
+                }
+            </MudChip>
+        }
+    </MudPaper>
+}
+
+@code {
+    [Parameter] public List<StackObject> Stack { get; set; } = new();
+}
