@@ -419,10 +419,10 @@ public class GameEngine
                     var eligible = new List<GameCard>();
                     var opponent = _state.GetOpponent(castPlayer);
                     foreach (var c in castPlayer.Battlefield.Cards)
-                        if (def.TargetFilter.IsLegal(c, ZoneType.Battlefield))
+                        if (def.TargetFilter.IsLegal(c, ZoneType.Battlefield) && !HasShroud(c))
                             eligible.Add(c);
                     foreach (var c in opponent.Battlefield.Cards)
-                        if (def.TargetFilter.IsLegal(c, ZoneType.Battlefield))
+                        if (def.TargetFilter.IsLegal(c, ZoneType.Battlefield) && !HasShroud(c))
                             eligible.Add(c);
 
                     if (eligible.Count == 0)
@@ -628,6 +628,13 @@ public class GameEngine
                                 ?? _state.Player2.Battlefield.Cards.FirstOrDefault(c => c.Id == action.TargetCardId.Value);
                 }
 
+                // Shroud check: cannot target a permanent with shroud
+                if (effectTarget != null && HasShroud(effectTarget))
+                {
+                    _state.Log($"{effectTarget.Name} has shroud — cannot be targeted.");
+                    break;
+                }
+
                 // Build context and execute effect
                 var effectContext = new EffectContext(_state, player, abilitySource, player.DecisionHandler)
                 {
@@ -643,6 +650,8 @@ public class GameEngine
             }
         }
     }
+
+    private bool HasShroud(GameCard card) => card.ActiveKeywords.Contains(Keyword.Shroud);
 
     public bool CanCastSorcery(Guid playerId)
     {
@@ -1039,8 +1048,13 @@ public class GameEngine
 
     private void ApplyKeywordEffect(ContinuousEffect effect, Player player)
     {
+        // ControllerOnly: skip if the source is not on this player's battlefield
+        if (effect.ControllerOnly && !player.Battlefield.Contains(effect.SourceId))
+            return;
+
         foreach (var card in player.Battlefield.Cards)
         {
+            if (effect.ExcludeSelf && card.Id == effect.SourceId) continue;
             if (!effect.Applies(card, player)) continue;
             if (effect.GrantedKeyword.HasValue)
                 card.ActiveKeywords.Add(effect.GrantedKeyword.Value);

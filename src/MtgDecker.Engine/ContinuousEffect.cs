@@ -22,4 +22,5 @@ public record ContinuousEffect(
     Func<GameCard, bool>? CostApplies = null,
     int ExtraLandDrops = 0,
     bool CostAppliesToOpponent = false,
-    bool ExcludeSelf = false);
+    bool ExcludeSelf = false,
+    bool ControllerOnly = false);
