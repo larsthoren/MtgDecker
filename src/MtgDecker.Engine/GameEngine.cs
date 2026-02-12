@@ -1175,32 +1175,58 @@ public class GameEngine
             {
                 card.EffectivePower = null;
                 card.EffectiveToughness = null;
+                card.EffectiveCardTypes = null;
                 card.ActiveKeywords.Clear();
             }
             player.MaxLandDrops = 1;
         }
 
-        // Apply effects
-        foreach (var effect in _state.ActiveEffects)
+        // Layer 1: Type-changing effects (BecomeCreature)
+        foreach (var effect in _state.ActiveEffects.Where(e => e.Type == ContinuousEffectType.BecomeCreature))
         {
-            switch (effect.Type)
+            ApplyBecomeCreatureEffect(effect, _state.Player1);
+            ApplyBecomeCreatureEffect(effect, _state.Player2);
+        }
+
+        // Layer 2: P/T modification
+        foreach (var effect in _state.ActiveEffects.Where(e => e.Type == ContinuousEffectType.ModifyPowerToughness))
+        {
+            ApplyPowerToughnessEffect(effect, _state.Player1);
+            ApplyPowerToughnessEffect(effect, _state.Player2);
+        }
+
+        // Layer 3: Keywords
+        foreach (var effect in _state.ActiveEffects.Where(e => e.Type == ContinuousEffectType.GrantKeyword))
+        {
+            ApplyKeywordEffect(effect, _state.Player1);
+            ApplyKeywordEffect(effect, _state.Player2);
+        }
+
+        // Non-layered effects
+        foreach (var effect in _state.ActiveEffects.Where(e => e.Type == ContinuousEffectType.ExtraLandDrop))
+        {
+            var sourceOwner = _state.Player1.Battlefield.Cards.Any(c => c.Id == effect.SourceId)
+                ? _state.Player1 : _state.Player2;
+            sourceOwner.MaxLandDrops += effect.ExtraLandDrops;
+        }
+    }
+
+    private void ApplyBecomeCreatureEffect(ContinuousEffect effect, Player player)
+    {
+        foreach (var card in player.Battlefield.Cards)
+        {
+            if (card.Id == effect.SourceId) continue; // "each other" exclusion
+            if (!effect.Applies(card, player)) continue;
+
+            // Add Creature type
+            card.EffectiveCardTypes = (card.EffectiveCardTypes ?? card.CardTypes) | CardType.Creature;
+
+            // Set P/T to CMC
+            if (effect.SetPowerToughnessToCMC && card.ManaCost != null)
             {
-                case ContinuousEffectType.ModifyPowerToughness:
-                    ApplyPowerToughnessEffect(effect, _state.Player1);
-                    ApplyPowerToughnessEffect(effect, _state.Player2);
-                    break;
-
-                case ContinuousEffectType.GrantKeyword:
-                    ApplyKeywordEffect(effect, _state.Player1);
-                    ApplyKeywordEffect(effect, _state.Player2);
-                    break;
-
-                case ContinuousEffectType.ExtraLandDrop:
-                    // Applies to the controller of the source
-                    var sourceOwner = _state.Player1.Battlefield.Cards.Any(c => c.Id == effect.SourceId)
-                        ? _state.Player1 : _state.Player2;
-                    sourceOwner.MaxLandDrops += effect.ExtraLandDrops;
-                    break;
+                var cmc = card.ManaCost.ConvertedManaCost;
+                card.EffectivePower = cmc;
+                card.EffectiveToughness = cmc;
             }
         }
     }

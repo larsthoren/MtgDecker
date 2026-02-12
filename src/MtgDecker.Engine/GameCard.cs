@@ -44,6 +44,9 @@ public class GameCard
         set => BaseToughness = value;
     }
 
+    // Type-changing effects (e.g., Opalescence makes enchantments into creatures)
+    public CardType? EffectiveCardTypes { get; set; }
+
     // Keywords granted by continuous effects or intrinsic abilities
     public HashSet<Keyword> ActiveKeywords { get; } = new();
 
@@ -91,11 +94,11 @@ public class GameCard
 
     // Backward-compatible: check both CardTypes flags and TypeLine
     public bool IsLand =>
-        CardTypes.HasFlag(CardType.Land) ||
+        (EffectiveCardTypes ?? CardTypes).HasFlag(CardType.Land) ||
         TypeLine.Contains("Land", StringComparison.OrdinalIgnoreCase);
 
     public bool IsCreature =>
-        CardTypes.HasFlag(CardType.Creature) ||
+        (EffectiveCardTypes ?? CardTypes).HasFlag(CardType.Creature) ||
         TypeLine.Contains("Creature", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Original factory: uses CardDefinitions registry only.</summary>

@@ -11,6 +11,7 @@ public enum ContinuousEffectType
     SkipDraw,
     GrantPlayerShroud,
     PreventDamageToPlayer,
+    BecomeCreature,
 }
 
 public record ContinuousEffect(
@@ -26,4 +27,5 @@ public record ContinuousEffect(
     int ExtraLandDrops = 0,
     bool CostAppliesToOpponent = false,
     bool ExcludeSelf = false,
-    bool ControllerOnly = false);
+    bool ControllerOnly = false,
+    bool SetPowerToughnessToCMC = false);

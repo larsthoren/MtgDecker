@@ -147,7 +147,16 @@ public static class CardDefinitions
             {
                 Triggers = [new Trigger(GameEvent.Upkeep, TriggerCondition.Upkeep, new RearrangeTopEffect(3))],
             },
-            ["Opalescence"] = new(ManaCost.Parse("{2}{W}{W}"), null, null, null, CardType.Enchantment),
+            ["Opalescence"] = new(ManaCost.Parse("{2}{W}{W}"), null, null, null, CardType.Enchantment)
+            {
+                ContinuousEffects =
+                [
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.BecomeCreature,
+                        (card, _) => card.CardTypes.HasFlag(CardType.Enchantment)
+                            && !card.Subtypes.Contains("Aura"),
+                        SetPowerToughnessToCMC: true),
+                ],
+            },
             ["Parallax Wave"] = new(ManaCost.Parse("{2}{W}{W}"), null, null, null, CardType.Enchantment)
             {
                 Triggers =
