@@ -17,13 +17,21 @@ public static class CardDefinitions
         var cards = new Dictionary<string, CardDefinition>(StringComparer.OrdinalIgnoreCase)
         {
             // === Goblins deck ===
-            ["Goblin Lackey"] = new(ManaCost.Parse("{R}"), null, 1, 1, CardType.Creature) { Subtypes = ["Goblin"] },
+            ["Goblin Lackey"] = new(ManaCost.Parse("{R}"), null, 1, 1, CardType.Creature)
+            {
+                Subtypes = ["Goblin"],
+                Triggers = [new Trigger(GameEvent.CombatDamageDealt, TriggerCondition.SelfDealsCombatDamage, new PutCreatureFromHandEffect("Goblin"))],
+            },
             ["Goblin Matron"] = new(ManaCost.Parse("{2}{R}"), null, 1, 1, CardType.Creature)
             {
                 Subtypes = ["Goblin"],
                 Triggers = [new Trigger(GameEvent.EnterBattlefield, TriggerCondition.Self, new SearchLibraryEffect("Goblin", optional: true))],
             },
-            ["Goblin Piledriver"] = new(ManaCost.Parse("{1}{R}"), null, 1, 2, CardType.Creature) { Subtypes = ["Goblin"] },
+            ["Goblin Piledriver"] = new(ManaCost.Parse("{1}{R}"), null, 1, 2, CardType.Creature)
+            {
+                Subtypes = ["Goblin"],
+                Triggers = [new Trigger(GameEvent.CombatDamageDealt, TriggerCondition.SelfAttacks, new PiledriverPumpEffect())],
+            },
             ["Goblin Ringleader"] = new(ManaCost.Parse("{3}{R}"), null, 2, 2, CardType.Creature)
             {
                 Subtypes = ["Goblin"],
@@ -64,11 +72,16 @@ public static class CardDefinitions
                         PowerMod: 1, ToughnessMod: 1),
                 ],
             },
-            ["Goblin Pyromancer"] = new(ManaCost.Parse("{3}{R}"), null, 2, 2, CardType.Creature) { Subtypes = ["Goblin"] },
+            ["Goblin Pyromancer"] = new(ManaCost.Parse("{3}{R}"), null, 2, 2, CardType.Creature)
+            {
+                Subtypes = ["Goblin"],
+                Triggers = [new Trigger(GameEvent.EnterBattlefield, TriggerCondition.Self, new PyromancerEffect())],
+            },
             ["Goblin Sharpshooter"] = new(ManaCost.Parse("{2}{R}"), null, 1, 1, CardType.Creature)
             {
                 Subtypes = ["Goblin"],
                 ActivatedAbility = new(new ActivatedAbilityCost(TapSelf: true), new DealDamageEffect(1), c => c.IsCreature, CanTargetPlayer: true),
+                Triggers = [new Trigger(GameEvent.Dies, TriggerCondition.AnyCreatureDies, new UntapSelfEffect())],
             },
             ["Goblin Tinkerer"] = new(ManaCost.Parse("{1}{R}"), null, 1, 1, CardType.Creature)
             {
@@ -98,11 +111,18 @@ public static class CardDefinitions
             },
 
             // === Enchantress deck ===
-            ["Argothian Enchantress"] = new(ManaCost.Parse("{1}{G}"), null, 0, 1, CardType.Creature | CardType.Enchantment) { Subtypes = ["Human", "Druid"] },
+            ["Argothian Enchantress"] = new(ManaCost.Parse("{1}{G}"), null, 0, 1, CardType.Creature | CardType.Enchantment)
+            {
+                Subtypes = ["Human", "Druid"],
+                Triggers = [new Trigger(GameEvent.SpellCast, TriggerCondition.ControllerCastsEnchantment, new DrawCardEffect())],
+            },
             ["Swords to Plowshares"] = new(ManaCost.Parse("{W}"), null, null, null, CardType.Instant,
                 TargetFilter.Creature(), new SwordsToPlowsharesEffect()),
             ["Replenish"] = new(ManaCost.Parse("{3}{W}"), null, null, null, CardType.Sorcery),
-            ["Enchantress's Presence"] = new(ManaCost.Parse("{2}{G}"), null, null, null, CardType.Enchantment),
+            ["Enchantress's Presence"] = new(ManaCost.Parse("{2}{G}"), null, null, null, CardType.Enchantment)
+            {
+                Triggers = [new Trigger(GameEvent.SpellCast, TriggerCondition.ControllerCastsEnchantment, new DrawCardEffect())],
+            },
             ["Wild Growth"] = new(ManaCost.Parse("{G}"), null, null, null, CardType.Enchantment) { Subtypes = ["Aura"] },
             ["Exploration"] = new(ManaCost.Parse("{G}"), null, null, null, CardType.Enchantment)
             {
@@ -112,7 +132,10 @@ public static class CardDefinitions
                         (_, _) => true, ExtraLandDrops: 1),
                 ],
             },
-            ["Mirri's Guile"] = new(ManaCost.Parse("{G}"), null, null, null, CardType.Enchantment),
+            ["Mirri's Guile"] = new(ManaCost.Parse("{G}"), null, null, null, CardType.Enchantment)
+            {
+                Triggers = [new Trigger(GameEvent.Upkeep, TriggerCondition.Upkeep, new RearrangeTopEffect(3))],
+            },
             ["Opalescence"] = new(ManaCost.Parse("{2}{W}{W}"), null, null, null, CardType.Enchantment),
             ["Parallax Wave"] = new(ManaCost.Parse("{2}{W}{W}"), null, null, null, CardType.Enchantment),
             ["Sterling Grove"] = new(ManaCost.Parse("{G}{W}"), null, null, null, CardType.Enchantment)
@@ -125,7 +148,10 @@ public static class CardDefinitions
                 ActivatedAbility = new(new ActivatedAbilityCost(SacrificeSelf: true), new DestroyTargetEffect(), c => c.CardTypes.HasFlag(CardType.Enchantment) || c.CardTypes.HasFlag(CardType.Artifact)),
             },
             ["Solitary Confinement"] = new(ManaCost.Parse("{2}{W}"), null, null, null, CardType.Enchantment),
-            ["Sylvan Library"] = new(ManaCost.Parse("{1}{G}"), null, null, null, CardType.Enchantment),
+            ["Sylvan Library"] = new(ManaCost.Parse("{1}{G}"), null, null, null, CardType.Enchantment)
+            {
+                Triggers = [new Trigger(GameEvent.Upkeep, TriggerCondition.Upkeep, new SylvanLibraryEffect())],
+            },
 
             // === Enchantress lands ===
             ["Plains"] = new(null, ManaAbility.Fixed(ManaColor.White), null, null, CardType.Land) { Subtypes = ["Plains"] },

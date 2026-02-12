@@ -756,6 +756,14 @@ public class GameEngine
             _state.Log($"{attacker.Name} attacks with {card.Name} ({card.Power}/{card.Toughness}).");
         }
 
+        // Fire SelfAttacks triggers (e.g., Piledriver pump) after attackers declared
+        foreach (var attackerId in validAttackerIds)
+        {
+            var card = attacker.Battlefield.Cards.FirstOrDefault(c => c.Id == attackerId);
+            if (card != null)
+                await ProcessAttackTriggersAsync(card, ct);
+        }
+
         // Declare Blockers
         _state.CombatStep = CombatStep.DeclareBlockers;
 
@@ -1172,9 +1180,7 @@ public class GameEngine
                             && relevantCard.Id == permanent.Id,
 
                         TriggerCondition.SelfAttacks =>
-                            evt == GameEvent.CombatDamageDealt
-                            && relevantCard != null
-                            && relevantCard.Id == permanent.Id,
+                            false, // Handled by ProcessAttackTriggersAsync
 
                         TriggerCondition.Upkeep =>
                             evt == GameEvent.Upkeep
@@ -1191,6 +1197,25 @@ public class GameEngine
                     }
                 }
             }
+        }
+    }
+
+    private async Task ProcessAttackTriggersAsync(GameCard attacker, CancellationToken ct)
+    {
+        var player = _state.ActivePlayer;
+
+        // Check the card's own triggers first, then fall back to CardDefinitions
+        var triggers = attacker.Triggers.Count > 0
+            ? attacker.Triggers
+            : (CardDefinitions.TryGet(attacker.Name, out var def) ? def.Triggers : []);
+
+        foreach (var trigger in triggers)
+        {
+            if (trigger.Condition != TriggerCondition.SelfAttacks) continue;
+
+            var context = new EffectContext(_state, player, attacker, player.DecisionHandler);
+            _state.Log($"{attacker.Name} triggers: {trigger.Effect.GetType().Name.Replace("Effect", "")}");
+            await trigger.Effect.Execute(context, ct);
         }
     }
 
