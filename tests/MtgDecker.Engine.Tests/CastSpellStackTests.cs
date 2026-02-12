@@ -106,6 +106,28 @@ public class CastSpellStackTests
     }
 
     [Fact]
+    public async Task CastInstant_ByNonActivePlayer_Allowed()
+    {
+        var (engine, state, _, h2) = CreateSetup();
+        await engine.StartGameAsync();
+        state.CurrentPhase = Phase.MainPhase1;
+        // P1 is active player — P2 (non-active) casts an instant
+
+        var swords = GameCard.Create("Swords to Plowshares");
+        state.Player2.Hand.Add(swords);
+        state.Player2.ManaPool.Add(ManaColor.White, 1);
+
+        var creature = GameCard.Create("Mogg Fanatic", "Creature — Goblin");
+        state.Player1.Battlefield.Add(creature);
+        h2.EnqueueTarget(new TargetInfo(creature.Id, state.Player1.Id, ZoneType.Battlefield));
+
+        await engine.ExecuteAction(GameAction.CastSpell(state.Player2.Id, swords.Id));
+
+        state.Stack.Should().HaveCount(1);
+        state.Stack[0].ControllerId.Should().Be(state.Player2.Id);
+    }
+
+    [Fact]
     public async Task CastSpell_InsufficientMana_Rejected()
     {
         var (engine, state, h1, _) = CreateSetup();

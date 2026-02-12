@@ -8,7 +8,7 @@ public class StackObject
     public Guid Id { get; } = Guid.NewGuid();
     public GameCard Card { get; }
     public Guid ControllerId { get; }
-    public Dictionary<ManaColor, int> ManaPaid { get; }
+    public IReadOnlyDictionary<ManaColor, int> ManaPaid { get; }
     public IReadOnlyList<TargetInfo> Targets { get; }
     public int Timestamp { get; }
 
