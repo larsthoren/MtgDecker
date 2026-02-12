@@ -690,6 +690,67 @@ public class GameEngine
             card.DamageMarked = 0;
     }
 
+    public void RecalculateState()
+    {
+        // Reset all effective values for both players
+        foreach (var player in new[] { _state.Player1, _state.Player2 })
+        {
+            foreach (var card in player.Battlefield.Cards)
+            {
+                card.EffectivePower = null;
+                card.EffectiveToughness = null;
+                card.ActiveKeywords.Clear();
+            }
+            player.MaxLandDrops = 1;
+        }
+
+        // Apply effects
+        foreach (var effect in _state.ActiveEffects)
+        {
+            switch (effect.Type)
+            {
+                case ContinuousEffectType.ModifyPowerToughness:
+                    ApplyPowerToughnessEffect(effect, _state.Player1);
+                    ApplyPowerToughnessEffect(effect, _state.Player2);
+                    break;
+
+                case ContinuousEffectType.GrantKeyword:
+                    ApplyKeywordEffect(effect, _state.Player1);
+                    ApplyKeywordEffect(effect, _state.Player2);
+                    break;
+
+                case ContinuousEffectType.ExtraLandDrop:
+                    // Applies to the controller of the source
+                    var sourceOwner = _state.Player1.Battlefield.Cards.Any(c => c.Id == effect.SourceId)
+                        ? _state.Player1 : _state.Player2;
+                    sourceOwner.MaxLandDrops += effect.ExtraLandDrops;
+                    break;
+            }
+        }
+    }
+
+    private void ApplyPowerToughnessEffect(ContinuousEffect effect, Player player)
+    {
+        foreach (var card in player.Battlefield.Cards)
+        {
+            if (card.Id == effect.SourceId) continue; // lords don't buff themselves
+            if (!effect.Applies(card, player)) continue;
+
+            card.EffectivePower = (card.EffectivePower ?? card.BasePower ?? 0) + effect.PowerMod;
+            card.EffectiveToughness = (card.EffectiveToughness ?? card.BaseToughness ?? 0) + effect.ToughnessMod;
+        }
+    }
+
+    private void ApplyKeywordEffect(ContinuousEffect effect, Player player)
+    {
+        foreach (var card in player.Battlefield.Cards)
+        {
+            if (!effect.Applies(card, player)) continue;
+            if (effect.GrantedKeyword.HasValue)
+                card.ActiveKeywords.Add(effect.GrantedKeyword.Value);
+        }
+    }
+
     internal void CheckStateBasedActions()
     {
         if (_state.IsGameOver) return;
