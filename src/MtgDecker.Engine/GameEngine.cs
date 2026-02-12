@@ -46,6 +46,12 @@ public class GameEngine
 
             if (_state.IsGameOver) return;
 
+            // Fire upkeep triggers (e.g., Mirri's Guile, Sylvan Library)
+            if (phase.Phase == Phase.Upkeep)
+            {
+                await ProcessBoardTriggersAsync(GameEvent.Upkeep, null, ct);
+            }
+
             if (phase.Phase == Phase.Combat)
             {
                 await RunCombatAsync(ct);
@@ -61,6 +67,9 @@ public class GameEngine
             _state.Player2.ManaPool.Clear();
 
         } while (_turnStateMachine.AdvancePhase() != null);
+
+        // Process delayed triggers at end step (e.g., Goblin Pyromancer destroys all Goblins)
+        await ProcessDelayedTriggersAsync(GameEvent.EndStep, ct);
 
         // Clear end-of-turn effects and recalculate
         StripEndOfTurnEffects();
@@ -1197,6 +1206,18 @@ public class GameEngine
                     }
                 }
             }
+        }
+    }
+
+    private async Task ProcessDelayedTriggersAsync(GameEvent evt, CancellationToken ct)
+    {
+        var toFire = _state.DelayedTriggers.Where(d => d.FireOn == evt).ToList();
+        foreach (var delayed in toFire)
+        {
+            var controller = delayed.ControllerId == _state.Player1.Id ? _state.Player1 : _state.Player2;
+            var context = new EffectContext(_state, controller, new GameCard { Name = "Delayed Trigger" }, controller.DecisionHandler);
+            await delayed.Effect.Execute(context, ct);
+            _state.DelayedTriggers.Remove(delayed);
         }
     }
 
