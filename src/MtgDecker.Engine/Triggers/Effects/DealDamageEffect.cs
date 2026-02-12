@@ -16,8 +16,21 @@ public class DealDamageEffect(int amount) : IEffect
             var target = context.State.Player1.Id == context.TargetPlayerId.Value
                 ? context.State.Player1
                 : context.State.Player2;
-            target.AdjustLife(-Amount);
-            context.State.Log($"{context.Source.Name} deals {Amount} damage to {target.Name}. ({target.Life} life)");
+
+            var hasDamageProtection = context.State.ActiveEffects.Any(e =>
+                e.Type == ContinuousEffectType.PreventDamageToPlayer
+                && (context.State.Player1.Battlefield.Contains(e.SourceId)
+                    ? context.State.Player1 : context.State.Player2).Id == target.Id);
+
+            if (hasDamageProtection)
+            {
+                context.State.Log($"Damage to {target.Name} is prevented (protection).");
+            }
+            else
+            {
+                target.AdjustLife(-Amount);
+                context.State.Log($"{context.Source.Name} deals {Amount} damage to {target.Name}. ({target.Life} life)");
+            }
         }
 
         return Task.CompletedTask;

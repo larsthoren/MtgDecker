@@ -8,6 +8,9 @@ public enum ContinuousEffectType
     GrantKeyword,
     ModifyCost,
     ExtraLandDrop,
+    SkipDraw,
+    GrantPlayerShroud,
+    PreventDamageToPlayer,
 }
 
 public record ContinuousEffect(

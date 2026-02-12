@@ -96,6 +96,18 @@ public class GameEngine
                 break;
 
             case Phase.Draw:
+                // Check for SkipDraw effects on the active player's permanents
+                var hasSkipDraw = _state.ActiveEffects.Any(e =>
+                    e.Type == ContinuousEffectType.SkipDraw
+                    && (_state.Player1.Battlefield.Contains(e.SourceId)
+                        ? _state.Player1 : _state.Player2).Id == _state.ActivePlayer.Id);
+
+                if (hasSkipDraw)
+                {
+                    _state.Log($"{_state.ActivePlayer.Name}'s draw is skipped.");
+                    break;
+                }
+
                 var drawn = _state.ActivePlayer.Library.DrawFromTop();
                 if (drawn != null)
                 {
@@ -660,6 +672,15 @@ public class GameEngine
                     break;
                 }
 
+                // Player shroud check: cannot target a player with shroud
+                if (action.TargetPlayerId.HasValue && HasPlayerShroud(action.TargetPlayerId.Value))
+                {
+                    var targetPlayerName = action.TargetPlayerId.Value == _state.Player1.Id
+                        ? _state.Player1.Name : _state.Player2.Name;
+                    _state.Log($"{targetPlayerName} has shroud — cannot be targeted.");
+                    break;
+                }
+
                 // Build context and execute effect
                 var effectContext = new EffectContext(_state, player, abilitySource, player.DecisionHandler)
                 {
@@ -717,6 +738,27 @@ public class GameEngine
     }
 
     private bool HasShroud(GameCard card) => card.ActiveKeywords.Contains(Keyword.Shroud);
+
+    private bool HasPlayerShroud(Guid playerId)
+    {
+        return _state.ActiveEffects.Any(e =>
+            e.Type == ContinuousEffectType.GrantPlayerShroud
+            && GetEffectController(e.SourceId)?.Id == playerId);
+    }
+
+    private bool HasPlayerDamageProtection(Guid playerId)
+    {
+        return _state.ActiveEffects.Any(e =>
+            e.Type == ContinuousEffectType.PreventDamageToPlayer
+            && GetEffectController(e.SourceId)?.Id == playerId);
+    }
+
+    private Player? GetEffectController(Guid sourceId)
+    {
+        if (_state.Player1.Battlefield.Contains(sourceId)) return _state.Player1;
+        if (_state.Player2.Battlefield.Contains(sourceId)) return _state.Player2;
+        return null;
+    }
 
     private async Task TryAttachAuraAsync(GameCard playCard, Player player, CancellationToken ct)
     {
@@ -1006,9 +1048,16 @@ public class GameEngine
                 var damage = attackerCard.Power ?? 0;
                 if (damage > 0)
                 {
-                    defender.AdjustLife(-damage);
-                    _state.Log($"{attackerCard.Name} deals {damage} damage to {defender.Name}. ({defender.Life} life)");
-                    unblockedAttackers.Add(attackerCard);
+                    if (HasPlayerDamageProtection(defender.Id))
+                    {
+                        _state.Log($"{attackerCard.Name}'s {damage} damage to {defender.Name} is prevented (protection).");
+                    }
+                    else
+                    {
+                        defender.AdjustLife(-damage);
+                        _state.Log($"{attackerCard.Name} deals {damage} damage to {defender.Name}. ({defender.Life} life)");
+                        unblockedAttackers.Add(attackerCard);
+                    }
                 }
             }
             else
