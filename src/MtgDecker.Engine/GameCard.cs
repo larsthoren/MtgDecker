@@ -15,19 +15,47 @@ public class GameCard
     // Resolved from CardDefinitions registry or auto-parsed
     public ManaCost? ManaCost { get; set; }
     public ManaAbility? ManaAbility { get; set; }
-    public int? Power { get; set; }
-    public int? Toughness { get; set; }
     public CardType CardTypes { get; set; } = CardType.None;
     public IReadOnlyList<string> Subtypes { get; init; } = [];
     public IReadOnlyList<Trigger> Triggers { get; init; } = [];
     public bool IsToken { get; init; }
+    public bool IsLegendary { get; init; }
+    public FetchAbility? FetchAbility { get; init; }
+
+    // Base power/toughness from the card definition
+    public int? BasePower { get; set; }
+    public int? BaseToughness { get; set; }
+
+    // Effective overrides set by continuous effects (RecalculateState)
+    public int? EffectivePower { get; set; }
+    public int? EffectiveToughness { get; set; }
+
+    // Computed: returns effective value if set, otherwise base value.
+    // Setter writes to base for backward compatibility.
+    public int? Power
+    {
+        get => EffectivePower ?? BasePower;
+        set => BasePower = value;
+    }
+
+    public int? Toughness
+    {
+        get => EffectiveToughness ?? BaseToughness;
+        set => BaseToughness = value;
+    }
+
+    // Keywords granted by continuous effects or intrinsic abilities
+    public HashSet<Keyword> ActiveKeywords { get; } = new();
 
     // Combat tracking
     public int? TurnEnteredBattlefield { get; set; }
     public int DamageMarked { get; set; }
 
     public bool HasSummoningSickness(int currentTurn) =>
-        IsCreature && TurnEnteredBattlefield.HasValue && TurnEnteredBattlefield.Value >= currentTurn;
+        IsCreature
+        && TurnEnteredBattlefield.HasValue
+        && TurnEnteredBattlefield.Value >= currentTurn
+        && !ActiveKeywords.Contains(Keyword.Haste);
 
     // Backward-compatible: check both CardTypes flags and TypeLine
     public bool IsLand =>
@@ -50,11 +78,13 @@ public class GameCard
                 ImageUrl = imageUrl,
                 ManaCost = def.ManaCost,
                 ManaAbility = def.ManaAbility,
-                Power = def.Power,
-                Toughness = def.Toughness,
+                BasePower = def.Power,
+                BaseToughness = def.Toughness,
                 CardTypes = def.CardTypes,
                 Subtypes = def.Subtypes,
                 Triggers = def.Triggers,
+                IsLegendary = def.IsLegendary,
+                FetchAbility = def.FetchAbility,
             };
         }
         return new GameCard { Name = name, TypeLine = typeLine, ImageUrl = imageUrl };
@@ -77,11 +107,13 @@ public class GameCard
                 ImageUrl = imageUrl,
                 ManaCost = def.ManaCost,
                 ManaAbility = def.ManaAbility,
-                Power = def.Power,
-                Toughness = def.Toughness,
+                BasePower = def.Power,
+                BaseToughness = def.Toughness,
                 CardTypes = def.CardTypes,
                 Subtypes = def.Subtypes,
                 Triggers = def.Triggers,
+                IsLegendary = def.IsLegendary,
+                FetchAbility = def.FetchAbility,
             };
         }
 
@@ -100,9 +132,9 @@ public class GameCard
             autoCard.ManaCost = ManaCost.Parse(manaCost);
 
         if (int.TryParse(power, out var p))
-            autoCard.Power = p;
+            autoCard.BasePower = p;
         if (int.TryParse(toughness, out var t))
-            autoCard.Toughness = t;
+            autoCard.BaseToughness = t;
 
         // Auto-detect mana ability for basic lands
         autoCard.ManaAbility = DetectBasicLandManaAbility(typeLine);

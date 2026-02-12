@@ -16,4 +16,7 @@ public record CardDefinition(
 {
     public IReadOnlyList<string> Subtypes { get; init; } = [];
     public IReadOnlyList<Trigger> Triggers { get; init; } = [];
+    public bool IsLegendary { get; init; }
+    public FetchAbility? FetchAbility { get; init; }
+    public IReadOnlyList<ContinuousEffect> ContinuousEffects { get; init; } = [];
 }
