@@ -2,8 +2,22 @@ using MtgDecker.Engine.Enums;
 
 namespace MtgDecker.Engine;
 
+public record ParsedTypeLine(CardType Types, IReadOnlyList<string> Subtypes);
+
 public static class CardTypeParser
 {
+    public static ParsedTypeLine ParseFull(string typeLine)
+    {
+        var types = Parse(typeLine);
+
+        if (string.IsNullOrWhiteSpace(typeLine) || !typeLine.Contains('—'))
+            return new ParsedTypeLine(types, []);
+
+        var subtypePart = typeLine[(typeLine.IndexOf('—') + 1)..].Trim();
+        var subtypes = subtypePart.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        return new ParsedTypeLine(types, subtypes);
+    }
+
     public static CardType Parse(string typeLine)
     {
         if (string.IsNullOrWhiteSpace(typeLine))

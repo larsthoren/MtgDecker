@@ -23,4 +23,26 @@ public class CardTypeParserTests
     {
         CardTypeParser.Parse(typeLine).Should().Be(expected);
     }
+
+    [Theory]
+    [MemberData(nameof(ParseFullTestData))]
+    public void ParseFull_ReturnsTypesAndSubtypes(string typeLine, CardType expectedType, string[] expectedSubtypes)
+    {
+        var result = CardTypeParser.ParseFull(typeLine);
+
+        result.Types.Should().Be(expectedType);
+        result.Subtypes.Should().BeEquivalentTo(expectedSubtypes);
+    }
+
+    public static IEnumerable<object[]> ParseFullTestData()
+    {
+        yield return new object[] { "Creature — Goblin", CardType.Creature, new[] { "Goblin" } };
+        yield return new object[] { "Legendary Creature — Goblin Warrior", CardType.Creature, new[] { "Goblin", "Warrior" } };
+        yield return new object[] { "Enchantment — Aura", CardType.Enchantment, new[] { "Aura" } };
+        yield return new object[] { "Basic Land — Mountain", CardType.Land, new[] { "Mountain" } };
+        yield return new object[] { "Artifact Creature — Golem", CardType.Creature | CardType.Artifact, new[] { "Golem" } };
+        yield return new object[] { "Creature", CardType.Creature, Array.Empty<string>() };
+        yield return new object[] { "Instant", CardType.Instant, Array.Empty<string>() };
+        yield return new object[] { "", CardType.None, Array.Empty<string>() };
+    }
 }

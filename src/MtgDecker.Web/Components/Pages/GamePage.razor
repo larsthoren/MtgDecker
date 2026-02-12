@@ -36,7 +36,9 @@ else if (_session.State != null)
                OnManaColorChosen="HandleManaColorChosen"
                OnAttackersChosen="HandleAttackersChosen"
                OnBlockersChosen="HandleBlockersChosen"
-               OnBlockerOrderChosen="HandleBlockerOrderChosen" />
+               OnBlockerOrderChosen="HandleBlockerOrderChosen"
+               OnCardChosen="HandleCardChosen"
+               OnRevealAcknowledged="HandleRevealAcknowledged" />
 }
 
 @code {
@@ -110,6 +112,14 @@ else if (_session.State != null)
         {
             InvokeAsync(StateHasChanged);
         }
+        else if (handler.IsWaitingForCardChoice)
+        {
+            InvokeAsync(StateHasChanged);
+        }
+        else if (handler.IsWaitingForRevealAck)
+        {
+            InvokeAsync(StateHasChanged);
+        }
     }
 
     private async Task ShowMulliganDialog(int mulliganCount)
@@ -163,6 +173,18 @@ else if (_session.State != null)
     {
         var handler = _session?.GetHandler(_playerSeat);
         handler?.SubmitBlockerOrder(orderedBlockerIds);
+    }
+
+    private void HandleCardChosen(Guid? cardId)
+    {
+        var handler = _session?.GetHandler(_playerSeat);
+        handler?.SubmitCardChoice(cardId);
+    }
+
+    private void HandleRevealAcknowledged()
+    {
+        var handler = _session?.GetHandler(_playerSeat);
+        handler?.AcknowledgeReveal();
     }
 
     private void HandleAction(GameAction action)

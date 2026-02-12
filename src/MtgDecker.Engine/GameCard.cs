@@ -1,5 +1,6 @@
 using MtgDecker.Engine.Enums;
 using MtgDecker.Engine.Mana;
+using MtgDecker.Engine.Triggers;
 
 namespace MtgDecker.Engine;
 
@@ -17,6 +18,9 @@ public class GameCard
     public int? Power { get; set; }
     public int? Toughness { get; set; }
     public CardType CardTypes { get; set; } = CardType.None;
+    public IReadOnlyList<string> Subtypes { get; init; } = [];
+    public IReadOnlyList<Trigger> Triggers { get; init; } = [];
+    public bool IsToken { get; init; }
 
     // Combat tracking
     public int? TurnEnteredBattlefield { get; set; }
@@ -37,16 +41,23 @@ public class GameCard
     /// <summary>Original factory: uses CardDefinitions registry only.</summary>
     public static GameCard Create(string name, string typeLine = "", string? imageUrl = null)
     {
-        var card = new GameCard { Name = name, TypeLine = typeLine, ImageUrl = imageUrl };
         if (CardDefinitions.TryGet(name, out var def))
         {
-            card.ManaCost = def.ManaCost;
-            card.ManaAbility = def.ManaAbility;
-            card.Power = def.Power;
-            card.Toughness = def.Toughness;
-            card.CardTypes = def.CardTypes;
+            return new GameCard
+            {
+                Name = name,
+                TypeLine = typeLine,
+                ImageUrl = imageUrl,
+                ManaCost = def.ManaCost,
+                ManaAbility = def.ManaAbility,
+                Power = def.Power,
+                Toughness = def.Toughness,
+                CardTypes = def.CardTypes,
+                Subtypes = def.Subtypes,
+                Triggers = def.Triggers,
+            };
         }
-        return card;
+        return new GameCard { Name = name, TypeLine = typeLine, ImageUrl = imageUrl };
     }
 
     /// <summary>
@@ -56,34 +67,47 @@ public class GameCard
     public static GameCard Create(string name, string typeLine, string? imageUrl,
         string? manaCost, string? power, string? toughness)
     {
-        var card = new GameCard { Name = name, TypeLine = typeLine, ImageUrl = imageUrl };
-
         // CardDefinitions registry takes full precedence if the card is registered
         if (CardDefinitions.TryGet(name, out var def))
         {
-            card.ManaCost = def.ManaCost;
-            card.ManaAbility = def.ManaAbility;
-            card.Power = def.Power;
-            card.Toughness = def.Toughness;
-            card.CardTypes = def.CardTypes;
-            return card;
+            return new GameCard
+            {
+                Name = name,
+                TypeLine = typeLine,
+                ImageUrl = imageUrl,
+                ManaCost = def.ManaCost,
+                ManaAbility = def.ManaAbility,
+                Power = def.Power,
+                Toughness = def.Toughness,
+                CardTypes = def.CardTypes,
+                Subtypes = def.Subtypes,
+                Triggers = def.Triggers,
+            };
         }
 
         // Auto-parse from raw data
-        card.CardTypes = CardTypeParser.Parse(typeLine);
+        var parsed = CardTypeParser.ParseFull(typeLine);
+        var autoCard = new GameCard
+        {
+            Name = name,
+            TypeLine = typeLine,
+            ImageUrl = imageUrl,
+            CardTypes = parsed.Types,
+            Subtypes = parsed.Subtypes
+        };
 
         if (!string.IsNullOrWhiteSpace(manaCost))
-            card.ManaCost = ManaCost.Parse(manaCost);
+            autoCard.ManaCost = ManaCost.Parse(manaCost);
 
         if (int.TryParse(power, out var p))
-            card.Power = p;
+            autoCard.Power = p;
         if (int.TryParse(toughness, out var t))
-            card.Toughness = t;
+            autoCard.Toughness = t;
 
         // Auto-detect mana ability for basic lands
-        card.ManaAbility = DetectBasicLandManaAbility(typeLine);
+        autoCard.ManaAbility = DetectBasicLandManaAbility(typeLine);
 
-        return card;
+        return autoCard;
     }
 
     private static ManaAbility? DetectBasicLandManaAbility(string typeLine)

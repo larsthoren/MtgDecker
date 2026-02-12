@@ -14,6 +14,7 @@ public class TestDecisionHandler : IPlayerDecisionHandler
     private readonly Queue<IReadOnlyList<Guid>> _attackerQueue = new();
     private readonly Queue<Dictionary<Guid, Guid>> _blockerQueue = new();
     private readonly Queue<IReadOnlyList<Guid>> _blockerOrderQueue = new();
+    private readonly Queue<Guid?> _cardChoiceQueue = new();
 
     public void EnqueueAction(GameAction action) => _actions.Enqueue(action);
 
@@ -29,6 +30,7 @@ public class TestDecisionHandler : IPlayerDecisionHandler
     public void EnqueueAttackers(IReadOnlyList<Guid> attackerIds) => _attackerQueue.Enqueue(attackerIds);
     public void EnqueueBlockers(Dictionary<Guid, Guid> assignments) => _blockerQueue.Enqueue(assignments);
     public void EnqueueBlockerOrder(IReadOnlyList<Guid> order) => _blockerOrderQueue.Enqueue(order);
+    public void EnqueueCardChoice(Guid? cardId) => _cardChoiceQueue.Enqueue(cardId);
 
     public Task<GameAction> GetAction(GameState gameState, Guid playerId, CancellationToken ct = default)
     {
@@ -87,4 +89,20 @@ public class TestDecisionHandler : IPlayerDecisionHandler
 
     public Task<IReadOnlyList<Guid>> OrderBlockers(Guid attackerId, IReadOnlyList<GameCard> blockers, CancellationToken ct = default)
         => Task.FromResult(_blockerOrderQueue.Count > 0 ? _blockerOrderQueue.Dequeue() : (IReadOnlyList<Guid>)blockers.Select(b => b.Id).ToList());
+
+    public Task<Guid?> ChooseCard(IReadOnlyList<GameCard> options, string prompt,
+        bool optional = false, CancellationToken ct = default)
+    {
+        if (_cardChoiceQueue.Count > 0)
+            return Task.FromResult(_cardChoiceQueue.Dequeue());
+        // Default: choose first if available, null if optional
+        return Task.FromResult(options.Count > 0 ? options[0].Id : (Guid?)null);
+    }
+
+    public Task RevealCards(IReadOnlyList<GameCard> cards, IReadOnlyList<GameCard> kept,
+        string prompt, CancellationToken ct = default)
+    {
+        // Test handler auto-acknowledges reveals
+        return Task.CompletedTask;
+    }
 }

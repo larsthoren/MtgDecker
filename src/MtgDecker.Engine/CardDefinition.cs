@@ -1,5 +1,6 @@
 using MtgDecker.Engine.Enums;
 using MtgDecker.Engine.Mana;
+using MtgDecker.Engine.Triggers;
 
 namespace MtgDecker.Engine;
 
@@ -9,4 +10,8 @@ public record CardDefinition(
     int? Power,
     int? Toughness,
     CardType CardTypes
-);
+)
+{
+    public IReadOnlyList<string> Subtypes { get; init; } = [];
+    public IReadOnlyList<Trigger> Triggers { get; init; } = [];
+}
