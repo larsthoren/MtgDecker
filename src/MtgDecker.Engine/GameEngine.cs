@@ -133,13 +133,23 @@ public class GameEngine
                 else if (playCard.ManaCost != null)
                 {
                     // Part B: Cast spell with mana payment
-                    if (!player.ManaPool.CanPay(playCard.ManaCost))
+                    // Apply cost reduction from continuous effects
+                    var effectiveCost = playCard.ManaCost;
+                    var costReduction = _state.ActiveEffects
+                        .Where(e => e.Type == ContinuousEffectType.ModifyCost
+                               && e.CostApplies != null
+                               && e.CostApplies(playCard))
+                        .Sum(e => e.CostMod);
+                    if (costReduction != 0)
+                        effectiveCost = effectiveCost.WithGenericReduction(-costReduction);
+
+                    if (!player.ManaPool.CanPay(effectiveCost))
                     {
                         _state.Log($"{player.Name} cannot cast {playCard.Name} — not enough mana.");
                         break;
                     }
 
-                    var cost = playCard.ManaCost;
+                    var cost = effectiveCost;
 
                     // Calculate remaining pool after colored requirements
                     var remaining = new Dictionary<ManaColor, int>();
@@ -360,8 +370,18 @@ public class GameEngine
                     return;
                 }
 
+                // Apply cost reduction from continuous effects
+                var castEffectiveCost = def.ManaCost;
+                var castCostReduction = _state.ActiveEffects
+                    .Where(e => e.Type == ContinuousEffectType.ModifyCost
+                           && e.CostApplies != null
+                           && e.CostApplies(castCard))
+                    .Sum(e => e.CostMod);
+                if (castCostReduction != 0)
+                    castEffectiveCost = castEffectiveCost.WithGenericReduction(-castCostReduction);
+
                 var pool = castPlayer.ManaPool;
-                if (!pool.CanPay(def.ManaCost))
+                if (!pool.CanPay(castEffectiveCost))
                 {
                     _state.Log($"Not enough mana to cast {castCard.Name}.");
                     return;
@@ -395,7 +415,7 @@ public class GameEngine
                 foreach (var kvp in pool.Available)
                 {
                     var after = kvp.Value;
-                    if (def.ManaCost.ColorRequirements.TryGetValue(kvp.Key, out var needed))
+                    if (castEffectiveCost.ColorRequirements.TryGetValue(kvp.Key, out var needed))
                         after -= needed;
                     if (after > 0)
                         remaining[kvp.Key] = after;
@@ -403,25 +423,25 @@ public class GameEngine
 
                 // Deduct colored requirements
                 var manaPaid = new Dictionary<ManaColor, int>();
-                foreach (var (color, amount) in def.ManaCost.ColorRequirements)
+                foreach (var (color, amount) in castEffectiveCost.ColorRequirements)
                 {
                     pool.Deduct(color, amount);
                     manaPaid[color] = amount;
                 }
 
                 // Handle generic cost
-                if (def.ManaCost.GenericCost > 0)
+                if (castEffectiveCost.GenericCost > 0)
                 {
                     int distinctColors = remaining.Count(kv => kv.Value > 0);
                     int totalRemaining = remaining.Values.Sum();
-                    bool useAutoPay = distinctColors <= 1 || totalRemaining == def.ManaCost.GenericCost;
+                    bool useAutoPay = distinctColors <= 1 || totalRemaining == castEffectiveCost.GenericCost;
 
                     if (!useAutoPay)
                     {
                         var genericPayment = await castPlayer.DecisionHandler
-                            .ChooseGenericPayment(def.ManaCost.GenericCost, remaining, ct);
+                            .ChooseGenericPayment(castEffectiveCost.GenericCost, remaining, ct);
 
-                        bool valid = genericPayment.Values.Sum() == def.ManaCost.GenericCost
+                        bool valid = genericPayment.Values.Sum() == castEffectiveCost.GenericCost
                             && genericPayment.All(kv => remaining.TryGetValue(kv.Key, out var avail) && kv.Value <= avail);
 
                         if (valid)
@@ -440,7 +460,7 @@ public class GameEngine
 
                     if (useAutoPay)
                     {
-                        var toPay = def.ManaCost.GenericCost;
+                        var toPay = castEffectiveCost.GenericCost;
                         foreach (var (color, amount) in remaining)
                         {
                             var take = Math.Min(amount, toPay);
@@ -459,7 +479,7 @@ public class GameEngine
                 var stackObj = new StackObject(castCard, castPlayer.Id, manaPaid, targets, _state.Stack.Count);
                 _state.Stack.Add(stackObj);
 
-                action.ManaCostPaid = def.ManaCost;
+                action.ManaCostPaid = castEffectiveCost;
                 castPlayer.ActionHistory.Push(action);
 
                 _state.Log($"{castPlayer.Name} casts {castCard.Name}.");
