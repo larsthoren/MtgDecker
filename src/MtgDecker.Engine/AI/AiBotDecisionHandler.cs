@@ -262,6 +262,20 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
     }
 
     /// <summary>
+    /// Chooses a target for a spell. Picks the opponent's creature with highest power,
+    /// falling back to the first eligible target.
+    /// </summary>
+    public Task<TargetInfo> ChooseTarget(string spellName, IReadOnlyList<GameCard> eligibleTargets, Guid defaultOwnerId = default, CancellationToken ct = default)
+    {
+        var best = eligibleTargets
+            .OrderByDescending(c => c.Power ?? 0)
+            .ThenByDescending(c => c.ManaCost?.ConvertedManaCost ?? 0)
+            .First();
+
+        return Task.FromResult(new TargetInfo(best.Id, defaultOwnerId, Enums.ZoneType.Battlefield));
+    }
+
+    /// <summary>
     /// Returns the acceptable land range for a given hand size.
     /// 7 cards: 2-5 lands, 6 cards: 2-4, 5 cards: 1-4.
     /// </summary>
