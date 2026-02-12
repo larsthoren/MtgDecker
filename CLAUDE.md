@@ -20,12 +20,14 @@ Domain (zero dependencies)
   └─ Application (MediatR, FluentValidation)
        └─ Infrastructure (EF Core, HttpClient, Parsers)
        └─ Web (Blazor, MudBlazor)
+Engine (standalone, no EF Core — referenced by Web)
 ```
 
 - **Domain**: Entities, value objects, enums, domain services, exceptions. No external dependencies.
 - **Application**: Commands/queries (MediatR handlers), validators, repository interfaces. Owns `TimeProvider` registration.
 - **Infrastructure**: EF Core DbContext, repositories, Scryfall API client, deck parsers (MTGO/Arena).
-- **Web**: Blazor pages/components, MudBlazor dialogs, in-memory log viewer.
+- **Engine**: Standalone game engine — turn loop, combat, stack, triggers, mana system, AI bots. No EF Core dependency.
+- **Web**: Blazor pages/components, MudBlazor dialogs, in-memory log viewer, game UI.
 
 ## Building & Running
 
@@ -45,6 +47,7 @@ dotnet run --project src/MtgDecker.Web/
 dotnet test tests/MtgDecker.Domain.Tests/
 dotnet test tests/MtgDecker.Application.Tests/
 dotnet test tests/MtgDecker.Infrastructure.Tests/
+dotnet test tests/MtgDecker.Engine.Tests/
 ```
 
 Database auto-migrates on startup in Development environment. For production, run migrations explicitly.
@@ -72,14 +75,26 @@ src/
     Data/              MtgDeckerDbContext, Configurations/, Migrations/, Repositories/
     Scryfall/          ScryfallClient, BulkDataImporter, ScryfallCard, ScryfallCardMapper
     Parsers/           MtgoDeckParser, ArenaDeckParser
+  MtgDecker.Engine/
+    GameEngine.cs      Turn loop, combat, stack resolution, state-based actions
+    GameState.cs       Players, phase tracking, game log, winner
+    GameCard.cs        In-game card with zones, tapping, damage, triggers
+    CardDefinitions.cs Registry of known cards (mana abilities, triggers, effects)
+    AI/                AiBotDecisionHandler, BoardEvaluator
+    Simulation/        SimulationRunner, SimulationResult, BatchResult
+    Triggers/          IEffect, Trigger, ETB effects (tokens, tutor, reveal)
+    Effects/           SpellEffect implementations (Naturalize, Swords)
+    Mana/              ManaCost, ManaPool, ManaAbility, ManaColor
+    Enums/             Phase, ActionType, ZoneType, CombatStep, GameEvent
   MtgDecker.Web/
-    Components/Pages/  CardSearch, DeckBuilder, MyDecks, MyCollection, ImportData, Logs, etc.
+    Components/Pages/  CardSearch, DeckBuilder, MyDecks, MyCollection, ImportData, Logs, Game/
     Services/          InMemoryLogStore/Provider
 
 tests/
-  MtgDecker.Domain.Tests/         85 tests
-  MtgDecker.Application.Tests/    70 tests
-  MtgDecker.Infrastructure.Tests/ 56 tests
+  MtgDecker.Domain.Tests/         91 tests
+  MtgDecker.Application.Tests/    143 tests
+  MtgDecker.Infrastructure.Tests/ 57 tests
+  MtgDecker.Engine.Tests/         488 tests
 ```
 
 ## Key Patterns
@@ -92,6 +107,18 @@ tests/
 - **Card data**: Imported from Scryfall bulk data API, streamed and upserted in batches of 1000.
 - **Card images**: Scryfall CDN links stored on Card entity, not downloaded locally.
 - **Single-user**: Hardcoded UserId in Web layer, data model supports multi-user.
+
+## Game Engine
+
+The `MtgDecker.Engine` project is a standalone game engine with no database dependency. Key concepts:
+
+- **IPlayerDecisionHandler**: Interface for all player decisions (mulligan, actions, combat, targeting). `InteractiveDecisionHandler` uses TaskCompletionSource for UI; `AiBotDecisionHandler` uses heuristics; `TestDecisionHandler` returns queued responses.
+- **Mana system**: ManaCost parsing from Scryfall strings (`{2}{R}{R}`), ManaPool, ManaAbility on lands, auto-tap support. Cards not in `CardDefinitions` registry work in sandbox mode (no mana required).
+- **Combat**: Full MTG combat — declare attackers/blockers, multi-block ordering, damage assignment, summoning sickness, creature death processing.
+- **Stack**: Spells go on the stack, priority passes, targeted spells with `TargetFilter`/`SpellEffect`, counter-spell support. Stack resolves LIFO.
+- **Triggers**: Event-driven system (`GameEvent` → `Trigger` → `IEffect`). ETB effects for token creation, tutor, reveal-and-filter. `ProcessTriggersAsync` fires at relevant points.
+- **AI simulation**: `AiBotDecisionHandler` (heuristic AI) + `BoardEvaluator` (static scoring) + `SimulationRunner` for bot-vs-bot games with batch statistics.
+- **State-based actions**: Deck-out (MTG 104.3c) and life-check after combat. `GameState.Winner` tracks game outcome.
 
 ## Critical: EF Core + Blazor Server Pitfalls
 
