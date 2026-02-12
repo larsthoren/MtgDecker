@@ -62,6 +62,10 @@ public class GameEngine
 
         } while (_turnStateMachine.AdvancePhase() != null);
 
+        // Clear end-of-turn effects and recalculate
+        StripEndOfTurnEffects();
+        RecalculateState();
+
         // Clear damage at end of turn
         ClearDamage();
 
@@ -762,6 +766,11 @@ public class GameEngine
             card.DamageMarked = 0;
         foreach (var card in _state.Player2.Battlefield.Cards)
             card.DamageMarked = 0;
+    }
+
+    public void StripEndOfTurnEffects()
+    {
+        _state.ActiveEffects.RemoveAll(e => e.UntilEndOfTurn);
     }
 
     public void RecalculateState()
