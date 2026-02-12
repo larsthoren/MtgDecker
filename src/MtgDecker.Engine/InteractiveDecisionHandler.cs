@@ -16,6 +16,8 @@ public class InteractiveDecisionHandler : IPlayerDecisionHandler
     private TaskCompletionSource<Dictionary<Guid, Guid>>? _blockersTcs;
     private TaskCompletionSource<IReadOnlyList<Guid>>? _blockerOrderTcs;
     private TaskCompletionSource<TargetInfo>? _targetTcs;
+    private TaskCompletionSource<Guid?>? _cardChoiceTcs;
+    private TaskCompletionSource<bool>? _revealAckTcs;
 
     public bool IsWaitingForAction => _actionTcs is { Task.IsCompleted: false };
     public bool IsWaitingForMulligan => _mulliganTcs is { Task.IsCompleted: false };
@@ -28,12 +30,20 @@ public class InteractiveDecisionHandler : IPlayerDecisionHandler
     public bool IsWaitingForTarget => _targetTcs is { Task.IsCompleted: false };
     public string? TargetingSpellName { get; private set; }
     public IReadOnlyList<GameCard>? EligibleTargets { get; private set; }
+    public bool IsWaitingForCardChoice => _cardChoiceTcs is { Task.IsCompleted: false };
+    public bool IsWaitingForRevealAck => _revealAckTcs is { Task.IsCompleted: false };
     public IReadOnlyList<ManaColor>? ManaColorOptions { get; private set; }
     public IReadOnlyList<GameCard>? EligibleAttackers { get; private set; }
     public IReadOnlyList<GameCard>? EligibleBlockers { get; private set; }
     public IReadOnlyList<GameCard>? CurrentAttackers { get; private set; }
     public Guid? OrderingAttackerId { get; private set; }
     public IReadOnlyList<GameCard>? BlockersToOrder { get; private set; }
+    public IReadOnlyList<GameCard>? CardChoiceOptions { get; private set; }
+    public string? CardChoicePrompt { get; private set; }
+    public bool CardChoiceOptional { get; private set; }
+    public IReadOnlyList<GameCard>? RevealedCards { get; private set; }
+    public IReadOnlyList<GameCard>? KeptCards { get; private set; }
+    public string? RevealPrompt { get; private set; }
 
     public event Action? OnWaitingForInput;
 
@@ -188,5 +198,46 @@ public class InteractiveDecisionHandler : IPlayerDecisionHandler
         OrderingAttackerId = null;
         BlockersToOrder = null;
         _blockerOrderTcs?.TrySetResult(orderedBlockerIds);
+    }
+
+    public Task<Guid?> ChooseCard(IReadOnlyList<GameCard> options, string prompt,
+        bool optional = false, CancellationToken ct = default)
+    {
+        CardChoiceOptions = options;
+        CardChoicePrompt = prompt;
+        CardChoiceOptional = optional;
+        _cardChoiceTcs = new TaskCompletionSource<Guid?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var registration = ct.Register(() => { CardChoiceOptions = null; CardChoicePrompt = null; _cardChoiceTcs.TrySetCanceled(); });
+        _cardChoiceTcs.Task.ContinueWith(_ => registration.Dispose(), TaskContinuationOptions.ExecuteSynchronously);
+        OnWaitingForInput?.Invoke();
+        return _cardChoiceTcs.Task;
+    }
+
+    public Task RevealCards(IReadOnlyList<GameCard> cards, IReadOnlyList<GameCard> kept,
+        string prompt, CancellationToken ct = default)
+    {
+        RevealedCards = cards;
+        KeptCards = kept;
+        RevealPrompt = prompt;
+        _revealAckTcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var registration = ct.Register(() => { RevealedCards = null; KeptCards = null; RevealPrompt = null; _revealAckTcs.TrySetCanceled(); });
+        _revealAckTcs.Task.ContinueWith(_ => registration.Dispose(), TaskContinuationOptions.ExecuteSynchronously);
+        OnWaitingForInput?.Invoke();
+        return _revealAckTcs.Task;
+    }
+
+    public void SubmitCardChoice(Guid? cardId)
+    {
+        CardChoiceOptions = null;
+        CardChoicePrompt = null;
+        _cardChoiceTcs?.TrySetResult(cardId);
+    }
+
+    public void AcknowledgeReveal()
+    {
+        RevealedCards = null;
+        KeptCards = null;
+        RevealPrompt = null;
+        _revealAckTcs?.TrySetResult(true);
     }
 }

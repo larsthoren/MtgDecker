@@ -106,7 +106,17 @@
                     IsWaitingForBlockerOrder="@(IsLocalActive && Handler?.IsWaitingForBlockerOrder == true)"
                     OrderingAttackerId="@(Handler?.OrderingAttackerId)"
                     BlockersToOrder="@(IsLocalActive ? Handler?.BlockersToOrder : null)"
-                    OnBlockerOrderChosen="OnBlockerOrderChosen" />
+                    OnBlockerOrderChosen="OnBlockerOrderChosen"
+                    IsWaitingForCardChoice="@IsWaitingForCardChoice"
+                    CardChoiceOptions="@(Handler?.CardChoiceOptions)"
+                    CardChoicePrompt="@(Handler?.CardChoicePrompt)"
+                    CardChoiceOptional="@(Handler?.CardChoiceOptional ?? false)"
+                    OnCardChosen="OnCardChosen"
+                    IsWaitingForRevealAck="@IsWaitingForRevealAck"
+                    RevealedCards="@(Handler?.RevealedCards)"
+                    KeptCards="@(Handler?.KeptCards)"
+                    RevealPrompt="@(Handler?.RevealPrompt)"
+                    OnRevealAcknowledged="OnRevealAcknowledged" />
     </div>
 
     @* Game log (right) *@
@@ -128,6 +138,8 @@
     [Parameter] public EventCallback<IReadOnlyList<Guid>> OnAttackersChosen { get; set; }
     [Parameter] public EventCallback<Dictionary<Guid, Guid>> OnBlockersChosen { get; set; }
     [Parameter] public EventCallback<IReadOnlyList<Guid>> OnBlockerOrderChosen { get; set; }
+    [Parameter] public EventCallback<Guid?> OnCardChosen { get; set; }
+    [Parameter] public EventCallback OnRevealAcknowledged { get; set; }
 
     private ElementReference _boardRef;
     private Player LocalPlayer => PlayerSeat == 1 ? State.Player1 : State.Player2;
@@ -142,6 +154,8 @@
         Handler?.IsWaitingForAttackers == true ||
         Handler?.IsWaitingForBlockers == true ||
         Handler?.IsWaitingForBlockerOrder == true;
+    private bool IsWaitingForCardChoice => Handler?.IsWaitingForCardChoice == true;
+    private bool IsWaitingForRevealAck => Handler?.IsWaitingForRevealAck == true;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {

@@ -152,4 +152,43 @@ public class ZoneTests
         foreach (var card in cards)
             zone.Contains(card.Id).Should().BeTrue();
     }
+
+    [Fact]
+    public void PeekTop_ReturnsTopNCards_WithoutRemoving()
+    {
+        var zone = new Zone(ZoneType.Library);
+        var card1 = new GameCard { Name = "Bottom" };
+        var card2 = new GameCard { Name = "Middle" };
+        var card3 = new GameCard { Name = "Top" };
+        zone.Add(card1);
+        zone.Add(card2);
+        zone.Add(card3);
+
+        var peeked = zone.PeekTop(2);
+
+        peeked.Should().HaveCount(2);
+        peeked[0].Name.Should().Be("Top");
+        peeked[1].Name.Should().Be("Middle");
+        zone.Count.Should().Be(3);
+    }
+
+    [Fact]
+    public void PeekTop_ReturnsAllCards_WhenCountExceedsSize()
+    {
+        var zone = new Zone(ZoneType.Library);
+        zone.Add(new GameCard { Name = "Only" });
+
+        var peeked = zone.PeekTop(5);
+
+        peeked.Should().HaveCount(1);
+        peeked[0].Name.Should().Be("Only");
+    }
+
+    [Fact]
+    public void PeekTop_EmptyZone_ReturnsEmpty()
+    {
+        var zone = new Zone(ZoneType.Library);
+        var peeked = zone.PeekTop(3);
+        peeked.Should().BeEmpty();
+    }
 }

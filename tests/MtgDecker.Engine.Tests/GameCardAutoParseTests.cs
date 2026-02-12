@@ -1,6 +1,7 @@
 using FluentAssertions;
 using MtgDecker.Engine.Enums;
 using MtgDecker.Engine.Mana;
+using MtgDecker.Engine.Triggers;
 
 namespace MtgDecker.Engine.Tests;
 
@@ -89,5 +90,48 @@ public class GameCardAutoParseTests
 
         card.Name.Should().Be("Mountain");
         card.TypeLine.Should().Be("Basic Land — Mountain");
+    }
+
+    [Fact]
+    public void Create_AutoParse_ExtractsSubtypes()
+    {
+        var card = GameCard.Create("Test Goblin", "Creature — Goblin Warrior", null, "{R}", "2", "2");
+        card.Subtypes.Should().BeEquivalentTo("Goblin", "Warrior");
+    }
+
+    [Fact]
+    public void Create_AutoParse_NoSubtypes_ReturnsEmpty()
+    {
+        var card = GameCard.Create("Test Spell", "Instant", null, "{R}", null, null);
+        card.Subtypes.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Create_Registry_GetsSubtypes_WhenDefined()
+    {
+        var card = GameCard.Create("Mountain");
+        card.Subtypes.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void IsToken_DefaultsFalse()
+    {
+        var card = GameCard.Create("Test", "Creature", null);
+        card.IsToken.Should().BeFalse();
+    }
+
+    [Fact]
+    public void IsToken_CanBeSetTrue()
+    {
+        var card = new GameCard { Name = "Goblin Token", IsToken = true };
+        card.IsToken.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Create_Registry_GetsSubtypesAndTriggersFromDefinition()
+    {
+        var card = GameCard.Create("Goblin Lackey");
+        card.Subtypes.Should().NotBeNull();
+        card.Triggers.Should().NotBeNull();
     }
 }

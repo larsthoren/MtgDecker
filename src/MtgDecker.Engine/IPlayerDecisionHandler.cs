@@ -14,4 +14,10 @@ public interface IPlayerDecisionHandler
     Task<Dictionary<Guid, Guid>> ChooseBlockers(IReadOnlyList<GameCard> eligibleBlockers, IReadOnlyList<GameCard> attackers, CancellationToken ct = default);
     Task<IReadOnlyList<Guid>> OrderBlockers(Guid attackerId, IReadOnlyList<GameCard> blockers, CancellationToken ct = default);
     Task<TargetInfo> ChooseTarget(string spellName, IReadOnlyList<GameCard> eligibleTargets, Guid defaultOwnerId = default, CancellationToken ct = default);
+
+    Task<Guid?> ChooseCard(IReadOnlyList<GameCard> options, string prompt,
+        bool optional = false, CancellationToken ct = default);
+
+    Task RevealCards(IReadOnlyList<GameCard> cards, IReadOnlyList<GameCard> kept,
+        string prompt, CancellationToken ct = default);
 }

@@ -1,5 +1,6 @@
 using MtgDecker.Engine.Enums;
 using MtgDecker.Engine.Mana;
+using MtgDecker.Engine.Triggers;
 
 namespace MtgDecker.Engine;
 
@@ -115,6 +116,7 @@ public class GameEngine
                     action.DestinationZone = ZoneType.Battlefield;
                     player.ActionHistory.Push(action);
                     _state.Log($"{player.Name} plays {playCard.Name} (land drop).");
+                    await ProcessTriggersAsync(GameEvent.EnterBattlefield, playCard, player, ct);
                 }
                 else if (playCard.ManaCost != null)
                 {
@@ -202,6 +204,7 @@ public class GameEngine
                         playCard.TurnEnteredBattlefield = _state.TurnNumber;
                         action.DestinationZone = ZoneType.Battlefield;
                         _state.Log($"{player.Name} casts {playCard.Name}.");
+                        await ProcessTriggersAsync(GameEvent.EnterBattlefield, playCard, player, ct);
                     }
                     action.ManaCostPaid = cost;
                     player.ActionHistory.Push(action);
@@ -214,6 +217,7 @@ public class GameEngine
                     playCard.TurnEnteredBattlefield = _state.TurnNumber;
                     player.ActionHistory.Push(action);
                     _state.Log($"{player.Name} plays {playCard.Name}.");
+                    await ProcessTriggersAsync(GameEvent.EnterBattlefield, playCard, player, ct);
                 }
                 break;
 
@@ -654,7 +658,10 @@ public class GameEngine
         foreach (var card in dead)
         {
             player.Battlefield.RemoveById(card.Id);
+            // MTG rules: tokens go to graveyard then cease to exist (SBA 704.5d)
             player.Graveyard.Add(card);
+            if (card.IsToken)
+                player.Graveyard.RemoveById(card.Id);
             card.DamageMarked = 0;
             _state.Log($"{card.Name} dies.");
         }
@@ -666,6 +673,22 @@ public class GameEngine
             card.DamageMarked = 0;
         foreach (var card in _state.Player2.Battlefield.Cards)
             card.DamageMarked = 0;
+    }
+
+    private async Task ProcessTriggersAsync(GameEvent evt, GameCard source, Player controller, CancellationToken ct)
+    {
+        if (source.Triggers.Count == 0) return;
+
+        foreach (var trigger in source.Triggers)
+        {
+            if (trigger.Event != evt) continue;
+            if (trigger.Condition == TriggerCondition.Self)
+            {
+                var ability = new TriggeredAbility(source, controller, trigger);
+                _state.Log($"{source.Name} triggers: {trigger.Effect.GetType().Name.Replace("Effect", "")}");
+                await ability.ResolveAsync(_state, ct);
+            }
+        }
     }
 
     internal async Task RunPriorityAsync(CancellationToken ct = default)

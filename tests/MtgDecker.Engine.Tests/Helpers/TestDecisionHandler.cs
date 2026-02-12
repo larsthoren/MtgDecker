@@ -15,6 +15,7 @@ public class TestDecisionHandler : IPlayerDecisionHandler
     private readonly Queue<Dictionary<Guid, Guid>> _blockerQueue = new();
     private readonly Queue<IReadOnlyList<Guid>> _blockerOrderQueue = new();
     private readonly Queue<TargetInfo> _targetQueue = new();
+    private readonly Queue<Guid?> _cardChoiceQueue = new();
 
     public void EnqueueAction(GameAction action) => _actions.Enqueue(action);
 
@@ -31,6 +32,7 @@ public class TestDecisionHandler : IPlayerDecisionHandler
     public void EnqueueBlockers(Dictionary<Guid, Guid> assignments) => _blockerQueue.Enqueue(assignments);
     public void EnqueueBlockerOrder(IReadOnlyList<Guid> order) => _blockerOrderQueue.Enqueue(order);
     public void EnqueueTarget(TargetInfo target) => _targetQueue.Enqueue(target);
+    public void EnqueueCardChoice(Guid? cardId) => _cardChoiceQueue.Enqueue(cardId);
 
     public Task<GameAction> GetAction(GameState gameState, Guid playerId, CancellationToken ct = default)
     {
@@ -96,5 +98,21 @@ public class TestDecisionHandler : IPlayerDecisionHandler
             return Task.FromResult(_targetQueue.Dequeue());
         var card = eligibleTargets[0];
         return Task.FromResult(new TargetInfo(card.Id, defaultOwnerId, Enums.ZoneType.Battlefield));
+    }
+
+    public Task<Guid?> ChooseCard(IReadOnlyList<GameCard> options, string prompt,
+        bool optional = false, CancellationToken ct = default)
+    {
+        if (_cardChoiceQueue.Count > 0)
+            return Task.FromResult(_cardChoiceQueue.Dequeue());
+        // Default: choose first if available, null if optional
+        return Task.FromResult(options.Count > 0 ? options[0].Id : (Guid?)null);
+    }
+
+    public Task RevealCards(IReadOnlyList<GameCard> cards, IReadOnlyList<GameCard> kept,
+        string prompt, CancellationToken ct = default)
+    {
+        // Test handler auto-acknowledges reveals
+        return Task.CompletedTask;
     }
 }
