@@ -29,7 +29,19 @@ public static class CardDefinitions
                 Subtypes = ["Goblin"],
                 Triggers = [new Trigger(GameEvent.EnterBattlefield, TriggerCondition.Self, new RevealAndFilterEffect(4, "Goblin"))],
             },
-            ["Goblin Warchief"] = new(ManaCost.Parse("{1}{R}{R}"), null, 2, 2, CardType.Creature) { Subtypes = ["Goblin"] },
+            ["Goblin Warchief"] = new(ManaCost.Parse("{1}{R}{R}"), null, 2, 2, CardType.Creature)
+            {
+                Subtypes = ["Goblin"],
+                ContinuousEffects =
+                [
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
+                        (card, _) => card.IsCreature && card.Subtypes.Contains("Goblin"),
+                        GrantedKeyword: Keyword.Haste),
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.ModifyCost,
+                        (_, _) => true, CostMod: -1,
+                        CostApplies: c => c.Subtypes.Contains("Goblin")),
+                ],
+            },
             ["Mogg Fanatic"] = new(ManaCost.Parse("{R}"), null, 1, 1, CardType.Creature) { Subtypes = ["Goblin"] },
             ["Gempalm Incinerator"] = new(ManaCost.Parse("{1}{R}"), null, 2, 1, CardType.Creature) { Subtypes = ["Goblin"] },
             ["Siege-Gang Commander"] = new(ManaCost.Parse("{3}{R}{R}"), null, 2, 2, CardType.Creature)
@@ -37,7 +49,16 @@ public static class CardDefinitions
                 Subtypes = ["Goblin"],
                 Triggers = [new Trigger(GameEvent.EnterBattlefield, TriggerCondition.Self, new CreateTokensEffect("Goblin", 1, 1, CardType.Creature, ["Goblin"], count: 3))],
             },
-            ["Goblin King"] = new(ManaCost.Parse("{1}{R}{R}"), null, 2, 2, CardType.Creature) { Subtypes = ["Goblin"] },
+            ["Goblin King"] = new(ManaCost.Parse("{1}{R}{R}"), null, 2, 2, CardType.Creature)
+            {
+                Subtypes = ["Goblin"],
+                ContinuousEffects =
+                [
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.ModifyPowerToughness,
+                        (card, _) => card.IsCreature && card.Subtypes.Contains("Goblin"),
+                        PowerMod: 1, ToughnessMod: 1),
+                ],
+            },
             ["Goblin Pyromancer"] = new(ManaCost.Parse("{3}{R}"), null, 2, 2, CardType.Creature) { Subtypes = ["Goblin"] },
             ["Goblin Sharpshooter"] = new(ManaCost.Parse("{2}{R}"), null, 1, 1, CardType.Creature) { Subtypes = ["Goblin"] },
             ["Goblin Tinkerer"] = new(ManaCost.Parse("{1}{R}"), null, 1, 1, CardType.Creature) { Subtypes = ["Goblin"] },
@@ -60,7 +81,14 @@ public static class CardDefinitions
             ["Replenish"] = new(ManaCost.Parse("{3}{W}"), null, null, null, CardType.Sorcery),
             ["Enchantress's Presence"] = new(ManaCost.Parse("{2}{G}"), null, null, null, CardType.Enchantment),
             ["Wild Growth"] = new(ManaCost.Parse("{G}"), null, null, null, CardType.Enchantment) { Subtypes = ["Aura"] },
-            ["Exploration"] = new(ManaCost.Parse("{G}"), null, null, null, CardType.Enchantment),
+            ["Exploration"] = new(ManaCost.Parse("{G}"), null, null, null, CardType.Enchantment)
+            {
+                ContinuousEffects =
+                [
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.ExtraLandDrop,
+                        (_, _) => true, ExtraLandDrops: 1),
+                ],
+            },
             ["Mirri's Guile"] = new(ManaCost.Parse("{G}"), null, null, null, CardType.Enchantment),
             ["Opalescence"] = new(ManaCost.Parse("{2}{W}{W}"), null, null, null, CardType.Enchantment),
             ["Parallax Wave"] = new(ManaCost.Parse("{2}{W}{W}"), null, null, null, CardType.Enchantment),

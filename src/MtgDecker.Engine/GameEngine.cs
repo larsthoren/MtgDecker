@@ -692,6 +692,17 @@ public class GameEngine
 
     public void RecalculateState()
     {
+        // Preserve temporary (UntilEndOfTurn) effects before rebuild
+        var tempEffects = _state.ActiveEffects.Where(e => e.UntilEndOfTurn).ToList();
+
+        // Rebuild ActiveEffects from CardDefinitions on the battlefield
+        _state.ActiveEffects.Clear();
+        RebuildActiveEffects(_state.Player1);
+        RebuildActiveEffects(_state.Player2);
+
+        // Re-add temporary effects
+        _state.ActiveEffects.AddRange(tempEffects);
+
         // Reset all effective values for both players
         foreach (var player in new[] { _state.Player1, _state.Player2 })
         {
@@ -748,6 +759,19 @@ public class GameEngine
             if (!effect.Applies(card, player)) continue;
             if (effect.GrantedKeyword.HasValue)
                 card.ActiveKeywords.Add(effect.GrantedKeyword.Value);
+        }
+    }
+
+    private void RebuildActiveEffects(Player player)
+    {
+        foreach (var card in player.Battlefield.Cards)
+        {
+            if (!CardDefinitions.TryGet(card.Name, out var def)) continue;
+            foreach (var templateEffect in def.ContinuousEffects)
+            {
+                var effect = templateEffect with { SourceId = card.Id };
+                _state.ActiveEffects.Add(effect);
+            }
         }
     }
 

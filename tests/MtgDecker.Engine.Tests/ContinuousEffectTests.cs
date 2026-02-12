@@ -56,18 +56,9 @@ public class ContinuousEffectTests
     {
         var (engine, state, p1, _) = Setup();
 
-        var king1Id = Guid.NewGuid();
-        var king2Id = Guid.NewGuid();
-        var king1 = new GameCard
-        {
-            Id = king1Id, Name = "King 1", BasePower = 2, BaseToughness = 2,
-            CardTypes = CardType.Creature, Subtypes = ["Goblin"]
-        };
-        var king2 = new GameCard
-        {
-            Id = king2Id, Name = "King 2", BasePower = 2, BaseToughness = 2,
-            CardTypes = CardType.Creature, Subtypes = ["Goblin"]
-        };
+        // Use real Goblin King entries from CardDefinitions (each has ContinuousEffects)
+        var king1 = GameCard.Create("Goblin King", "Creature — Goblin");
+        var king2 = GameCard.Create("Goblin King", "Creature — Goblin");
         var grunt = new GameCard
         {
             Name = "Grunt", BasePower = 1, BaseToughness = 1,
@@ -77,15 +68,6 @@ public class ContinuousEffectTests
         p1.Battlefield.Add(king1);
         p1.Battlefield.Add(king2);
         p1.Battlefield.Add(grunt);
-
-        state.ActiveEffects.Add(new ContinuousEffect(
-            king1Id, ContinuousEffectType.ModifyPowerToughness,
-            (card, _) => card.IsCreature && card.Subtypes.Contains("Goblin"),
-            PowerMod: 1, ToughnessMod: 1));
-        state.ActiveEffects.Add(new ContinuousEffect(
-            king2Id, ContinuousEffectType.ModifyPowerToughness,
-            (card, _) => card.IsCreature && card.Subtypes.Contains("Goblin"),
-            PowerMod: 1, ToughnessMod: 1));
 
         engine.RecalculateState();
 
@@ -102,12 +84,8 @@ public class ContinuousEffectTests
     {
         var (engine, state, p1, _) = Setup();
 
-        var warchiefId = Guid.NewGuid();
-        var warchief = new GameCard
-        {
-            Id = warchiefId, Name = "Warchief", BasePower = 2, BaseToughness = 2,
-            CardTypes = CardType.Creature, Subtypes = ["Goblin"]
-        };
+        // Use real Goblin Warchief from CardDefinitions (has GrantKeyword Haste effect)
+        var warchief = GameCard.Create("Goblin Warchief", "Creature — Goblin");
         var goblin = new GameCard
         {
             Name = "Goblin", BasePower = 1, BaseToughness = 1,
@@ -122,11 +100,6 @@ public class ContinuousEffectTests
         p1.Battlefield.Add(warchief);
         p1.Battlefield.Add(goblin);
         p1.Battlefield.Add(elf);
-
-        state.ActiveEffects.Add(new ContinuousEffect(
-            warchiefId, ContinuousEffectType.GrantKeyword,
-            (card, _) => card.IsCreature && card.Subtypes.Contains("Goblin"),
-            GrantedKeyword: Keyword.Haste));
 
         engine.RecalculateState();
 
