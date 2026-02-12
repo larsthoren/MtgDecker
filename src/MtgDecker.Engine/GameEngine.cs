@@ -827,6 +827,10 @@ public class GameEngine
                     player.ManaPool.Add(color, amount);
                 _state.Log($"{player.Name} undoes casting {removedStack.Card.Name}.");
                 break;
+
+            case ActionType.Cycle:
+                _state.Log("Cycling cannot be undone.");
+                return false;
         }
 
         return true;

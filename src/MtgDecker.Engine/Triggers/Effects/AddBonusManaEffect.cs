@@ -9,7 +9,7 @@ public class AddBonusManaEffect(ManaColor color) : IEffect
     public Task Execute(EffectContext context, CancellationToken ct = default)
     {
         context.Controller.ManaPool.Add(Color);
-        context.State.Log($"Wild Growth adds {Color} mana.");
+        context.State.Log($"{context.Source.Name} adds {Color} mana.");
         return Task.CompletedTask;
     }
 }

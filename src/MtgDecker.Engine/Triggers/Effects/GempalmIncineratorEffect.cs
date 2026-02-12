@@ -17,7 +17,7 @@ public class GempalmIncineratorEffect : IEffect
 
         var eligible = context.State.Player1.Battlefield.Cards
             .Concat(context.State.Player2.Battlefield.Cards)
-            .Where(c => c.IsCreature)
+            .Where(c => c.IsCreature && !c.ActiveKeywords.Contains(Keyword.Shroud))
             .ToList();
 
         if (eligible.Count == 0) return;
