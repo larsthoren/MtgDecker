@@ -50,6 +50,29 @@ public class GameCard
     // Aura attachment
     public Guid? AttachedTo { get; set; }
 
+    // Counter tracking
+    public Dictionary<CounterType, int> Counters { get; } = new();
+
+    public void AddCounters(CounterType type, int count)
+    {
+        Counters.TryGetValue(type, out var current);
+        Counters[type] = current + count;
+    }
+
+    public bool RemoveCounter(CounterType type)
+    {
+        if (!Counters.TryGetValue(type, out var current) || current <= 0)
+            return false;
+        Counters[type] = current - 1;
+        return true;
+    }
+
+    public int GetCounters(CounterType type) =>
+        Counters.TryGetValue(type, out var count) ? count : 0;
+
+    // Per-source exile tracking (e.g., Parallax Wave)
+    public List<Guid> ExiledCardIds { get; } = new();
+
     // Combat tracking
     public int? TurnEnteredBattlefield { get; set; }
     public int DamageMarked { get; set; }

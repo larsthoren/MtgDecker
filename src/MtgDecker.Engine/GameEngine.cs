@@ -374,6 +374,7 @@ public class GameEngine
 
                 // Pay costs: 1 life + sacrifice
                 player.AdjustLife(-1);
+                await FireLeaveBattlefieldTriggersAsync(fetchLand, player, ct);
                 player.Battlefield.RemoveById(fetchLand.Id);
                 player.Graveyard.Add(fetchLand);
                 _state.Log($"{player.Name} sacrifices {fetchLand.Name}, pays 1 life ({player.Life}).");
@@ -577,6 +578,16 @@ public class GameEngine
                     break;
                 }
 
+                // Validate: counter removal cost
+                if (cost.RemoveCounterType.HasValue)
+                {
+                    if (abilitySource.GetCounters(cost.RemoveCounterType.Value) <= 0)
+                    {
+                        _state.Log($"Cannot activate {abilitySource.Name} — no {cost.RemoveCounterType.Value} counters.");
+                        break;
+                    }
+                }
+
                 // Validate: sacrifice subtype
                 GameCard? sacrificeTarget = null;
                 if (cost.SacrificeSubtype != null)
@@ -644,6 +655,7 @@ public class GameEngine
                 // Pay costs: sacrifice self
                 if (cost.SacrificeSelf)
                 {
+                    await FireLeaveBattlefieldTriggersAsync(abilitySource, player, ct);
                     player.Battlefield.RemoveById(abilitySource.Id);
                     player.Graveyard.Add(abilitySource);
                     _state.Log($"{player.Name} sacrifices {abilitySource.Name}.");
@@ -652,9 +664,16 @@ public class GameEngine
                 // Pay costs: sacrifice subtype target
                 if (sacrificeTarget != null)
                 {
+                    await FireLeaveBattlefieldTriggersAsync(sacrificeTarget, player, ct);
                     player.Battlefield.RemoveById(sacrificeTarget.Id);
                     player.Graveyard.Add(sacrificeTarget);
                     _state.Log($"{player.Name} sacrifices {sacrificeTarget.Name}.");
+                }
+
+                // Pay costs: remove counter
+                if (cost.RemoveCounterType.HasValue)
+                {
+                    abilitySource.RemoveCounter(cost.RemoveCounterType.Value);
                 }
 
                 // Find effect target
@@ -1296,15 +1315,15 @@ public class GameEngine
                 anyActionTaken = true;
 
             // Zero-or-less toughness (MTG 704.5f)
-            bool lethalP1 = CheckLethalToughness(_state.Player1);
-            bool lethalP2 = CheckLethalToughness(_state.Player2);
+            bool lethalP1 = await CheckLethalToughness(_state.Player1, ct);
+            bool lethalP2 = await CheckLethalToughness(_state.Player2, ct);
             if (lethalP1 || lethalP2)
                 anyActionTaken = true;
 
             // Lethal damage (MTG 704.5g) — creatures with damage >= toughness die
             var lethalDamageDeaths = new List<GameCard>();
-            CheckLethalDamage(_state.Player1, lethalDamageDeaths);
-            CheckLethalDamage(_state.Player2, lethalDamageDeaths);
+            await CheckLethalDamage(_state.Player1, lethalDamageDeaths, ct);
+            await CheckLethalDamage(_state.Player2, lethalDamageDeaths, ct);
             if (lethalDamageDeaths.Count > 0)
             {
                 anyActionTaken = true;
@@ -1323,6 +1342,7 @@ public class GameEngine
                         || _state.Player2.Battlefield.Contains(aura.AttachedTo!.Value);
                     if (!targetExists)
                     {
+                        await FireLeaveBattlefieldTriggersAsync(aura, p, ct);
                         p.Battlefield.RemoveById(aura.Id);
                         p.Graveyard.Add(aura);
                         _state.Log($"{aura.Name} falls off (enchanted permanent left battlefield).");
@@ -1358,6 +1378,7 @@ public class GameEngine
 
             foreach (var card in duplicates.Where(c => c.Id != chosenId))
             {
+                await FireLeaveBattlefieldTriggersAsync(card, player, ct);
                 player.Battlefield.RemoveById(card.Id);
                 player.Graveyard.Add(card);
                 _state.Log($"{card.Name} is put into graveyard (legendary rule).");
@@ -1367,7 +1388,7 @@ public class GameEngine
         return true;
     }
 
-    private bool CheckLethalToughness(Player player)
+    private async Task<bool> CheckLethalToughness(Player player, CancellationToken ct)
     {
         var dead = player.Battlefield.Cards
             .Where(c => c.IsCreature && (c.Toughness ?? 1) <= 0)
@@ -1375,6 +1396,7 @@ public class GameEngine
 
         foreach (var card in dead)
         {
+            await FireLeaveBattlefieldTriggersAsync(card, player, ct);
             player.Battlefield.RemoveById(card.Id);
             player.Graveyard.Add(card);
             _state.Log($"{card.Name} dies (0 toughness).");
@@ -1383,7 +1405,7 @@ public class GameEngine
         return dead.Count > 0;
     }
 
-    private void CheckLethalDamage(Player player, List<GameCard> deaths)
+    private async Task CheckLethalDamage(Player player, List<GameCard> deaths, CancellationToken ct)
     {
         var dead = player.Battlefield.Cards
             .Where(c => c.IsCreature && c.Toughness.HasValue && c.DamageMarked >= c.Toughness.Value && c.Toughness.Value > 0)
@@ -1391,6 +1413,7 @@ public class GameEngine
 
         foreach (var card in dead)
         {
+            await FireLeaveBattlefieldTriggersAsync(card, player, ct);
             player.Battlefield.RemoveById(card.Id);
             // MTG rules: tokens go to graveyard then cease to exist (SBA 704.5d)
             player.Graveyard.Add(card);
@@ -1509,6 +1532,20 @@ public class GameEngine
             var source = new GameCard { Name = "Delayed Trigger" };
             _state.Stack.Add(new TriggeredAbilityStackObject(source, controller.Id, delayed.Effect));
             _state.DelayedTriggers.Remove(delayed);
+        }
+    }
+
+    internal async Task FireLeaveBattlefieldTriggersAsync(GameCard card, Player controller, CancellationToken ct)
+    {
+        if (!CardDefinitions.TryGet(card.Name, out var def)) return;
+
+        foreach (var trigger in def.Triggers)
+        {
+            if (trigger.Condition == TriggerCondition.SelfLeavesBattlefield)
+            {
+                _state.Log($"{card.Name} triggers: {trigger.Effect.GetType().Name.Replace("Effect", "")}");
+                _state.Stack.Add(new TriggeredAbilityStackObject(card, controller.Id, trigger.Effect));
+            }
         }
     }
 

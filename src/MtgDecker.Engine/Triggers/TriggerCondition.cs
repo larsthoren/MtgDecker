@@ -9,4 +9,5 @@ public enum TriggerCondition
     SelfAttacks,
     Upkeep,
     AttachedPermanentTapped,
+    SelfLeavesBattlefield,
 }
