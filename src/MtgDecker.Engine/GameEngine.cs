@@ -149,13 +149,9 @@ public class GameEngine
                 else if (playCard.ManaCost != null)
                 {
                     // Part B: Cast spell with mana payment
-                    // Apply cost reduction from continuous effects
+                    // Apply cost modification from continuous effects
                     var effectiveCost = playCard.ManaCost;
-                    var costReduction = _state.ActiveEffects
-                        .Where(e => e.Type == ContinuousEffectType.ModifyCost
-                               && e.CostApplies != null
-                               && e.CostApplies(playCard))
-                        .Sum(e => e.CostMod);
+                    var costReduction = ComputeCostModification(playCard, player);
                     if (costReduction != 0)
                         effectiveCost = effectiveCost.WithGenericReduction(-costReduction);
 
@@ -404,13 +400,9 @@ public class GameEngine
                     return;
                 }
 
-                // Apply cost reduction from continuous effects
+                // Apply cost modification from continuous effects
                 var castEffectiveCost = def.ManaCost;
-                var castCostReduction = _state.ActiveEffects
-                    .Where(e => e.Type == ContinuousEffectType.ModifyCost
-                           && e.CostApplies != null
-                           && e.CostApplies(castCard))
-                    .Sum(e => e.CostMod);
+                var castCostReduction = ComputeCostModification(castCard, castPlayer);
                 if (castCostReduction != 0)
                     castEffectiveCost = castEffectiveCost.WithGenericReduction(-castCostReduction);
 
@@ -1057,6 +1049,28 @@ public class GameEngine
                 _state.ActiveEffects.Add(effect);
             }
         }
+    }
+
+    internal int ComputeCostModification(GameCard card, Player caster)
+    {
+        return _state.ActiveEffects
+            .Where(e => e.Type == ContinuousEffectType.ModifyCost
+                   && e.CostApplies != null
+                   && e.CostApplies(card)
+                   && IsCostEffectApplicable(e, caster))
+            .Sum(e => e.CostMod);
+    }
+
+    private bool IsCostEffectApplicable(ContinuousEffect effect, Player caster)
+    {
+        if (!effect.CostAppliesToOpponent) return true;
+
+        // For opponent-only effects, find who controls the source
+        var effectController = _state.Player1.Battlefield.Contains(effect.SourceId) ? _state.Player1
+            : _state.Player2.Battlefield.Contains(effect.SourceId) ? _state.Player2 : null;
+
+        // Only apply if the caster is the opponent (not the controller)
+        return effectController != null && effectController.Id != caster.Id;
     }
 
     internal async Task OnBoardChangedAsync(CancellationToken ct = default)

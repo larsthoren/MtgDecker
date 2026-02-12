@@ -20,4 +20,6 @@ public record ContinuousEffect(
     Keyword? GrantedKeyword = null,
     int CostMod = 0,
     Func<GameCard, bool>? CostApplies = null,
-    int ExtraLandDrops = 0);
+    int ExtraLandDrops = 0,
+    bool CostAppliesToOpponent = false,
+    bool ExcludeSelf = false);
