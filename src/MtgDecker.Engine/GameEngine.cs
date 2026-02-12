@@ -115,7 +115,7 @@ public class GameEngine
                 if (playCard.IsLand)
                 {
                     // Part A: Land drop enforcement
-                    if (player.LandsPlayedThisTurn >= 1)
+                    if (player.LandsPlayedThisTurn >= player.MaxLandDrops)
                     {
                         _state.Log($"{player.Name} cannot play another land this turn.");
                         break;
