@@ -19,4 +19,5 @@ public record CardDefinition(
     public bool IsLegendary { get; init; }
     public FetchAbility? FetchAbility { get; init; }
     public IReadOnlyList<ContinuousEffect> ContinuousEffects { get; init; } = [];
+    public ActivatedAbility? ActivatedAbility { get; init; }
 }
