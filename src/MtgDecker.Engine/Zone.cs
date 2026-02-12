@@ -16,6 +16,8 @@ public class Zone
 
     public void AddToBottom(GameCard card) => _cards.Insert(0, card);
 
+    public void AddToTop(GameCard card) => _cards.Add(card);
+
     public void AddRange(IEnumerable<GameCard> cards) => _cards.AddRange(cards);
 
     public GameCard? RemoveById(Guid cardId)

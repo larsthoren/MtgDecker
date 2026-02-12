@@ -234,6 +234,8 @@ public class GameEngine
                         await ProcessTriggersAsync(GameEvent.EnterBattlefield, playCard, player, ct);
                         await OnBoardChangedAsync(ct);
                     }
+                    // Fire SpellCast board triggers (e.g., enchantress draw on enchantment cast)
+                    await ProcessBoardTriggersAsync(GameEvent.SpellCast, playCard, ct);
                     action.ManaCostPaid = cost;
                     player.ActionHistory.Push(action);
                 }
@@ -799,11 +801,23 @@ public class GameEngine
 
         // Combat Damage
         _state.CombatStep = CombatStep.CombatDamage;
-        ResolveCombatDamage(attacker, defender);
+        var unblocked = ResolveCombatDamage(attacker, defender);
+
+        // Fire CombatDamageDealt triggers for unblocked attackers that dealt damage to the player
+        foreach (var unblockedAttacker in unblocked)
+        {
+            await ProcessBoardTriggersAsync(GameEvent.CombatDamageDealt, unblockedAttacker, ct);
+        }
 
         // Process deaths (state-based actions)
-        ProcessCombatDeaths(attacker);
-        ProcessCombatDeaths(defender);
+        var deadFromAttacker = ProcessCombatDeaths(attacker);
+        var deadFromDefender = ProcessCombatDeaths(defender);
+
+        // Fire Dies triggers for each creature that died
+        foreach (var deadCard in deadFromAttacker.Concat(deadFromDefender))
+        {
+            await ProcessBoardTriggersAsync(GameEvent.Dies, deadCard, ct);
+        }
 
         // Recalculate effects and check if any player lost due to combat damage
         await OnBoardChangedAsync(ct);
@@ -816,8 +830,13 @@ public class GameEngine
         _state.Combat = null;
     }
 
-    private void ResolveCombatDamage(Player attacker, Player defender)
+    /// <summary>
+    /// Resolves combat damage. Returns the list of unblocked attacker cards that dealt damage to the player.
+    /// </summary>
+    private List<GameCard> ResolveCombatDamage(Player attacker, Player defender)
     {
+        var unblockedAttackers = new List<GameCard>();
+
         foreach (var attackerId in _state.Combat!.Attackers)
         {
             var attackerCard = attacker.Battlefield.Cards.FirstOrDefault(c => c.Id == attackerId);
@@ -831,6 +850,7 @@ public class GameEngine
                 {
                     defender.AdjustLife(-damage);
                     _state.Log($"{attackerCard.Name} deals {damage} damage to {defender.Name}. ({defender.Life} life)");
+                    unblockedAttackers.Add(attackerCard);
                 }
             }
             else
@@ -869,9 +889,14 @@ public class GameEngine
                 }
             }
         }
+
+        return unblockedAttackers;
     }
 
-    private void ProcessCombatDeaths(Player player)
+    /// <summary>
+    /// Processes combat deaths for a player. Returns the list of cards that died.
+    /// </summary>
+    private List<GameCard> ProcessCombatDeaths(Player player)
     {
         var dead = player.Battlefield.Cards
             .Where(c => c.IsCreature && c.Toughness.HasValue && c.DamageMarked >= c.Toughness.Value)
@@ -887,6 +912,8 @@ public class GameEngine
             card.DamageMarked = 0;
             _state.Log($"{card.Name} dies.");
         }
+
+        return dead;
     }
 
     public void ClearDamage()
@@ -1104,6 +1131,65 @@ public class GameEngine
                 var ability = new TriggeredAbility(source, controller, trigger);
                 _state.Log($"{source.Name} triggers: {trigger.Effect.GetType().Name.Replace("Effect", "")}");
                 await ability.ResolveAsync(_state, ct);
+            }
+        }
+    }
+
+    internal async Task ProcessBoardTriggersAsync(GameEvent evt, GameCard? relevantCard, CancellationToken ct)
+    {
+        foreach (var player in new[] { _state.Player1, _state.Player2 })
+        {
+            // Snapshot the battlefield to avoid modification during iteration
+            var permanents = player.Battlefield.Cards.ToList();
+            foreach (var permanent in permanents)
+            {
+                // Use triggers from the card instance (which includes CardDefinition triggers
+                // if created via GameCard.Create), falling back to CardDefinitions registry
+                var triggers = permanent.Triggers.Count > 0
+                    ? permanent.Triggers
+                    : (CardDefinitions.TryGet(permanent.Name, out var def) ? def.Triggers : []);
+                if (triggers.Count == 0) continue;
+
+                foreach (var trigger in triggers)
+                {
+                    if (trigger.Event != evt) continue;
+                    if (trigger.Condition == TriggerCondition.Self) continue; // Handled by ProcessTriggersAsync
+
+                    bool matches = trigger.Condition switch
+                    {
+                        TriggerCondition.AnyCreatureDies =>
+                            evt == GameEvent.Dies && relevantCard != null && relevantCard.IsCreature,
+
+                        TriggerCondition.ControllerCastsEnchantment =>
+                            evt == GameEvent.SpellCast
+                            && relevantCard != null
+                            && relevantCard.CardTypes.HasFlag(CardType.Enchantment)
+                            && _state.ActivePlayer == player,
+
+                        TriggerCondition.SelfDealsCombatDamage =>
+                            evt == GameEvent.CombatDamageDealt
+                            && relevantCard != null
+                            && relevantCard.Id == permanent.Id,
+
+                        TriggerCondition.SelfAttacks =>
+                            evt == GameEvent.CombatDamageDealt
+                            && relevantCard != null
+                            && relevantCard.Id == permanent.Id,
+
+                        TriggerCondition.Upkeep =>
+                            evt == GameEvent.Upkeep
+                            && _state.ActivePlayer == player,
+
+                        _ => false,
+                    };
+
+                    if (matches)
+                    {
+                        var context = new EffectContext(_state, player, permanent, player.DecisionHandler);
+                        _state.Log($"{permanent.Name} triggers: {trigger.Effect.GetType().Name.Replace("Effect", "")}");
+                        await trigger.Effect.Execute(context, ct);
+                    }
+                }
             }
         }
     }
