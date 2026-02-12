@@ -21,4 +21,6 @@ public record CardDefinition(
     public IReadOnlyList<ContinuousEffect> ContinuousEffects { get; init; } = [];
     public ActivatedAbility? ActivatedAbility { get; init; }
     public AuraTarget? AuraTarget { get; init; }
+    public ManaCost? CyclingCost { get; init; }
+    public IReadOnlyList<Trigger> CyclingTriggers { get; init; } = [];
 }

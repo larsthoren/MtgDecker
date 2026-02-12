@@ -55,7 +55,12 @@ public static class CardDefinitions
                 Subtypes = ["Goblin"],
                 ActivatedAbility = new(new ActivatedAbilityCost(SacrificeSelf: true), new DealDamageEffect(1), c => c.IsCreature, CanTargetPlayer: true),
             },
-            ["Gempalm Incinerator"] = new(ManaCost.Parse("{1}{R}"), null, 2, 1, CardType.Creature) { Subtypes = ["Goblin"] },
+            ["Gempalm Incinerator"] = new(ManaCost.Parse("{1}{R}"), null, 2, 1, CardType.Creature)
+            {
+                Subtypes = ["Goblin"],
+                CyclingCost = ManaCost.Parse("{1}{R}"),
+                CyclingTriggers = [new Trigger(GameEvent.Cycle, TriggerCondition.Self, new GempalmIncineratorEffect())],
+            },
             ["Siege-Gang Commander"] = new(ManaCost.Parse("{3}{R}{R}"), null, 2, 2, CardType.Creature)
             {
                 Subtypes = ["Goblin"],

@@ -9,5 +9,6 @@ public enum ActionType
     MoveCard,
     CastSpell,
     ActivateFetch,
-    ActivateAbility
+    ActivateAbility,
+    Cycle
 }

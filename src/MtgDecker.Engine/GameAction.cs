@@ -82,4 +82,12 @@ public class GameAction
         TargetCardId = targetId,
         TargetPlayerId = targetPlayerId,
     };
+
+    public static GameAction Cycle(Guid playerId, Guid cardId) => new()
+    {
+        Type = ActionType.Cycle,
+        PlayerId = playerId,
+        CardId = cardId,
+        SourceZone = ZoneType.Hand,
+    };
 }
