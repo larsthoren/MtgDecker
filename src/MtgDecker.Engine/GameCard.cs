@@ -47,6 +47,9 @@ public class GameCard
     // Keywords granted by continuous effects or intrinsic abilities
     public HashSet<Keyword> ActiveKeywords { get; } = new();
 
+    // Aura attachment
+    public Guid? AttachedTo { get; set; }
+
     // Combat tracking
     public int? TurnEnteredBattlefield { get; set; }
     public int DamageMarked { get; set; }

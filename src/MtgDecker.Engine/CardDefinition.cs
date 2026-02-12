@@ -20,4 +20,5 @@ public record CardDefinition(
     public FetchAbility? FetchAbility { get; init; }
     public IReadOnlyList<ContinuousEffect> ContinuousEffects { get; init; } = [];
     public ActivatedAbility? ActivatedAbility { get; init; }
+    public AuraTarget? AuraTarget { get; init; }
 }

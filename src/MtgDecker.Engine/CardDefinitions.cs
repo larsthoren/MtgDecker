@@ -123,7 +123,11 @@ public static class CardDefinitions
             {
                 Triggers = [new Trigger(GameEvent.SpellCast, TriggerCondition.ControllerCastsEnchantment, new DrawCardEffect())],
             },
-            ["Wild Growth"] = new(ManaCost.Parse("{G}"), null, null, null, CardType.Enchantment) { Subtypes = ["Aura"] },
+            ["Wild Growth"] = new(ManaCost.Parse("{G}"), null, null, null, CardType.Enchantment)
+            {
+                Subtypes = ["Aura"],
+                AuraTarget = AuraTarget.Land,
+            },
             ["Exploration"] = new(ManaCost.Parse("{G}"), null, null, null, CardType.Enchantment)
             {
                 ContinuousEffects =
