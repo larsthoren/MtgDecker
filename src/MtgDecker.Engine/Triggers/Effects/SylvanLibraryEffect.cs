@@ -39,8 +39,15 @@ public class SylvanLibraryEffect : IEffect
             }
             else
             {
-                context.Controller.AdjustLife(-4);
-                context.State.Log($"{context.Controller.Name} pays 4 life to keep a card. ({context.Controller.Life} life)");
+                // Player keeps all remaining drawn cards, paying 4 life for each
+                foreach (var kept in remaining)
+                {
+                    if (context.Controller.Hand.Contains(kept.Id))
+                    {
+                        context.Controller.AdjustLife(-4);
+                        context.State.Log($"{context.Controller.Name} pays 4 life to keep {kept.Name}. ({context.Controller.Life} life)");
+                    }
+                }
                 break;
             }
         }

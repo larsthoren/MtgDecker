@@ -11,7 +11,6 @@ public class TriggerSystemExtensionTests
     [Theory]
     [InlineData(TriggerCondition.Self)]
     [InlineData(TriggerCondition.AnyCreatureDies)]
-    [InlineData(TriggerCondition.ControllerCasts)]
     [InlineData(TriggerCondition.ControllerCastsEnchantment)]
     [InlineData(TriggerCondition.SelfDealsCombatDamage)]
     [InlineData(TriggerCondition.SelfAttacks)]

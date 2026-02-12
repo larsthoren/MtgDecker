@@ -7,6 +7,7 @@ public enum GameEvent
     Dies,
     SpellCast,
     CombatDamageDealt,
+    BeginCombat,
     DrawCard,
     Upkeep,
     EndStep,

@@ -43,7 +43,7 @@ public class TriggeredAbilityCardRegistrationTests
         CardDefinitions.TryGet("Goblin Piledriver", out var def).Should().BeTrue();
         def!.Triggers.Should().ContainSingle();
         var trigger = def.Triggers[0];
-        trigger.Event.Should().Be(GameEvent.CombatDamageDealt);
+        trigger.Event.Should().Be(GameEvent.BeginCombat);
         trigger.Condition.Should().Be(TriggerCondition.SelfAttacks);
         trigger.Effect.Should().BeOfType<PiledriverPumpEffect>();
     }

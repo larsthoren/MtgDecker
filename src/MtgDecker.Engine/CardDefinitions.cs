@@ -30,7 +30,7 @@ public static class CardDefinitions
             ["Goblin Piledriver"] = new(ManaCost.Parse("{1}{R}"), null, 1, 2, CardType.Creature)
             {
                 Subtypes = ["Goblin"],
-                Triggers = [new Trigger(GameEvent.CombatDamageDealt, TriggerCondition.SelfAttacks, new PiledriverPumpEffect())],
+                Triggers = [new Trigger(GameEvent.BeginCombat, TriggerCondition.SelfAttacks, new PiledriverPumpEffect())],
             },
             ["Goblin Ringleader"] = new(ManaCost.Parse("{3}{R}"), null, 2, 2, CardType.Creature)
             {
@@ -107,7 +107,7 @@ public static class CardDefinitions
             },
             ["Wasteland"] = new(null, null, null, null, CardType.Land)
             {
-                ActivatedAbility = new(new ActivatedAbilityCost(TapSelf: true, SacrificeSelf: true), new DestroyTargetEffect(), c => c.IsLand),
+                ActivatedAbility = new(new ActivatedAbilityCost(TapSelf: true, SacrificeSelf: true), new DestroyTargetEffect(), c => c.IsLand && !c.IsBasicLand),
             },
 
             // === Enchantress deck ===

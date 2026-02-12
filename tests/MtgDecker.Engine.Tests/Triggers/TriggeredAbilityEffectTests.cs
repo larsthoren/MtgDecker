@@ -514,9 +514,9 @@ public class TriggeredAbilityEffectTests
 
         await effect.Execute(context);
 
-        // Kept the cards, paid 4 life
+        // Kept 2 cards, paid 4 life each = 8 total (20 - 8 = 12)
         player.Hand.Count.Should().Be(2);
-        player.Life.Should().Be(16);
+        player.Life.Should().Be(12);
         state.GameLog.Should().Contain(l => l.Contains("pays 4 life"));
     }
 

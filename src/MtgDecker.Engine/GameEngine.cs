@@ -631,6 +631,7 @@ public class GameEngine
                 await ability.Effect.Execute(effectContext, ct);
                 await OnBoardChangedAsync(ct);
 
+                player.ActionHistory.Push(action);
                 break;
             }
         }

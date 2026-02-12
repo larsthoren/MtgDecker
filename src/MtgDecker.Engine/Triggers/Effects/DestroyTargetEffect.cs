@@ -12,7 +12,8 @@ public class DestroyTargetEffect : IEffect
             : context.State.Player2;
 
         owner.Battlefield.RemoveById(target.Id);
-        owner.Graveyard.Add(target);
+        if (!target.IsToken)
+            owner.Graveyard.Add(target);
         context.State.Log($"{target.Name} is destroyed.");
 
         return Task.CompletedTask;

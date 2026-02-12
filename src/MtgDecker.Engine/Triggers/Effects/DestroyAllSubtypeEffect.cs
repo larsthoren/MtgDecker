@@ -13,7 +13,8 @@ public class DestroyAllSubtypeEffect(string subtype) : IEffect
             foreach (var card in toDestroy)
             {
                 player.Battlefield.RemoveById(card.Id);
-                player.Graveyard.Add(card);
+                if (!card.IsToken)
+                    player.Graveyard.Add(card);
                 context.State.Log($"{card.Name} is destroyed.");
             }
         }
