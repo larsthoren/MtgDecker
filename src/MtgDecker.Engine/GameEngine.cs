@@ -493,6 +493,135 @@ public class GameEngine
                 _state.Log($"{castPlayer.Name} casts {castCard.Name}.");
                 break;
             }
+
+            case ActionType.ActivateAbility:
+            {
+                var abilitySource = player.Battlefield.Cards.FirstOrDefault(c => c.Id == action.CardId);
+                if (abilitySource == null) break;
+
+                if (!CardDefinitions.TryGet(abilitySource.Name, out var abilityDef) || abilityDef.ActivatedAbility == null)
+                {
+                    _state.Log($"{abilitySource.Name} has no activated ability.");
+                    break;
+                }
+
+                var ability = abilityDef.ActivatedAbility;
+                var cost = ability.Cost;
+
+                // Validate: tap cost when already tapped
+                if (cost.TapSelf && abilitySource.IsTapped)
+                {
+                    _state.Log($"Cannot activate {abilitySource.Name} — already tapped.");
+                    break;
+                }
+
+                // Validate: mana cost
+                if (cost.ManaCost != null && !player.ManaPool.CanPay(cost.ManaCost))
+                {
+                    _state.Log($"Cannot activate {abilitySource.Name} — not enough mana.");
+                    break;
+                }
+
+                // Validate: sacrifice subtype
+                GameCard? sacrificeTarget = null;
+                if (cost.SacrificeSubtype != null)
+                {
+                    var eligible = player.Battlefield.Cards
+                        .Where(c => c.IsCreature && c.Subtypes.Contains(cost.SacrificeSubtype, StringComparer.OrdinalIgnoreCase))
+                        .ToList();
+
+                    if (eligible.Count == 0)
+                    {
+                        _state.Log($"Cannot activate {abilitySource.Name} — no eligible {cost.SacrificeSubtype} to sacrifice.");
+                        break;
+                    }
+
+                    var chosenId = await player.DecisionHandler.ChooseCard(
+                        eligible, $"Choose a {cost.SacrificeSubtype} to sacrifice", optional: false, ct);
+
+                    if (chosenId.HasValue)
+                        sacrificeTarget = eligible.FirstOrDefault(c => c.Id == chosenId.Value);
+
+                    if (sacrificeTarget == null)
+                    {
+                        _state.Log($"Cannot activate {abilitySource.Name} — no sacrifice target chosen.");
+                        break;
+                    }
+                }
+
+                // Pay costs: mana
+                if (cost.ManaCost != null)
+                {
+                    var abilityCost = cost.ManaCost;
+
+                    // Deduct colored requirements
+                    foreach (var (color, required) in abilityCost.ColorRequirements)
+                        player.ManaPool.Deduct(color, required);
+
+                    // Handle generic cost
+                    if (abilityCost.GenericCost > 0)
+                    {
+                        var remaining = new Dictionary<ManaColor, int>();
+                        foreach (var kvp in player.ManaPool.Available)
+                        {
+                            if (kvp.Value > 0)
+                                remaining[kvp.Key] = kvp.Value;
+                        }
+
+                        var toPay = abilityCost.GenericCost;
+                        foreach (var (color, amount) in remaining)
+                        {
+                            var take = Math.Min(amount, toPay);
+                            if (take > 0)
+                            {
+                                player.ManaPool.Deduct(color, take);
+                                toPay -= take;
+                            }
+                            if (toPay == 0) break;
+                        }
+                    }
+                }
+
+                // Pay costs: tap self
+                if (cost.TapSelf)
+                    abilitySource.IsTapped = true;
+
+                // Pay costs: sacrifice self
+                if (cost.SacrificeSelf)
+                {
+                    player.Battlefield.RemoveById(abilitySource.Id);
+                    player.Graveyard.Add(abilitySource);
+                    _state.Log($"{player.Name} sacrifices {abilitySource.Name}.");
+                }
+
+                // Pay costs: sacrifice subtype target
+                if (sacrificeTarget != null)
+                {
+                    player.Battlefield.RemoveById(sacrificeTarget.Id);
+                    player.Graveyard.Add(sacrificeTarget);
+                    _state.Log($"{player.Name} sacrifices {sacrificeTarget.Name}.");
+                }
+
+                // Find effect target
+                GameCard? effectTarget = null;
+                if (action.TargetCardId.HasValue)
+                {
+                    effectTarget = _state.Player1.Battlefield.Cards.FirstOrDefault(c => c.Id == action.TargetCardId.Value)
+                                ?? _state.Player2.Battlefield.Cards.FirstOrDefault(c => c.Id == action.TargetCardId.Value);
+                }
+
+                // Build context and execute effect
+                var effectContext = new EffectContext(_state, player, abilitySource, player.DecisionHandler)
+                {
+                    Target = effectTarget,
+                    TargetPlayerId = action.TargetPlayerId,
+                };
+
+                await ability.Effect.Execute(effectContext, ct);
+                await OnBoardChangedAsync(ct);
+
+                break;
+            }
         }
     }
 
