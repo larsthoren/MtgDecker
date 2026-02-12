@@ -46,6 +46,12 @@ public class GameEngine
 
             if (_state.IsGameOver) return;
 
+            // Fire upkeep triggers (e.g., Mirri's Guile, Sylvan Library)
+            if (phase.Phase == Phase.Upkeep)
+            {
+                await ProcessBoardTriggersAsync(GameEvent.Upkeep, null, ct);
+            }
+
             if (phase.Phase == Phase.Combat)
             {
                 await RunCombatAsync(ct);
@@ -61,6 +67,9 @@ public class GameEngine
             _state.Player2.ManaPool.Clear();
 
         } while (_turnStateMachine.AdvancePhase() != null);
+
+        // Process delayed triggers at end step (e.g., Goblin Pyromancer destroys all Goblins)
+        await ProcessDelayedTriggersAsync(GameEvent.EndStep, ct);
 
         // Clear end-of-turn effects and recalculate
         StripEndOfTurnEffects();
@@ -234,6 +243,8 @@ public class GameEngine
                         await ProcessTriggersAsync(GameEvent.EnterBattlefield, playCard, player, ct);
                         await OnBoardChangedAsync(ct);
                     }
+                    // Fire SpellCast board triggers (e.g., enchantress draw on enchantment cast)
+                    await ProcessBoardTriggersAsync(GameEvent.SpellCast, playCard, ct);
                     action.ManaCostPaid = cost;
                     player.ActionHistory.Push(action);
                 }
@@ -493,6 +504,136 @@ public class GameEngine
                 _state.Log($"{castPlayer.Name} casts {castCard.Name}.");
                 break;
             }
+
+            case ActionType.ActivateAbility:
+            {
+                var abilitySource = player.Battlefield.Cards.FirstOrDefault(c => c.Id == action.CardId);
+                if (abilitySource == null) break;
+
+                if (!CardDefinitions.TryGet(abilitySource.Name, out var abilityDef) || abilityDef.ActivatedAbility == null)
+                {
+                    _state.Log($"{abilitySource.Name} has no activated ability.");
+                    break;
+                }
+
+                var ability = abilityDef.ActivatedAbility;
+                var cost = ability.Cost;
+
+                // Validate: tap cost when already tapped
+                if (cost.TapSelf && abilitySource.IsTapped)
+                {
+                    _state.Log($"Cannot activate {abilitySource.Name} — already tapped.");
+                    break;
+                }
+
+                // Validate: mana cost
+                if (cost.ManaCost != null && !player.ManaPool.CanPay(cost.ManaCost))
+                {
+                    _state.Log($"Cannot activate {abilitySource.Name} — not enough mana.");
+                    break;
+                }
+
+                // Validate: sacrifice subtype
+                GameCard? sacrificeTarget = null;
+                if (cost.SacrificeSubtype != null)
+                {
+                    var eligible = player.Battlefield.Cards
+                        .Where(c => c.IsCreature && c.Subtypes.Contains(cost.SacrificeSubtype, StringComparer.OrdinalIgnoreCase))
+                        .ToList();
+
+                    if (eligible.Count == 0)
+                    {
+                        _state.Log($"Cannot activate {abilitySource.Name} — no eligible {cost.SacrificeSubtype} to sacrifice.");
+                        break;
+                    }
+
+                    var chosenId = await player.DecisionHandler.ChooseCard(
+                        eligible, $"Choose a {cost.SacrificeSubtype} to sacrifice", optional: false, ct);
+
+                    if (chosenId.HasValue)
+                        sacrificeTarget = eligible.FirstOrDefault(c => c.Id == chosenId.Value);
+
+                    if (sacrificeTarget == null)
+                    {
+                        _state.Log($"Cannot activate {abilitySource.Name} — no sacrifice target chosen.");
+                        break;
+                    }
+                }
+
+                // Pay costs: mana
+                if (cost.ManaCost != null)
+                {
+                    var abilityCost = cost.ManaCost;
+
+                    // Deduct colored requirements
+                    foreach (var (color, required) in abilityCost.ColorRequirements)
+                        player.ManaPool.Deduct(color, required);
+
+                    // Handle generic cost
+                    if (abilityCost.GenericCost > 0)
+                    {
+                        var remaining = new Dictionary<ManaColor, int>();
+                        foreach (var kvp in player.ManaPool.Available)
+                        {
+                            if (kvp.Value > 0)
+                                remaining[kvp.Key] = kvp.Value;
+                        }
+
+                        var toPay = abilityCost.GenericCost;
+                        foreach (var (color, amount) in remaining)
+                        {
+                            var take = Math.Min(amount, toPay);
+                            if (take > 0)
+                            {
+                                player.ManaPool.Deduct(color, take);
+                                toPay -= take;
+                            }
+                            if (toPay == 0) break;
+                        }
+                    }
+                }
+
+                // Pay costs: tap self
+                if (cost.TapSelf)
+                    abilitySource.IsTapped = true;
+
+                // Pay costs: sacrifice self
+                if (cost.SacrificeSelf)
+                {
+                    player.Battlefield.RemoveById(abilitySource.Id);
+                    player.Graveyard.Add(abilitySource);
+                    _state.Log($"{player.Name} sacrifices {abilitySource.Name}.");
+                }
+
+                // Pay costs: sacrifice subtype target
+                if (sacrificeTarget != null)
+                {
+                    player.Battlefield.RemoveById(sacrificeTarget.Id);
+                    player.Graveyard.Add(sacrificeTarget);
+                    _state.Log($"{player.Name} sacrifices {sacrificeTarget.Name}.");
+                }
+
+                // Find effect target
+                GameCard? effectTarget = null;
+                if (action.TargetCardId.HasValue)
+                {
+                    effectTarget = _state.Player1.Battlefield.Cards.FirstOrDefault(c => c.Id == action.TargetCardId.Value)
+                                ?? _state.Player2.Battlefield.Cards.FirstOrDefault(c => c.Id == action.TargetCardId.Value);
+                }
+
+                // Build context and execute effect
+                var effectContext = new EffectContext(_state, player, abilitySource, player.DecisionHandler)
+                {
+                    Target = effectTarget,
+                    TargetPlayerId = action.TargetPlayerId,
+                };
+
+                await ability.Effect.Execute(effectContext, ct);
+                await OnBoardChangedAsync(ct);
+
+                player.ActionHistory.Push(action);
+                break;
+            }
         }
     }
 
@@ -625,6 +766,14 @@ public class GameEngine
             _state.Log($"{attacker.Name} attacks with {card.Name} ({card.Power}/{card.Toughness}).");
         }
 
+        // Fire SelfAttacks triggers (e.g., Piledriver pump) after attackers declared
+        foreach (var attackerId in validAttackerIds)
+        {
+            var card = attacker.Battlefield.Cards.FirstOrDefault(c => c.Id == attackerId);
+            if (card != null)
+                await ProcessAttackTriggersAsync(card, ct);
+        }
+
         // Declare Blockers
         _state.CombatStep = CombatStep.DeclareBlockers;
 
@@ -670,11 +819,23 @@ public class GameEngine
 
         // Combat Damage
         _state.CombatStep = CombatStep.CombatDamage;
-        ResolveCombatDamage(attacker, defender);
+        var unblocked = ResolveCombatDamage(attacker, defender);
+
+        // Fire CombatDamageDealt triggers for unblocked attackers that dealt damage to the player
+        foreach (var unblockedAttacker in unblocked)
+        {
+            await ProcessBoardTriggersAsync(GameEvent.CombatDamageDealt, unblockedAttacker, ct);
+        }
 
         // Process deaths (state-based actions)
-        ProcessCombatDeaths(attacker);
-        ProcessCombatDeaths(defender);
+        var deadFromAttacker = ProcessCombatDeaths(attacker);
+        var deadFromDefender = ProcessCombatDeaths(defender);
+
+        // Fire Dies triggers for each creature that died
+        foreach (var deadCard in deadFromAttacker.Concat(deadFromDefender))
+        {
+            await ProcessBoardTriggersAsync(GameEvent.Dies, deadCard, ct);
+        }
 
         // Recalculate effects and check if any player lost due to combat damage
         await OnBoardChangedAsync(ct);
@@ -687,8 +848,13 @@ public class GameEngine
         _state.Combat = null;
     }
 
-    private void ResolveCombatDamage(Player attacker, Player defender)
+    /// <summary>
+    /// Resolves combat damage. Returns the list of unblocked attacker cards that dealt damage to the player.
+    /// </summary>
+    private List<GameCard> ResolveCombatDamage(Player attacker, Player defender)
     {
+        var unblockedAttackers = new List<GameCard>();
+
         foreach (var attackerId in _state.Combat!.Attackers)
         {
             var attackerCard = attacker.Battlefield.Cards.FirstOrDefault(c => c.Id == attackerId);
@@ -702,6 +868,7 @@ public class GameEngine
                 {
                     defender.AdjustLife(-damage);
                     _state.Log($"{attackerCard.Name} deals {damage} damage to {defender.Name}. ({defender.Life} life)");
+                    unblockedAttackers.Add(attackerCard);
                 }
             }
             else
@@ -740,9 +907,14 @@ public class GameEngine
                 }
             }
         }
+
+        return unblockedAttackers;
     }
 
-    private void ProcessCombatDeaths(Player player)
+    /// <summary>
+    /// Processes combat deaths for a player. Returns the list of cards that died.
+    /// </summary>
+    private List<GameCard> ProcessCombatDeaths(Player player)
     {
         var dead = player.Battlefield.Cards
             .Where(c => c.IsCreature && c.Toughness.HasValue && c.DamageMarked >= c.Toughness.Value)
@@ -758,6 +930,8 @@ public class GameEngine
             card.DamageMarked = 0;
             _state.Log($"{card.Name} dies.");
         }
+
+        return dead;
     }
 
     public void ClearDamage()
@@ -911,6 +1085,18 @@ public class GameEngine
             if (lethalP1 || lethalP2)
                 anyActionTaken = true;
 
+            // Lethal damage (MTG 704.5g) — creatures with damage >= toughness die
+            var lethalDamageDeaths = new List<GameCard>();
+            CheckLethalDamage(_state.Player1, lethalDamageDeaths);
+            CheckLethalDamage(_state.Player2, lethalDamageDeaths);
+            if (lethalDamageDeaths.Count > 0)
+            {
+                anyActionTaken = true;
+                // Fire Dies triggers for each creature that died from lethal damage
+                foreach (var deadCard in lethalDamageDeaths)
+                    await ProcessBoardTriggersAsync(GameEvent.Dies, deadCard, ct);
+            }
+
             // If anything changed, recalculate effects before looping
             if (anyActionTaken)
                 RecalculateState();
@@ -963,6 +1149,25 @@ public class GameEngine
         return dead.Count > 0;
     }
 
+    private void CheckLethalDamage(Player player, List<GameCard> deaths)
+    {
+        var dead = player.Battlefield.Cards
+            .Where(c => c.IsCreature && c.Toughness.HasValue && c.DamageMarked >= c.Toughness.Value && c.Toughness.Value > 0)
+            .ToList();
+
+        foreach (var card in dead)
+        {
+            player.Battlefield.RemoveById(card.Id);
+            // MTG rules: tokens go to graveyard then cease to exist (SBA 704.5d)
+            player.Graveyard.Add(card);
+            if (card.IsToken)
+                player.Graveyard.RemoveById(card.Id);
+            card.DamageMarked = 0;
+            _state.Log($"{card.Name} dies (lethal damage).");
+            deaths.Add(card);
+        }
+    }
+
     private async Task ProcessTriggersAsync(GameEvent evt, GameCard source, Player controller, CancellationToken ct)
     {
         if (source.Triggers.Count == 0) return;
@@ -976,6 +1181,94 @@ public class GameEngine
                 _state.Log($"{source.Name} triggers: {trigger.Effect.GetType().Name.Replace("Effect", "")}");
                 await ability.ResolveAsync(_state, ct);
             }
+        }
+    }
+
+    internal async Task ProcessBoardTriggersAsync(GameEvent evt, GameCard? relevantCard, CancellationToken ct)
+    {
+        foreach (var player in new[] { _state.Player1, _state.Player2 })
+        {
+            // Snapshot the battlefield to avoid modification during iteration
+            var permanents = player.Battlefield.Cards.ToList();
+            foreach (var permanent in permanents)
+            {
+                // Use triggers from the card instance (which includes CardDefinition triggers
+                // if created via GameCard.Create), falling back to CardDefinitions registry
+                var triggers = permanent.Triggers.Count > 0
+                    ? permanent.Triggers
+                    : (CardDefinitions.TryGet(permanent.Name, out var def) ? def.Triggers : []);
+                if (triggers.Count == 0) continue;
+
+                foreach (var trigger in triggers)
+                {
+                    if (trigger.Event != evt) continue;
+                    if (trigger.Condition == TriggerCondition.Self) continue; // Handled by ProcessTriggersAsync
+
+                    bool matches = trigger.Condition switch
+                    {
+                        TriggerCondition.AnyCreatureDies =>
+                            evt == GameEvent.Dies && relevantCard != null && relevantCard.IsCreature,
+
+                        TriggerCondition.ControllerCastsEnchantment =>
+                            evt == GameEvent.SpellCast
+                            && relevantCard != null
+                            && relevantCard.CardTypes.HasFlag(CardType.Enchantment)
+                            && _state.ActivePlayer == player,
+
+                        TriggerCondition.SelfDealsCombatDamage =>
+                            evt == GameEvent.CombatDamageDealt
+                            && relevantCard != null
+                            && relevantCard.Id == permanent.Id,
+
+                        TriggerCondition.SelfAttacks =>
+                            false, // Handled by ProcessAttackTriggersAsync
+
+                        TriggerCondition.Upkeep =>
+                            evt == GameEvent.Upkeep
+                            && _state.ActivePlayer == player,
+
+                        _ => false,
+                    };
+
+                    if (matches)
+                    {
+                        var context = new EffectContext(_state, player, permanent, player.DecisionHandler);
+                        _state.Log($"{permanent.Name} triggers: {trigger.Effect.GetType().Name.Replace("Effect", "")}");
+                        await trigger.Effect.Execute(context, ct);
+                    }
+                }
+            }
+        }
+    }
+
+    private async Task ProcessDelayedTriggersAsync(GameEvent evt, CancellationToken ct)
+    {
+        var toFire = _state.DelayedTriggers.Where(d => d.FireOn == evt).ToList();
+        foreach (var delayed in toFire)
+        {
+            var controller = delayed.ControllerId == _state.Player1.Id ? _state.Player1 : _state.Player2;
+            var context = new EffectContext(_state, controller, new GameCard { Name = "Delayed Trigger" }, controller.DecisionHandler);
+            await delayed.Effect.Execute(context, ct);
+            _state.DelayedTriggers.Remove(delayed);
+        }
+    }
+
+    private async Task ProcessAttackTriggersAsync(GameCard attacker, CancellationToken ct)
+    {
+        var player = _state.ActivePlayer;
+
+        // Check the card's own triggers first, then fall back to CardDefinitions
+        var triggers = attacker.Triggers.Count > 0
+            ? attacker.Triggers
+            : (CardDefinitions.TryGet(attacker.Name, out var def) ? def.Triggers : []);
+
+        foreach (var trigger in triggers)
+        {
+            if (trigger.Condition != TriggerCondition.SelfAttacks) continue;
+
+            var context = new EffectContext(_state, player, attacker, player.DecisionHandler);
+            _state.Log($"{attacker.Name} triggers: {trigger.Effect.GetType().Name.Replace("Effect", "")}");
+            await trigger.Effect.Execute(context, ct);
         }
     }
 

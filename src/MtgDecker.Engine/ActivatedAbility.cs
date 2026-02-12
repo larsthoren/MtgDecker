@@ -1,0 +1,16 @@
+using MtgDecker.Engine.Mana;
+using MtgDecker.Engine.Triggers;
+
+namespace MtgDecker.Engine;
+
+public record ActivatedAbilityCost(
+    bool TapSelf = false,
+    bool SacrificeSelf = false,
+    string? SacrificeSubtype = null,
+    ManaCost? ManaCost = null);
+
+public record ActivatedAbility(
+    ActivatedAbilityCost Cost,
+    IEffect Effect,
+    Func<GameCard, bool>? TargetFilter = null,
+    bool CanTargetPlayer = false);

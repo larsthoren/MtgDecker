@@ -57,6 +57,12 @@ public class GameCard
         && TurnEnteredBattlefield.Value >= currentTurn
         && !ActiveKeywords.Contains(Keyword.Haste);
 
+    private static readonly HashSet<string> BasicLandNames = new(StringComparer.OrdinalIgnoreCase)
+        { "Plains", "Island", "Swamp", "Mountain", "Forest" };
+
+    public bool IsBasicLand =>
+        IsLand && BasicLandNames.Contains(Name);
+
     // Backward-compatible: check both CardTypes flags and TypeLine
     public bool IsLand =>
         CardTypes.HasFlag(CardType.Land) ||
