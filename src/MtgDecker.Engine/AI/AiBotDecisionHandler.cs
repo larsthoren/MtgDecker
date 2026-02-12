@@ -5,8 +5,8 @@ namespace MtgDecker.Engine.AI;
 
 /// <summary>
 /// Heuristic AI bot that makes automated decisions for game play.
-/// Implements mulligan logic, mana payment, action selection, and card choice heuristics.
-/// Combat decisions (attackers/blockers) are stubs pending Task 6.
+/// Implements mulligan logic, mana payment, action selection, combat decisions,
+/// and card choice heuristics.
 /// </summary>
 public class AiBotDecisionHandler : IPlayerDecisionHandler
 {
@@ -173,27 +173,54 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
     }
 
     /// <summary>
-    /// Stub: returns empty list. Real logic implemented in Task 6.
+    /// Attacks with all eligible creatures. The engine already filters for
+    /// summoning sickness, so every creature passed here is ready to attack.
     /// </summary>
-    public Task<IReadOnlyList<Guid>> ChooseAttackers(IReadOnlyList<GameCard> eligibleAttackers, CancellationToken ct = default)
+    public Task<IReadOnlyList<Guid>> ChooseAttackers(IReadOnlyList<GameCard> eligibleAttackers,
+        CancellationToken ct = default)
     {
-        return Task.FromResult<IReadOnlyList<Guid>>([]);
+        var attackerIds = eligibleAttackers.Select(c => c.Id).ToList();
+        return Task.FromResult<IReadOnlyList<Guid>>(attackerIds);
     }
 
     /// <summary>
-    /// Stub: returns empty dict. Real logic implemented in Task 6.
+    /// Blocks when a creature can kill the attacker (power >= attacker toughness).
+    /// Uses the smallest sufficient blocker. Prioritizes blocking the biggest
+    /// attacker first to maximize value. Each blocker is only assigned once.
     /// </summary>
-    public Task<Dictionary<Guid, Guid>> ChooseBlockers(IReadOnlyList<GameCard> eligibleBlockers, IReadOnlyList<GameCard> attackers, CancellationToken ct = default)
+    public Task<Dictionary<Guid, Guid>> ChooseBlockers(IReadOnlyList<GameCard> eligibleBlockers,
+        IReadOnlyList<GameCard> attackers, CancellationToken ct = default)
     {
-        return Task.FromResult(new Dictionary<Guid, Guid>());
+        var assignments = new Dictionary<Guid, Guid>();
+        var usedBlockers = new HashSet<Guid>();
+
+        foreach (var attacker in attackers.OrderByDescending(a => a.Power ?? 0))
+        {
+            var bestBlocker = eligibleBlockers
+                .Where(b => !usedBlockers.Contains(b.Id))
+                .Where(b => (b.Power ?? 0) >= (attacker.Toughness ?? 0))
+                .OrderBy(b => b.Power ?? 0)
+                .FirstOrDefault();
+
+            if (bestBlocker != null)
+            {
+                assignments[bestBlocker.Id] = attacker.Id;
+                usedBlockers.Add(bestBlocker.Id);
+            }
+        }
+
+        return Task.FromResult(assignments);
     }
 
     /// <summary>
-    /// Stub: returns blockers in their given order. Real logic implemented in Task 6.
+    /// Orders blockers by toughness ascending so damage kills the smallest first,
+    /// maximizing the chance of killing multiple blockers.
     /// </summary>
-    public Task<IReadOnlyList<Guid>> OrderBlockers(Guid attackerId, IReadOnlyList<GameCard> blockers, CancellationToken ct = default)
+    public Task<IReadOnlyList<Guid>> OrderBlockers(Guid attackerId, IReadOnlyList<GameCard> blockers,
+        CancellationToken ct = default)
     {
-        return Task.FromResult<IReadOnlyList<Guid>>(blockers.Select(b => b.Id).ToList());
+        var ordered = blockers.OrderBy(b => b.Toughness ?? 0).Select(b => b.Id).ToList();
+        return Task.FromResult<IReadOnlyList<Guid>>(ordered);
     }
 
     /// <summary>
