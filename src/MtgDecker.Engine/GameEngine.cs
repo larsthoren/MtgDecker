@@ -83,6 +83,14 @@ public class GameEngine
                     _state.ActivePlayer.Hand.Add(drawn);
                     _state.Log($"{_state.ActivePlayer.Name} draws a card.");
                 }
+                else
+                {
+                    var loser = _state.ActivePlayer;
+                    var winner = _state.GetOpponent(loser);
+                    _state.IsGameOver = true;
+                    _state.Winner = winner.Name;
+                    _state.Log($"{loser.Name} loses — cannot draw from an empty library.");
+                }
                 break;
         }
     }
@@ -619,13 +627,23 @@ public class GameEngine
         _state.Log($"{player.Name} mulliganed to 0 cards.");
     }
 
-    private void DrawCards(Player player, int count)
+    internal void DrawCards(Player player, int count)
     {
         for (int i = 0; i < count; i++)
         {
             var card = player.Library.DrawFromTop();
             if (card != null)
+            {
                 player.Hand.Add(card);
+            }
+            else
+            {
+                var winner = _state.GetOpponent(player);
+                _state.IsGameOver = true;
+                _state.Winner = winner.Name;
+                _state.Log($"{player.Name} loses — cannot draw from an empty library.");
+                return;
+            }
         }
     }
 
