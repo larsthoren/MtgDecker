@@ -157,7 +157,9 @@ public static class CardDefinitions
             ["Plains"] = new(null, ManaAbility.Fixed(ManaColor.White), null, null, CardType.Land) { Subtypes = ["Plains"] },
             ["Brushland"] = new(null, ManaAbility.Choice(ManaColor.Colorless, ManaColor.Green, ManaColor.White), null, null, CardType.Land),
             ["Windswept Heath"] = new(null, null, null, null, CardType.Land) { FetchAbility = new FetchAbility(["Plains", "Forest"]) },
-            ["Serra's Sanctum"] = new(null, null, null, null, CardType.Land) { IsLegendary = true },
+            ["Serra's Sanctum"] = new(null, ManaAbility.Dynamic(ManaColor.White,
+                p => p.Battlefield.Cards.Count(c => c.CardTypes.HasFlag(CardType.Enchantment))),
+                null, null, CardType.Land) { IsLegendary = true },
         };
 
         Registry = cards.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);

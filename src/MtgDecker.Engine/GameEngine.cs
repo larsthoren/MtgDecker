@@ -287,6 +287,19 @@ public class GameEngine
                             action.ManaProduced = chosen;
                             _state.Log($"{player.Name} taps {tapTarget.Name} for {chosen}.");
                         }
+                        else if (ability.Type == ManaAbilityType.Dynamic)
+                        {
+                            var amount = ability.CountFunc!(player);
+                            if (amount > 0)
+                            {
+                                player.ManaPool.Add(ability.DynamicColor!.Value, amount);
+                                _state.Log($"{player.Name} taps {tapTarget.Name} for {amount} {ability.DynamicColor}.");
+                            }
+                            else
+                            {
+                                _state.Log($"{player.Name} taps {tapTarget.Name} (produces no mana).");
+                            }
+                        }
                     }
                     else
                     {
