@@ -9,4 +9,5 @@ public enum GameEvent
     CombatDamageDealt,
     DrawCard,
     Upkeep,
+    EndStep,
 }

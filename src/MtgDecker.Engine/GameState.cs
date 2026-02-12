@@ -17,6 +17,7 @@ public class GameState
     public CombatState? Combat { get; set; }
     public List<StackObject> Stack { get; } = new();
     public List<ContinuousEffect> ActiveEffects { get; } = new();
+    public List<DelayedTrigger> DelayedTriggers { get; } = new();
     public List<string> GameLog { get; } = new();
     public event Action? OnStateChanged;
 
