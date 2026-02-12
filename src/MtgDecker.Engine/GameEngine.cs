@@ -510,6 +510,7 @@ public class GameEngine
         foreach (var card in dead)
         {
             player.Battlefield.RemoveById(card.Id);
+            // MTG rules: tokens go to graveyard then cease to exist (SBA 704.5d)
             player.Graveyard.Add(card);
             if (card.IsToken)
                 player.Graveyard.RemoveById(card.Id);

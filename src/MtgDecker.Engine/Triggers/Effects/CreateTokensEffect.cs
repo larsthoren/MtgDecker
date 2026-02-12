@@ -6,7 +6,7 @@ public class CreateTokensEffect(
     string name, int power, int toughness, CardType cardTypes,
     IReadOnlyList<string> subtypes, int count = 1) : IEffect
 {
-    public async Task Execute(EffectContext context, CancellationToken ct = default)
+    public Task Execute(EffectContext context, CancellationToken ct = default)
     {
         for (int i = 0; i < count; i++)
         {
@@ -23,6 +23,6 @@ public class CreateTokensEffect(
             context.Controller.Battlefield.Add(token);
             context.State.Log($"{context.Controller.Name} creates a {name} token ({power}/{toughness}).");
         }
-        await Task.CompletedTask;
+        return Task.CompletedTask;
     }
 }
