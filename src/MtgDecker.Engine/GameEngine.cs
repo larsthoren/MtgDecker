@@ -44,6 +44,8 @@ public class GameEngine
                     ExecuteTurnBasedAction(phase.Phase);
             }
 
+            if (_state.IsGameOver) return;
+
             if (phase.Phase == Phase.Combat)
             {
                 await RunCombatAsync(ct);
@@ -52,6 +54,8 @@ public class GameEngine
             {
                 await RunPriorityAsync(ct);
             }
+
+            if (_state.IsGameOver) return;
 
             _state.Player1.ManaPool.Clear();
             _state.Player2.ManaPool.Clear();
@@ -82,6 +86,14 @@ public class GameEngine
                 {
                     _state.ActivePlayer.Hand.Add(drawn);
                     _state.Log($"{_state.ActivePlayer.Name} draws a card.");
+                }
+                else
+                {
+                    var loser = _state.ActivePlayer;
+                    var winner = _state.GetOpponent(loser);
+                    _state.IsGameOver = true;
+                    _state.Winner = winner.Name;
+                    _state.Log($"{loser.Name} loses — cannot draw from an empty library.");
                 }
                 break;
         }
@@ -586,6 +598,9 @@ public class GameEngine
         ProcessCombatDeaths(attacker);
         ProcessCombatDeaths(defender);
 
+        // Check if any player lost due to combat damage
+        CheckStateBasedActions();
+
         // End Combat
         _state.CombatStep = CombatStep.EndCombat;
         _state.Log("End of combat.");
@@ -673,6 +688,33 @@ public class GameEngine
             card.DamageMarked = 0;
         foreach (var card in _state.Player2.Battlefield.Cards)
             card.DamageMarked = 0;
+    }
+
+    internal void CheckStateBasedActions()
+    {
+        if (_state.IsGameOver) return;
+
+        bool p1Dead = _state.Player1.Life <= 0;
+        bool p2Dead = _state.Player2.Life <= 0;
+
+        if (p1Dead && p2Dead)
+        {
+            _state.IsGameOver = true;
+            _state.Winner = null; // draw
+            _state.Log($"Both players lose — {_state.Player1.Name} ({_state.Player1.Life} life) and {_state.Player2.Name} ({_state.Player2.Life} life).");
+        }
+        else if (p1Dead)
+        {
+            _state.IsGameOver = true;
+            _state.Winner = _state.Player2.Name;
+            _state.Log($"{_state.Player1.Name} loses — life reached {_state.Player1.Life}.");
+        }
+        else if (p2Dead)
+        {
+            _state.IsGameOver = true;
+            _state.Winner = _state.Player1.Name;
+            _state.Log($"{_state.Player2.Name} loses — life reached {_state.Player2.Life}.");
+        }
     }
 
     private async Task ProcessTriggersAsync(GameEvent evt, GameCard source, Player controller, CancellationToken ct)
@@ -829,13 +871,23 @@ public class GameEngine
         _state.Log($"{player.Name} mulliganed to 0 cards.");
     }
 
-    private void DrawCards(Player player, int count)
+    internal void DrawCards(Player player, int count)
     {
         for (int i = 0; i < count; i++)
         {
             var card = player.Library.DrawFromTop();
             if (card != null)
+            {
                 player.Hand.Add(card);
+            }
+            else
+            {
+                var winner = _state.GetOpponent(player);
+                _state.IsGameOver = true;
+                _state.Winner = winner.Name;
+                _state.Log($"{player.Name} loses — cannot draw from an empty library.");
+                return;
+            }
         }
     }
 
