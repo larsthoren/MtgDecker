@@ -80,6 +80,7 @@
                              Power="@card.Power"
                              Toughness="@card.Toughness"
                              DamageMarked="@card.DamageMarked"
+                             SummoningSick="@(card.IsCreature && card.HasSummoningSickness(State.TurnNumber))"
                              OnClick="async () => await HandleOpponentCardClick(card)" />
             }
         </div>
@@ -124,6 +125,7 @@
                              IsAttacking="@(_selectedAttackers.Contains(card.Id) || State.Combat?.Attackers.Contains(card.Id) == true)"
                              IsBlocking="@(_blockerAssignments.ContainsKey(card.Id) || IsCardBlockingAnywhere(card.Id))"
                              Eligible="@(isEligibleAttacker || isEligibleBlocker)"
+                             SummoningSick="@(card.IsCreature && card.HasSummoningSickness(State.TurnNumber))"
                              Clickable="true"
                              OnClick="async () => await HandleBattlefieldClick(card, isEligibleAttacker, isEligibleBlocker)" />
             }
