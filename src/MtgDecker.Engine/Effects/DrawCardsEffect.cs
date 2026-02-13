@@ -8,7 +8,7 @@ public class DrawCardsEffect : SpellEffect
 
     public override void Resolve(GameState state, StackObject spell)
     {
-        var player = spell.ControllerId == state.Player1.Id ? state.Player1 : state.Player2;
+        var player = state.GetPlayer(spell.ControllerId);
         var drawn = 0;
         for (int i = 0; i < Count; i++)
         {

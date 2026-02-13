@@ -104,7 +104,7 @@ public class GameEngine
         if (action.PlayerId != _state.Player1.Id && action.PlayerId != _state.Player2.Id)
             throw new InvalidOperationException($"Unknown player ID: {action.PlayerId}");
 
-        var player = action.PlayerId == _state.Player1.Id ? _state.Player1 : _state.Player2;
+        var player = _state.GetPlayer(action.PlayerId);
 
         switch (action.Type)
         {
@@ -289,7 +289,7 @@ public class GameEngine
 
             case ActionType.CastSpell:
             {
-                var castPlayer = action.PlayerId == _state.Player1.Id ? _state.Player1 : _state.Player2;
+                var castPlayer = _state.GetPlayer(action.PlayerId);
                 var castCard = castPlayer.Hand.Cards.FirstOrDefault(c => c.Id == action.CardId);
                 if (castCard == null)
                 {
@@ -693,24 +693,6 @@ public class GameEngine
         }
     }
 
-    private void ProcessCombatDeaths(Player player)
-    {
-        var dead = player.Battlefield.Cards
-            .Where(c => c.IsCreature && c.Toughness.HasValue && c.DamageMarked >= c.Toughness.Value)
-            .ToList();
-
-        foreach (var card in dead)
-        {
-            player.Battlefield.RemoveById(card.Id);
-            // MTG rules: tokens go to graveyard then cease to exist (SBA 704.5d)
-            player.Graveyard.Add(card);
-            if (card.IsToken)
-                player.Graveyard.RemoveById(card.Id);
-            card.DamageMarked = 0;
-            _state.Log($"{card.Name} dies.");
-        }
-    }
-
     public void ClearDamage()
     {
         foreach (var card in _state.Player1.Battlefield.Cards)
@@ -835,7 +817,7 @@ public class GameEngine
 
         var top = _state.Stack[^1];
         _state.Stack.RemoveAt(_state.Stack.Count - 1);
-        var controller = top.ControllerId == _state.Player1.Id ? _state.Player1 : _state.Player2;
+        var controller = _state.GetPlayer(top.ControllerId);
 
         _state.Log($"Resolving {top.Card.Name}.");
 
@@ -861,7 +843,7 @@ public class GameEngine
                         continue;
                     }
 
-                    var targetOwner = target.PlayerId == _state.Player1.Id ? _state.Player1 : _state.Player2;
+                    var targetOwner = _state.GetPlayer(target.PlayerId);
                     var targetZone = targetOwner.GetZone(target.Zone);
                     if (!targetZone.Contains(target.CardId))
                     {

@@ -23,14 +23,14 @@ public class DamageEffect : SpellEffect
         if (target.CardId == Guid.Empty && target.Zone == ZoneType.None)
         {
             // Player target
-            var player = target.PlayerId == state.Player1.Id ? state.Player1 : state.Player2;
+            var player = state.GetPlayer(target.PlayerId);
             player.AdjustLife(-Amount);
             state.Log($"{spell.Card.Name} deals {Amount} damage to {player.Name}. ({player.Life} life)");
         }
         else
         {
             // Creature target
-            var owner = target.PlayerId == state.Player1.Id ? state.Player1 : state.Player2;
+            var owner = state.GetPlayer(target.PlayerId);
             var creature = owner.Battlefield.Cards.FirstOrDefault(c => c.Id == target.CardId);
             if (creature == null) return; // target removed = fizzle
             creature.DamageMarked += Amount;

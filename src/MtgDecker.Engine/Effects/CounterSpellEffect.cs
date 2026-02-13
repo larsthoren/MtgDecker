@@ -19,7 +19,7 @@ public class CounterSpellEffect : SpellEffect
         state.Stack.Remove(targetSpell);
 
         // Move countered card to owner's graveyard
-        var owner = targetSpell.ControllerId == state.Player1.Id ? state.Player1 : state.Player2;
+        var owner = state.GetPlayer(targetSpell.ControllerId);
         owner.Graveyard.Add(targetSpell.Card);
 
         state.Log($"{targetSpell.Card.Name} is countered by {spell.Card.Name}.");

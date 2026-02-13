@@ -5,7 +5,7 @@ public class BrainstormEffect : SpellEffect
     public override async Task ResolveAsync(GameState state, StackObject spell,
         IPlayerDecisionHandler handler, CancellationToken ct = default)
     {
-        var player = spell.ControllerId == state.Player1.Id ? state.Player1 : state.Player2;
+        var player = state.GetPlayer(spell.ControllerId);
 
         // Draw 3
         var drawn = 0;

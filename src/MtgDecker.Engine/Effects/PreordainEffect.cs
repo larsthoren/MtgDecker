@@ -5,7 +5,7 @@ public class PreordainEffect : SpellEffect
     public override async Task ResolveAsync(GameState state, StackObject spell,
         IPlayerDecisionHandler handler, CancellationToken ct = default)
     {
-        var player = spell.ControllerId == state.Player1.Id ? state.Player1 : state.Player2;
+        var player = state.GetPlayer(spell.ControllerId);
 
         // Scry 2: look at top 2 cards
         var top2 = player.Library.PeekTop(2).ToList();

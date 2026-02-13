@@ -108,7 +108,7 @@ public class CardDefinitionsTests
             // Burn deck
             "Lightning Bolt", "Chain Lightning", "Lava Spike", "Rift Bolt",
             "Fireblast", "Goblin Guide", "Monastery Swiftspear",
-            "Eidolon of the Great Revel", "Searing Blood",
+            "Eidolon of the Great Revel", "Searing Blood", "Flame Rift",
             // UR Delver deck
             "Brainstorm", "Ponder", "Preordain", "Counterspell", "Daze",
             "Force of Will", "Delver of Secrets", "Murktide Regent",
@@ -156,6 +156,7 @@ public class CardDefinitionsTests
     [InlineData("Monastery Swiftspear")]
     [InlineData("Eidolon of the Great Revel")]
     [InlineData("Searing Blood")]
+    [InlineData("Flame Rift")]
     public void BurnDeckCard_IsRegistered(string cardName)
     {
         CardDefinitions.TryGet(cardName, out var def).Should().BeTrue();

@@ -32,6 +32,9 @@ public class GameState
     public Player GetOpponent(Player player) =>
         player == Player1 ? Player2 : Player1;
 
+    public Player GetPlayer(Guid playerId) =>
+        playerId == Player1.Id ? Player1 : Player2;
+
     public void Log(string message)
     {
         GameLog.Add(message);

@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Collections.Frozen;
 using System.Diagnostics.CodeAnalysis;
 using MtgDecker.Engine.Effects;
@@ -11,7 +12,7 @@ namespace MtgDecker.Engine;
 public static class CardDefinitions
 {
     private static readonly FrozenDictionary<string, CardDefinition> Registry;
-    private static readonly Dictionary<string, CardDefinition> RuntimeOverrides = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly ConcurrentDictionary<string, CardDefinition> RuntimeOverrides = new(StringComparer.OrdinalIgnoreCase);
 
     static CardDefinitions()
     {
@@ -94,6 +95,8 @@ public static class CardDefinitions
                 CardType.Creature | CardType.Enchantment) { Subtypes = ["Spirit"] },
             ["Searing Blood"] = new(ManaCost.Parse("{R}{R}"), null, null, null, CardType.Instant,
                 TargetFilter.Creature(), new DamageEffect(2, canTargetPlayer: false)),
+            ["Flame Rift"] = new(ManaCost.Parse("{1}{R}"), null, null, null, CardType.Sorcery,
+                Effect: new DamageAllPlayersEffect(4)),
 
             // === UR Delver deck ===
             ["Brainstorm"] = new(ManaCost.Parse("{U}"), null, null, null, CardType.Instant,
@@ -143,6 +146,6 @@ public static class CardDefinitions
     /// </summary>
     public static bool Unregister(string cardName)
     {
-        return RuntimeOverrides.Remove(cardName);
+        return RuntimeOverrides.TryRemove(cardName, out _);
     }
 }
