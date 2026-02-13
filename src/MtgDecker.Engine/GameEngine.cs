@@ -757,7 +757,7 @@ public class GameEngine
                 {
                     if (_state.Stack.Count > 0)
                     {
-                        ResolveTopOfStack();
+                        await ResolveTopOfStackAsync(ct);
                         _state.PriorityPlayer = _state.ActivePlayer;
                         activePlayerPassed = false;
                         nonActivePlayerPassed = false;
@@ -778,7 +778,7 @@ public class GameEngine
         }
     }
 
-    private void ResolveTopOfStack()
+    private async Task ResolveTopOfStackAsync(CancellationToken ct = default)
     {
         if (_state.Stack.Count == 0) return;
 
@@ -812,7 +812,7 @@ public class GameEngine
                 }
             }
 
-            def.Effect.Resolve(_state, top);
+            await def.Effect.ResolveAsync(_state, top, controller.DecisionHandler, ct);
             controller.Graveyard.Add(top.Card);
         }
         else

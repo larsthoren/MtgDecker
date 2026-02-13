@@ -11,6 +11,7 @@ namespace MtgDecker.Engine;
 public static class CardDefinitions
 {
     private static readonly FrozenDictionary<string, CardDefinition> Registry;
+    private static readonly Dictionary<string, CardDefinition> RuntimeOverrides = new(StringComparer.OrdinalIgnoreCase);
 
     static CardDefinitions()
     {
@@ -82,6 +83,25 @@ public static class CardDefinitions
 
     public static bool TryGet(string cardName, [NotNullWhen(true)] out CardDefinition? definition)
     {
+        if (RuntimeOverrides.TryGetValue(cardName, out definition))
+            return true;
         return Registry.TryGetValue(cardName, out definition);
+    }
+
+    /// <summary>
+    /// Register a card definition at runtime (for new card sets, tests, etc.).
+    /// Runtime registrations take priority over the built-in registry.
+    /// </summary>
+    public static void Register(CardDefinition definition)
+    {
+        RuntimeOverrides[definition.Name] = definition;
+    }
+
+    /// <summary>
+    /// Remove a runtime-registered card definition.
+    /// </summary>
+    public static bool Unregister(string cardName)
+    {
+        return RuntimeOverrides.Remove(cardName);
     }
 }
