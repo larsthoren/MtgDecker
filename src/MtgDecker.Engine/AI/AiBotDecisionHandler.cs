@@ -23,6 +23,10 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
         if (gameState.CurrentPhase != Phase.MainPhase1 && gameState.CurrentPhase != Phase.MainPhase2)
             return Task.FromResult(GameAction.Pass(playerId));
 
+        // Non-active player passes priority (this bot doesn't play instants)
+        if (gameState.ActivePlayer.Id != playerId)
+            return Task.FromResult(GameAction.Pass(playerId));
+
         var player = gameState.Player1.Id == playerId ? gameState.Player1 : gameState.Player2;
         var hand = player.Hand.Cards;
 
@@ -66,6 +70,10 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
         }
 
         // Priority 4: Cast most expensive affordable spell (accounting for cost modification)
+        // Only attempt sorcery-speed casts when the stack is empty (matches engine's CanCastSorcery check)
+        if (gameState.Stack.Count > 0)
+            return Task.FromResult(GameAction.Pass(playerId));
+
         var castable = hand
             .Where(c => !c.IsLand && c.ManaCost != null)
             .Select(c =>
@@ -82,7 +90,13 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
             .FirstOrDefault();
 
         if (castable != null)
+        {
+            // Use CastSpell for cards in the registry (proper stack/mana flow),
+            // fall back to PlayCard for sandbox-mode cards (no CardDefinitions entry)
+            if (CardDefinitions.TryGet(castable.Name, out _))
+                return Task.FromResult(GameAction.CastSpell(playerId, castable.Id));
             return Task.FromResult(GameAction.PlayCard(playerId, castable.Id));
+        }
 
         // Priority 5: Cycling — if a card can be cycled but not cast, cycle it
         foreach (var card in hand)

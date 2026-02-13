@@ -18,6 +18,7 @@ public class GameAction
     // Undo metadata — set by GameEngine during ExecuteAction
     public ManaColor? ManaProduced { get; internal set; }
     public ManaCost? ManaCostPaid { get; internal set; }
+    public Dictionary<ManaColor, int>? ActualManaPaid { get; internal set; }
     public bool IsLandDrop { get; internal set; }
 
     public static GameAction Pass(Guid playerId) => new()

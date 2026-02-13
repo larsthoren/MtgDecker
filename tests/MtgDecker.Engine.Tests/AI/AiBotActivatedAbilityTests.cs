@@ -119,7 +119,7 @@ public class AiBotActivatedAbilityTests
         var action = await bot.DecisionHandler.GetAction(state, bot.Id);
 
         // Should cast the spell, not activate Prospector
-        action.Type.Should().Be(ActionType.PlayCard);
+        action.Type.Should().Be(ActionType.CastSpell);
         action.CardId.Should().Be(lackey.Id);
     }
 

@@ -52,7 +52,7 @@ public class AiBotActionTests
 
         var action = await ((AiBotDecisionHandler)player.DecisionHandler).GetAction(state, player.Id);
 
-        action.Type.Should().Be(ActionType.PlayCard);
+        action.Type.Should().Be(ActionType.CastSpell);
         action.CardId.Should().Be(goblin.Id);
     }
 
@@ -150,12 +150,13 @@ public class AiBotActionTests
     [Fact]
     public async Task GetAction_Player2AsBot_ResolvesCorrectly()
     {
-        // Ensure the bot works when it's Player2, not just Player1
+        // Ensure the bot works when it's Player2 and active player
         var bot = new AiBotDecisionHandler();
         var p1 = new Player(Guid.NewGuid(), "Human", new AiBotDecisionHandler());
         var p2 = new Player(Guid.NewGuid(), "Bot", bot);
         var state = new GameState(p1, p2);
         state.CurrentPhase = Phase.MainPhase1;
+        state.ActivePlayer = p2;
 
         var mountain = new GameCard { Name = "Mountain", CardTypes = CardType.Land };
         p2.Hand.Add(mountain);

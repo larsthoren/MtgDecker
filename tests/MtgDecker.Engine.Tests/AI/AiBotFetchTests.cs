@@ -156,7 +156,7 @@ public class AiBotFetchTests
 
         var action = await bot.GetAction(state, p1.Id);
         // Bot should try to cast the Ringleader (with cost reduction, it can afford it)
-        action.Type.Should().Be(ActionType.PlayCard);
+        action.Type.Should().Be(ActionType.CastSpell);
         action.CardId.Should().Be(ringleader.Id);
     }
 }
