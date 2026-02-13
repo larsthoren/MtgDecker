@@ -627,11 +627,7 @@ public class GameEngine
         _state.CombatStep = CombatStep.CombatDamage;
         ResolveCombatDamage(attacker, defender);
 
-        // Process deaths (state-based actions)
-        ProcessCombatDeaths(attacker);
-        ProcessCombatDeaths(defender);
-
-        // Check if any player lost due to combat damage
+        // State-based actions: creature lethal damage + player life check
         CheckStateBasedActions();
 
         // End Combat
@@ -727,6 +723,26 @@ public class GameEngine
     {
         if (_state.IsGameOver) return;
 
+        // SBA 704.5a/b: Creature lethal damage — check both players' battlefields
+        foreach (var player in new[] { _state.Player1, _state.Player2 })
+        {
+            var lethal = player.Battlefield.Cards
+                .Where(c => c.IsCreature && c.Toughness.HasValue && c.DamageMarked >= c.Toughness.Value)
+                .ToList();
+
+            foreach (var creature in lethal)
+            {
+                player.Battlefield.RemoveById(creature.Id);
+                creature.DamageMarked = 0;
+                player.Graveyard.Add(creature);
+                // MTG rules: tokens go to graveyard then cease to exist (SBA 704.5d)
+                if (creature.IsToken)
+                    player.Graveyard.RemoveById(creature.Id);
+                _state.Log($"{creature.Name} dies (lethal damage).");
+            }
+        }
+
+        // SBA 704.5: Player life check
         bool p1Dead = _state.Player1.Life <= 0;
         bool p2Dead = _state.Player2.Life <= 0;
 
@@ -791,6 +807,8 @@ public class GameEngine
                     if (_state.Stack.Count > 0)
                     {
                         await ResolveTopOfStackAsync(ct);
+                        CheckStateBasedActions();
+                        if (_state.IsGameOver) return;
                         _state.PriorityPlayer = _state.ActivePlayer;
                         activePlayerPassed = false;
                         nonActivePlayerPassed = false;
