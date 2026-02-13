@@ -17,4 +17,11 @@ public record CardDefinition(
     public string Name { get; init; } = string.Empty;
     public IReadOnlyList<string> Subtypes { get; init; } = [];
     public IReadOnlyList<Trigger> Triggers { get; init; } = [];
+    public bool IsLegendary { get; init; }
+    public FetchAbility? FetchAbility { get; init; }
+    public IReadOnlyList<ContinuousEffect> ContinuousEffects { get; init; } = [];
+    public ActivatedAbility? ActivatedAbility { get; init; }
+    public AuraTarget? AuraTarget { get; init; }
+    public ManaCost? CyclingCost { get; init; }
+    public IReadOnlyList<Trigger> CyclingTriggers { get; init; } = [];
 }

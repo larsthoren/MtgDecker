@@ -3,7 +3,7 @@ using MtgDecker.Engine.Mana;
 
 namespace MtgDecker.Engine;
 
-public class StackObject
+public class StackObject : IStackObject
 {
     public Guid Id { get; } = Guid.NewGuid();
     public GameCard Card { get; }

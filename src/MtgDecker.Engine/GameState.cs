@@ -15,7 +15,9 @@ public class GameState
     public bool IsFirstTurn { get; set; }
     public CombatStep CombatStep { get; set; } = CombatStep.None;
     public CombatState? Combat { get; set; }
-    public List<StackObject> Stack { get; } = new();
+    public List<IStackObject> Stack { get; } = new();
+    public List<ContinuousEffect> ActiveEffects { get; } = new();
+    public List<DelayedTrigger> DelayedTriggers { get; } = new();
     public List<string> GameLog { get; } = new();
     public event Action? OnStateChanged;
 

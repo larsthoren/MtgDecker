@@ -99,5 +99,7 @@ public class SimulationRunner
         Subtypes = original.Subtypes,
         Triggers = original.Triggers,
         IsToken = original.IsToken,
+        IsLegendary = original.IsLegendary,
+        FetchAbility = original.FetchAbility,
     };
 }

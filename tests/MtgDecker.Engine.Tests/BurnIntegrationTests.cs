@@ -252,7 +252,7 @@ public class BurnIntegrationTests
         await engine.ExecuteAction(GameAction.CastSpell(state.Player1.Id, bolt.Id));
 
         state.Stack.Should().HaveCount(1);
-        state.Stack[0].Card.Name.Should().Be("Lightning Bolt");
+        ((StackObject)state.Stack[0]).Card.Name.Should().Be("Lightning Bolt");
     }
 
     [Fact]

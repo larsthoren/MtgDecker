@@ -7,7 +7,7 @@ namespace MtgDecker.Engine.Tests;
 public class StateBasedActionTests
 {
     [Fact]
-    public void CheckStateBasedActions_LifeAtZero_SetsGameOver()
+    public async Task CheckStateBasedActions_LifeAtZero_SetsGameOver()
     {
         var p1 = new Player(Guid.NewGuid(), "Player 1", new TestDecisionHandler());
         var p2 = new Player(Guid.NewGuid(), "Player 2", new TestDecisionHandler());
@@ -16,14 +16,14 @@ public class StateBasedActionTests
 
         p1.AdjustLife(-20); // life = 0
 
-        engine.CheckStateBasedActions();
+        await engine.CheckStateBasedActionsAsync();
 
         state.IsGameOver.Should().BeTrue();
         state.Winner.Should().Be("Player 2");
     }
 
     [Fact]
-    public void CheckStateBasedActions_LifeBelowZero_SetsGameOver()
+    public async Task CheckStateBasedActions_LifeBelowZero_SetsGameOver()
     {
         var p1 = new Player(Guid.NewGuid(), "Player 1", new TestDecisionHandler());
         var p2 = new Player(Guid.NewGuid(), "Player 2", new TestDecisionHandler());
@@ -32,28 +32,28 @@ public class StateBasedActionTests
 
         p2.AdjustLife(-25); // life = -5
 
-        engine.CheckStateBasedActions();
+        await engine.CheckStateBasedActionsAsync();
 
         state.IsGameOver.Should().BeTrue();
         state.Winner.Should().Be("Player 1");
     }
 
     [Fact]
-    public void CheckStateBasedActions_BothAlive_DoesNotEndGame()
+    public async Task CheckStateBasedActions_BothAlive_DoesNotEndGame()
     {
         var p1 = new Player(Guid.NewGuid(), "Player 1", new TestDecisionHandler());
         var p2 = new Player(Guid.NewGuid(), "Player 2", new TestDecisionHandler());
         var state = new GameState(p1, p2);
         var engine = new GameEngine(state);
 
-        engine.CheckStateBasedActions();
+        await engine.CheckStateBasedActionsAsync();
 
         state.IsGameOver.Should().BeFalse();
         state.Winner.Should().BeNull();
     }
 
     [Fact]
-    public void CheckStateBasedActions_BothAtZero_SetsGameOver()
+    public async Task CheckStateBasedActions_BothAtZero_SetsGameOver()
     {
         var p1 = new Player(Guid.NewGuid(), "Player 1", new TestDecisionHandler());
         var p2 = new Player(Guid.NewGuid(), "Player 2", new TestDecisionHandler());
@@ -63,14 +63,14 @@ public class StateBasedActionTests
         p1.AdjustLife(-20);
         p2.AdjustLife(-20);
 
-        engine.CheckStateBasedActions();
+        await engine.CheckStateBasedActionsAsync();
 
         // Both at 0 — draw (both lose simultaneously)
         state.IsGameOver.Should().BeTrue();
     }
 
     [Fact]
-    public void CreatureWithLethalDamage_Dies()
+    public async Task CreatureWithLethalDamage_Dies()
     {
         // Setup: 2/2 creature on battlefield with 2 damage marked
         var p1 = new Player(Guid.NewGuid(), "Player 1", new TestDecisionHandler());
@@ -88,14 +88,14 @@ public class StateBasedActionTests
         p1.Battlefield.Add(creature);
         creature.DamageMarked = 2;
 
-        engine.CheckStateBasedActions();
+        await engine.CheckStateBasedActionsAsync();
 
         p1.Battlefield.Cards.Should().NotContain(creature);
         p1.Graveyard.Cards.Should().Contain(creature);
     }
 
     [Fact]
-    public void CreatureWithExcessDamage_Dies()
+    public async Task CreatureWithExcessDamage_Dies()
     {
         // 1/1 with 3 damage marked -> still dies
         var p1 = new Player(Guid.NewGuid(), "Player 1", new TestDecisionHandler());
@@ -113,14 +113,14 @@ public class StateBasedActionTests
         p1.Battlefield.Add(creature);
         creature.DamageMarked = 3;
 
-        engine.CheckStateBasedActions();
+        await engine.CheckStateBasedActionsAsync();
 
         p1.Battlefield.Cards.Should().NotContain(creature);
         p1.Graveyard.Cards.Should().Contain(creature);
     }
 
     [Fact]
-    public void CreatureWithNonLethalDamage_Survives()
+    public async Task CreatureWithNonLethalDamage_Survives()
     {
         // 3/3 with 2 damage marked -> stays on battlefield
         var p1 = new Player(Guid.NewGuid(), "Player 1", new TestDecisionHandler());
@@ -138,14 +138,14 @@ public class StateBasedActionTests
         p1.Battlefield.Add(creature);
         creature.DamageMarked = 2;
 
-        engine.CheckStateBasedActions();
+        await engine.CheckStateBasedActionsAsync();
 
         p1.Battlefield.Cards.Should().Contain(creature);
         p1.Graveyard.Cards.Should().BeEmpty();
     }
 
     [Fact]
-    public void PlayerAtZeroLife_LosesGame()
+    public async Task PlayerAtZeroLife_LosesGame()
     {
         var p1 = new Player(Guid.NewGuid(), "Player 1", new TestDecisionHandler());
         var p2 = new Player(Guid.NewGuid(), "Player 2", new TestDecisionHandler());
@@ -154,7 +154,7 @@ public class StateBasedActionTests
 
         p1.AdjustLife(-20); // life = 0
 
-        engine.CheckStateBasedActions();
+        await engine.CheckStateBasedActionsAsync();
 
         state.IsGameOver.Should().BeTrue();
         state.Winner.Should().Be("Player 2");
@@ -162,7 +162,7 @@ public class StateBasedActionTests
     }
 
     [Fact]
-    public void PlayerAtNegativeLife_LosesGame()
+    public async Task PlayerAtNegativeLife_LosesGame()
     {
         var p1 = new Player(Guid.NewGuid(), "Player 1", new TestDecisionHandler());
         var p2 = new Player(Guid.NewGuid(), "Player 2", new TestDecisionHandler());
@@ -171,7 +171,7 @@ public class StateBasedActionTests
 
         p2.AdjustLife(-30); // life = -10
 
-        engine.CheckStateBasedActions();
+        await engine.CheckStateBasedActionsAsync();
 
         state.IsGameOver.Should().BeTrue();
         state.Winner.Should().Be("Player 1");
@@ -204,7 +204,7 @@ public class StateBasedActionTests
     }
 
     [Fact]
-    public void LethalDamage_ClearsOnCreatureDeath()
+    public async Task LethalDamage_ClearsOnCreatureDeath()
     {
         // When a creature dies from lethal damage, its DamageMarked resets
         var p1 = new Player(Guid.NewGuid(), "Player 1", new TestDecisionHandler());
@@ -222,13 +222,13 @@ public class StateBasedActionTests
         p1.Battlefield.Add(creature);
         creature.DamageMarked = 2;
 
-        engine.CheckStateBasedActions();
+        await engine.CheckStateBasedActionsAsync();
 
         creature.DamageMarked.Should().Be(0);
     }
 
     [Fact]
-    public void LethalDamage_LogsCreatureDeath()
+    public async Task LethalDamage_LogsCreatureDeath()
     {
         var p1 = new Player(Guid.NewGuid(), "Player 1", new TestDecisionHandler());
         var p2 = new Player(Guid.NewGuid(), "Player 2", new TestDecisionHandler());
@@ -245,13 +245,13 @@ public class StateBasedActionTests
         p1.Battlefield.Add(creature);
         creature.DamageMarked = 2;
 
-        engine.CheckStateBasedActions();
+        await engine.CheckStateBasedActionsAsync();
 
         state.GameLog.Should().Contain(m => m.Contains("Grizzly Bears") && m.Contains("lethal damage"));
     }
 
     [Fact]
-    public void MultipleCreaturesWithLethalDamage_AllDie()
+    public async Task MultipleCreaturesWithLethalDamage_AllDie()
     {
         var p1 = new Player(Guid.NewGuid(), "Player 1", new TestDecisionHandler());
         var p2 = new Player(Guid.NewGuid(), "Player 2", new TestDecisionHandler());
@@ -268,7 +268,7 @@ public class StateBasedActionTests
         bear2.DamageMarked = 3;
         survivor.DamageMarked = 1;
 
-        engine.CheckStateBasedActions();
+        await engine.CheckStateBasedActionsAsync();
 
         p1.Battlefield.Cards.Should().NotContain(bear1);
         p1.Battlefield.Cards.Should().NotContain(bear2);
@@ -277,7 +277,7 @@ public class StateBasedActionTests
     }
 
     [Fact]
-    public void LethalDamageOnPlayer2Creatures_Dies()
+    public async Task LethalDamageOnPlayer2Creatures_Dies()
     {
         // Verify SBAs check both players' battlefields
         var p1 = new Player(Guid.NewGuid(), "Player 1", new TestDecisionHandler());
@@ -295,14 +295,14 @@ public class StateBasedActionTests
         p2.Battlefield.Add(creature);
         creature.DamageMarked = 1;
 
-        engine.CheckStateBasedActions();
+        await engine.CheckStateBasedActionsAsync();
 
         p2.Battlefield.Cards.Should().BeEmpty();
         p2.Graveyard.Cards.Should().Contain(creature);
     }
 
     [Fact]
-    public void TokenWithLethalDamage_GoesToGraveyardThenCeasesToExist()
+    public async Task TokenWithLethalDamage_GoesToGraveyardThenCeasesToExist()
     {
         // MTG rules: tokens go to graveyard then cease to exist (SBA 704.5d)
         var p1 = new Player(Guid.NewGuid(), "Player 1", new TestDecisionHandler());
@@ -321,7 +321,7 @@ public class StateBasedActionTests
         p1.Battlefield.Add(token);
         token.DamageMarked = 1;
 
-        engine.CheckStateBasedActions();
+        await engine.CheckStateBasedActionsAsync();
 
         p1.Battlefield.Cards.Should().BeEmpty();
         p1.Graveyard.Cards.Should().BeEmpty("tokens cease to exist after going to graveyard");

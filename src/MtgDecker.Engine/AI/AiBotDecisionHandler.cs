@@ -1,5 +1,6 @@
 using MtgDecker.Engine.Enums;
 using MtgDecker.Engine.Mana;
+using MtgDecker.Engine.Triggers.Effects;
 
 namespace MtgDecker.Engine.AI;
 
@@ -11,10 +12,11 @@ namespace MtgDecker.Engine.AI;
 public class AiBotDecisionHandler : IPlayerDecisionHandler
 {
     /// <summary>
-    /// Selects an action using a land-first, tap-lands, greedy-cast heuristic.
+    /// Selects an action using a land-first, fetch, tap-lands, greedy-cast heuristic.
     /// Only acts during main phases. Prioritizes playing a land (if available
-    /// and land drop unused), then taps untapped lands with mana abilities,
-    /// then casts the most expensive affordable spell.
+    /// and land drop unused), then activates fetch lands if spells are in hand,
+    /// then taps untapped lands with mana abilities, then casts the most expensive
+    /// affordable spell.
     /// </summary>
     public Task<GameAction> GetAction(GameState gameState, Guid playerId, CancellationToken ct = default)
     {
@@ -24,18 +26,34 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
         var player = gameState.Player1.Id == playerId ? gameState.Player1 : gameState.Player2;
         var hand = player.Hand.Cards;
 
-        if (hand.Count == 0)
-            return Task.FromResult(GameAction.Pass(playerId));
-
         // Priority 1: Play a land
-        if (player.LandsPlayedThisTurn == 0)
+        if (hand.Count > 0 && player.LandsPlayedThisTurn == 0)
         {
             var land = hand.FirstOrDefault(c => c.IsLand);
             if (land != null)
                 return Task.FromResult(GameAction.PlayCard(playerId, land.Id));
         }
 
-        // Priority 2: Tap an untapped land with a mana ability to build up mana pool
+        // Priority 2: Activate a fetch land if we have spells to cast
+        var fetchLand = player.Battlefield.Cards
+            .FirstOrDefault(c => !c.IsTapped && c.FetchAbility != null);
+        if (fetchLand != null)
+        {
+            var hasSpellInHand = hand.Any(c => !c.IsLand && c.ManaCost != null);
+            if (hasSpellInHand)
+                return Task.FromResult(GameAction.ActivateFetch(playerId, fetchLand.Id));
+        }
+
+        // Priority 2.5: Activate abilities on permanents (e.g., Mogg Fanatic, Skirk Prospector)
+        var opponent = gameState.Player1.Id == playerId ? gameState.Player2 : gameState.Player1;
+        var abilityAction = EvaluateActivatedAbilities(player, opponent, gameState);
+        if (abilityAction != null)
+            return Task.FromResult(abilityAction);
+
+        if (hand.Count == 0)
+            return Task.FromResult(GameAction.Pass(playerId));
+
+        // Priority 3: Tap an untapped land with a mana ability to build up mana pool
         var untappedLand = player.Battlefield.Cards
             .FirstOrDefault(c => c.IsLand && !c.IsTapped && c.ManaAbility != null);
 
@@ -47,14 +65,38 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
                 return Task.FromResult(GameAction.TapCard(playerId, untappedLand.Id));
         }
 
-        // Priority 3: Cast most expensive affordable spell
+        // Priority 4: Cast most expensive affordable spell (accounting for cost modification)
         var castable = hand
-            .Where(c => !c.IsLand && c.ManaCost != null && player.ManaPool.CanPay(c.ManaCost))
-            .OrderByDescending(c => c.ManaCost!.ConvertedManaCost)
+            .Where(c => !c.IsLand && c.ManaCost != null)
+            .Select(c =>
+            {
+                var cost = c.ManaCost!;
+                var reduction = ComputeCostModification(gameState, c, player);
+                if (reduction != 0)
+                    cost = cost.WithGenericReduction(-reduction);
+                return (Card: c, EffectiveCost: cost);
+            })
+            .Where(x => player.ManaPool.CanPay(x.EffectiveCost))
+            .OrderByDescending(x => x.Card.ManaCost!.ConvertedManaCost)
+            .Select(x => x.Card)
             .FirstOrDefault();
 
         if (castable != null)
             return Task.FromResult(GameAction.PlayCard(playerId, castable.Id));
+
+        // Priority 5: Cycling — if a card can be cycled but not cast, cycle it
+        foreach (var card in hand)
+        {
+            if (CardDefinitions.TryGet(card.Name, out var cycleDef) && cycleDef.CyclingCost != null)
+            {
+                if (player.ManaPool.CanPay(cycleDef.CyclingCost))
+                {
+                    // Only cycle if we can't afford to cast it
+                    if (card.ManaCost == null || !player.ManaPool.CanPay(card.ManaCost))
+                        return Task.FromResult(GameAction.Cycle(playerId, card.Id));
+                }
+            }
+        }
 
         return Task.FromResult(GameAction.Pass(playerId));
     }
@@ -286,4 +328,122 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
         5 => (1, 4),
         _ => (0, handSize) // Always keep at 4 or fewer (handled before this)
     };
+
+    /// <summary>
+    /// Evaluates activated abilities on permanents and returns an action if one is worth activating.
+    /// Heuristics:
+    /// - DealDamageEffect: Activate if it can kill an opponent's creature.
+    /// - AddManaEffect (Skirk Prospector): Activate if sacrificing enables casting a spell that needs exactly 1 more mana.
+    /// </summary>
+    private static GameAction? EvaluateActivatedAbilities(Player player, Player opponent, GameState gameState)
+    {
+        foreach (var permanent in player.Battlefield.Cards.ToList())
+        {
+            if (!CardDefinitions.TryGet(permanent.Name, out var def) || def.ActivatedAbility == null)
+                continue;
+
+            var ability = def.ActivatedAbility;
+            var cost = ability.Cost;
+
+            // Skip if tap cost and already tapped
+            if (cost.TapSelf && permanent.IsTapped)
+                continue;
+
+            // Skip if mana cost can't be paid
+            if (cost.ManaCost != null && !player.ManaPool.CanPay(cost.ManaCost))
+                continue;
+
+            // Skip if sacrifice subtype needed but none available
+            if (cost.SacrificeSubtype != null)
+            {
+                var hasSacTarget = player.Battlefield.Cards
+                    .Any(c => c.IsCreature && c.Subtypes.Contains(cost.SacrificeSubtype, StringComparer.OrdinalIgnoreCase));
+                if (!hasSacTarget)
+                    continue;
+            }
+
+            // DealDamageEffect heuristic: activate if it can kill an opponent creature
+            if (ability.Effect is DealDamageEffect dealDamage)
+            {
+                var damageAmount = dealDamage.Amount;
+                var killableTarget = opponent.Battlefield.Cards
+                    .Where(c => c.IsCreature)
+                    .FirstOrDefault(c => (c.Toughness ?? 0) - c.DamageMarked <= damageAmount);
+
+                if (killableTarget != null)
+                    return GameAction.ActivateAbility(player.Id, permanent.Id, targetId: killableTarget.Id);
+
+                // Don't activate DealDamage without a good target
+                continue;
+            }
+
+            // ExileCreatureEffect heuristic: exile the biggest opponent threat
+            if (ability.Effect is ExileCreatureEffect)
+            {
+                // Check counter availability
+                if (cost.RemoveCounterType.HasValue
+                    && permanent.GetCounters(cost.RemoveCounterType.Value) <= 0)
+                    continue;
+
+                var biggestThreat = opponent.Battlefield.Cards
+                    .Where(c => c.IsCreature)
+                    .OrderByDescending(c => c.Power ?? 0)
+                    .FirstOrDefault();
+
+                if (biggestThreat != null)
+                    return GameAction.ActivateAbility(player.Id, permanent.Id, targetId: biggestThreat.Id);
+
+                continue;
+            }
+
+            // AddManaEffect heuristic: activate if sacrificing enables casting a spell
+            if (ability.Effect is AddManaEffect)
+            {
+                // Check if there's a spell in hand that needs exactly 1 more mana
+                var currentManaTotal = player.ManaPool.Total;
+                var hasSpellNeedingOneMana = player.Hand.Cards
+                    .Where(c => !c.IsLand && c.ManaCost != null)
+                    .Any(c =>
+                    {
+                        var spellCost = c.ManaCost!;
+                        // Apply cost modification
+                        var reduction = ComputeCostModification(gameState, c, player);
+                        if (reduction != 0)
+                            spellCost = spellCost.WithGenericReduction(-reduction);
+
+                        // Check if we need exactly 1 more mana to cast
+                        return spellCost.ConvertedManaCost == currentManaTotal + 1
+                            && player.ManaPool.CanPay(spellCost) == false;
+                    });
+
+                if (hasSpellNeedingOneMana)
+                    return GameAction.ActivateAbility(player.Id, permanent.Id);
+
+                // Don't sacrifice creatures for mana without good reason
+                continue;
+            }
+        }
+
+        return null;
+    }
+
+    private static int ComputeCostModification(GameState gameState, GameCard card, Player caster)
+    {
+        return gameState.ActiveEffects
+            .Where(e => e.Type == ContinuousEffectType.ModifyCost
+                   && e.CostApplies != null
+                   && e.CostApplies(card)
+                   && IsCostEffectApplicable(gameState, e, caster))
+            .Sum(e => e.CostMod);
+    }
+
+    private static bool IsCostEffectApplicable(GameState gameState, ContinuousEffect effect, Player caster)
+    {
+        if (!effect.CostAppliesToOpponent) return true;
+
+        var effectController = gameState.Player1.Battlefield.Contains(effect.SourceId) ? gameState.Player1
+            : gameState.Player2.Battlefield.Contains(effect.SourceId) ? gameState.Player2 : null;
+
+        return effectController != null && effectController.Id != caster.Id;
+    }
 }

@@ -15,27 +15,90 @@ public class GameCard
     // Resolved from CardDefinitions registry or auto-parsed
     public ManaCost? ManaCost { get; set; }
     public ManaAbility? ManaAbility { get; set; }
-    public int? Power { get; set; }
-    public int? Toughness { get; set; }
     public CardType CardTypes { get; set; } = CardType.None;
     public IReadOnlyList<string> Subtypes { get; init; } = [];
     public IReadOnlyList<Trigger> Triggers { get; init; } = [];
     public bool IsToken { get; init; }
+    public bool IsLegendary { get; init; }
+    public FetchAbility? FetchAbility { get; init; }
+
+    // Base power/toughness from the card definition
+    public int? BasePower { get; set; }
+    public int? BaseToughness { get; set; }
+
+    // Effective overrides set by continuous effects (RecalculateState)
+    public int? EffectivePower { get; set; }
+    public int? EffectiveToughness { get; set; }
+
+    // Computed: returns effective value if set, otherwise base value.
+    // Setter writes to base for backward compatibility.
+    public int? Power
+    {
+        get => EffectivePower ?? BasePower;
+        set => BasePower = value;
+    }
+
+    public int? Toughness
+    {
+        get => EffectiveToughness ?? BaseToughness;
+        set => BaseToughness = value;
+    }
+
+    // Type-changing effects (e.g., Opalescence makes enchantments into creatures)
+    public CardType? EffectiveCardTypes { get; set; }
+
+    // Keywords granted by continuous effects or intrinsic abilities
+    public HashSet<Keyword> ActiveKeywords { get; } = new();
+
+    // Aura attachment
+    public Guid? AttachedTo { get; set; }
+
+    // Counter tracking
+    public Dictionary<CounterType, int> Counters { get; } = new();
+
+    public void AddCounters(CounterType type, int count)
+    {
+        Counters.TryGetValue(type, out var current);
+        Counters[type] = current + count;
+    }
+
+    public bool RemoveCounter(CounterType type)
+    {
+        if (!Counters.TryGetValue(type, out var current) || current <= 0)
+            return false;
+        Counters[type] = current - 1;
+        return true;
+    }
+
+    public int GetCounters(CounterType type) =>
+        Counters.TryGetValue(type, out var count) ? count : 0;
+
+    // Per-source exile tracking (e.g., Parallax Wave)
+    public List<Guid> ExiledCardIds { get; } = new();
 
     // Combat tracking
     public int? TurnEnteredBattlefield { get; set; }
     public int DamageMarked { get; set; }
 
     public bool HasSummoningSickness(int currentTurn) =>
-        IsCreature && TurnEnteredBattlefield.HasValue && TurnEnteredBattlefield.Value >= currentTurn;
+        IsCreature
+        && TurnEnteredBattlefield.HasValue
+        && TurnEnteredBattlefield.Value >= currentTurn
+        && !ActiveKeywords.Contains(Keyword.Haste);
+
+    private static readonly HashSet<string> BasicLandNames = new(StringComparer.OrdinalIgnoreCase)
+        { "Plains", "Island", "Swamp", "Mountain", "Forest" };
+
+    public bool IsBasicLand =>
+        IsLand && BasicLandNames.Contains(Name);
 
     // Backward-compatible: check both CardTypes flags and TypeLine
     public bool IsLand =>
-        CardTypes.HasFlag(CardType.Land) ||
+        (EffectiveCardTypes ?? CardTypes).HasFlag(CardType.Land) ||
         TypeLine.Contains("Land", StringComparison.OrdinalIgnoreCase);
 
     public bool IsCreature =>
-        CardTypes.HasFlag(CardType.Creature) ||
+        (EffectiveCardTypes ?? CardTypes).HasFlag(CardType.Creature) ||
         TypeLine.Contains("Creature", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Original factory: uses CardDefinitions registry only.</summary>
@@ -50,14 +113,22 @@ public class GameCard
                 ImageUrl = imageUrl,
                 ManaCost = def.ManaCost,
                 ManaAbility = def.ManaAbility,
-                Power = def.Power,
-                Toughness = def.Toughness,
+                BasePower = def.Power,
+                BaseToughness = def.Toughness,
                 CardTypes = def.CardTypes,
                 Subtypes = def.Subtypes,
                 Triggers = def.Triggers,
+                IsLegendary = def.IsLegendary,
+                FetchAbility = def.FetchAbility,
             };
         }
-        return new GameCard { Name = name, TypeLine = typeLine, ImageUrl = imageUrl };
+        return new GameCard
+        {
+            Name = name,
+            TypeLine = typeLine,
+            ImageUrl = imageUrl,
+            IsLegendary = typeLine.Contains("Legendary", StringComparison.OrdinalIgnoreCase),
+        };
     }
 
     /// <summary>
@@ -77,11 +148,13 @@ public class GameCard
                 ImageUrl = imageUrl,
                 ManaCost = def.ManaCost,
                 ManaAbility = def.ManaAbility,
-                Power = def.Power,
-                Toughness = def.Toughness,
+                BasePower = def.Power,
+                BaseToughness = def.Toughness,
                 CardTypes = def.CardTypes,
                 Subtypes = def.Subtypes,
                 Triggers = def.Triggers,
+                IsLegendary = def.IsLegendary,
+                FetchAbility = def.FetchAbility,
             };
         }
 
@@ -93,16 +166,17 @@ public class GameCard
             TypeLine = typeLine,
             ImageUrl = imageUrl,
             CardTypes = parsed.Types,
-            Subtypes = parsed.Subtypes
+            Subtypes = parsed.Subtypes,
+            IsLegendary = typeLine.Contains("Legendary", StringComparison.OrdinalIgnoreCase),
         };
 
         if (!string.IsNullOrWhiteSpace(manaCost))
             autoCard.ManaCost = ManaCost.Parse(manaCost);
 
         if (int.TryParse(power, out var p))
-            autoCard.Power = p;
+            autoCard.BasePower = p;
         if (int.TryParse(toughness, out var t))
-            autoCard.Toughness = t;
+            autoCard.BaseToughness = t;
 
         // Auto-detect mana ability for basic lands
         autoCard.ManaAbility = DetectBasicLandManaAbility(typeLine);

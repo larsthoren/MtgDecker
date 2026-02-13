@@ -96,7 +96,7 @@ public class StackTargetingTests
 
             // Bear should now be on the stack
             state.Stack.Should().HaveCount(1);
-            state.Stack[0].Card.Name.Should().Be("Test Bear");
+            ((StackObject)state.Stack[0]).Card.Name.Should().Be("Test Bear");
 
             // P2: add mana directly to pool (Island not registered in CardDefinitions)
             p2.ManaPool.Add(ManaColor.Blue, 2);
@@ -108,7 +108,7 @@ public class StackTargetingTests
 
             // The counterspell should be on the stack targeting the bear
             state.Stack.Should().HaveCount(2);
-            var counterOnStack = state.Stack[1];
+            var counterOnStack = (StackObject)state.Stack[1];
             counterOnStack.Card.Name.Should().Be("Test Counterspell");
             counterOnStack.Targets.Should().HaveCount(1);
             counterOnStack.Targets[0].CardId.Should().Be(bear.Id);

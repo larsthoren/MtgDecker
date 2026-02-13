@@ -44,7 +44,7 @@ public class CounterSpellEffectTests
         effect.Resolve(state, counterSpell);
 
         // Assert: creature spell removed from stack
-        state.Stack.Should().NotContain(s => s.Card.Id == creatureCard.Id);
+        state.Stack.OfType<StackObject>().Should().NotContain(s => s.Card.Id == creatureCard.Id);
     }
 
     [Fact]

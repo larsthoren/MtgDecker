@@ -12,6 +12,8 @@ public class GameAction
     public Guid? CardId { get; init; }
     public ZoneType? SourceZone { get; init; }
     public ZoneType? DestinationZone { get; set; }
+    public Guid? TargetCardId { get; init; }
+    public Guid? TargetPlayerId { get; init; }
 
     // Undo metadata — set by GameEngine during ExecuteAction
     public ManaColor? ManaProduced { get; set; }
@@ -62,5 +64,30 @@ public class GameAction
         PlayerId = playerId,
         CardId = cardId,
         SourceZone = ZoneType.Hand
+    };
+
+    public static GameAction ActivateFetch(Guid playerId, Guid cardId) => new()
+    {
+        Type = ActionType.ActivateFetch,
+        PlayerId = playerId,
+        CardId = cardId
+    };
+
+    public static GameAction ActivateAbility(Guid playerId, Guid cardId,
+        Guid? targetId = null, Guid? targetPlayerId = null) => new()
+    {
+        Type = ActionType.ActivateAbility,
+        PlayerId = playerId,
+        CardId = cardId,
+        TargetCardId = targetId,
+        TargetPlayerId = targetPlayerId,
+    };
+
+    public static GameAction Cycle(Guid playerId, Guid cardId) => new()
+    {
+        Type = ActionType.Cycle,
+        PlayerId = playerId,
+        CardId = cardId,
+        SourceZone = ZoneType.Hand,
     };
 }

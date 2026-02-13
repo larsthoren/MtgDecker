@@ -7,5 +7,8 @@ public enum ActionType
     TapCard,
     UntapCard,
     MoveCard,
-    CastSpell
+    CastSpell,
+    ActivateFetch,
+    ActivateAbility,
+    Cycle
 }

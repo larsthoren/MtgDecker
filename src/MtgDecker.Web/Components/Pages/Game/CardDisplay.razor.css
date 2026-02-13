@@ -1,6 +1,4 @@
 .card-display {
-    width: 100px;
-    min-height: 140px;
     display: inline-block;
     margin: 4px;
     transition: transform 0.15s ease;
@@ -37,15 +35,20 @@
     box-shadow: 0 0 10px rgba(68, 136, 255, 0.5);
 }
 
+.card-display.eligible {
+    box-shadow: 0 0 8px rgba(100, 200, 100, 0.6);
+}
+
 .card-display img {
     width: 100%;
+    height: auto;
     border-radius: 6px;
     display: block;
 }
 
 .card-back {
     width: 100%;
-    min-height: 140px;
+    height: 100%;
     background: linear-gradient(135deg, #2D2540, #5D4E8C);
     border-radius: 6px;
     display: flex;
@@ -56,7 +59,7 @@
 
 .card-placeholder {
     width: 100%;
-    min-height: 140px;
+    height: 100%;
     background: #231E30;
     border-radius: 6px;
     display: flex;

@@ -120,7 +120,7 @@ public class PlayerTargetingTests
 
             // The spell should be on the stack with a player target
             state.Stack.Should().HaveCount(1);
-            var stackObj = state.Stack[0];
+            var stackObj = (StackObject)state.Stack[0];
             stackObj.Targets.Should().HaveCount(1);
             stackObj.Targets[0].CardId.Should().Be(Guid.Empty);
             stackObj.Targets[0].PlayerId.Should().Be(p2.Id);
@@ -174,8 +174,8 @@ public class PlayerTargetingTests
             await engine.ExecuteAction(GameAction.CastSpell(p1.Id, axe.Id));
 
             state.Stack.Should().HaveCount(1);
-            state.Stack[0].Targets[0].Zone.Should().Be(ZoneType.None);
-            state.Stack[0].Targets[0].PlayerId.Should().Be(p2.Id);
+            ((StackObject)state.Stack[0]).Targets[0].Zone.Should().Be(ZoneType.None);
+            ((StackObject)state.Stack[0]).Targets[0].PlayerId.Should().Be(p2.Id);
         }
         finally
         {
@@ -224,7 +224,7 @@ public class PlayerTargetingTests
 
             // Should succeed -- player is a valid target even with no creatures
             state.Stack.Should().HaveCount(1);
-            state.Stack[0].Targets[0].PlayerId.Should().Be(p2.Id);
+            ((StackObject)state.Stack[0]).Targets[0].PlayerId.Should().Be(p2.Id);
         }
         finally
         {
