@@ -14,6 +14,23 @@ public class GameSessionTests
             .Build();
     }
 
+    /// <summary>
+    /// Waits until at least one handler is waiting for input, meaning the engine
+    /// has yielded and IsEngineSafeForMutation() will return true.
+    /// </summary>
+    private static async Task WaitForHandlerReady(GameSession session, int timeoutMs = 2000)
+    {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        while (sw.ElapsedMilliseconds < timeoutMs)
+        {
+            if ((session.Player1Handler?.IsWaitingForInput ?? false) ||
+                (session.Player2Handler?.IsWaitingForInput ?? false))
+                return;
+            await Task.Delay(10);
+        }
+        throw new TimeoutException("Handler did not reach waiting state within timeout.");
+    }
+
     [Fact]
     public void Constructor_SetsGameId()
     {
@@ -88,9 +105,8 @@ public class GameSessionTests
         session.JoinPlayer("Bob", CreateDeck());
 
         await session.StartAsync();
+        await WaitForHandlerReady(session);
 
-        // Engine is now waiting for P1's mulligan decision
-        await Task.Delay(50); // Let background task start
         session.Player1Handler!.IsWaitingForMulligan.Should().BeTrue();
     }
 
@@ -119,13 +135,13 @@ public class GameSessionTests
         session.OnStateChanged += () => changeCount++;
 
         await session.StartAsync();
-        await Task.Delay(50);
+        await WaitForHandlerReady(session);
 
         // Submit mulligans to progress the game
         session.Player1Handler!.SubmitMulliganDecision(MtgDecker.Engine.Enums.MulliganDecision.Keep);
-        await Task.Delay(50);
+        await WaitForHandlerReady(session);
         session.Player2Handler!.SubmitMulliganDecision(MtgDecker.Engine.Enums.MulliganDecision.Keep);
-        await Task.Delay(50);
+        await WaitForHandlerReady(session);
 
         changeCount.Should().BeGreaterThan(0);
     }
@@ -149,6 +165,7 @@ public class GameSessionTests
         session.JoinPlayer("Alice", CreateDeck());
         session.JoinPlayer("Bob", CreateDeck());
         await session.StartAsync();
+        await WaitForHandlerReady(session);
 
         session.AdjustLife(1, -3);
 
@@ -162,6 +179,7 @@ public class GameSessionTests
         session.JoinPlayer("Alice", CreateDeck());
         session.JoinPlayer("Bob", CreateDeck());
         await session.StartAsync();
+        await WaitForHandlerReady(session);
 
         session.AdjustLife(2, -5);
 
@@ -175,6 +193,7 @@ public class GameSessionTests
         session.JoinPlayer("Alice", CreateDeck());
         session.JoinPlayer("Bob", CreateDeck());
         await session.StartAsync();
+        await WaitForHandlerReady(session);
 
         session.AdjustLife(1, -20);
 
@@ -190,6 +209,7 @@ public class GameSessionTests
         session.JoinPlayer("Alice", CreateDeck());
         session.JoinPlayer("Bob", CreateDeck());
         await session.StartAsync();
+        await WaitForHandlerReady(session);
 
         session.AdjustLife(2, -25);
 
@@ -205,6 +225,7 @@ public class GameSessionTests
         session.JoinPlayer("Alice", CreateDeck());
         session.JoinPlayer("Bob", CreateDeck());
         await session.StartAsync();
+        await WaitForHandlerReady(session);
 
         session.AdjustLife(1, 5);
 
@@ -219,12 +240,12 @@ public class GameSessionTests
         session.JoinPlayer("Alice", CreateDeck());
         session.JoinPlayer("Bob", CreateDeck());
         await session.StartAsync();
+        await WaitForHandlerReady(session);
 
-        // Keep mulligans to get to playing state
         session.Player1Handler!.SubmitMulliganDecision(MtgDecker.Engine.Enums.MulliganDecision.Keep);
-        await Task.Delay(50);
+        await WaitForHandlerReady(session);
         session.Player2Handler!.SubmitMulliganDecision(MtgDecker.Engine.Enums.MulliganDecision.Keep);
-        await Task.Delay(50);
+        await WaitForHandlerReady(session);
 
         var p1 = session.State!.Player1;
         var handBefore = p1.Hand.Count;
@@ -243,11 +264,12 @@ public class GameSessionTests
         session.JoinPlayer("Alice", CreateDeck(7)); // Exactly 7 cards — all drawn during mulligan
         session.JoinPlayer("Bob", CreateDeck());
         await session.StartAsync();
+        await WaitForHandlerReady(session);
 
         session.Player1Handler!.SubmitMulliganDecision(MtgDecker.Engine.Enums.MulliganDecision.Keep);
-        await Task.Delay(50);
+        await WaitForHandlerReady(session);
         session.Player2Handler!.SubmitMulliganDecision(MtgDecker.Engine.Enums.MulliganDecision.Keep);
-        await Task.Delay(50);
+        await WaitForHandlerReady(session);
 
         var p1 = session.State!.Player1;
         p1.Library.Count.Should().Be(0);
@@ -265,11 +287,12 @@ public class GameSessionTests
         session.JoinPlayer("Alice", CreateDeck());
         session.JoinPlayer("Bob", CreateDeck());
         await session.StartAsync();
+        await WaitForHandlerReady(session);
 
         session.Player1Handler!.SubmitMulliganDecision(MtgDecker.Engine.Enums.MulliganDecision.Keep);
-        await Task.Delay(50);
+        await WaitForHandlerReady(session);
         session.Player2Handler!.SubmitMulliganDecision(MtgDecker.Engine.Enums.MulliganDecision.Keep);
-        await Task.Delay(50);
+        await WaitForHandlerReady(session);
 
         session.DrawCard(1);
 
@@ -283,6 +306,7 @@ public class GameSessionTests
         session.JoinPlayer("Alice", CreateDeck());
         session.JoinPlayer("Bob", CreateDeck());
         await session.StartAsync();
+        await WaitForHandlerReady(session);
 
         session.AdjustLife(1, -3);
 

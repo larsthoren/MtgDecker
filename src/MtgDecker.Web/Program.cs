@@ -24,6 +24,7 @@ builder.Services.AddInfrastructure(connectionString);
 
 // Game session manager
 builder.Services.AddSingleton<MtgDecker.Engine.GameSessionManager>();
+builder.Services.AddHostedService<GameSessionCleanupService>();
 
 // In-memory log viewer
 var logStore = new InMemoryLogStore();

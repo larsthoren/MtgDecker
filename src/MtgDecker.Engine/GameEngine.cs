@@ -1466,9 +1466,9 @@ public class GameEngine
     }
 
     /// <summary>Queues Self triggers for a specific card onto the stack.</summary>
-    internal async Task QueueSelfTriggersOnStackAsync(GameEvent evt, GameCard source, Player controller, CancellationToken ct = default)
+    internal Task QueueSelfTriggersOnStackAsync(GameEvent evt, GameCard source, Player controller, CancellationToken ct = default)
     {
-        if (source.Triggers.Count == 0) return;
+        if (source.Triggers.Count == 0) return Task.CompletedTask;
 
         foreach (var trigger in source.Triggers)
         {
@@ -1478,10 +1478,12 @@ public class GameEngine
             _state.Log($"{source.Name} triggers: {trigger.Effect.GetType().Name.Replace("Effect", "")}");
             _state.Stack.Add(new TriggeredAbilityStackObject(source, controller.Id, trigger.Effect));
         }
+
+        return Task.CompletedTask;
     }
 
     /// <summary>Queues board-wide triggers onto the stack with APNAP ordering.</summary>
-    internal async Task QueueBoardTriggersOnStackAsync(GameEvent evt, GameCard? relevantCard, CancellationToken ct = default)
+    internal Task QueueBoardTriggersOnStackAsync(GameEvent evt, GameCard? relevantCard, CancellationToken ct = default)
     {
         var activePlayer = _state.ActivePlayer;
         var nonActivePlayer = _state.GetOpponent(activePlayer);
@@ -1495,6 +1497,8 @@ public class GameEngine
         // Non-active player's triggers on top (resolve first via LIFO)
         foreach (var t in nonActiveTriggers)
             _state.Stack.Add(t);
+
+        return Task.CompletedTask;
     }
 
     private List<TriggeredAbilityStackObject> CollectBoardTriggers(GameEvent evt, GameCard? relevantCard, Player player)
@@ -1546,7 +1550,7 @@ public class GameEngine
     }
 
     /// <summary>Queues attack triggers onto the stack.</summary>
-    internal async Task QueueAttackTriggersOnStackAsync(GameCard attacker, CancellationToken ct = default)
+    internal Task QueueAttackTriggersOnStackAsync(GameCard attacker, CancellationToken ct = default)
     {
         var player = _state.ActivePlayer;
         var triggers = attacker.Triggers.Count > 0
@@ -1560,10 +1564,12 @@ public class GameEngine
             _state.Log($"{attacker.Name} triggers: {trigger.Effect.GetType().Name.Replace("Effect", "")}");
             _state.Stack.Add(new TriggeredAbilityStackObject(attacker, player.Id, trigger.Effect));
         }
+
+        return Task.CompletedTask;
     }
 
     /// <summary>Queues delayed triggers onto the stack and removes them.</summary>
-    internal async Task QueueDelayedTriggersOnStackAsync(GameEvent evt, CancellationToken ct = default)
+    internal Task QueueDelayedTriggersOnStackAsync(GameEvent evt, CancellationToken ct = default)
     {
         var toFire = _state.DelayedTriggers.Where(d => d.FireOn == evt).ToList();
         foreach (var delayed in toFire)
@@ -1573,11 +1579,13 @@ public class GameEngine
             _state.Stack.Add(new TriggeredAbilityStackObject(source, controller.Id, delayed.Effect));
             _state.DelayedTriggers.Remove(delayed);
         }
+
+        return Task.CompletedTask;
     }
 
-    internal async Task FireLeaveBattlefieldTriggersAsync(GameCard card, Player controller, CancellationToken ct)
+    internal Task FireLeaveBattlefieldTriggersAsync(GameCard card, Player controller, CancellationToken ct)
     {
-        if (!CardDefinitions.TryGet(card.Name, out var def)) return;
+        if (!CardDefinitions.TryGet(card.Name, out var def)) return Task.CompletedTask;
 
         foreach (var trigger in def.Triggers)
         {
@@ -1587,6 +1595,8 @@ public class GameEngine
                 _state.Stack.Add(new TriggeredAbilityStackObject(card, controller.Id, trigger.Effect));
             }
         }
+
+        return Task.CompletedTask;
     }
 
     /// <summary>Resolves all items on the stack (for testing).</summary>

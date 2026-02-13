@@ -528,15 +528,16 @@
         await SelectCard(card, ZoneType.Hand);
     }
 
-    private async Task SelectCard(GameCard card, ZoneType zone)
+    private Task SelectCard(GameCard card, ZoneType zone)
     {
         if (_selectedCard?.Id == card.Id)
         {
             ClearSelection();
-            return;
+            return Task.CompletedTask;
         }
         _selectedCard = card;
         _selectedZone = zone;
+        return Task.CompletedTask;
     }
 
     private void ClearSelection() { _selectedCard = null; }
@@ -635,10 +636,11 @@
         Handler?.SubmitTarget(new TargetInfo(card.Id, ownerId, ZoneType.Battlefield));
     }
 
-    private async Task HandleOpponentCardClick(GameCard card)
+    private Task HandleOpponentCardClick(GameCard card)
     {
         if (Handler?.IsWaitingForTarget == true)
             Handler.SubmitTarget(new TargetInfo(card.Id, OpponentPlayer.Id, ZoneType.Battlefield));
+        return Task.CompletedTask;
     }
 
     // --- Card choice (tutor) ---
