@@ -45,6 +45,16 @@ public class InteractiveDecisionHandler : IPlayerDecisionHandler
     public IReadOnlyList<GameCard>? KeptCards { get; private set; }
     public string? RevealPrompt { get; private set; }
 
+    public PhaseStopSettings PhaseStops { get; } = new();
+
+    public bool ShouldAutoPass(Phase phase, CombatStep combatStep, bool stackEmpty)
+    {
+        if (!stackEmpty) return false;
+        if (phase == Phase.Combat && combatStep != CombatStep.None)
+            return !PhaseStops.ShouldStop(combatStep);
+        return !PhaseStops.ShouldStop(phase);
+    }
+
     public event Action? OnWaitingForInput;
 
     public Task<GameAction> GetAction(GameState gameState, Guid playerId, CancellationToken ct = default)
