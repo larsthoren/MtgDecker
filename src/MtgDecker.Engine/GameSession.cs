@@ -14,6 +14,7 @@ public class GameSession : IDisposable
     public bool IsStarted { get; private set; }
     public bool IsGameOver => State?.IsGameOver ?? false;
     public string? Winner { get; private set; }
+    public DateTime LastActivity { get; private set; } = DateTime.UtcNow;
     public event Action? OnStateChanged;
 
     private List<GameCard>? _player1Deck;
@@ -22,6 +23,16 @@ public class GameSession : IDisposable
     private CancellationTokenSource? _cts;
     private readonly object _joinLock = new();
     private readonly object _stateLock = new();
+
+    /// <summary>
+    /// True while the game loop is actively executing engine operations and has
+    /// not yet yielded to wait for player input. UI operations that mutate
+    /// shared state check this flag to avoid corrupting state mid-execution.
+    /// The flag is set before engine calls and cleared when the engine yields
+    /// (detected via handler IsWaitingForInput), as well as at the end of each
+    /// engine call.
+    /// </summary>
+    private volatile bool _engineBusy;
 
     public GameSession(string gameId)
     {
@@ -74,15 +85,32 @@ public class GameSession : IDisposable
 
     private async Task RunGameLoopAsync(GameEngine engine, CancellationToken ct)
     {
+        LastActivity = DateTime.UtcNow;
         try
         {
-            await engine.StartGameAsync(ct);
+            _engineBusy = true;
+            try
+            {
+                await engine.StartGameAsync(ct);
+            }
+            finally
+            {
+                _engineBusy = false;
+            }
             State!.IsFirstTurn = true;
 
             while (!State.IsGameOver)
             {
                 ct.ThrowIfCancellationRequested();
-                await engine.RunTurnAsync(ct);
+                _engineBusy = true;
+                try
+                {
+                    await engine.RunTurnAsync(ct);
+                }
+                finally
+                {
+                    _engineBusy = false;
+                }
             }
         }
         catch (OperationCanceledException) { }
@@ -93,14 +121,34 @@ public class GameSession : IDisposable
         }
         finally
         {
+            _engineBusy = false;
             OnStateChanged?.Invoke();
         }
     }
 
+    /// <summary>
+    /// Returns true when the game engine is between actions and safe for UI
+    /// mutations. The engine is idle when it has yielded control to an
+    /// InteractiveDecisionHandler (waiting for player input). During those
+    /// awaits _engineBusy is technically still true (the await hasn't returned),
+    /// so we also check whether a handler is waiting for input.
+    /// </summary>
+    private bool IsEngineSafeForMutation()
+    {
+        if (!_engineBusy) return true;
+
+        // The engine is in an async method that has yielded to await player
+        // input via TaskCompletionSource. It is NOT actively mutating state.
+        return (Player1Handler?.IsWaitingForInput ?? false)
+            || (Player2Handler?.IsWaitingForInput ?? false);
+    }
+
     public void Surrender(int playerSeat)
     {
+        // Surrender always works regardless of engine state — it cancels the loop.
         lock (_stateLock)
         {
+            LastActivity = DateTime.UtcNow;
             if (State == null) return;
             State.IsGameOver = true;
             Winner = playerSeat == 1 ? Player2Name : Player1Name;
@@ -113,7 +161,8 @@ public class GameSession : IDisposable
     {
         lock (_stateLock)
         {
-            if (_engine == null || State == null) return false;
+            LastActivity = DateTime.UtcNow;
+            if (!IsEngineSafeForMutation() || _engine == null || State == null) return false;
             var playerId = playerSeat == 1 ? State.Player1.Id : State.Player2.Id;
             return _engine.UndoLastAction(playerId);
         }
@@ -123,7 +172,8 @@ public class GameSession : IDisposable
     {
         lock (_stateLock)
         {
-            if (State == null) return;
+            LastActivity = DateTime.UtcNow;
+            if (!IsEngineSafeForMutation() || State == null) return;
             var player = playerSeat == 1 ? State.Player1 : State.Player2;
             var oldLife = player.Life;
             player.AdjustLife(delta);
@@ -143,7 +193,8 @@ public class GameSession : IDisposable
     {
         lock (_stateLock)
         {
-            if (State == null) return;
+            LastActivity = DateTime.UtcNow;
+            if (!IsEngineSafeForMutation() || State == null) return;
             var player = playerSeat == 1 ? State.Player1 : State.Player2;
             var card = player.Library.DrawFromTop();
             if (card != null)
