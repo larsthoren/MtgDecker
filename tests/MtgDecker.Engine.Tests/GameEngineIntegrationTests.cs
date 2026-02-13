@@ -166,7 +166,24 @@ public class GameEngineIntegrationTests
     [Fact]
     public async Task MultiTurn_BoardBuildsUp()
     {
-        var engine = CreateGame(out var state, out var p1Handler, out var p2Handler);
+        // Use all-land decks to ensure we always have lands to play
+        var p1Handler = new TestDecisionHandler();
+        var p2Handler = new TestDecisionHandler();
+        var p1 = new Player(Guid.NewGuid(), "Alice", p1Handler);
+        var p2 = new Player(Guid.NewGuid(), "Bob", p2Handler);
+
+        var deck1 = new DeckBuilder()
+            .AddLand("Forest", 60)
+            .Build();
+        var deck2 = new DeckBuilder()
+            .AddLand("Mountain", 60)
+            .Build();
+
+        foreach (var card in deck1) p1.Library.Add(card);
+        foreach (var card in deck2) p2.Library.Add(card);
+
+        var state = new GameState(p1, p2);
+        var engine = new GameEngine(state);
         await engine.StartGameAsync();
         state.IsFirstTurn = true;
 
