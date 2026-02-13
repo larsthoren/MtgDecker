@@ -14,9 +14,9 @@ public class Zone
 
     public void Add(GameCard card) => _cards.Add(card);
 
-    public void AddToBottom(GameCard card) => _cards.Insert(0, card);
-
     public void AddToTop(GameCard card) => _cards.Add(card);
+
+    public void AddToBottom(GameCard card) => _cards.Insert(0, card);
 
     public void AddRange(IEnumerable<GameCard> cards) => _cards.AddRange(cards);
 
@@ -51,6 +51,8 @@ public class Zone
             (_cards[i], _cards[j]) = (_cards[j], _cards[i]);
         }
     }
+
+    public bool Remove(GameCard card) => _cards.Remove(card);
 
     public void Clear() => _cards.Clear();
 

@@ -19,4 +19,11 @@ public class TargetFilter
     public static TargetFilter EnchantmentOrArtifact() => new((card, zone) =>
         zone == ZoneType.Battlefield &&
         (card.CardTypes.HasFlag(CardType.Enchantment) || card.CardTypes.HasFlag(CardType.Artifact)));
+
+    public static TargetFilter CreatureOrPlayer() => new((card, zone) =>
+        (zone == ZoneType.Battlefield && card.IsCreature) || zone == ZoneType.None);
+
+    public static TargetFilter Player() => new((card, zone) => zone == ZoneType.None);
+
+    public static TargetFilter Spell() => new((card, zone) => zone == ZoneType.Stack);
 }

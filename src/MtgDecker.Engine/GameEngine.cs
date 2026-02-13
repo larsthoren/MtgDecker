@@ -131,7 +131,7 @@ public class GameEngine
         if (action.PlayerId != _state.Player1.Id && action.PlayerId != _state.Player2.Id)
             throw new InvalidOperationException($"Unknown player ID: {action.PlayerId}");
 
-        var player = action.PlayerId == _state.Player1.Id ? _state.Player1 : _state.Player2;
+        var player = _state.GetPlayer(action.PlayerId);
 
         switch (action.Type)
         {
@@ -367,7 +367,7 @@ public class GameEngine
 
             case ActionType.CastSpell:
             {
-                var castPlayer = action.PlayerId == _state.Player1.Id ? _state.Player1 : _state.Player2;
+                var castPlayer = _state.GetPlayer(action.PlayerId);
                 var castCard = castPlayer.Hand.Cards.FirstOrDefault(c => c.Id == action.CardId);
                 if (castCard == null)
                 {
@@ -412,6 +412,24 @@ public class GameEngine
                         if (def.TargetFilter.IsLegal(c, ZoneType.Battlefield) && !HasShroud(c))
                             eligible.Add(c);
 
+                    // Add player sentinels if the filter allows player targets
+                    var dummyCard = new GameCard { Name = "Player" };
+                    if (def.TargetFilter.IsLegal(dummyCard, ZoneType.None))
+                    {
+                        eligible.Add(new GameCard { Id = Guid.Empty, Name = castPlayer.Name });
+                        eligible.Add(new GameCard { Id = Guid.Empty, Name = opponent.Name });
+                    }
+
+                    // Add stack objects as targets if the filter allows spell targets
+                    if (def.TargetFilter.IsLegal(dummyCard, ZoneType.Stack))
+                    {
+                        foreach (var so in _state.Stack.OfType<StackObject>())
+                        {
+                            if (def.TargetFilter.IsLegal(so.Card, ZoneType.Stack))
+                                eligible.Add(so.Card);
+                        }
+                    }
+
                     if (eligible.Count == 0)
                     {
                         _state.Log($"No legal targets for {castCard.Name}.");
@@ -420,7 +438,22 @@ public class GameEngine
 
                     var target = await castPlayer.DecisionHandler.ChooseTarget(
                         castCard.Name, eligible, opponent.Id, ct);
-                    targets.Add(target);
+
+                    // Convert player sentinel targets to proper TargetInfo
+                    if (target.Zone == ZoneType.None)
+                    {
+                        // Player target — ensure correct convention
+                        targets.Add(new TargetInfo(Guid.Empty, target.PlayerId, ZoneType.None));
+                    }
+                    else
+                    {
+                        // Auto-detect stack targets: if the chosen card is on the stack, use ZoneType.Stack
+                        var stackTarget = _state.Stack.OfType<StackObject>().FirstOrDefault(s => s.Card.Id == target.CardId);
+                        if (stackTarget != null)
+                            targets.Add(new TargetInfo(stackTarget.Card.Id, stackTarget.ControllerId, ZoneType.Stack));
+                        else
+                            targets.Add(target);
+                    }
                 }
 
                 var manaPaid = await PayManaCostAsync(castEffectiveCost, castPlayer, ct);
@@ -1085,6 +1118,7 @@ public class GameEngine
         return dead;
     }
 
+
     public void ClearDamage()
     {
         foreach (var card in _state.Player1.Battlefield.Cards)
@@ -1604,7 +1638,7 @@ public class GameEngine
 
         var top = _state.Stack[^1];
         _state.Stack.RemoveAt(_state.Stack.Count - 1);
-        var controller = top.ControllerId == _state.Player1.Id ? _state.Player1 : _state.Player2;
+        var controller = _state.GetPlayer(top.ControllerId);
 
         if (top is TriggeredAbilityStackObject triggered)
         {
@@ -1636,7 +1670,22 @@ public class GameEngine
                     var allTargetsLegal = true;
                     foreach (var target in spell.Targets)
                     {
-                        var targetOwner = target.PlayerId == _state.Player1.Id ? _state.Player1 : _state.Player2;
+                        // Player targets (zone == None) are always legal
+                        if (target.Zone == ZoneType.None)
+                            continue;
+
+                        // Stack targets — check if the target spell is still on the stack
+                        if (target.Zone == ZoneType.Stack)
+                        {
+                            if (!_state.Stack.Any(s => s is StackObject so && so.Card.Id == target.CardId))
+                            {
+                                allTargetsLegal = false;
+                                break;
+                            }
+                            continue;
+                        }
+
+                        var targetOwner = _state.GetPlayer(target.PlayerId);
                         var targetZone = targetOwner.GetZone(target.Zone);
                         if (!targetZone.Contains(target.CardId))
                         {
@@ -1653,7 +1702,7 @@ public class GameEngine
                     }
                 }
 
-                def.Effect.Resolve(_state, spell);
+                await def.Effect.ResolveAsync(_state, spell, controller.DecisionHandler, ct);
                 controller.Graveyard.Add(spell.Card);
                 await OnBoardChangedAsync(ct);
             }

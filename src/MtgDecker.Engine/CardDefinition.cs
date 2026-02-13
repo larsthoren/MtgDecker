@@ -14,6 +14,7 @@ public record CardDefinition(
     SpellEffect? Effect = null
 )
 {
+    public string Name { get; init; } = string.Empty;
     public IReadOnlyList<string> Subtypes { get; init; } = [];
     public IReadOnlyList<Trigger> Triggers { get; init; } = [];
     public bool IsLegendary { get; init; }

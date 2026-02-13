@@ -250,11 +250,30 @@
                 <MudText Typo="Typo.body2" Class="mb-1">Choose target for @(Handler.TargetingSpellName):</MudText>
                 @foreach (var target in Handler.EligibleTargets)
                 {
-                    <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Warning"
-                               Class="ma-1" OnClick="@(() => HandleTargetButtonClick(target))">
-                        @target.Name
-                        @if (target.Power.HasValue) { <span> (@target.Power/@target.Toughness)</span> }
-                    </MudButton>
+                    @if (target.Id == Guid.Empty)
+                    {
+                        @* Player sentinel target *@
+                        <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Error"
+                                   Class="ma-1" OnClick="@(() => HandleTargetButtonClick(target))">
+                            @target.Name (Player)
+                        </MudButton>
+                    }
+                    else if (State?.Stack?.OfType<MtgDecker.Engine.StackObject>().Any(s => s.Card.Id == target.Id) == true)
+                    {
+                        @* Stack target (for counterspells) *@
+                        <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Error"
+                                   Class="ma-1" OnClick="@(() => HandleTargetButtonClick(target))">
+                            @target.Name (Stack)
+                        </MudButton>
+                    }
+                    else
+                    {
+                        <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Warning"
+                                   Class="ma-1" OnClick="@(() => HandleTargetButtonClick(target))">
+                            @target.Name
+                            @if (target.Power.HasValue) { <span> (@target.Power/@target.Toughness)</span> }
+                        </MudButton>
+                    }
                 }
             </MudPaper>
         </div>
@@ -632,8 +651,23 @@
 
     private void HandleTargetButtonClick(GameCard card)
     {
-        var ownerId = LocalPlayer.Battlefield.Cards.Any(c => c.Id == card.Id) ? LocalPlayer.Id : OpponentPlayer.Id;
-        Handler?.SubmitTarget(new TargetInfo(card.Id, ownerId, ZoneType.Battlefield));
+        if (card.Id == Guid.Empty)
+        {
+            // Player sentinel target
+            var playerId = card.Name == LocalPlayer.Name ? LocalPlayer.Id : OpponentPlayer.Id;
+            Handler?.SubmitTarget(new TargetInfo(Guid.Empty, playerId, ZoneType.None));
+        }
+        else if (State?.Stack?.OfType<MtgDecker.Engine.StackObject>().Any(s => s.Card.Id == card.Id) == true)
+        {
+            // Stack target (for counterspells)
+            var ownerId = LocalPlayer.Id; // Stack spells use controller ID from the stack object
+            Handler?.SubmitTarget(new TargetInfo(card.Id, ownerId, ZoneType.Stack));
+        }
+        else
+        {
+            var ownerId = LocalPlayer.Battlefield.Cards.Any(c => c.Id == card.Id) ? LocalPlayer.Id : OpponentPlayer.Id;
+            Handler?.SubmitTarget(new TargetInfo(card.Id, ownerId, ZoneType.Battlefield));
+        }
     }
 
     private Task HandleOpponentCardClick(GameCard card)

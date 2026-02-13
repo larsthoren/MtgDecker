@@ -6,7 +6,7 @@ public class SwordsToPlowsharesEffect : SpellEffect
     {
         if (spell.Targets.Count == 0) return;
         var target = spell.Targets[0];
-        var owner = target.PlayerId == state.Player1.Id ? state.Player1 : state.Player2;
+        var owner = state.GetPlayer(target.PlayerId);
         var creature = owner.Battlefield.RemoveById(target.CardId);
         if (creature == null) return;
         var power = creature.Power ?? 0;
