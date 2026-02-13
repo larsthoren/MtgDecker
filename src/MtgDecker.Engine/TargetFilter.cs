@@ -24,4 +24,6 @@ public class TargetFilter
         (zone == ZoneType.Battlefield && card.IsCreature) || zone == ZoneType.None);
 
     public static TargetFilter Player() => new((card, zone) => zone == ZoneType.None);
+
+    public static TargetFilter Spell() => new((card, zone) => zone == ZoneType.Stack);
 }

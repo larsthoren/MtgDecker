@@ -337,6 +337,16 @@ public class GameEngine
                         eligible.Add(new GameCard { Id = Guid.Empty, Name = opponent.Name });
                     }
 
+                    // Add stack objects as targets if the filter allows spell targets
+                    if (def.TargetFilter.IsLegal(dummyCard, ZoneType.Stack))
+                    {
+                        foreach (var so in _state.Stack)
+                        {
+                            if (def.TargetFilter.IsLegal(so.Card, ZoneType.Stack))
+                                eligible.Add(so.Card);
+                        }
+                    }
+
                     if (eligible.Count == 0)
                     {
                         _state.Log($"No legal targets for {castCard.Name}.");
@@ -354,7 +364,12 @@ public class GameEngine
                     }
                     else
                     {
-                        targets.Add(target);
+                        // Auto-detect stack targets: if the chosen card is on the stack, use ZoneType.Stack
+                        var stackTarget = _state.Stack.FirstOrDefault(s => s.Card.Id == target.CardId);
+                        if (stackTarget != null)
+                            targets.Add(new TargetInfo(stackTarget.Card.Id, stackTarget.ControllerId, ZoneType.Stack));
+                        else
+                            targets.Add(target);
                     }
                 }
 
@@ -816,6 +831,17 @@ public class GameEngine
                     // Player targets (zone == None) are always legal
                     if (target.Zone == ZoneType.None)
                         continue;
+
+                    // Stack targets — check if the target spell is still on the stack
+                    if (target.Zone == ZoneType.Stack)
+                    {
+                        if (!_state.Stack.Any(s => s.Card.Id == target.CardId))
+                        {
+                            allTargetsLegal = false;
+                            break;
+                        }
+                        continue;
+                    }
 
                     var targetOwner = target.PlayerId == _state.Player1.Id ? _state.Player1 : _state.Player2;
                     var targetZone = targetOwner.GetZone(target.Zone);

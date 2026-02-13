@@ -7,5 +7,6 @@ public enum ZoneType
     Hand,
     Battlefield,
     Graveyard,
-    Exile
+    Exile,
+    Stack
 }
