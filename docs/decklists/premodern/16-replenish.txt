@@ -1,0 +1,31 @@
+// Deck: Replenish
+// Source: mtgtop8.com - Ecoscuro, MTGO Challenge 32 (2026-02-10)
+// Format: Premodern
+// Archetype: Combo (5% meta)
+
+// Maindeck
+4 Frantic Search
+4 Intuition
+3 Mana Leak
+4 Replenish
+4 Swords to Plowshares
+3 Attunement
+3 Decree of Silence
+4 Opalescence
+4 Parallax Wave
+2 Seal of Cleansing
+4 Adarkar Wastes
+4 Ancient Tomb
+4 Flooded Strand
+4 Island
+5 Plains
+4 Skycloud Expanse
+
+// Sideboard
+3 Blue Elemental Blast
+2 Circle of Protection: Red
+4 Orim's Chant
+1 Seal of Cleansing
+1 Spiritual Focus
+3 Tsabo's Web
+1 Wrath of God

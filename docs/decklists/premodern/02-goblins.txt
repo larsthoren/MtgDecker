@@ -1,0 +1,34 @@
+// Deck: Goblins
+// Source: mtgtop8.com - Chu Duo, PM Magic Beijing #25 (2026-02-11)
+// Format: Premodern
+// Archetype: Aggro (Tier 2, 6% meta)
+
+// Maindeck
+3 Gempalm Incinerator
+1 Goblin King
+4 Goblin Lackey
+4 Goblin Matron
+4 Goblin Piledriver
+4 Goblin Ringleader
+1 Goblin Sharpshooter
+4 Goblin Warchief
+4 Mogg Fanatic
+3 Siege-Gang Commander
+1 Skirk Prospector
+3 Naturalize
+1 Forest
+4 Karplusan Forest
+9 Mountain
+3 Rishadan Port
+3 Wasteland
+4 Wooded Foothills
+
+// Sideboard
+1 Goblin King
+1 Goblin Tinkerer
+3 Mogg Salvage
+2 Pyroblast
+2 Pyrokinesis
+2 Red Elemental Blast
+2 Tormod's Crypt
+2 Tranquil Domain

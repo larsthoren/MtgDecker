@@ -1,0 +1,35 @@
+// Deck: Mono Black Aggro
+// Source: mtgtop8.com - Li Zhuang, PM Magic Beijing #25 (2026-02-11)
+// Format: Premodern
+// Archetype: Aggro (5% meta)
+
+// Maindeck
+1 Graveborn Muse
+4 Hypnotic Specter
+3 Nantuko Shade
+4 Ravenous Rats
+4 Withered Wretch
+4 Cabal Therapy
+4 Dark Ritual
+1 Diabolic Edict
+4 Duress
+1 Funeral Charm
+1 Skeletal Scrying
+3 Smother
+1 Snuff Out
+2 Cursed Scroll
+4 Mishra's Factory
+1 Spawning Pool
+16 Swamp
+2 Wasteland
+
+// Sideboard
+1 Diabolic Edict
+2 Dystopia
+3 Engineered Plague
+2 Gloom
+1 Phyrexian Furnace
+2 Plague Spitter
+1 Spinning Darkness
+1 Tormod's Crypt
+2 Zombie Infestation

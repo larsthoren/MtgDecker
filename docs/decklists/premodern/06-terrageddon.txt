@@ -1,0 +1,41 @@
+// Deck: Terrageddon
+// Source: mtgtop8.com - LasVegasChaos, MTGO Challenge 32 (2026-02-10)
+// Format: Premodern
+// Archetype: Aggro (3% meta)
+
+// Maindeck
+1 Mother of Runes
+4 Nimble Mongoose
+4 Terravore
+3 Armageddon
+3 Call of the Herd
+1 Cataclysm
+1 Disenchant
+1 Naturalize
+4 Swords to Plowshares
+4 Vindicate
+4 Mox Diamond
+3 Sylvan Library
+1 Zuran Orb
+1 Battlefield Forge
+1 Caves of Koilos
+2 Darigaaz's Caldera
+2 Forest
+4 Gemstone Mine
+1 Llanowar Wastes
+2 Plains
+2 Rishadan Port
+3 Treetop Village
+4 Wasteland
+4 Windswept Heath
+
+// Sideboard
+2 Aura of Silence
+2 Circle of Protection: Red
+1 Cursed Totem
+2 Pyroclasm
+3 Red Elemental Blast
+2 Simoon
+1 Sphere of Resistance
+1 Tranquil Domain
+1 Zuran Orb

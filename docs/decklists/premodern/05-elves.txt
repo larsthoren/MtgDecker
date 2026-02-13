@@ -1,0 +1,38 @@
+// Deck: Elves
+// Source: mtgtop8.com - walrusmadness, MTGO Challenge 32 (2026-02-10)
+// Format: Premodern
+// Archetype: Aggro (Tier 1, 3% meta)
+
+// Maindeck
+1 Anger
+1 Caller of the Claw
+2 Deranged Hermit
+4 Fyndhorn Elves
+4 Llanowar Elves
+2 Masticore
+4 Multani's Acolyte
+2 Nantuko Vigilante
+4 Priest of Titania
+3 Quirion Ranger
+1 Ravenous Baloth
+1 Squee, Goblin Nabob
+1 Wall of Blossoms
+1 Wall of Roots
+4 Wirewood Symbiote
+1 Yavimaya Granger
+4 Survival of the Fittest
+11 Forest
+4 Gaea's Cradle
+1 Mountain
+4 Wooded Foothills
+
+// Sideboard
+2 Call of the Herd
+1 Caller of the Claw
+1 Crumble
+1 Nantuko Vigilante
+4 Naturalize
+1 Ravenous Baloth
+1 Tormod's Crypt
+2 Tranquil Domain
+2 Wall of Blossoms

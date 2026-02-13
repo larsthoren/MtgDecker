@@ -1,4 +1,5 @@
 using MtgDecker.Engine.Enums;
+using MtgDecker.Engine.Mana;
 
 namespace MtgDecker.Engine;
 
@@ -26,4 +27,14 @@ public class TargetFilter
     public static TargetFilter Player() => new((card, zone) => zone == ZoneType.None);
 
     public static TargetFilter Spell() => new((card, zone) => zone == ZoneType.Stack);
+
+    public static TargetFilter NonBlackCreature() => new((card, zone) =>
+        zone == ZoneType.Battlefield && card.IsCreature
+        && (card.ManaCost == null || !card.ManaCost.ColorRequirements.ContainsKey(ManaColor.Black)));
+
+    public static TargetFilter CreatureWithCMCAtMost(int maxCmc) => new((card, zone) =>
+        zone == ZoneType.Battlefield && card.IsCreature
+        && (card.ManaCost?.ConvertedManaCost ?? 0) <= maxCmc);
+
+    public static TargetFilter AnyPermanent() => new((card, zone) => zone == ZoneType.Battlefield);
 }
