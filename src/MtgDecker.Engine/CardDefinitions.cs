@@ -76,6 +76,47 @@ public static class CardDefinitions
             ["Brushland"] = new(null, ManaAbility.Choice(ManaColor.Colorless, ManaColor.Green, ManaColor.White), null, null, CardType.Land),
             ["Windswept Heath"] = new(null, null, null, null, CardType.Land),
             ["Serra's Sanctum"] = new(null, null, null, null, CardType.Land),
+
+            // === Burn deck ===
+            ["Lightning Bolt"] = new(ManaCost.Parse("{R}"), null, null, null, CardType.Instant,
+                TargetFilter.CreatureOrPlayer(), new DamageEffect(3)),
+            ["Chain Lightning"] = new(ManaCost.Parse("{R}"), null, null, null, CardType.Sorcery,
+                TargetFilter.CreatureOrPlayer(), new DamageEffect(3)),
+            ["Lava Spike"] = new(ManaCost.Parse("{R}"), null, null, null, CardType.Sorcery,
+                TargetFilter.Player(), new DamageEffect(3, canTargetCreature: false)),
+            ["Rift Bolt"] = new(ManaCost.Parse("{1}{R}"), null, null, null, CardType.Sorcery,
+                TargetFilter.CreatureOrPlayer(), new DamageEffect(3)),
+            ["Fireblast"] = new(ManaCost.Parse("{4}{R}{R}"), null, null, null, CardType.Instant,
+                TargetFilter.CreatureOrPlayer(), new DamageEffect(4)),
+            ["Goblin Guide"] = new(ManaCost.Parse("{R}"), null, 2, 2, CardType.Creature) { Subtypes = ["Goblin"] },
+            ["Monastery Swiftspear"] = new(ManaCost.Parse("{R}"), null, 1, 2, CardType.Creature) { Subtypes = ["Human", "Monk"] },
+            ["Eidolon of the Great Revel"] = new(ManaCost.Parse("{R}{R}"), null, 2, 2,
+                CardType.Creature | CardType.Enchantment) { Subtypes = ["Spirit"] },
+            ["Searing Blood"] = new(ManaCost.Parse("{R}{R}"), null, null, null, CardType.Instant,
+                TargetFilter.Creature(), new DamageEffect(2, canTargetPlayer: false)),
+
+            // === UR Delver deck ===
+            ["Brainstorm"] = new(ManaCost.Parse("{U}"), null, null, null, CardType.Instant,
+                Effect: new BrainstormEffect()),
+            ["Ponder"] = new(ManaCost.Parse("{U}"), null, null, null, CardType.Sorcery,
+                Effect: new PonderEffect()),
+            ["Preordain"] = new(ManaCost.Parse("{U}"), null, null, null, CardType.Sorcery,
+                Effect: new PreordainEffect()),
+            ["Counterspell"] = new(ManaCost.Parse("{U}{U}"), null, null, null, CardType.Instant,
+                TargetFilter.Spell(), new CounterSpellEffect()),
+            ["Daze"] = new(ManaCost.Parse("{1}{U}"), null, null, null, CardType.Instant,
+                TargetFilter.Spell(), new CounterSpellEffect()),
+            ["Force of Will"] = new(ManaCost.Parse("{3}{U}{U}"), null, null, null, CardType.Instant,
+                TargetFilter.Spell(), new CounterSpellEffect()),
+            ["Delver of Secrets"] = new(ManaCost.Parse("{U}"), null, 1, 1, CardType.Creature) { Subtypes = ["Human", "Wizard"] },
+            ["Murktide Regent"] = new(ManaCost.Parse("{5}{U}{U}"), null, 3, 3, CardType.Creature) { Subtypes = ["Dragon"] },
+            ["Dragon's Rage Channeler"] = new(ManaCost.Parse("{R}"), null, 1, 1, CardType.Creature) { Subtypes = ["Human", "Shaman"] },
+
+            // === UR Delver lands ===
+            ["Island"] = new(null, ManaAbility.Fixed(ManaColor.Blue), null, null, CardType.Land),
+            ["Volcanic Island"] = new(null, ManaAbility.Choice(ManaColor.Blue, ManaColor.Red), null, null, CardType.Land),
+            ["Scalding Tarn"] = new(null, null, null, null, CardType.Land),
+            ["Mystic Sanctuary"] = new(null, ManaAbility.Fixed(ManaColor.Blue), null, null, CardType.Land),
         };
 
         Registry = cards.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);

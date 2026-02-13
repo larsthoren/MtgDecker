@@ -1,4 +1,5 @@
 using FluentAssertions;
+using MtgDecker.Engine.Effects;
 using MtgDecker.Engine.Enums;
 using MtgDecker.Engine.Mana;
 
@@ -92,16 +93,27 @@ public class CardDefinitionsTests
     {
         var allCardNames = new[]
         {
+            // Goblins deck
             "Goblin Lackey", "Goblin Matron", "Goblin Piledriver", "Goblin Ringleader",
             "Goblin Warchief", "Mogg Fanatic", "Gempalm Incinerator", "Siege-Gang Commander",
             "Goblin King", "Goblin Pyromancer", "Goblin Sharpshooter", "Goblin Tinkerer",
             "Skirk Prospector", "Naturalize", "Mountain", "Forest", "Karplusan Forest",
             "Wooded Foothills", "Rishadan Port", "Wasteland",
+            // Enchantress deck
             "Argothian Enchantress", "Swords to Plowshares", "Replenish",
             "Enchantress's Presence", "Wild Growth", "Exploration", "Mirri's Guile",
             "Opalescence", "Parallax Wave", "Sterling Grove", "Aura of Silence",
             "Seal of Cleansing", "Solitary Confinement", "Sylvan Library",
-            "Plains", "Brushland", "Windswept Heath", "Serra's Sanctum"
+            "Plains", "Brushland", "Windswept Heath", "Serra's Sanctum",
+            // Burn deck
+            "Lightning Bolt", "Chain Lightning", "Lava Spike", "Rift Bolt",
+            "Fireblast", "Goblin Guide", "Monastery Swiftspear",
+            "Eidolon of the Great Revel", "Searing Blood",
+            // UR Delver deck
+            "Brainstorm", "Ponder", "Preordain", "Counterspell", "Daze",
+            "Force of Will", "Delver of Secrets", "Murktide Regent",
+            "Dragon's Rage Channeler", "Island", "Volcanic Island",
+            "Scalding Tarn", "Mystic Sanctuary"
         };
 
         foreach (var name in allCardNames)
@@ -130,5 +142,75 @@ public class CardDefinitionsTests
         CardDefinitions.TryGet(cardName, out var def);
 
         def!.CardTypes.Should().HaveFlag(CardType.Instant);
+    }
+
+    // === Burn deck tests ===
+
+    [Theory]
+    [InlineData("Lightning Bolt")]
+    [InlineData("Chain Lightning")]
+    [InlineData("Lava Spike")]
+    [InlineData("Rift Bolt")]
+    [InlineData("Fireblast")]
+    [InlineData("Goblin Guide")]
+    [InlineData("Monastery Swiftspear")]
+    [InlineData("Eidolon of the Great Revel")]
+    [InlineData("Searing Blood")]
+    public void BurnDeckCard_IsRegistered(string cardName)
+    {
+        CardDefinitions.TryGet(cardName, out var def).Should().BeTrue();
+        def.Should().NotBeNull();
+    }
+
+    [Fact]
+    public void LightningBolt_HasCorrectEffect()
+    {
+        CardDefinitions.TryGet("Lightning Bolt", out var def);
+        def!.Effect.Should().BeOfType<DamageEffect>();
+        ((DamageEffect)def.Effect!).Amount.Should().Be(3);
+    }
+
+    [Fact]
+    public void LavaSpike_CanOnlyTargetPlayers()
+    {
+        CardDefinitions.TryGet("Lava Spike", out var def);
+        var effect = (DamageEffect)def!.Effect!;
+        effect.CanTargetPlayer.Should().BeTrue();
+        effect.CanTargetCreature.Should().BeFalse();
+    }
+
+    // === UR Delver deck tests ===
+
+    [Theory]
+    [InlineData("Brainstorm")]
+    [InlineData("Ponder")]
+    [InlineData("Preordain")]
+    [InlineData("Counterspell")]
+    [InlineData("Daze")]
+    [InlineData("Force of Will")]
+    [InlineData("Delver of Secrets")]
+    [InlineData("Murktide Regent")]
+    [InlineData("Dragon's Rage Channeler")]
+    [InlineData("Volcanic Island")]
+    public void DelverDeckCard_IsRegistered(string cardName)
+    {
+        CardDefinitions.TryGet(cardName, out var def).Should().BeTrue();
+        def.Should().NotBeNull();
+    }
+
+    [Fact]
+    public void Counterspell_HasSpellTargetAndCounterEffect()
+    {
+        CardDefinitions.TryGet("Counterspell", out var def);
+        def!.Effect.Should().BeOfType<CounterSpellEffect>();
+        def.TargetFilter.Should().NotBeNull();
+    }
+
+    [Fact]
+    public void Brainstorm_HasBrainstormEffect_NoTarget()
+    {
+        CardDefinitions.TryGet("Brainstorm", out var def);
+        def!.Effect.Should().BeOfType<BrainstormEffect>();
+        def.TargetFilter.Should().BeNull();
     }
 }
