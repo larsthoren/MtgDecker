@@ -1,5 +1,6 @@
 @using MtgDecker.Engine
 @using MtgDecker.Engine.Enums
+@using MtgDecker.Engine.Mana
 @namespace MtgDecker.Web.Components.Pages.Game
 
 <div class="game-board" tabindex="0" @ref="_boardRef" @onkeydown="HandleKeyDown">
@@ -18,60 +19,98 @@
         </div>
     }
 
-    <div class="board-main">
-        @* Opponent zone (top) *@
-        <PlayerZone PlayerName="@OpponentPlayer.Name"
-                    Battlefield="@OpponentPlayer.Battlefield.Cards"
-                    Hand="@OpponentPlayer.Hand.Cards"
-                    Graveyard="@OpponentPlayer.Graveyard.Cards"
-                    Life="@OpponentPlayer.Life"
-                    LibraryCount="@OpponentPlayer.Library.Count"
-                    Exile="@OpponentPlayer.Exile.Cards"
-                    ManaPool="@OpponentPlayer.ManaPool"
-                    OnLifeAdjust="(delta) => OnLifeAdjust.InvokeAsync((OpponentSeat, delta))"
-                    OnDrawCard="() => OnDrawCard.InvokeAsync(OpponentSeat)"
-                    IsOpponent="true"
-                    IsActivePlayer="@(State.ActivePlayer == OpponentPlayer)"
-                    CanAct="@HasPriority"
-                    PlayerId="@OpponentPlayer.Id"
-                    OnAction="OnAction"
-                    CombatState="@State.Combat" />
-
-        @* Turn bar (middle) *@
-        <MudPaper Class="turn-bar pa-2" Elevation="2">
-            <div class="turn-bar-content">
-                <MudText Typo="Typo.body2">
-                    Turn @State.TurnNumber — @State.ActivePlayer.Name's turn
-                </MudText>
-                <MudChip T="string" Size="Size.Small" Color="Color.Primary">@State.CurrentPhase</MudChip>
-                @if (State.CurrentPhase == Phase.Combat && State.CombatStep != CombatStep.None)
+    @* Row 1: Opponent info bar *@
+    <div class="opponent-info-bar">
+        <MudText Typo="Typo.subtitle2">@OpponentPlayer.Name</MudText>
+        <MudChip T="string" Size="Size.Small" Color="Color.Error">@OpponentPlayer.Life HP</MudChip>
+        <MudChip T="string" Size="Size.Small" Color="Color.Default">Hand: @OpponentPlayer.Hand.Cards.Count</MudChip>
+        <MudChip T="string" Size="Size.Small" Color="Color.Default">Grave: @OpponentPlayer.Graveyard.Cards.Count</MudChip>
+        <MudChip T="string" Size="Size.Small" Color="Color.Default">Exile: @OpponentPlayer.Exile.Cards.Count</MudChip>
+        <MudChip T="string" Size="Size.Small" Color="Color.Default">Lib: @OpponentPlayer.Library.Count</MudChip>
+        @if (OpponentPlayer.ManaPool?.Total > 0)
+        {
+            <div class="mana-pool-display">
+                @foreach (var (color, symbol) in ManaSymbols)
                 {
-                    <MudChip T="string" Color="Color.Error" Size="Size.Small">@FormatCombatStep(State.CombatStep)</MudChip>
+                    @if (OpponentPlayer.ManaPool[color] > 0)
+                    {
+                        <span class="mana-entry">
+                            <img src="https://svgs.scryfall.io/card-symbols/@(symbol).svg"
+                                 alt="@color" class="mana-symbol" />
+                            <span class="mana-count">@OpponentPlayer.ManaPool[color]</span>
+                        </span>
+                    }
                 }
-                @if (HasPriority)
-                {
-                    <MudChip T="string" Size="Size.Small" Color="Color.Success">Your Priority</MudChip>
-                    <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary"
-                               OnClick="PassPriority">Pass Priority</MudButton>
-                }
-                else if (!IsWaitingForCombat)
-                {
-                    <MudChip T="string" Size="Size.Small" Color="Color.Default">Waiting...</MudChip>
-                }
-                <MudSpacer />
-                <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Warning"
-                           StartIcon="@Icons.Material.Filled.Undo"
-                           Disabled="@(LocalPlayer.ActionHistory.Count == 0)"
-                           OnClick="() => OnUndo.InvokeAsync()">Undo</MudButton>
-                <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Error"
-                           OnClick="() => OnSurrender.InvokeAsync()">Surrender</MudButton>
             </div>
-        </MudPaper>
+        }
+        @if (State.ActivePlayer == OpponentPlayer)
+        {
+            <MudChip T="string" Size="Size.Small" Color="Color.Primary">Active</MudChip>
+        }
+    </div>
 
-        @* Stack display (between turn bar and local player) *@
+    @* Row 2: Opponent battlefield *@
+    <div class="opponent-battlefield">
+        <div class="battlefield-row lands-row">
+            @foreach (var card in OpponentPlayer.Battlefield.Cards.Where(c => c.IsLand))
+            {
+                <CardDisplay Name="@card.Name"
+                             ImageUrl="@card.ImageUrl"
+                             Tapped="@card.IsTapped"
+                             CardSize="90"
+                             Clickable="@(Handler?.IsWaitingForTarget == true)"
+                             IsAttacking="@(State.Combat?.Attackers.Contains(card.Id) == true)"
+                             IsBlocking="@IsCardBlockingAnywhere(card.Id)"
+                             Power="@card.Power"
+                             Toughness="@card.Toughness"
+                             DamageMarked="@card.DamageMarked"
+                             OnClick="async () => await HandleOpponentCardClick(card)" />
+            }
+        </div>
+        <div class="battlefield-row nonlands-row">
+            @foreach (var card in OpponentPlayer.Battlefield.Cards.Where(c => !c.IsLand))
+            {
+                <CardDisplay Name="@card.Name"
+                             ImageUrl="@card.ImageUrl"
+                             Tapped="@card.IsTapped"
+                             CardSize="90"
+                             Clickable="@(Handler?.IsWaitingForTarget == true)"
+                             IsAttacking="@(State.Combat?.Attackers.Contains(card.Id) == true)"
+                             IsBlocking="@IsCardBlockingAnywhere(card.Id)"
+                             Power="@card.Power"
+                             Toughness="@card.Toughness"
+                             DamageMarked="@card.DamageMarked"
+                             OnClick="async () => await HandleOpponentCardClick(card)" />
+            }
+        </div>
+        @if (OpponentPlayer.Battlefield.Cards.Count == 0)
+        {
+            <MudText Typo="Typo.caption" Class="empty-zone">Opponent Battlefield</MudText>
+        }
+    </div>
+
+    @* Row 3: Phase bar + stack *@
+    <div class="phase-stack-row">
+        <PhaseBar CurrentPhase="@State.CurrentPhase"
+                  CurrentCombatStep="@State.CombatStep"
+                  TurnNumber="@State.TurnNumber"
+                  ActivePlayerName="@State.ActivePlayer.Name"
+                  HasPriority="@HasPriority"
+                  IsWaitingForCombat="@IsWaitingForCombat"
+                  IsWaitingForAttackers="@(IsLocalActive && Handler?.IsWaitingForAttackers == true)"
+                  IsWaitingForBlockers="@(IsLocalDefending && Handler?.IsWaitingForBlockers == true)"
+                  CanUndo="@(LocalPlayer.ActionHistory.Count > 0)"
+                  StackCount="@State.Stack.Count"
+                  StopSettings="@_phaseStops"
+                  OnPass="PassPriority"
+                  OnUndo="() => OnUndo.InvokeAsync()"
+                  OnSurrender="() => OnSurrender.InvokeAsync()" />
+
         <StackDisplay Stack="@State.Stack" />
+    </div>
 
-        @* Local player zone (bottom) *@
+    @* Row 4: Player battlefield *@
+    <div class="player-battlefield-row">
         <PlayerZone PlayerName="@LocalPlayer.Name"
                     Battlefield="@LocalPlayer.Battlefield.Cards"
                     Hand="@LocalPlayer.Hand.Cards"
@@ -119,8 +158,19 @@
                     OnRevealAcknowledged="OnRevealAcknowledged" />
     </div>
 
-    @* Game log (right) *@
-    <GameLogPanel GameLog="@State.GameLog" />
+    @* Log toggle button *@
+    <MudIconButton Icon="@Icons.Material.Filled.Article" Size="Size.Small"
+                   Class="log-toggle-btn" OnClick="ToggleLog" Title="Toggle Game Log" />
+
+    @* Log overlay *@
+    @if (_showLog)
+    {
+        <div class="log-overlay" @onclick="ToggleLog">
+            <div class="log-panel" @onclick:stopPropagation>
+                <GameLogPanel GameLog="@State.GameLog" />
+            </div>
+        </div>
+    }
 </div>
 
 @code {
@@ -142,6 +192,9 @@
     [Parameter] public EventCallback OnRevealAcknowledged { get; set; }
 
     private ElementReference _boardRef;
+    private PhaseStopSettings _phaseStops = new();
+    private bool _showLog = false;
+
     private Player LocalPlayer => PlayerSeat == 1 ? State.Player1 : State.Player2;
     private Player OpponentPlayer => PlayerSeat == 1 ? State.Player2 : State.Player1;
     private int OpponentSeat => PlayerSeat == 1 ? 2 : 1;
@@ -156,6 +209,8 @@
         Handler?.IsWaitingForBlockerOrder == true;
     private bool IsWaitingForCardChoice => Handler?.IsWaitingForCardChoice == true;
     private bool IsWaitingForRevealAck => Handler?.IsWaitingForRevealAck == true;
+
+    private void ToggleLog() => _showLog = !_showLog;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -188,13 +243,18 @@
         Handler?.SubmitTarget(target);
     }
 
-    private string FormatCombatStep(CombatStep step) => step switch
+    private async Task HandleOpponentCardClick(GameCard card)
     {
-        CombatStep.BeginCombat => "Begin Combat",
-        CombatStep.DeclareAttackers => "Declare Attackers",
-        CombatStep.DeclareBlockers => "Declare Blockers",
-        CombatStep.CombatDamage => "Combat Damage",
-        CombatStep.EndCombat => "End Combat",
-        _ => ""
-    };
+        if (Handler?.IsWaitingForTarget == true)
+            Handler.SubmitTarget(new TargetInfo(card.Id, OpponentPlayer.Id, ZoneType.Battlefield));
+    }
+
+    private bool IsCardBlockingAnywhere(Guid cardId) =>
+        State.Combat?.Attackers.Any(a => State.Combat.GetBlockers(a).Contains(cardId)) == true;
+
+    private static readonly (ManaColor color, string symbol)[] ManaSymbols =
+    [
+        (ManaColor.White, "W"), (ManaColor.Blue, "U"), (ManaColor.Black, "B"),
+        (ManaColor.Red, "R"), (ManaColor.Green, "G"), (ManaColor.Colorless, "C")
+    ];
 }

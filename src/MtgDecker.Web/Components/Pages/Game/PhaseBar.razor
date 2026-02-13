@@ -1,0 +1,135 @@
+@using MtgDecker.Engine
+@using MtgDecker.Engine.Enums
+@namespace MtgDecker.Web.Components.Pages.Game
+
+<div class="phase-bar">
+    <div class="phase-info">
+        <span class="turn-number">T@TurnNumber</span>
+        <span class="active-player">@ActivePlayerName</span>
+    </div>
+
+    <div class="phase-steps">
+        @foreach (var step in Steps)
+        {
+            var isActive = IsStepActive(step);
+            var isPast = IsStepPast(step);
+            var hasDot = HasStop(step);
+            <div class="phase-step @(isActive ? "active" : "") @(isPast ? "past" : "")"
+                 @onclick="() => ToggleStop(step)"
+                 title="@step.Label — click to toggle stop">
+                <span class="step-label">@step.Label</span>
+                <span class="stop-dot @(hasDot ? "enabled" : "")">@(hasDot ? "\u25CF" : "\u25CB")</span>
+            </div>
+        }
+    </div>
+
+    <div class="phase-actions">
+        @if (StackCount > 0)
+        {
+            <span class="stack-badge">@StackCount</span>
+        }
+
+        @if (HasPriority)
+        {
+            <button class="action-btn pass-btn" @onclick="OnPass">@PassLabel</button>
+        }
+
+        <button class="action-btn undo-btn" disabled="@(!CanUndo)" @onclick="OnUndo"
+                title="Undo (Ctrl+Z)">
+            <span class="btn-icon">&#x21B6;</span>
+        </button>
+
+        <button class="action-btn surrender-btn" @onclick="OnSurrender" title="Surrender">
+            <span class="btn-icon">&#x2691;</span>
+        </button>
+    </div>
+</div>
+
+@code {
+    [Parameter] public Phase CurrentPhase { get; set; }
+    [Parameter] public CombatStep CurrentCombatStep { get; set; }
+    [Parameter] public int TurnNumber { get; set; }
+    [Parameter] public string ActivePlayerName { get; set; } = "";
+    [Parameter] public bool HasPriority { get; set; }
+    [Parameter] public bool IsWaitingForCombat { get; set; }
+    [Parameter] public bool IsWaitingForAttackers { get; set; }
+    [Parameter] public bool IsWaitingForBlockers { get; set; }
+    [Parameter] public bool CanUndo { get; set; }
+    [Parameter] public int StackCount { get; set; }
+    [Parameter] public PhaseStopSettings? StopSettings { get; set; }
+    [Parameter] public EventCallback OnPass { get; set; }
+    [Parameter] public EventCallback OnUndo { get; set; }
+    [Parameter] public EventCallback OnSurrender { get; set; }
+    [Parameter] public EventCallback OnSkipCombat { get; set; }
+
+    private string PassLabel
+    {
+        get
+        {
+            if (IsWaitingForAttackers) return "Confirm Attacks";
+            if (IsWaitingForBlockers) return "Confirm Blocks";
+            return "Pass";
+        }
+    }
+
+    private static readonly StepInfo[] Steps =
+    [
+        new("Untap", Phase.Untap, CombatStep.None),
+        new("Upkeep", Phase.Upkeep, CombatStep.None),
+        new("Draw", Phase.Draw, CombatStep.None),
+        new("Main", Phase.MainPhase1, CombatStep.None),
+        new("Begin Cbt", Phase.Combat, CombatStep.BeginCombat),
+        new("Attackers", Phase.Combat, CombatStep.DeclareAttackers),
+        new("Blockers", Phase.Combat, CombatStep.DeclareBlockers),
+        new("Damage", Phase.Combat, CombatStep.CombatDamage),
+        new("End Cbt", Phase.Combat, CombatStep.EndCombat),
+        new("Main", Phase.MainPhase2, CombatStep.None),
+        new("End", Phase.End, CombatStep.None),
+    ];
+
+    private bool IsStepActive(StepInfo step)
+    {
+        if (step.Phase == Phase.Combat)
+            return CurrentPhase == Phase.Combat && CurrentCombatStep == step.CombatStep;
+        return CurrentPhase == step.Phase;
+    }
+
+    private bool IsStepPast(StepInfo step)
+    {
+        if (IsStepActive(step)) return false;
+
+        var currentIndex = GetCurrentIndex();
+        var stepIndex = Array.IndexOf(Steps, step);
+        return stepIndex < currentIndex;
+    }
+
+    private int GetCurrentIndex()
+    {
+        for (int i = 0; i < Steps.Length; i++)
+        {
+            if (IsStepActive(Steps[i])) return i;
+        }
+        return -1;
+    }
+
+    private bool HasStop(StepInfo step)
+    {
+        if (StopSettings == null) return false;
+
+        if (step.Phase == Phase.Combat)
+            return StopSettings.ShouldStop(step.CombatStep);
+        return StopSettings.ShouldStop(step.Phase);
+    }
+
+    private void ToggleStop(StepInfo step)
+    {
+        if (StopSettings == null) return;
+
+        if (step.Phase == Phase.Combat)
+            StopSettings.ToggleCombatStep(step.CombatStep);
+        else
+            StopSettings.TogglePhase(step.Phase);
+    }
+
+    private record StepInfo(string Label, Phase Phase, CombatStep CombatStep);
+}

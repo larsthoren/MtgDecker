@@ -1,6 +1,7 @@
 @namespace MtgDecker.Web.Components.Pages.Game
 
 <div class="card-display @(Tapped ? "tapped" : "") @(Selected ? "selected" : "") @(Clickable ? "clickable" : "") @(IsAttacking ? "attacking" : "") @(IsBlocking ? "blocking" : "")"
+     style="width: @(CardSize)px; min-height: @(CardSize * 1.4)px;"
      @onclick="HandleClick">
     @if (IsBack)
     {
@@ -39,6 +40,7 @@
 @code {
     [Parameter] public string? ImageUrl { get; set; }
     [Parameter] public string Name { get; set; } = "";
+    [Parameter] public int CardSize { get; set; } = 100;
     [Parameter] public bool Tapped { get; set; }
     [Parameter] public bool IsBack { get; set; }
     [Parameter] public bool Selected { get; set; }
