@@ -96,6 +96,18 @@ public class GameEngine
                 break;
 
             case Phase.Draw:
+                // Check for SkipDraw effects on the active player's permanents
+                var hasSkipDraw = _state.ActiveEffects.Any(e =>
+                    e.Type == ContinuousEffectType.SkipDraw
+                    && (_state.Player1.Battlefield.Contains(e.SourceId)
+                        ? _state.Player1 : _state.Player2).Id == _state.ActivePlayer.Id);
+
+                if (hasSkipDraw)
+                {
+                    _state.Log($"{_state.ActivePlayer.Name}'s draw is skipped.");
+                    break;
+                }
+
                 var drawn = _state.ActivePlayer.Library.DrawFromTop();
                 if (drawn != null)
                 {
@@ -321,7 +333,15 @@ public class GameEngine
                         {
                             if (trigger.Condition == TriggerCondition.AttachedPermanentTapped)
                             {
-                                var ctx = new EffectContext(_state, player, aura, player.DecisionHandler);
+                                var ctx = new EffectContext(_state, player, aura, player.DecisionHandler)
+                                {
+                                    FireLeaveBattlefieldTriggers = async card =>
+                                    {
+                                        var ctrl = _state.Player1.Battlefield.Contains(card.Id) ? _state.Player1
+                                            : _state.Player2.Battlefield.Contains(card.Id) ? _state.Player2 : null;
+                                        if (ctrl != null) await FireLeaveBattlefieldTriggersAsync(card, ctrl, ct);
+                                    },
+                                };
                                 await trigger.Effect.Execute(ctx);
                             }
                         }
@@ -362,6 +382,7 @@ public class GameEngine
 
                 // Pay costs: 1 life + sacrifice
                 player.AdjustLife(-1);
+                await FireLeaveBattlefieldTriggersAsync(fetchLand, player, ct);
                 player.Battlefield.RemoveById(fetchLand.Id);
                 player.Graveyard.Add(fetchLand);
                 _state.Log($"{player.Name} sacrifices {fetchLand.Name}, pays 1 life ({player.Life}).");
@@ -565,6 +586,16 @@ public class GameEngine
                     break;
                 }
 
+                // Validate: counter removal cost
+                if (cost.RemoveCounterType.HasValue)
+                {
+                    if (abilitySource.GetCounters(cost.RemoveCounterType.Value) <= 0)
+                    {
+                        _state.Log($"Cannot activate {abilitySource.Name} — no {cost.RemoveCounterType.Value} counters.");
+                        break;
+                    }
+                }
+
                 // Validate: sacrifice subtype
                 GameCard? sacrificeTarget = null;
                 if (cost.SacrificeSubtype != null)
@@ -632,6 +663,7 @@ public class GameEngine
                 // Pay costs: sacrifice self
                 if (cost.SacrificeSelf)
                 {
+                    await FireLeaveBattlefieldTriggersAsync(abilitySource, player, ct);
                     player.Battlefield.RemoveById(abilitySource.Id);
                     player.Graveyard.Add(abilitySource);
                     _state.Log($"{player.Name} sacrifices {abilitySource.Name}.");
@@ -640,9 +672,16 @@ public class GameEngine
                 // Pay costs: sacrifice subtype target
                 if (sacrificeTarget != null)
                 {
+                    await FireLeaveBattlefieldTriggersAsync(sacrificeTarget, player, ct);
                     player.Battlefield.RemoveById(sacrificeTarget.Id);
                     player.Graveyard.Add(sacrificeTarget);
                     _state.Log($"{player.Name} sacrifices {sacrificeTarget.Name}.");
+                }
+
+                // Pay costs: remove counter
+                if (cost.RemoveCounterType.HasValue)
+                {
+                    abilitySource.RemoveCounter(cost.RemoveCounterType.Value);
                 }
 
                 // Find effect target
@@ -660,11 +699,26 @@ public class GameEngine
                     break;
                 }
 
+                // Player shroud check: cannot target a player with shroud
+                if (action.TargetPlayerId.HasValue && HasPlayerShroud(action.TargetPlayerId.Value))
+                {
+                    var targetPlayerName = action.TargetPlayerId.Value == _state.Player1.Id
+                        ? _state.Player1.Name : _state.Player2.Name;
+                    _state.Log($"{targetPlayerName} has shroud — cannot be targeted.");
+                    break;
+                }
+
                 // Build context and execute effect
                 var effectContext = new EffectContext(_state, player, abilitySource, player.DecisionHandler)
                 {
                     Target = effectTarget,
                     TargetPlayerId = action.TargetPlayerId,
+                    FireLeaveBattlefieldTriggers = async card =>
+                    {
+                        var ctrl = _state.Player1.Battlefield.Contains(card.Id) ? _state.Player1
+                            : _state.Player2.Battlefield.Contains(card.Id) ? _state.Player2 : null;
+                        if (ctrl != null) await FireLeaveBattlefieldTriggersAsync(card, ctrl, ct);
+                    },
                 };
 
                 await ability.Effect.Execute(effectContext, ct);
@@ -717,6 +771,27 @@ public class GameEngine
     }
 
     private bool HasShroud(GameCard card) => card.ActiveKeywords.Contains(Keyword.Shroud);
+
+    private bool HasPlayerShroud(Guid playerId)
+    {
+        return _state.ActiveEffects.Any(e =>
+            e.Type == ContinuousEffectType.GrantPlayerShroud
+            && GetEffectController(e.SourceId)?.Id == playerId);
+    }
+
+    private bool HasPlayerDamageProtection(Guid playerId)
+    {
+        return _state.ActiveEffects.Any(e =>
+            e.Type == ContinuousEffectType.PreventDamageToPlayer
+            && GetEffectController(e.SourceId)?.Id == playerId);
+    }
+
+    private Player? GetEffectController(Guid sourceId)
+    {
+        if (_state.Player1.Battlefield.Contains(sourceId)) return _state.Player1;
+        if (_state.Player2.Battlefield.Contains(sourceId)) return _state.Player2;
+        return null;
+    }
 
     private async Task TryAttachAuraAsync(GameCard playCard, Player player, CancellationToken ct)
     {
@@ -1006,9 +1081,16 @@ public class GameEngine
                 var damage = attackerCard.Power ?? 0;
                 if (damage > 0)
                 {
-                    defender.AdjustLife(-damage);
-                    _state.Log($"{attackerCard.Name} deals {damage} damage to {defender.Name}. ({defender.Life} life)");
-                    unblockedAttackers.Add(attackerCard);
+                    if (HasPlayerDamageProtection(defender.Id))
+                    {
+                        _state.Log($"{attackerCard.Name}'s {damage} damage to {defender.Name} is prevented (protection).");
+                    }
+                    else
+                    {
+                        defender.AdjustLife(-damage);
+                        _state.Log($"{attackerCard.Name} deals {damage} damage to {defender.Name}. ({defender.Life} life)");
+                        unblockedAttackers.Add(attackerCard);
+                    }
                 }
             }
             else
@@ -1107,32 +1189,58 @@ public class GameEngine
             {
                 card.EffectivePower = null;
                 card.EffectiveToughness = null;
+                card.EffectiveCardTypes = null;
                 card.ActiveKeywords.Clear();
             }
             player.MaxLandDrops = 1;
         }
 
-        // Apply effects
-        foreach (var effect in _state.ActiveEffects)
+        // Layer 1: Type-changing effects (BecomeCreature)
+        foreach (var effect in _state.ActiveEffects.Where(e => e.Type == ContinuousEffectType.BecomeCreature))
         {
-            switch (effect.Type)
+            ApplyBecomeCreatureEffect(effect, _state.Player1);
+            ApplyBecomeCreatureEffect(effect, _state.Player2);
+        }
+
+        // Layer 2: P/T modification
+        foreach (var effect in _state.ActiveEffects.Where(e => e.Type == ContinuousEffectType.ModifyPowerToughness))
+        {
+            ApplyPowerToughnessEffect(effect, _state.Player1);
+            ApplyPowerToughnessEffect(effect, _state.Player2);
+        }
+
+        // Layer 3: Keywords
+        foreach (var effect in _state.ActiveEffects.Where(e => e.Type == ContinuousEffectType.GrantKeyword))
+        {
+            ApplyKeywordEffect(effect, _state.Player1);
+            ApplyKeywordEffect(effect, _state.Player2);
+        }
+
+        // Non-layered effects
+        foreach (var effect in _state.ActiveEffects.Where(e => e.Type == ContinuousEffectType.ExtraLandDrop))
+        {
+            var sourceOwner = _state.Player1.Battlefield.Cards.Any(c => c.Id == effect.SourceId)
+                ? _state.Player1 : _state.Player2;
+            sourceOwner.MaxLandDrops += effect.ExtraLandDrops;
+        }
+    }
+
+    private void ApplyBecomeCreatureEffect(ContinuousEffect effect, Player player)
+    {
+        foreach (var card in player.Battlefield.Cards)
+        {
+            if (card.Id == effect.SourceId) continue; // "each other" exclusion
+            if (!effect.Applies(card, player)) continue;
+
+            // Add Creature type
+            card.EffectiveCardTypes = (card.EffectiveCardTypes ?? card.CardTypes) | CardType.Creature;
+
+            // Set P/T to CMC
+            if (effect.SetPowerToughnessToCMC && card.ManaCost != null)
             {
-                case ContinuousEffectType.ModifyPowerToughness:
-                    ApplyPowerToughnessEffect(effect, _state.Player1);
-                    ApplyPowerToughnessEffect(effect, _state.Player2);
-                    break;
-
-                case ContinuousEffectType.GrantKeyword:
-                    ApplyKeywordEffect(effect, _state.Player1);
-                    ApplyKeywordEffect(effect, _state.Player2);
-                    break;
-
-                case ContinuousEffectType.ExtraLandDrop:
-                    // Applies to the controller of the source
-                    var sourceOwner = _state.Player1.Battlefield.Cards.Any(c => c.Id == effect.SourceId)
-                        ? _state.Player1 : _state.Player2;
-                    sourceOwner.MaxLandDrops += effect.ExtraLandDrops;
-                    break;
+                var cmc = card.ManaCost.ConvertedManaCost;
+                card.EffectivePower = cmc;
+                card.EffectiveToughness = cmc;
             }
         }
     }
@@ -1247,15 +1355,15 @@ public class GameEngine
                 anyActionTaken = true;
 
             // Zero-or-less toughness (MTG 704.5f)
-            bool lethalP1 = CheckLethalToughness(_state.Player1);
-            bool lethalP2 = CheckLethalToughness(_state.Player2);
+            bool lethalP1 = await CheckLethalToughness(_state.Player1, ct);
+            bool lethalP2 = await CheckLethalToughness(_state.Player2, ct);
             if (lethalP1 || lethalP2)
                 anyActionTaken = true;
 
             // Lethal damage (MTG 704.5g) — creatures with damage >= toughness die
             var lethalDamageDeaths = new List<GameCard>();
-            CheckLethalDamage(_state.Player1, lethalDamageDeaths);
-            CheckLethalDamage(_state.Player2, lethalDamageDeaths);
+            await CheckLethalDamage(_state.Player1, lethalDamageDeaths, ct);
+            await CheckLethalDamage(_state.Player2, lethalDamageDeaths, ct);
             if (lethalDamageDeaths.Count > 0)
             {
                 anyActionTaken = true;
@@ -1274,6 +1382,7 @@ public class GameEngine
                         || _state.Player2.Battlefield.Contains(aura.AttachedTo!.Value);
                     if (!targetExists)
                     {
+                        await FireLeaveBattlefieldTriggersAsync(aura, p, ct);
                         p.Battlefield.RemoveById(aura.Id);
                         p.Graveyard.Add(aura);
                         _state.Log($"{aura.Name} falls off (enchanted permanent left battlefield).");
@@ -1309,6 +1418,7 @@ public class GameEngine
 
             foreach (var card in duplicates.Where(c => c.Id != chosenId))
             {
+                await FireLeaveBattlefieldTriggersAsync(card, player, ct);
                 player.Battlefield.RemoveById(card.Id);
                 player.Graveyard.Add(card);
                 _state.Log($"{card.Name} is put into graveyard (legendary rule).");
@@ -1318,7 +1428,7 @@ public class GameEngine
         return true;
     }
 
-    private bool CheckLethalToughness(Player player)
+    private async Task<bool> CheckLethalToughness(Player player, CancellationToken ct)
     {
         var dead = player.Battlefield.Cards
             .Where(c => c.IsCreature && (c.Toughness ?? 1) <= 0)
@@ -1326,6 +1436,7 @@ public class GameEngine
 
         foreach (var card in dead)
         {
+            await FireLeaveBattlefieldTriggersAsync(card, player, ct);
             player.Battlefield.RemoveById(card.Id);
             player.Graveyard.Add(card);
             _state.Log($"{card.Name} dies (0 toughness).");
@@ -1334,7 +1445,7 @@ public class GameEngine
         return dead.Count > 0;
     }
 
-    private void CheckLethalDamage(Player player, List<GameCard> deaths)
+    private async Task CheckLethalDamage(Player player, List<GameCard> deaths, CancellationToken ct)
     {
         var dead = player.Battlefield.Cards
             .Where(c => c.IsCreature && c.Toughness.HasValue && c.DamageMarked >= c.Toughness.Value && c.Toughness.Value > 0)
@@ -1342,6 +1453,7 @@ public class GameEngine
 
         foreach (var card in dead)
         {
+            await FireLeaveBattlefieldTriggersAsync(card, player, ct);
             player.Battlefield.RemoveById(card.Id);
             // MTG rules: tokens go to graveyard then cease to exist (SBA 704.5d)
             player.Graveyard.Add(card);
@@ -1463,6 +1575,20 @@ public class GameEngine
         }
     }
 
+    internal async Task FireLeaveBattlefieldTriggersAsync(GameCard card, Player controller, CancellationToken ct)
+    {
+        if (!CardDefinitions.TryGet(card.Name, out var def)) return;
+
+        foreach (var trigger in def.Triggers)
+        {
+            if (trigger.Condition == TriggerCondition.SelfLeavesBattlefield)
+            {
+                _state.Log($"{card.Name} triggers: {trigger.Effect.GetType().Name.Replace("Effect", "")}");
+                _state.Stack.Add(new TriggeredAbilityStackObject(card, controller.Id, trigger.Effect));
+            }
+        }
+    }
+
     /// <summary>Resolves all items on the stack (for testing).</summary>
     internal async Task ResolveAllTriggersAsync(CancellationToken ct = default)
     {
@@ -1530,6 +1656,12 @@ public class GameEngine
             {
                 Target = triggered.Target,
                 TargetPlayerId = triggered.TargetPlayerId,
+                FireLeaveBattlefieldTriggers = async card =>
+                {
+                    var ctrl = _state.Player1.Battlefield.Contains(card.Id) ? _state.Player1
+                        : _state.Player2.Battlefield.Contains(card.Id) ? _state.Player2 : null;
+                    if (ctrl != null) await FireLeaveBattlefieldTriggersAsync(card, ctrl, ct);
+                },
             };
             await triggered.Effect.Execute(context, ct);
             await OnBoardChangedAsync(ct);

@@ -1,3 +1,4 @@
+using MtgDecker.Engine.Enums;
 using MtgDecker.Engine.Mana;
 using MtgDecker.Engine.Triggers;
 
@@ -7,7 +8,8 @@ public record ActivatedAbilityCost(
     bool TapSelf = false,
     bool SacrificeSelf = false,
     string? SacrificeSubtype = null,
-    ManaCost? ManaCost = null);
+    ManaCost? ManaCost = null,
+    CounterType? RemoveCounterType = null);
 
 public record ActivatedAbility(
     ActivatedAbilityCost Cost,

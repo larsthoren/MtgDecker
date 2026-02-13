@@ -44,11 +44,37 @@ public class GameCard
         set => BaseToughness = value;
     }
 
+    // Type-changing effects (e.g., Opalescence makes enchantments into creatures)
+    public CardType? EffectiveCardTypes { get; set; }
+
     // Keywords granted by continuous effects or intrinsic abilities
     public HashSet<Keyword> ActiveKeywords { get; } = new();
 
     // Aura attachment
     public Guid? AttachedTo { get; set; }
+
+    // Counter tracking
+    public Dictionary<CounterType, int> Counters { get; } = new();
+
+    public void AddCounters(CounterType type, int count)
+    {
+        Counters.TryGetValue(type, out var current);
+        Counters[type] = current + count;
+    }
+
+    public bool RemoveCounter(CounterType type)
+    {
+        if (!Counters.TryGetValue(type, out var current) || current <= 0)
+            return false;
+        Counters[type] = current - 1;
+        return true;
+    }
+
+    public int GetCounters(CounterType type) =>
+        Counters.TryGetValue(type, out var count) ? count : 0;
+
+    // Per-source exile tracking (e.g., Parallax Wave)
+    public List<Guid> ExiledCardIds { get; } = new();
 
     // Combat tracking
     public int? TurnEnteredBattlefield { get; set; }
@@ -68,11 +94,11 @@ public class GameCard
 
     // Backward-compatible: check both CardTypes flags and TypeLine
     public bool IsLand =>
-        CardTypes.HasFlag(CardType.Land) ||
+        (EffectiveCardTypes ?? CardTypes).HasFlag(CardType.Land) ||
         TypeLine.Contains("Land", StringComparison.OrdinalIgnoreCase);
 
     public bool IsCreature =>
-        CardTypes.HasFlag(CardType.Creature) ||
+        (EffectiveCardTypes ?? CardTypes).HasFlag(CardType.Creature) ||
         TypeLine.Contains("Creature", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Original factory: uses CardDefinitions registry only.</summary>

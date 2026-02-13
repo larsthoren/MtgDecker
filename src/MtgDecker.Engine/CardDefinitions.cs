@@ -147,8 +147,28 @@ public static class CardDefinitions
             {
                 Triggers = [new Trigger(GameEvent.Upkeep, TriggerCondition.Upkeep, new RearrangeTopEffect(3))],
             },
-            ["Opalescence"] = new(ManaCost.Parse("{2}{W}{W}"), null, null, null, CardType.Enchantment),
-            ["Parallax Wave"] = new(ManaCost.Parse("{2}{W}{W}"), null, null, null, CardType.Enchantment),
+            ["Opalescence"] = new(ManaCost.Parse("{2}{W}{W}"), null, null, null, CardType.Enchantment)
+            {
+                ContinuousEffects =
+                [
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.BecomeCreature,
+                        (card, _) => card.CardTypes.HasFlag(CardType.Enchantment)
+                            && !card.Subtypes.Contains("Aura"),
+                        SetPowerToughnessToCMC: true),
+                ],
+            },
+            ["Parallax Wave"] = new(ManaCost.Parse("{2}{W}{W}"), null, null, null, CardType.Enchantment)
+            {
+                Triggers =
+                [
+                    new Trigger(GameEvent.EnterBattlefield, TriggerCondition.Self, new AddCountersEffect(CounterType.Fade, 5)),
+                    new Trigger(GameEvent.LeavesBattlefield, TriggerCondition.SelfLeavesBattlefield, new ReturnExiledCardsEffect()),
+                ],
+                ActivatedAbility = new(
+                    new ActivatedAbilityCost(RemoveCounterType: CounterType.Fade),
+                    new ExileCreatureEffect(),
+                    c => c.IsCreature),
+            },
             ["Sterling Grove"] = new(ManaCost.Parse("{G}{W}"), null, null, null, CardType.Enchantment)
             {
                 ContinuousEffects =
@@ -178,7 +198,16 @@ public static class CardDefinitions
             {
                 ActivatedAbility = new(new ActivatedAbilityCost(SacrificeSelf: true), new DestroyTargetEffect(), c => c.CardTypes.HasFlag(CardType.Enchantment) || c.CardTypes.HasFlag(CardType.Artifact)),
             },
-            ["Solitary Confinement"] = new(ManaCost.Parse("{2}{W}"), null, null, null, CardType.Enchantment),
+            ["Solitary Confinement"] = new(ManaCost.Parse("{2}{W}"), null, null, null, CardType.Enchantment)
+            {
+                Triggers = [new Trigger(GameEvent.Upkeep, TriggerCondition.Upkeep, new UpkeepCostEffect())],
+                ContinuousEffects =
+                [
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.SkipDraw, (_, _) => true),
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantPlayerShroud, (_, _) => true),
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.PreventDamageToPlayer, (_, _) => true),
+                ],
+            },
             ["Sylvan Library"] = new(ManaCost.Parse("{1}{G}"), null, null, null, CardType.Enchantment)
             {
                 Triggers = [new Trigger(GameEvent.Upkeep, TriggerCondition.Upkeep, new SylvanLibraryEffect())],
