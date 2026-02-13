@@ -1,0 +1,170 @@
+.phase-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 8px;
+    background: #1a1a2e;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    min-height: 38px;
+}
+
+.phase-info {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding-right: 8px;
+    border-right: 1px solid rgba(255, 255, 255, 0.12);
+    white-space: nowrap;
+}
+
+.turn-number {
+    font-weight: 700;
+    font-size: 0.8rem;
+    color: #c69b3c;
+}
+
+.active-player {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.7);
+    max-width: 80px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.phase-steps {
+    display: flex;
+    align-items: center;
+    gap: 1px;
+    flex: 1;
+    justify-content: center;
+}
+
+.phase-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 2px 6px;
+    border-radius: 4px;
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.15s ease;
+    min-width: 46px;
+}
+
+.phase-step:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.phase-step .step-label {
+    font-size: 0.65rem;
+    color: rgba(255, 255, 255, 0.35);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    line-height: 1.2;
+}
+
+.phase-step .stop-dot {
+    font-size: 0.55rem;
+    color: rgba(255, 255, 255, 0.25);
+    line-height: 1;
+}
+
+.phase-step .stop-dot.enabled {
+    color: #4caf50;
+}
+
+/* Past phases: slightly brighter */
+.phase-step.past .step-label {
+    color: rgba(255, 255, 255, 0.55);
+}
+
+/* Active phase: amber/gold highlight */
+.phase-step.active {
+    background: rgba(198, 155, 60, 0.25);
+    border: 1px solid rgba(198, 155, 60, 0.6);
+}
+
+.phase-step.active .step-label {
+    color: #c69b3c;
+    font-weight: 600;
+}
+
+.phase-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding-left: 8px;
+    border-left: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.stack-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #7b1fa2;
+    color: white;
+    font-size: 0.7rem;
+    font-weight: 700;
+}
+
+.action-btn {
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
+    padding: 3px 10px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+    background: rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.85);
+    line-height: 1.4;
+}
+
+.action-btn:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+.action-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.pass-btn {
+    background: rgba(25, 118, 210, 0.3);
+    border-color: rgba(25, 118, 210, 0.5);
+    color: #90caf9;
+    font-weight: 600;
+}
+
+.pass-btn:hover {
+    background: rgba(25, 118, 210, 0.5) !important;
+}
+
+.skip-btn {
+    background: rgba(158, 158, 158, 0.2);
+    border-color: rgba(158, 158, 158, 0.4);
+    color: #bdbdbd;
+}
+
+.skip-btn:hover {
+    background: rgba(158, 158, 158, 0.35) !important;
+}
+
+.undo-btn .btn-icon,
+.surrender-btn .btn-icon {
+    font-size: 0.9rem;
+}
+
+.surrender-btn {
+    border-color: rgba(244, 67, 54, 0.4);
+    color: #ef9a9a;
+}
+
+.surrender-btn:hover {
+    background: rgba(244, 67, 54, 0.2) !important;
+    border-color: rgba(244, 67, 54, 0.6) !important;
+}
