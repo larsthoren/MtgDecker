@@ -16,7 +16,7 @@ public class InteractiveDecisionHandler : IPlayerDecisionHandler
     private TaskCompletionSource<IReadOnlyList<Guid>>? _attackersTcs;
     private TaskCompletionSource<Dictionary<Guid, Guid>>? _blockersTcs;
     private TaskCompletionSource<IReadOnlyList<Guid>>? _blockerOrderTcs;
-    private TaskCompletionSource<TargetInfo>? _targetTcs;
+    private TaskCompletionSource<TargetInfo?>? _targetTcs;
     private TaskCompletionSource<Guid?>? _cardChoiceTcs;
     private TaskCompletionSource<bool>? _revealAckTcs;
 
@@ -185,11 +185,11 @@ public class InteractiveDecisionHandler : IPlayerDecisionHandler
         return _blockerOrderTcs.Task;
     }
 
-    public Task<TargetInfo> ChooseTarget(string spellName, IReadOnlyList<GameCard> eligibleTargets, Guid defaultOwnerId = default, CancellationToken ct = default)
+    public Task<TargetInfo?> ChooseTarget(string spellName, IReadOnlyList<GameCard> eligibleTargets, Guid defaultOwnerId = default, CancellationToken ct = default)
     {
         TargetingSpellName = spellName;
         EligibleTargets = eligibleTargets;
-        _targetTcs = new TaskCompletionSource<TargetInfo>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _targetTcs = new TaskCompletionSource<TargetInfo?>(TaskCreationOptions.RunContinuationsAsynchronously);
         var registration = ct.Register(() => { TargetingSpellName = null; EligibleTargets = null; _targetTcs.TrySetCanceled(); });
         _targetTcs.Task.ContinueWith(_ => registration.Dispose(), TaskContinuationOptions.ExecuteSynchronously);
         OnWaitingForInput?.Invoke();
@@ -201,6 +201,13 @@ public class InteractiveDecisionHandler : IPlayerDecisionHandler
         TargetingSpellName = null;
         EligibleTargets = null;
         _targetTcs?.TrySetResult(target);
+    }
+
+    public void CancelTarget()
+    {
+        TargetingSpellName = null;
+        EligibleTargets = null;
+        _targetTcs?.TrySetResult(null);
     }
 
     public void SubmitAttackers(IReadOnlyList<Guid> attackerIds)

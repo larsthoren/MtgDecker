@@ -276,6 +276,8 @@
                         </MudButton>
                     }
                 }
+                <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Default"
+                           Class="ma-1" OnClick="HandleTargetCancel">Cancel</MudButton>
             </MudPaper>
         </div>
     }
@@ -654,6 +656,11 @@
             var ownerId = LocalPlayer.Battlefield.Cards.Any(c => c.Id == card.Id) ? LocalPlayer.Id : OpponentPlayer.Id;
             Handler?.SubmitTarget(new TargetInfo(card.Id, ownerId, ZoneType.Battlefield));
         }
+    }
+
+    private void HandleTargetCancel()
+    {
+        Handler?.CancelTarget();
     }
 
     private Task HandleOpponentCardClick(GameCard card)

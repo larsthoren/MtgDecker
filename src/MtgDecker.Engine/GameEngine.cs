@@ -429,6 +429,13 @@ public class GameEngine
                     var target = await castPlayer.DecisionHandler.ChooseTarget(
                         castCard.Name, eligible, opponent.Id, ct);
 
+                    // Null target means the player cancelled the spell
+                    if (target == null)
+                    {
+                        _state.Log($"{castPlayer.Name} cancels casting {castCard.Name}.");
+                        return;
+                    }
+
                     // Convert player sentinel targets to proper TargetInfo
                     if (target.Zone == ZoneType.None)
                     {
