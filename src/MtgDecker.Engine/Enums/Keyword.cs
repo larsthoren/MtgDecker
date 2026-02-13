@@ -5,4 +5,12 @@ public enum Keyword
     Haste,
     Shroud,
     Mountainwalk,
+    Flying,
+    Trample,
+    FirstStrike,
+    Protection,
+    Swampwalk,
+    Forestwalk,
+    Islandwalk,
+    Plainswalk,
 }
