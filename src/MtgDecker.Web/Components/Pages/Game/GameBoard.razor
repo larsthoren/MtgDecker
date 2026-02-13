@@ -99,12 +99,10 @@
                   IsWaitingForCombat="@IsWaitingForCombat"
                   IsWaitingForAttackers="@(IsLocalActive && Handler?.IsWaitingForAttackers == true)"
                   IsWaitingForBlockers="@(IsLocalDefending && Handler?.IsWaitingForBlockers == true)"
-                  CanUndo="@(LocalPlayer.ActionHistory.Count > 0)"
                   StackCount="@State.Stack.Count"
                   StopSettings="@_phaseStops"
                   OnPass="HandlePassOrConfirm"
                   OnSkipCombat="HandleSkipCombat"
-                  OnUndo="() => OnUndo.InvokeAsync()"
                   OnSurrender="() => OnSurrender.InvokeAsync()" />
 
         <StackDisplay Stack="@State.Stack" />
@@ -133,11 +131,22 @@
         <div class="battlefield-row player-lands">
             @foreach (var card in LocalPlayer.Battlefield.Cards.Where(c => c.IsLand))
             {
-                <CardDisplay Name="@card.Name" ImageUrl="@card.ImageUrl" Tapped="@card.IsTapped"
-                             CardSize="130"
-                             Selected="@(_selectedCard?.Id == card.Id)"
-                             Clickable="true"
-                             OnClick="async () => await HandleLandClick(card)" />
+                var hasPendingMana = card.IsTapped && LocalPlayer.PendingManaTaps.Contains(card.Id);
+                <div class="land-wrapper">
+                    <CardDisplay Name="@card.Name" ImageUrl="@card.ImageUrl" Tapped="@card.IsTapped"
+                                 CardSize="130"
+                                 Selected="@(_selectedCard?.Id == card.Id)"
+                                 Clickable="true"
+                                 OnClick="async () => await HandleLandClick(card)" />
+                    @if (hasPendingMana)
+                    {
+                        <button class="untap-affordance" @onclick="HandleUntapLand"
+                                @onclick:stopPropagation="true"
+                                title="Untap (unspent mana)">
+                            &#x21B6;
+                        </button>
+                    }
+                </div>
             }
         </div>
         @if (LocalPlayer.Battlefield.Cards.Count == 0)
@@ -380,7 +389,7 @@
     [Parameter] public InteractiveDecisionHandler? Handler { get; set; }
     [Parameter] public EventCallback<GameAction> OnAction { get; set; }
     [Parameter] public EventCallback OnSurrender { get; set; }
-    [Parameter] public EventCallback OnUndo { get; set; }
+    [Parameter] public EventCallback OnUndoTap { get; set; }
     [Parameter] public bool IsGameOver { get; set; }
     [Parameter] public string? Winner { get; set; }
     [Parameter] public EventCallback<ManaColor> OnManaColorChosen { get; set; }
@@ -432,12 +441,10 @@
         }
     }
 
-    private async Task HandleKeyDown(KeyboardEventArgs e)
+    private Task HandleKeyDown(KeyboardEventArgs e)
     {
-        if (e.CtrlKey && e.Key == "z" && LocalPlayer.ActionHistory.Count > 0)
-        {
-            await OnUndo.InvokeAsync();
-        }
+        // No global keyboard shortcuts — undo is per-land via untap affordance
+        return Task.CompletedTask;
     }
 
     // --- Pass / Combat confirm via PhaseBar ---
@@ -662,6 +669,13 @@
     {
         _selectedChoiceId = null;
         await OnCardChosen.InvokeAsync(cardId);
+    }
+
+    // --- Untap (pending mana) ---
+
+    private async Task HandleUntapLand()
+    {
+        await OnUndoTap.InvokeAsync();
     }
 
     // --- Helpers ---

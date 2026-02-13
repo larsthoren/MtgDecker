@@ -38,11 +38,6 @@
             <button class="action-btn pass-btn" @onclick="OnPass">@PassLabel</button>
         }
 
-        <button class="action-btn undo-btn" disabled="@(!CanUndo)" @onclick="OnUndo"
-                title="Undo (Ctrl+Z)">
-            <span class="btn-icon">&#x21B6;</span>
-        </button>
-
         <button class="action-btn surrender-btn" @onclick="OnSurrender" title="Surrender">
             <span class="btn-icon">&#x2691;</span>
         </button>
@@ -58,11 +53,9 @@
     [Parameter] public bool IsWaitingForCombat { get; set; }
     [Parameter] public bool IsWaitingForAttackers { get; set; }
     [Parameter] public bool IsWaitingForBlockers { get; set; }
-    [Parameter] public bool CanUndo { get; set; }
     [Parameter] public int StackCount { get; set; }
     [Parameter] public PhaseStopSettings? StopSettings { get; set; }
     [Parameter] public EventCallback OnPass { get; set; }
-    [Parameter] public EventCallback OnUndo { get; set; }
     [Parameter] public EventCallback OnSurrender { get; set; }
     [Parameter] public EventCallback OnSkipCombat { get; set; }
 

@@ -28,7 +28,7 @@ else if (_session.State != null)
                Handler="_session.GetHandler(_playerSeat)"
                OnAction="HandleAction"
                OnSurrender="HandleSurrender"
-               OnUndo="HandleUndo"
+               OnUndoTap="HandleUndoTap"
                IsGameOver="_session.IsGameOver"
                Winner="_session.Winner"
                OnManaColorChosen="HandleManaColorChosen"
@@ -211,7 +211,7 @@ else if (_session.State != null)
         _session?.Surrender(_playerSeat);
     }
 
-    private void HandleUndo()
+    private void HandleUndoTap()
     {
         _session?.Undo(_playerSeat);
     }
