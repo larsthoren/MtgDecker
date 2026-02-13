@@ -50,15 +50,6 @@ public class GameAction
         CardId = cardId
     };
 
-    public static GameAction MoveCard(Guid playerId, Guid cardId, ZoneType from, ZoneType to) => new()
-    {
-        Type = ActionType.MoveCard,
-        PlayerId = playerId,
-        CardId = cardId,
-        SourceZone = from,
-        DestinationZone = to
-    };
-
     public static GameAction CastSpell(Guid playerId, Guid cardId) => new()
     {
         Type = ActionType.CastSpell,

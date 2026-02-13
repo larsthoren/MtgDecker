@@ -64,22 +64,6 @@ public class GameEngineUndoTests
     }
 
     [Fact]
-    public async Task UndoMoveCard_ReversesSourceAndDestination()
-    {
-        var engine = CreateEngine(out _, out var p1, out _);
-        var card = new GameCard { Name = "Bear", TypeLine = "Creature — Bear" };
-        p1.Battlefield.Add(card);
-        await engine.ExecuteAction(GameAction.MoveCard(p1.Id, card.Id, ZoneType.Battlefield, ZoneType.Graveyard));
-
-        var result = engine.UndoLastAction(p1.Id);
-
-        result.Should().BeTrue();
-        p1.Graveyard.Count.Should().Be(0);
-        p1.Battlefield.Count.Should().Be(1);
-        p1.Battlefield.Cards[0].Should().BeSameAs(card);
-    }
-
-    [Fact]
     public void Undo_EmptyHistory_ReturnsFalse()
     {
         var engine = CreateEngine(out _, out var p1, out _);
@@ -115,20 +99,6 @@ public class GameEngineUndoTests
         engine.UndoLastAction(p1.Id);
 
         state.GameLog.Should().Contain(l => l.Contains("undoes tapping") && l.Contains("Forest"));
-    }
-
-    [Fact]
-    public async Task Undo_LogsReversal_MoveCard()
-    {
-        var engine = CreateEngine(out var state, out var p1, out _);
-        var card = new GameCard { Name = "Bear", TypeLine = "Creature — Bear" };
-        p1.Battlefield.Add(card);
-        await engine.ExecuteAction(GameAction.MoveCard(p1.Id, card.Id, ZoneType.Battlefield, ZoneType.Graveyard));
-        state.GameLog.Clear();
-
-        engine.UndoLastAction(p1.Id);
-
-        state.GameLog.Should().Contain(l => l.Contains("undoes moving") && l.Contains("Bear"));
     }
 
     [Fact]
@@ -222,23 +192,6 @@ public class GameEngineUndoTests
     }
 
     [Fact]
-    public async Task Undo_PopOnlyOnSuccess_MoveCard()
-    {
-        var engine = CreateEngine(out _, out var p1, out _);
-        var card = new GameCard { Name = "Bear", TypeLine = "Creature — Bear" };
-        p1.Battlefield.Add(card);
-        await engine.ExecuteAction(GameAction.MoveCard(p1.Id, card.Id, ZoneType.Battlefield, ZoneType.Graveyard));
-
-        // Manually remove the card from graveyard
-        p1.Graveyard.RemoveById(card.Id);
-
-        // Undo should fail — card not in destination zone
-        var result = engine.UndoLastAction(p1.Id);
-        result.Should().BeFalse();
-        p1.ActionHistory.Count.Should().Be(1, "history should not be consumed on failed undo");
-    }
-
-    [Fact]
     public async Task Undo_PopOnlyOnSuccess_TapCard()
     {
         var engine = CreateEngine(out _, out var p1, out _);
@@ -272,20 +225,6 @@ public class GameEngineUndoTests
         // Undo tap → card should be untapped
         engine.UndoLastAction(p1.Id).Should().BeTrue();
         card.IsTapped.Should().BeFalse();
-    }
-
-    [Fact]
-    public async Task Undo_MoveToExile_ReversesCorrectly()
-    {
-        var engine = CreateEngine(out _, out var p1, out _);
-        var card = new GameCard { Name = "Bear", TypeLine = "Creature — Bear" };
-        p1.Battlefield.Add(card);
-
-        await engine.ExecuteAction(GameAction.MoveCard(p1.Id, card.Id, ZoneType.Battlefield, ZoneType.Exile));
-
-        engine.UndoLastAction(p1.Id).Should().BeTrue();
-        p1.Exile.Count.Should().Be(0);
-        p1.Battlefield.Count.Should().Be(1);
     }
 
     // === Task 1: TapCard undo should remove mana ===

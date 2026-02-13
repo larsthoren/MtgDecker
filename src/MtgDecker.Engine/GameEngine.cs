@@ -301,18 +301,6 @@ public class GameEngine
                 }
                 break;
 
-            case ActionType.MoveCard:
-                var source = player.GetZone(action.SourceZone!.Value);
-                var dest = player.GetZone(action.DestinationZone!.Value);
-                var movedCard = source.RemoveById(action.CardId!.Value);
-                if (movedCard != null)
-                {
-                    dest.Add(movedCard);
-                    player.ActionHistory.Push(action);
-                    _state.Log($"{player.Name} moves {movedCard.Name} from {action.SourceZone} to {action.DestinationZone}.");
-                }
-                break;
-
             case ActionType.ActivateFetch:
             {
                 var fetchLand = player.Battlefield.Cards.FirstOrDefault(c => c.Id == action.CardId);
@@ -841,16 +829,6 @@ public class GameEngine
                 player.ActionHistory.Pop();
                 untapTarget.IsTapped = true;
                 _state.Log($"{player.Name} undoes untapping {untapTarget.Name}.");
-                break;
-
-            case ActionType.MoveCard:
-                var dest = player.GetZone(action.DestinationZone!.Value);
-                var movedCard = dest.RemoveById(action.CardId!.Value);
-                if (movedCard == null) return false;
-                player.ActionHistory.Pop();
-                var src = player.GetZone(action.SourceZone!.Value);
-                src.Add(movedCard);
-                _state.Log($"{player.Name} undoes moving {movedCard.Name}.");
                 break;
 
             case ActionType.CastSpell:

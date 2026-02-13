@@ -216,7 +216,7 @@ public class GameEngineIntegrationTests
     }
 
     [Fact]
-    public async Task PlayCard_TapIt_MoveToGraveyard_AllInOneTurn()
+    public async Task PlayCard_TapIt_ThenManuallyMoveToGraveyard()
     {
         var engine = CreateGame(out var state, out var p1Handler, out _);
         await engine.StartGameAsync();
@@ -224,11 +224,13 @@ public class GameEngineIntegrationTests
         var card = state.Player1.Hand.Cards[0];
         p1Handler.EnqueueAction(GameAction.PlayCard(state.Player1.Id, card.Id));
         p1Handler.EnqueueAction(GameAction.TapCard(state.Player1.Id, card.Id));
-        p1Handler.EnqueueAction(
-            GameAction.MoveCard(state.Player1.Id, card.Id, ZoneType.Battlefield, ZoneType.Graveyard));
 
         state.IsFirstTurn = true;
         await engine.RunTurnAsync();
+
+        // Simulate zone move via direct manipulation (MoveCard action was removed)
+        state.Player1.Battlefield.RemoveById(card.Id);
+        state.Player1.Graveyard.Add(card);
 
         state.Player1.Hand.Count.Should().Be(6);
         state.Player1.Battlefield.Count.Should().Be(0);

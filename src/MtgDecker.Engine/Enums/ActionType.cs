@@ -6,7 +6,6 @@ public enum ActionType
     PlayCard,
     TapCard,
     UntapCard,
-    MoveCard,
     CastSpell,
     ActivateFetch,
     ActivateAbility,

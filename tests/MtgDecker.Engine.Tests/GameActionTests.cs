@@ -51,15 +51,4 @@ public class GameActionTests
         action.CardId.Should().Be(_cardId);
     }
 
-    [Fact]
-    public void MoveCard_CreatesMoveAction()
-    {
-        var action = GameAction.MoveCard(_playerId, _cardId, ZoneType.Battlefield, ZoneType.Graveyard);
-
-        action.Type.Should().Be(ActionType.MoveCard);
-        action.PlayerId.Should().Be(_playerId);
-        action.CardId.Should().Be(_cardId);
-        action.SourceZone.Should().Be(ZoneType.Battlefield);
-        action.DestinationZone.Should().Be(ZoneType.Graveyard);
-    }
 }

@@ -98,20 +98,6 @@ public class GameEngineActionExecutionTests
     }
 
     [Fact]
-    public async Task ExecuteAction_MoveCard_MovesBetweenZones()
-    {
-        var engine = CreateEngine(out _, out var p1);
-        var card = new GameCard { Name = "Bear", TypeLine = "Creature — Bear" };
-        p1.Battlefield.Add(card);
-
-        await engine.ExecuteAction(GameAction.MoveCard(p1.Id, card.Id, ZoneType.Battlefield, ZoneType.Graveyard));
-
-        p1.Battlefield.Count.Should().Be(0);
-        p1.Graveyard.Count.Should().Be(1);
-        p1.Graveyard.Cards[0].Should().BeSameAs(card);
-    }
-
-    [Fact]
     public async Task ExecuteAction_UnknownPlayerId_Throws()
     {
         var engine = CreateEngine(out _, out _);

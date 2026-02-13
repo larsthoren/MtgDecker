@@ -639,12 +639,12 @@
         ClearSelection();
     }
 
-    private async Task HandleMoveTo(ZoneType destination)
+    private Task HandleMoveTo(ZoneType destination)
     {
-        if (_selectedCard == null) return;
-        await OnAction.InvokeAsync(
-            GameAction.MoveCard(LocalPlayer.Id, _selectedCard.Id, _selectedZone, destination));
+        // MoveCard action removed — free zone moves no longer supported.
+        // UI elements referencing this will be removed in a later task.
         ClearSelection();
+        return Task.CompletedTask;
     }
 
     // --- Target picker ---
