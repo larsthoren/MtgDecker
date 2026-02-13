@@ -1,0 +1,41 @@
+// Deck: Oath of Druids
+// Source: mtgtop8.com - Johannes Zuber, Munich Series February 2026
+// Format: Premodern
+// Archetype: Control (5% meta)
+
+// Maindeck
+3 Terravore
+3 Call of the Herd
+3 Cataclysm
+1 Deep Analysis
+2 Funeral Pyre
+1 Naturalize
+2 Quiet Speculation
+1 Ray of Revelation
+1 Reckless Charge
+4 Swords to Plowshares
+1 Volcanic Spray
+4 Mox Diamond
+4 Oath of Druids
+3 Sylvan Library
+2 Adarkar Wastes
+1 City of Brass
+2 Forest
+3 Gemstone Mine
+2 Plains
+3 Rishadan Port
+4 Treetop Village
+2 Treva's Ruins
+4 Wasteland
+4 Windswept Heath
+
+// Sideboard
+3 Annul
+1 Aura of Silence
+1 Krosan Reclamation
+4 Meddling Mage
+1 Powder Keg
+1 Ray of Revelation
+1 Terravore
+2 Thornscape Apprentice
+1 Volcanic Spray

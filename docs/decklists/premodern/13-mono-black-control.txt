@@ -1,0 +1,33 @@
+// Deck: Mono Black Control
+// Source: mtgtop8.com - Tomas Paulovic, Cloudpost PM 1/26 (2026-02-11)
+// Format: Premodern
+// Archetype: Control (3% meta)
+
+// Maindeck
+2 Bane of the Living
+3 Plague Spitter
+3 Withered Wretch
+3 Cabal Therapy
+4 Dark Ritual
+2 Diabolic Edict
+4 Duress
+3 Funeral Charm
+1 Smother
+1 Snuff Out
+3 Bottomless Pit
+2 Cursed Scroll
+3 Powder Keg
+4 The Rack
+1 Cabal Pit
+1 Dust Bowl
+4 Mishra's Factory
+13 Swamp
+3 Wasteland
+
+// Sideboard
+3 Dystopia
+2 Engineered Plague
+2 Ensnaring Bridge
+2 Gloom
+2 Phyrexian Arena
+4 Rejuvenation Chamber

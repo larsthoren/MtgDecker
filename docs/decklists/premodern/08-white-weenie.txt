@@ -1,0 +1,37 @@
+// Deck: White Weenie
+// Source: mtgtop8.com - Stefan Kronschnabl, Munich Series February 2026
+// Format: Premodern
+// Archetype: Aggro (1% meta)
+
+// Maindeck
+1 Exalted Angel
+3 Nova Cleric
+1 Ramosian Sergeant
+3 Savannah Lions
+3 Soltari Champion
+4 Soltari Foot Soldier
+2 Soltari Monk
+4 Soltari Priest
+2 True Believer
+2 Whipcorder
+2 Armageddon
+1 Disenchant
+4 Swords to Plowshares
+2 Crusade
+2 Cursed Scroll
+3 Tsabo's Web
+18 Plains
+3 Windswept Heath
+
+// Sideboard
+1 Absolute Law
+1 Circle of Protection: Red
+2 Cleansing Meditation
+1 Disenchant
+1 Enlightened Tutor
+1 Gaea's Blessing
+1 Kirtar's Desire
+3 Orim's Chant
+1 Phyrexian Furnace
+1 Seal of Cleansing
+2 Tormod's Crypt

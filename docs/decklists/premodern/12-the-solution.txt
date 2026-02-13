@@ -1,0 +1,40 @@
+// Deck: The Solution
+// Source: mtgtop8.com - Dariorod, SPMCR Monthly (2026-02-10)
+// Format: Premodern
+// Archetype: Control (3% meta)
+
+// Maindeck
+1 Eternal Dragon
+3 Exalted Angel
+2 Meddling Mage
+4 Ramosian Sergeant
+4 Whipcorder
+1 Absorb
+4 Accumulated Knowledge
+4 Counterspell
+2 Disenchant
+2 Fact or Fiction
+4 Mana Leak
+4 Swords to Plowshares
+1 Tsabo's Web
+4 Adarkar Wastes
+1 Coastal Tower
+4 Flooded Strand
+7 Island
+7 Plains
+1 Skycloud Expanse
+
+// Sideboard
+1 Aura of Silence
+2 Blue Elemental Blast
+1 Circle of Protection: Black
+2 Enlightened Tutor
+1 Ivory Tower
+1 Null Rod
+1 Phyrexian Furnace
+1 Serenity
+1 Spiritual Focus
+1 Tormod's Crypt
+1 Tsabo's Web
+1 Warmth
+1 Worship

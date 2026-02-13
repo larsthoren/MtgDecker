@@ -1,0 +1,31 @@
+// Deck: RG Aggro
+// Source: mtgtop8.com - Tibor Siska, Cloudpost PM 1/26 (2026-02-11)
+// Format: Premodern
+// Archetype: Aggro (2% meta)
+
+// Maindeck
+4 Grim Lavamancer
+4 Jackal Pup
+4 Mogg Fanatic
+1 River Boa
+4 Wild Mongrel
+1 Assault / Battery
+4 Call of the Herd
+4 Incinerate
+4 Lightning Bolt
+3 Naturalize
+2 Rancor
+3 Seal of Fire
+4 Forest
+4 Karplusan Forest
+8 Mountain
+2 Treetop Village
+4 Wooded Foothills
+
+// Sideboard
+3 Earthquake
+2 Flametongue Kavu
+1 Naturalize
+2 Ravenous Baloth
+4 Red Elemental Blast
+3 Tormod's Crypt
