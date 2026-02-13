@@ -173,66 +173,7 @@ public class GameEngine
                         break;
                     }
 
-                    var cost = effectiveCost;
-
-                    // Calculate remaining pool after colored requirements
-                    var remaining = new Dictionary<ManaColor, int>();
-                    foreach (var kvp in player.ManaPool.Available)
-                    {
-                        var after = kvp.Value;
-                        if (cost.ColorRequirements.TryGetValue(kvp.Key, out var needed))
-                            after -= needed;
-                        if (after > 0)
-                            remaining[kvp.Key] = after;
-                    }
-
-                    // Deduct colored requirements
-                    foreach (var (color, required) in cost.ColorRequirements)
-                        player.ManaPool.Deduct(color, required);
-
-                    // Handle generic cost
-                    if (cost.GenericCost > 0)
-                    {
-                        int distinctColors = remaining.Count(kv => kv.Value > 0);
-                        int totalRemaining = remaining.Values.Sum();
-                        bool useAutoPay = distinctColors <= 1 || totalRemaining == cost.GenericCost;
-
-                        if (!useAutoPay)
-                        {
-                            // Ambiguous: prompt player
-                            var genericPayment = await player.DecisionHandler
-                                .ChooseGenericPayment(cost.GenericCost, remaining, ct);
-
-                            // Validate payment: sum must equal generic cost, amounts must not exceed available
-                            bool valid = genericPayment.Values.Sum() == cost.GenericCost
-                                && genericPayment.All(kv => remaining.TryGetValue(kv.Key, out var avail) && kv.Value <= avail);
-
-                            if (valid)
-                            {
-                                foreach (var (color, amount) in genericPayment)
-                                    player.ManaPool.Deduct(color, amount);
-                            }
-                            else
-                            {
-                                useAutoPay = true;
-                            }
-                        }
-
-                        if (useAutoPay)
-                        {
-                            var toPay = cost.GenericCost;
-                            foreach (var (color, amount) in remaining)
-                            {
-                                var take = Math.Min(amount, toPay);
-                                if (take > 0)
-                                {
-                                    player.ManaPool.Deduct(color, take);
-                                    toPay -= take;
-                                }
-                                if (toPay == 0) break;
-                            }
-                        }
-                    }
+                    var playManaPaid = await PayManaCostAsync(effectiveCost, player, ct);
 
                     // Move card to destination
                     player.Hand.RemoveById(playCard.Id);
@@ -259,7 +200,8 @@ public class GameEngine
                     }
                     // Fire SpellCast board triggers (e.g., enchantress draw on enchantment cast)
                     await QueueBoardTriggersOnStackAsync(GameEvent.SpellCast, playCard, ct);
-                    action.ManaCostPaid = cost;
+                    action.ManaCostPaid = effectiveCost;
+                    action.ActualManaPaid = playManaPaid;
                     player.ActionHistory.Push(action);
                 }
                 else
@@ -452,8 +394,7 @@ public class GameEngine
                 if (castCostReduction != 0)
                     castEffectiveCost = castEffectiveCost.WithGenericReduction(-castCostReduction);
 
-                var pool = castPlayer.ManaPool;
-                if (!pool.CanPay(castEffectiveCost))
+                if (!castPlayer.ManaPool.CanPay(castEffectiveCost))
                 {
                     _state.Log($"Not enough mana to cast {castCard.Name}.");
                     return;
@@ -482,70 +423,7 @@ public class GameEngine
                     targets.Add(target);
                 }
 
-                // Calculate remaining pool after colored requirements for generic payment
-                var remaining = new Dictionary<ManaColor, int>();
-                foreach (var kvp in pool.Available)
-                {
-                    var after = kvp.Value;
-                    if (castEffectiveCost.ColorRequirements.TryGetValue(kvp.Key, out var needed))
-                        after -= needed;
-                    if (after > 0)
-                        remaining[kvp.Key] = after;
-                }
-
-                // Deduct colored requirements
-                var manaPaid = new Dictionary<ManaColor, int>();
-                foreach (var (color, amount) in castEffectiveCost.ColorRequirements)
-                {
-                    pool.Deduct(color, amount);
-                    manaPaid[color] = amount;
-                }
-
-                // Handle generic cost
-                if (castEffectiveCost.GenericCost > 0)
-                {
-                    int distinctColors = remaining.Count(kv => kv.Value > 0);
-                    int totalRemaining = remaining.Values.Sum();
-                    bool useAutoPay = distinctColors <= 1 || totalRemaining == castEffectiveCost.GenericCost;
-
-                    if (!useAutoPay)
-                    {
-                        var genericPayment = await castPlayer.DecisionHandler
-                            .ChooseGenericPayment(castEffectiveCost.GenericCost, remaining, ct);
-
-                        bool valid = genericPayment.Values.Sum() == castEffectiveCost.GenericCost
-                            && genericPayment.All(kv => remaining.TryGetValue(kv.Key, out var avail) && kv.Value <= avail);
-
-                        if (valid)
-                        {
-                            foreach (var (color, amount) in genericPayment)
-                            {
-                                pool.Deduct(color, amount);
-                                manaPaid[color] = manaPaid.GetValueOrDefault(color) + amount;
-                            }
-                        }
-                        else
-                        {
-                            useAutoPay = true;
-                        }
-                    }
-
-                    if (useAutoPay)
-                    {
-                        var toPay = castEffectiveCost.GenericCost;
-                        foreach (var (color, amount) in remaining)
-                        {
-                            var take = Math.Min(amount, toPay);
-                            if (take > 0)
-                            {
-                                pool.Deduct(color, take);
-                                manaPaid[color] = manaPaid.GetValueOrDefault(color) + take;
-                                toPay -= take;
-                            }
-                            if (toPay == 0) break;
-                        }
-                    }
-                }
+                var manaPaid = await PayManaCostAsync(castEffectiveCost, castPlayer, ct);
 
                 castPlayer.Hand.RemoveById(castCard.Id);
                 var stackObj = new StackObject(castCard, castPlayer.Id, manaPaid, targets, _state.Stack.Count);
@@ -555,6 +433,9 @@ public class GameEngine
                 castPlayer.ActionHistory.Push(action);
 
                 _state.Log($"{castPlayer.Name} casts {castCard.Name}.");
+
+                // Fire SpellCast board triggers (e.g., enchantress draw on enchantment cast)
+                await QueueBoardTriggersOnStackAsync(GameEvent.SpellCast, castCard, ct);
                 break;
             }
 
@@ -625,36 +506,7 @@ public class GameEngine
 
                 // Pay costs: mana
                 if (cost.ManaCost != null)
-                {
-                    var abilityCost = cost.ManaCost;
-
-                    // Deduct colored requirements
-                    foreach (var (color, required) in abilityCost.ColorRequirements)
-                        player.ManaPool.Deduct(color, required);
-
-                    // Handle generic cost
-                    if (abilityCost.GenericCost > 0)
-                    {
-                        var remaining = new Dictionary<ManaColor, int>();
-                        foreach (var kvp in player.ManaPool.Available)
-                        {
-                            if (kvp.Value > 0)
-                                remaining[kvp.Key] = kvp.Value;
-                        }
-
-                        var toPay = abilityCost.GenericCost;
-                        foreach (var (color, amount) in remaining)
-                        {
-                            var take = Math.Min(amount, toPay);
-                            if (take > 0)
-                            {
-                                player.ManaPool.Deduct(color, take);
-                                toPay -= take;
-                            }
-                            if (toPay == 0) break;
-                        }
-                    }
-                }
+                    await PayManaCostAsync(cost.ManaCost, player, ct);
 
                 // Pay costs: tap self
                 if (cost.TapSelf)
@@ -770,6 +622,85 @@ public class GameEngine
         }
     }
 
+    /// <summary>
+    /// Pays a mana cost from the player's mana pool, prompting for generic payment choices when ambiguous.
+    /// Returns a dictionary of colors actually paid (for undo tracking).
+    /// Assumes CanPay has already been checked.
+    /// </summary>
+    internal async Task<Dictionary<ManaColor, int>> PayManaCostAsync(ManaCost cost, Player player, CancellationToken ct)
+    {
+        var pool = player.ManaPool;
+        var manaPaid = new Dictionary<ManaColor, int>();
+
+        // Calculate remaining pool after colored requirements (for generic payment decisions)
+        var remaining = new Dictionary<ManaColor, int>();
+        foreach (var kvp in pool.Available)
+        {
+            var after = kvp.Value;
+            if (cost.ColorRequirements.TryGetValue(kvp.Key, out var needed))
+                after -= needed;
+            if (after > 0)
+                remaining[kvp.Key] = after;
+        }
+
+        // Deduct colored requirements
+        foreach (var (color, required) in cost.ColorRequirements)
+        {
+            pool.Deduct(color, required);
+            manaPaid[color] = required;
+        }
+
+        // Handle generic cost
+        if (cost.GenericCost > 0)
+        {
+            int distinctColors = remaining.Count(kv => kv.Value > 0);
+            int totalRemaining = remaining.Values.Sum();
+            bool useAutoPay = distinctColors <= 1 || totalRemaining == cost.GenericCost;
+
+            if (!useAutoPay)
+            {
+                // Ambiguous: prompt player for generic payment choices
+                var genericPayment = await player.DecisionHandler
+                    .ChooseGenericPayment(cost.GenericCost, remaining, ct);
+
+                // Validate payment: sum must equal generic cost, amounts must not exceed available
+                bool valid = genericPayment.Values.Sum() == cost.GenericCost
+                    && genericPayment.All(kv => remaining.TryGetValue(kv.Key, out var avail) && kv.Value <= avail);
+
+                if (valid)
+                {
+                    foreach (var (color, amount) in genericPayment)
+                    {
+                        pool.Deduct(color, amount);
+                        manaPaid[color] = manaPaid.GetValueOrDefault(color) + amount;
+                    }
+                }
+                else
+                {
+                    useAutoPay = true;
+                }
+            }
+
+            if (useAutoPay)
+            {
+                var toPay = cost.GenericCost;
+                foreach (var (color, amount) in remaining)
+                {
+                    var take = Math.Min(amount, toPay);
+                    if (take > 0)
+                    {
+                        pool.Deduct(color, take);
+                        manaPaid[color] = manaPaid.GetValueOrDefault(color) + take;
+                        toPay -= take;
+                    }
+                    if (toPay == 0) break;
+                }
+            }
+        }
+
+        return manaPaid;
+    }
+
     private bool HasShroud(GameCard card) => card.ActiveKeywords.Contains(Keyword.Shroud);
 
     private bool HasPlayerShroud(Guid playerId)
@@ -853,12 +784,10 @@ public class GameEngine
                 player.Hand.Add(card);
                 if (action.IsLandDrop)
                     player.LandsPlayedThisTurn--;
-                if (action.ManaCostPaid != null)
+                if (action.ActualManaPaid != null)
                 {
-                    foreach (var (color, amount) in action.ManaCostPaid.ColorRequirements)
+                    foreach (var (color, amount) in action.ActualManaPaid)
                         player.ManaPool.Add(color, amount);
-                    if (action.ManaCostPaid.GenericCost > 0)
-                        player.ManaPool.Add(ManaColor.Colorless, action.ManaCostPaid.GenericCost);
                 }
                 _state.Log($"{player.Name} undoes playing {card.Name}.");
                 break;
@@ -1466,9 +1395,9 @@ public class GameEngine
     }
 
     /// <summary>Queues Self triggers for a specific card onto the stack.</summary>
-    internal async Task QueueSelfTriggersOnStackAsync(GameEvent evt, GameCard source, Player controller, CancellationToken ct = default)
+    internal Task QueueSelfTriggersOnStackAsync(GameEvent evt, GameCard source, Player controller, CancellationToken ct = default)
     {
-        if (source.Triggers.Count == 0) return;
+        if (source.Triggers.Count == 0) return Task.CompletedTask;
 
         foreach (var trigger in source.Triggers)
         {
@@ -1478,10 +1407,12 @@ public class GameEngine
             _state.Log($"{source.Name} triggers: {trigger.Effect.GetType().Name.Replace("Effect", "")}");
             _state.Stack.Add(new TriggeredAbilityStackObject(source, controller.Id, trigger.Effect));
         }
+
+        return Task.CompletedTask;
     }
 
     /// <summary>Queues board-wide triggers onto the stack with APNAP ordering.</summary>
-    internal async Task QueueBoardTriggersOnStackAsync(GameEvent evt, GameCard? relevantCard, CancellationToken ct = default)
+    internal Task QueueBoardTriggersOnStackAsync(GameEvent evt, GameCard? relevantCard, CancellationToken ct = default)
     {
         var activePlayer = _state.ActivePlayer;
         var nonActivePlayer = _state.GetOpponent(activePlayer);
@@ -1495,6 +1426,8 @@ public class GameEngine
         // Non-active player's triggers on top (resolve first via LIFO)
         foreach (var t in nonActiveTriggers)
             _state.Stack.Add(t);
+
+        return Task.CompletedTask;
     }
 
     private List<TriggeredAbilityStackObject> CollectBoardTriggers(GameEvent evt, GameCard? relevantCard, Player player)
@@ -1546,7 +1479,7 @@ public class GameEngine
     }
 
     /// <summary>Queues attack triggers onto the stack.</summary>
-    internal async Task QueueAttackTriggersOnStackAsync(GameCard attacker, CancellationToken ct = default)
+    internal Task QueueAttackTriggersOnStackAsync(GameCard attacker, CancellationToken ct = default)
     {
         var player = _state.ActivePlayer;
         var triggers = attacker.Triggers.Count > 0
@@ -1560,10 +1493,12 @@ public class GameEngine
             _state.Log($"{attacker.Name} triggers: {trigger.Effect.GetType().Name.Replace("Effect", "")}");
             _state.Stack.Add(new TriggeredAbilityStackObject(attacker, player.Id, trigger.Effect));
         }
+
+        return Task.CompletedTask;
     }
 
     /// <summary>Queues delayed triggers onto the stack and removes them.</summary>
-    internal async Task QueueDelayedTriggersOnStackAsync(GameEvent evt, CancellationToken ct = default)
+    internal Task QueueDelayedTriggersOnStackAsync(GameEvent evt, CancellationToken ct = default)
     {
         var toFire = _state.DelayedTriggers.Where(d => d.FireOn == evt).ToList();
         foreach (var delayed in toFire)
@@ -1573,11 +1508,13 @@ public class GameEngine
             _state.Stack.Add(new TriggeredAbilityStackObject(source, controller.Id, delayed.Effect));
             _state.DelayedTriggers.Remove(delayed);
         }
+
+        return Task.CompletedTask;
     }
 
-    internal async Task FireLeaveBattlefieldTriggersAsync(GameCard card, Player controller, CancellationToken ct)
+    internal Task FireLeaveBattlefieldTriggersAsync(GameCard card, Player controller, CancellationToken ct)
     {
-        if (!CardDefinitions.TryGet(card.Name, out var def)) return;
+        if (!CardDefinitions.TryGet(card.Name, out var def)) return Task.CompletedTask;
 
         foreach (var trigger in def.Triggers)
         {
@@ -1587,6 +1524,8 @@ public class GameEngine
                 _state.Stack.Add(new TriggeredAbilityStackObject(card, controller.Id, trigger.Effect));
             }
         }
+
+        return Task.CompletedTask;
     }
 
     /// <summary>Resolves all items on the stack (for testing).</summary>
@@ -1633,10 +1572,28 @@ public class GameEngine
             }
             else
             {
+                var player = action.PlayerId == _state.Player1.Id ? _state.Player1 : _state.Player2;
+                var historyCount = player.ActionHistory.Count;
                 await ExecuteAction(action, ct);
-                activePlayerPassed = false;
-                nonActivePlayerPassed = false;
-                _state.PriorityPlayer = _state.ActivePlayer;
+
+                // Only reset pass flags if the action actually did something
+                // (ExecuteAction pushes to ActionHistory on success, returns early on failure)
+                if (player.ActionHistory.Count > historyCount)
+                {
+                    activePlayerPassed = false;
+                    nonActivePlayerPassed = false;
+                    _state.PriorityPlayer = _state.ActivePlayer;
+                }
+                else
+                {
+                    // Action was rejected by the engine — treat as pass to avoid infinite loops
+                    if (_state.PriorityPlayer == _state.ActivePlayer)
+                        activePlayerPassed = true;
+                    else
+                        nonActivePlayerPassed = true;
+
+                    _state.PriorityPlayer = _state.GetOpponent(_state.PriorityPlayer);
+                }
             }
         }
     }
@@ -1711,6 +1668,7 @@ public class GameEngine
                     // Aura attachment on stack resolution
                     await TryAttachAuraAsync(spell.Card, controller, ct);
 
+                    await QueueSelfTriggersOnStackAsync(GameEvent.EnterBattlefield, spell.Card, controller, ct);
                     await OnBoardChangedAsync(ct);
                 }
                 else

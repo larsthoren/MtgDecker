@@ -8,6 +8,7 @@ public class InteractiveDecisionHandler : IPlayerDecisionHandler
     private TaskCompletionSource<GameAction>? _actionTcs;
     private TaskCompletionSource<MulliganDecision>? _mulliganTcs;
     private TaskCompletionSource<IReadOnlyList<GameCard>>? _bottomCardsTcs;
+    private TaskCompletionSource<bool>? _bottomCardsReadyTcs;
     private TaskCompletionSource<ManaColor>? _manaColorTcs;
 #pragma warning disable CS0649 // Left for potential future interactive generic payment UI
     private TaskCompletionSource<Dictionary<ManaColor, int>>? _genericPaymentTcs;
@@ -32,6 +33,17 @@ public class InteractiveDecisionHandler : IPlayerDecisionHandler
     public IReadOnlyList<GameCard>? EligibleTargets { get; private set; }
     public bool IsWaitingForCardChoice => _cardChoiceTcs is { Task.IsCompleted: false };
     public bool IsWaitingForRevealAck => _revealAckTcs is { Task.IsCompleted: false };
+
+    /// <summary>
+    /// True when this handler is waiting for any player input, meaning the
+    /// game engine has yielded and is not actively mutating game state.
+    /// </summary>
+    public bool IsWaitingForInput =>
+        IsWaitingForAction || IsWaitingForMulligan || IsWaitingForBottomCards
+        || IsWaitingForManaColor || IsWaitingForGenericPayment
+        || IsWaitingForAttackers || IsWaitingForBlockers || IsWaitingForBlockerOrder
+        || IsWaitingForTarget || IsWaitingForCardChoice || IsWaitingForRevealAck;
+
     public IReadOnlyList<ManaColor>? ManaColorOptions { get; private set; }
     public IReadOnlyList<GameCard>? EligibleAttackers { get; private set; }
     public IReadOnlyList<GameCard>? EligibleBlockers { get; private set; }
@@ -80,6 +92,7 @@ public class InteractiveDecisionHandler : IPlayerDecisionHandler
         _bottomCardsTcs = new TaskCompletionSource<IReadOnlyList<GameCard>>(TaskCreationOptions.RunContinuationsAsynchronously);
         var registration = ct.Register(() => _bottomCardsTcs.TrySetCanceled());
         _bottomCardsTcs.Task.ContinueWith(_ => registration.Dispose(), TaskContinuationOptions.ExecuteSynchronously);
+        _bottomCardsReadyTcs?.TrySetResult(true);
         OnWaitingForInput?.Invoke();
         return _bottomCardsTcs.Task;
     }
@@ -122,13 +135,13 @@ public class InteractiveDecisionHandler : IPlayerDecisionHandler
     {
         // The engine creates _bottomCardsTcs after processing the Keep decision.
         // Due to RunContinuationsAsynchronously, there's a brief window where
-        // the TCS doesn't exist yet. Wait for it.
-        for (int i = 0; i < 50; i++)
-        {
-            if (_bottomCardsTcs?.TrySetResult(cards) == true)
-                return;
-            await Task.Delay(10);
-        }
+        // the TCS doesn't exist yet. Wait for the ready signal.
+        if (_bottomCardsTcs?.TrySetResult(cards) == true)
+            return;
+
+        _bottomCardsReadyTcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        await _bottomCardsReadyTcs.Task;
+        _bottomCardsTcs?.TrySetResult(cards);
     }
 
     public void SubmitManaColor(ManaColor color)

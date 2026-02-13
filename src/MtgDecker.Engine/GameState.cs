@@ -18,8 +18,26 @@ public class GameState
     public List<IStackObject> Stack { get; } = new();
     public List<ContinuousEffect> ActiveEffects { get; } = new();
     public List<DelayedTrigger> DelayedTriggers { get; } = new();
-    public List<string> GameLog { get; } = new();
     public event Action? OnStateChanged;
+
+    private readonly object _logLock = new();
+    private readonly List<string> _gameLog = new();
+
+    /// <summary>
+    /// Thread-safe snapshot of the game log. Returns a copy to avoid
+    /// collection-modified-during-enumeration exceptions when the UI
+    /// iterates while the game loop appends.
+    /// </summary>
+    public List<string> GameLog
+    {
+        get
+        {
+            lock (_logLock)
+            {
+                return _gameLog.ToList();
+            }
+        }
+    }
 
     public GameState(Player player1, Player player2)
     {
@@ -36,7 +54,10 @@ public class GameState
 
     public void Log(string message)
     {
-        GameLog.Add(message);
+        lock (_logLock)
+        {
+            _gameLog.Add(message);
+        }
         OnStateChanged?.Invoke();
     }
 }

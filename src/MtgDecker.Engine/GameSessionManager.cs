@@ -17,8 +17,20 @@ public class GameSessionManager
     public GameSession? GetSession(string gameId) =>
         _sessions.TryGetValue(gameId, out var session) ? session : null;
 
-    public void RemoveSession(string gameId) =>
-        _sessions.TryRemove(gameId, out _);
+    public void RemoveSession(string gameId)
+    {
+        if (_sessions.TryRemove(gameId, out var session))
+            session.Dispose();
+    }
+
+    public IEnumerable<string> GetStaleSessionIds(TimeSpan maxInactivity)
+    {
+        var cutoff = DateTime.UtcNow - maxInactivity;
+        return _sessions
+            .Where(kvp => kvp.Value.LastActivity < cutoff || kvp.Value.IsGameOver)
+            .Select(kvp => kvp.Key)
+            .ToList();
+    }
 
     private string GenerateGameId()
     {

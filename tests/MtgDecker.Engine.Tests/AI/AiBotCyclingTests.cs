@@ -36,7 +36,7 @@ public class AiBotCyclingTests
         var action = await bot.GetAction(state, player.Id);
 
         // When bot can afford to cast, it should prefer casting the creature
-        action.Type.Should().Be(ActionType.PlayCard);
+        action.Type.Should().Be(ActionType.CastSpell);
         action.CardId.Should().Be(gempalm.Id);
     }
 
@@ -54,7 +54,7 @@ public class AiBotCyclingTests
 
         var action = await bot.GetAction(state, player.Id);
 
-        action.Type.Should().Be(ActionType.PlayCard);
+        action.Type.Should().Be(ActionType.CastSpell);
         action.CardId.Should().Be(gempalm.Id);
     }
 

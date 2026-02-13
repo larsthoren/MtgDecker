@@ -481,5 +481,8 @@ $RECYCLE.BIN/
 # Vim temporary swap files
 *.swp
 
+# Windows reserved device names (created accidentally by some tools)
+nul
+
 # Git worktrees
 .worktrees/
