@@ -329,6 +329,14 @@ public class GameEngine
                         if (def.TargetFilter.IsLegal(c, ZoneType.Battlefield))
                             eligible.Add(c);
 
+                    // Add player sentinels if the filter allows player targets
+                    var dummyCard = new GameCard { Name = "Player" };
+                    if (def.TargetFilter.IsLegal(dummyCard, ZoneType.None))
+                    {
+                        eligible.Add(new GameCard { Id = Guid.Empty, Name = castPlayer.Name });
+                        eligible.Add(new GameCard { Id = Guid.Empty, Name = opponent.Name });
+                    }
+
                     if (eligible.Count == 0)
                     {
                         _state.Log($"No legal targets for {castCard.Name}.");
@@ -337,7 +345,17 @@ public class GameEngine
 
                     var target = await castPlayer.DecisionHandler.ChooseTarget(
                         castCard.Name, eligible, opponent.Id, ct);
-                    targets.Add(target);
+
+                    // Convert player sentinel targets to proper TargetInfo
+                    if (target.Zone == ZoneType.None)
+                    {
+                        // Player target — ensure correct convention
+                        targets.Add(new TargetInfo(Guid.Empty, target.PlayerId, ZoneType.None));
+                    }
+                    else
+                    {
+                        targets.Add(target);
+                    }
                 }
 
                 // Calculate remaining pool after colored requirements for generic payment
@@ -795,6 +813,10 @@ public class GameEngine
                 var allTargetsLegal = true;
                 foreach (var target in top.Targets)
                 {
+                    // Player targets (zone == None) are always legal
+                    if (target.Zone == ZoneType.None)
+                        continue;
+
                     var targetOwner = target.PlayerId == _state.Player1.Id ? _state.Player1 : _state.Player2;
                     var targetZone = targetOwner.GetZone(target.Zone);
                     if (!targetZone.Contains(target.CardId))
