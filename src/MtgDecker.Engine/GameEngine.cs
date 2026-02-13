@@ -65,6 +65,8 @@ public class GameEngine
 
             _state.Player1.ManaPool.Clear();
             _state.Player2.ManaPool.Clear();
+            _state.Player1.PendingManaTaps.Clear();
+            _state.Player2.PendingManaTaps.Clear();
 
         } while (_turnStateMachine.AdvancePhase() != null);
 
@@ -92,6 +94,7 @@ public class GameEngine
             case Phase.Untap:
                 foreach (var card in _state.ActivePlayer.Battlefield.Cards)
                     card.IsTapped = false;
+                _state.ActivePlayer.PendingManaTaps.Clear();
                 _state.Log($"{_state.ActivePlayer.Name} untaps all permanents.");
                 break;
 

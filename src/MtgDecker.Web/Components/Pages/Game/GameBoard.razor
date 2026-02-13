@@ -3,7 +3,7 @@
 @using MtgDecker.Engine.Mana
 @namespace MtgDecker.Web.Components.Pages.Game
 
-<div class="game-board" tabindex="0" @ref="_boardRef" @onkeydown="HandleKeyDown">
+<div class="game-board" tabindex="0" @ref="_boardRef">
     @if (IsGameOver)
     {
         <div class="game-over-overlay">
@@ -133,14 +133,18 @@
         <div class="battlefield-row player-lands">
             @foreach (var card in LocalPlayer.Battlefield.Cards.Where(c => c.IsLand))
             {
-                var hasPendingMana = card.IsTapped && LocalPlayer.PendingManaTaps.Contains(card.Id);
+                var isUndoCandidate = card.IsTapped
+                    && LocalPlayer.ActionHistory.Count > 0
+                    && LocalPlayer.ActionHistory.Peek().Type == ActionType.TapCard
+                    && LocalPlayer.ActionHistory.Peek().CardId == card.Id
+                    && LocalPlayer.PendingManaTaps.Contains(card.Id);
                 <div class="land-wrapper">
                     <CardDisplay Name="@card.Name" ImageUrl="@card.ImageUrl" Tapped="@card.IsTapped"
                                  CardSize="130"
                                  Selected="@(_selectedCard?.Id == card.Id)"
                                  Clickable="true"
                                  OnClick="async () => await HandleLandClick(card)" />
-                    @if (hasPendingMana)
+                    @if (isUndoCandidate)
                     {
                         <button class="untap-affordance" @onclick="HandleUntapLand"
                                 @onclick:stopPropagation="true"
@@ -443,12 +447,6 @@
         {
             await _boardRef.FocusAsync();
         }
-    }
-
-    private Task HandleKeyDown(KeyboardEventArgs e)
-    {
-        // No global keyboard shortcuts — undo is per-land via untap affordance
-        return Task.CompletedTask;
     }
 
     // --- Pass / Combat confirm via PhaseBar ---
