@@ -191,4 +191,36 @@ public class ZoneTests
         var peeked = zone.PeekTop(3);
         peeked.Should().BeEmpty();
     }
+
+    [Fact]
+    public void AddToTop_PlacesCardAtTopOfZone()
+    {
+        var zone = new Zone(ZoneType.Library);
+        var card1 = new GameCard { Name = "Card1" };
+        var card2 = new GameCard { Name = "Card2" };
+        zone.Add(card1);
+        zone.AddToTop(card2);
+        zone.PeekTop(1)[0].Name.Should().Be("Card2");
+    }
+
+    [Fact]
+    public void Remove_RemovesSpecificCardObject()
+    {
+        var zone = new Zone(ZoneType.Hand);
+        var card1 = new GameCard { Name = "Card1" };
+        var card2 = new GameCard { Name = "Card2" };
+        zone.Add(card1);
+        zone.Add(card2);
+        zone.Remove(card1).Should().BeTrue();
+        zone.Count.Should().Be(1);
+        zone.Cards[0].Name.Should().Be("Card2");
+    }
+
+    [Fact]
+    public void Remove_ReturnsFalse_WhenCardNotInZone()
+    {
+        var zone = new Zone(ZoneType.Hand);
+        var card = new GameCard { Name = "NotHere" };
+        zone.Remove(card).Should().BeFalse();
+    }
 }
