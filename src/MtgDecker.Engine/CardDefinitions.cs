@@ -265,6 +265,282 @@ public static class CardDefinitions
             ["Volcanic Island"] = new(null, ManaAbility.Choice(ManaColor.Blue, ManaColor.Red), null, null, CardType.Land),
             ["Scalding Tarn"] = new(null, null, null, null, CardType.Land),
             ["Mystic Sanctuary"] = new(null, ManaAbility.Fixed(ManaColor.Blue), null, null, CardType.Land),
+
+            // === Shared Premodern cards ===
+
+            // Basic land
+            ["Swamp"] = new(null, ManaAbility.Fixed(ManaColor.Black), null, null, CardType.Land) { Subtypes = ["Swamp"] },
+
+            // Dual/Pain lands
+            ["Caves of Koilos"] = new(null, ManaAbility.Choice(ManaColor.Colorless, ManaColor.White, ManaColor.Black), null, null, CardType.Land),
+            ["Llanowar Wastes"] = new(null, ManaAbility.Choice(ManaColor.Colorless, ManaColor.Black, ManaColor.Green), null, null, CardType.Land),
+            ["Battlefield Forge"] = new(null, ManaAbility.Choice(ManaColor.Colorless, ManaColor.Red, ManaColor.White), null, null, CardType.Land),
+            ["Tainted Field"] = new(null, ManaAbility.Choice(ManaColor.White, ManaColor.Black), null, null, CardType.Land),
+            ["Coastal Tower"] = new(null, ManaAbility.Choice(ManaColor.White, ManaColor.Blue), null, null, CardType.Land),
+            ["Skycloud Expanse"] = new(null, ManaAbility.Choice(ManaColor.White, ManaColor.Blue), null, null, CardType.Land),
+            ["Adarkar Wastes"] = new(null, ManaAbility.Choice(ManaColor.Colorless, ManaColor.White, ManaColor.Blue), null, null, CardType.Land),
+            ["Gemstone Mine"] = new(null, ManaAbility.Choice(ManaColor.White, ManaColor.Blue, ManaColor.Black, ManaColor.Red, ManaColor.Green), null, null, CardType.Land),
+            ["City of Brass"] = new(null, ManaAbility.Choice(ManaColor.White, ManaColor.Blue, ManaColor.Black, ManaColor.Red, ManaColor.Green), null, null, CardType.Land),
+            ["Darigaaz's Caldera"] = new(null, ManaAbility.Choice(ManaColor.Black, ManaColor.Red, ManaColor.Green), null, null, CardType.Land),
+            ["Treva's Ruins"] = new(null, ManaAbility.Choice(ManaColor.White, ManaColor.Blue, ManaColor.Green), null, null, CardType.Land),
+
+            // Fetch lands
+            ["Flooded Strand"] = new(null, null, null, null, CardType.Land) { FetchAbility = new FetchAbility(["Plains", "Island"]) },
+            ["Bloodstained Mire"] = new(null, null, null, null, CardType.Land) { FetchAbility = new FetchAbility(["Swamp", "Mountain"]) },
+
+            // Mana
+            ["Dark Ritual"] = new(ManaCost.Parse("{B}"), null, null, null, CardType.Instant,
+                Effect: new AddManaSpellEffect(ManaColor.Black, 3)),
+            ["Mox Diamond"] = new(ManaCost.Parse("{0}"), null, null, null, CardType.Artifact),
+
+            // Common removal
+            ["Disenchant"] = new(ManaCost.Parse("{1}{W}"), null, null, null, CardType.Instant,
+                TargetFilter.EnchantmentOrArtifact(), new NaturalizeEffect()),
+            ["Vindicate"] = new(ManaCost.Parse("{1}{W}{B}"), null, null, null, CardType.Sorcery,
+                TargetFilter.AnyPermanent(), new DestroyPermanentEffect()),
+            ["Smother"] = new(ManaCost.Parse("{1}{B}"), null, null, null, CardType.Instant,
+                TargetFilter.CreatureWithCMCAtMost(3), new DestroyCreatureEffect()),
+            ["Snuff Out"] = new(ManaCost.Parse("{3}{B}"), null, null, null, CardType.Instant,
+                TargetFilter.NonBlackCreature(), new DestroyCreatureEffect()),
+            ["Diabolic Edict"] = new(ManaCost.Parse("{1}{B}"), null, null, null, CardType.Instant,
+                TargetFilter.Player(), new EdictEffect()),
+            ["Wrath of God"] = new(ManaCost.Parse("{2}{W}{W}"), null, null, null, CardType.Sorcery,
+                Effect: new DestroyAllCreaturesEffect()),
+            ["Armageddon"] = new(ManaCost.Parse("{3}{W}"), null, null, null, CardType.Sorcery,
+                Effect: new DestroyAllLandsEffect()),
+
+            // Common discard
+            ["Duress"] = new(ManaCost.Parse("{B}"), null, null, null, CardType.Sorcery,
+                TargetFilter.Player(), new DiscardEffect(1, c => !c.IsCreature && !c.IsLand)),
+            ["Cabal Therapy"] = new(ManaCost.Parse("{B}"), null, null, null, CardType.Sorcery,
+                TargetFilter.Player(), new DiscardEffect(1)),
+            ["Gerrard's Verdict"] = new(ManaCost.Parse("{W}{B}"), null, null, null, CardType.Sorcery,
+                TargetFilter.Player(), new DiscardEffect(2)),
+
+            // Common counterspells
+            ["Mana Leak"] = new(ManaCost.Parse("{1}{U}"), null, null, null, CardType.Instant,
+                TargetFilter.Spell(), new CounterSpellEffect()),
+            ["Absorb"] = new(ManaCost.Parse("{W}{U}{U}"), null, null, null, CardType.Instant,
+                TargetFilter.Spell(), new CounterSpellEffect()),
+
+            // Common utility
+            ["Fact or Fiction"] = new(ManaCost.Parse("{3}{U}"), null, null, null, CardType.Instant,
+                Effect: new DrawCardsEffect(3)),
+            ["Impulse"] = new(ManaCost.Parse("{1}{U}"), null, null, null, CardType.Instant,
+                Effect: new DrawCardsEffect(1)),
+            ["Deep Analysis"] = new(ManaCost.Parse("{3}{U}"), null, null, null, CardType.Sorcery,
+                Effect: new DrawCardsEffect(2)),
+
+            // === Sligh (RDW) deck ===
+            ["Ball Lightning"] = new(ManaCost.Parse("{R}{R}{R}"), null, 6, 1, CardType.Creature)
+            {
+                Subtypes = ["Elemental"],
+                ContinuousEffects =
+                [
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
+                        (card, _) => card.Name == "Ball Lightning",
+                        GrantedKeyword: Keyword.Haste),
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
+                        (card, _) => card.Name == "Ball Lightning",
+                        GrantedKeyword: Keyword.Trample),
+                ],
+            },
+            ["Grim Lavamancer"] = new(ManaCost.Parse("{R}"), null, 1, 1, CardType.Creature)
+            {
+                Subtypes = ["Human", "Wizard"],
+                ActivatedAbility = new(new ActivatedAbilityCost(TapSelf: true), new DealDamageEffect(1), c => c.IsCreature, CanTargetPlayer: true),
+            },
+            ["Jackal Pup"] = new(ManaCost.Parse("{R}"), null, 2, 1, CardType.Creature) { Subtypes = ["Hound"] },
+            ["Incinerate"] = new(ManaCost.Parse("{1}{R}"), null, null, null, CardType.Instant,
+                TargetFilter.CreatureOrPlayer(), new DamageEffect(3)),
+            ["Shock"] = new(ManaCost.Parse("{R}"), null, null, null, CardType.Instant,
+                TargetFilter.CreatureOrPlayer(), new DamageEffect(2)),
+            ["Sulfuric Vortex"] = new(ManaCost.Parse("{1}{R}{R}"), null, null, null, CardType.Enchantment)
+            {
+                Triggers = [new Trigger(GameEvent.Upkeep, TriggerCondition.Upkeep, new DamageAllPlayersTriggerEffect(2))],
+            },
+            ["Cursed Scroll"] = new(ManaCost.Parse("{1}"), null, null, null, CardType.Artifact)
+            {
+                ActivatedAbility = new(new ActivatedAbilityCost(TapSelf: true, ManaCost: ManaCost.Parse("{3}")), new DealDamageEffect(2), c => c.IsCreature, CanTargetPlayer: true),
+            },
+            ["Barbarian Ring"] = new(null, ManaAbility.Fixed(ManaColor.Red), null, null, CardType.Land),
+
+            // === Mono Black Control deck ===
+            ["Bane of the Living"] = new(ManaCost.Parse("{2}{B}{B}"), null, 4, 3, CardType.Creature) { Subtypes = ["Zombie"] },
+            ["Plague Spitter"] = new(ManaCost.Parse("{2}{B}"), null, 2, 2, CardType.Creature)
+            {
+                Subtypes = ["Zombie"],
+                Triggers = [new Trigger(GameEvent.Upkeep, TriggerCondition.Upkeep, new DamageAllCreaturesTriggerEffect(1, includePlayers: true))],
+            },
+            ["Withered Wretch"] = new(ManaCost.Parse("{B}{B}"), null, 2, 2, CardType.Creature) { Subtypes = ["Zombie", "Cleric"] },
+            ["Funeral Charm"] = new(ManaCost.Parse("{B}"), null, null, null, CardType.Instant,
+                TargetFilter.Player(), new DiscardEffect(1)),
+            ["Bottomless Pit"] = new(ManaCost.Parse("{1}{B}{B}"), null, null, null, CardType.Enchantment)
+            {
+                Triggers = [new Trigger(GameEvent.Upkeep, TriggerCondition.Upkeep, new EachPlayerDiscardsEffect(1))],
+            },
+            ["The Rack"] = new(ManaCost.Parse("{1}"), null, null, null, CardType.Artifact)
+            {
+                Triggers = [new Trigger(GameEvent.Upkeep, TriggerCondition.Upkeep, new RackDamageEffect())],
+            },
+            ["Powder Keg"] = new(ManaCost.Parse("{2}"), null, null, null, CardType.Artifact),
+            ["Cabal Pit"] = new(null, ManaAbility.Fixed(ManaColor.Black), null, null, CardType.Land),
+            ["Dust Bowl"] = new(null, ManaAbility.Fixed(ManaColor.Colorless), null, null, CardType.Land),
+
+            // === Mono Black Aggro deck ===
+            ["Hypnotic Specter"] = new(ManaCost.Parse("{1}{B}{B}"), null, 2, 2, CardType.Creature)
+            {
+                Subtypes = ["Specter"],
+                ContinuousEffects =
+                [
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
+                        (card, _) => card.Name == "Hypnotic Specter",
+                        GrantedKeyword: Keyword.Flying),
+                ],
+                Triggers = [new Trigger(GameEvent.CombatDamageDealt, TriggerCondition.SelfDealsCombatDamage, new OpponentDiscardsEffect(1))],
+            },
+            ["Nantuko Shade"] = new(ManaCost.Parse("{B}{B}"), null, 2, 1, CardType.Creature) { Subtypes = ["Insect", "Shade"] },
+            ["Ravenous Rats"] = new(ManaCost.Parse("{1}{B}"), null, 1, 1, CardType.Creature)
+            {
+                Subtypes = ["Rat"],
+                Triggers = [new Trigger(GameEvent.EnterBattlefield, TriggerCondition.Self, new OpponentDiscardsEffect(1))],
+            },
+            ["Graveborn Muse"] = new(ManaCost.Parse("{2}{B}{B}"), null, 3, 3, CardType.Creature)
+            {
+                Subtypes = ["Zombie", "Spirit"],
+                Triggers = [new Trigger(GameEvent.Upkeep, TriggerCondition.Upkeep, new DrawAndLoseLifeEffect(1, 1))],
+            },
+            ["Spawning Pool"] = new(null, ManaAbility.Fixed(ManaColor.Black), null, null, CardType.Land)
+            {
+                ActivatedAbility = new(new ActivatedAbilityCost(ManaCost: ManaCost.Parse("{1}{B}")), new BecomeCreatureEffect(1, 1, "Skeleton")),
+            },
+            ["Skeletal Scrying"] = new(ManaCost.Parse("{1}{B}"), null, null, null, CardType.Instant,
+                Effect: new DrawCardsEffect(2)),
+
+            // === Deadguy Ale deck ===
+            ["Exalted Angel"] = new(ManaCost.Parse("{4}{W}{W}"), null, 4, 5, CardType.Creature)
+            {
+                Subtypes = ["Angel"],
+                ContinuousEffects =
+                [
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
+                        (card, _) => card.Name == "Exalted Angel",
+                        GrantedKeyword: Keyword.Flying),
+                ],
+            },
+            ["Knight of Stromgald"] = new(ManaCost.Parse("{B}{B}"), null, 2, 1, CardType.Creature) { Subtypes = ["Human", "Knight"] },
+            ["Phyrexian Rager"] = new(ManaCost.Parse("{2}{B}"), null, 2, 2, CardType.Creature)
+            {
+                Subtypes = ["Horror"],
+                Triggers = [new Trigger(GameEvent.EnterBattlefield, TriggerCondition.Self, new DrawAndLoseLifeEffect(1, 1))],
+            },
+            ["Phyrexian Arena"] = new(ManaCost.Parse("{1}{B}{B}"), null, null, null, CardType.Enchantment)
+            {
+                Triggers = [new Trigger(GameEvent.Upkeep, TriggerCondition.Upkeep, new DrawAndLoseLifeEffect(1, 1))],
+            },
+
+            // === Landstill deck ===
+            ["Prohibit"] = new(ManaCost.Parse("{1}{U}"), null, null, null, CardType.Instant,
+                TargetFilter.Spell(), new CounterSpellEffect()),
+            ["Standstill"] = new(ManaCost.Parse("{1}{U}"), null, null, null, CardType.Enchantment),
+            ["Humility"] = new(ManaCost.Parse("{2}{W}{W}"), null, null, null, CardType.Enchantment),
+            ["Decree of Justice"] = new(ManaCost.Parse("{2}{W}{W}"), null, null, null, CardType.Sorcery),
+            ["Phyrexian Furnace"] = new(ManaCost.Parse("{1}"), null, null, null, CardType.Artifact),
+            ["Faerie Conclave"] = new(null, ManaAbility.Fixed(ManaColor.Blue), null, null, CardType.Land)
+            {
+                ActivatedAbility = new(new ActivatedAbilityCost(ManaCost: ManaCost.Parse("{1}{U}")), new BecomeCreatureEffect(2, 1, "Faerie")),
+            },
+            ["Mishra's Factory"] = new(null, ManaAbility.Fixed(ManaColor.Colorless), null, null, CardType.Land)
+            {
+                ActivatedAbility = new(new ActivatedAbilityCost(ManaCost: ManaCost.Parse("{1}")), new BecomeCreatureEffect(2, 2, "Assembly-Worker")),
+            },
+
+            // === Oath of Druids deck ===
+            ["Terravore"] = new(ManaCost.Parse("{1}{G}{G}"), null, 3, 3, CardType.Creature) { Subtypes = ["Lhurgoyf"] },
+            ["Call of the Herd"] = new(ManaCost.Parse("{2}{G}"), null, null, null, CardType.Sorcery,
+                Effect: new CreateTokenSpellEffect("Elephant", 3, 3, CardType.Creature, ["Elephant"])),
+            ["Cataclysm"] = new(ManaCost.Parse("{2}{W}{W}"), null, null, null, CardType.Sorcery,
+                Effect: new DestroyAllCreaturesEffect()),
+            ["Oath of Druids"] = new(ManaCost.Parse("{1}{G}"), null, null, null, CardType.Enchantment),
+            ["Ray of Revelation"] = new(ManaCost.Parse("{1}{W}"), null, null, null, CardType.Instant,
+                TargetFilter.EnchantmentOrArtifact(), new NaturalizeEffect()),
+            ["Reckless Charge"] = new(ManaCost.Parse("{R}"), null, null, null, CardType.Sorcery),
+            ["Volcanic Spray"] = new(ManaCost.Parse("{1}{R}"), null, null, null, CardType.Sorcery,
+                Effect: new DamageAllCreaturesEffect(1)),
+            ["Quiet Speculation"] = new(ManaCost.Parse("{1}{U}"), null, null, null, CardType.Sorcery),
+            ["Funeral Pyre"] = new(ManaCost.Parse("{W}"), null, null, null, CardType.Instant),
+            ["Treetop Village"] = new(null, ManaAbility.Fixed(ManaColor.Green), null, null, CardType.Land)
+            {
+                ActivatedAbility = new(new ActivatedAbilityCost(ManaCost: ManaCost.Parse("{1}{G}")), new BecomeCreatureEffect(3, 3, "Ape")),
+            },
+
+            // === Terrageddon deck ===
+            ["Mother of Runes"] = new(ManaCost.Parse("{W}"), null, 1, 1, CardType.Creature) { Subtypes = ["Human", "Cleric"] },
+            ["Nimble Mongoose"] = new(ManaCost.Parse("{G}"), null, 1, 1, CardType.Creature)
+            {
+                Subtypes = ["Mongoose"],
+                ContinuousEffects =
+                [
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
+                        (card, _) => card.Name == "Nimble Mongoose",
+                        GrantedKeyword: Keyword.Shroud),
+                ],
+            },
+            ["Zuran Orb"] = new(ManaCost.Parse("{0}"), null, null, null, CardType.Artifact),
+
+            // === Elves deck ===
+            ["Llanowar Elves"] = new(ManaCost.Parse("{G}"), null, 1, 1, CardType.Creature)
+            {
+                Subtypes = ["Elf", "Druid"],
+                ActivatedAbility = new(new ActivatedAbilityCost(TapSelf: true), new AddManaEffect(ManaColor.Green)),
+            },
+            ["Fyndhorn Elves"] = new(ManaCost.Parse("{G}"), null, 1, 1, CardType.Creature)
+            {
+                Subtypes = ["Elf", "Druid"],
+                ActivatedAbility = new(new ActivatedAbilityCost(TapSelf: true), new AddManaEffect(ManaColor.Green)),
+            },
+            ["Priest of Titania"] = new(ManaCost.Parse("{1}{G}"), null, 1, 1, CardType.Creature)
+            {
+                Subtypes = ["Elf", "Druid"],
+                ActivatedAbility = new(new ActivatedAbilityCost(TapSelf: true), new AddManaEffect(ManaColor.Green)),
+            },
+            ["Quirion Ranger"] = new(ManaCost.Parse("{G}"), null, 1, 1, CardType.Creature) { Subtypes = ["Elf"] },
+            ["Wirewood Symbiote"] = new(ManaCost.Parse("{G}"), null, 1, 1, CardType.Creature) { Subtypes = ["Insect"] },
+            ["Multani's Acolyte"] = new(ManaCost.Parse("{G}{G}"), null, 2, 1, CardType.Creature)
+            {
+                Subtypes = ["Elf"],
+                Triggers = [new Trigger(GameEvent.EnterBattlefield, TriggerCondition.Self, new DrawCardEffect())],
+            },
+            ["Deranged Hermit"] = new(ManaCost.Parse("{3}{G}{G}"), null, 1, 1, CardType.Creature)
+            {
+                Subtypes = ["Elf"],
+                Triggers = [new Trigger(GameEvent.EnterBattlefield, TriggerCondition.Self, new CreateTokensEffect("Squirrel", 1, 1, CardType.Creature, ["Squirrel"], count: 4))],
+            },
+            ["Wall of Blossoms"] = new(ManaCost.Parse("{1}{G}"), null, 0, 4, CardType.Creature)
+            {
+                Subtypes = ["Plant", "Wall"],
+                Triggers = [new Trigger(GameEvent.EnterBattlefield, TriggerCondition.Self, new DrawCardEffect())],
+            },
+            ["Wall of Roots"] = new(ManaCost.Parse("{1}{G}"), null, 0, 5, CardType.Creature) { Subtypes = ["Plant", "Wall"] },
+            ["Ravenous Baloth"] = new(ManaCost.Parse("{2}{G}{G}"), null, 4, 4, CardType.Creature) { Subtypes = ["Beast"] },
+            ["Caller of the Claw"] = new(ManaCost.Parse("{2}{G}"), null, 2, 2, CardType.Creature) { Subtypes = ["Elf"] },
+            ["Masticore"] = new(ManaCost.Parse("{4}"), null, 4, 4, CardType.Artifact | CardType.Creature),
+            ["Nantuko Vigilante"] = new(ManaCost.Parse("{3}{G}"), null, 3, 2, CardType.Creature) { Subtypes = ["Insect", "Druid"] },
+            ["Yavimaya Granger"] = new(ManaCost.Parse("{2}{G}"), null, 2, 2, CardType.Creature)
+            {
+                Subtypes = ["Elf"],
+                Triggers = [new Trigger(GameEvent.EnterBattlefield, TriggerCondition.Self, new SearchLibraryEffect("Forest", optional: true))],
+            },
+            ["Anger"] = new(ManaCost.Parse("{3}{R}"), null, 2, 2, CardType.Creature) { Subtypes = ["Incarnation"] },
+            ["Squee, Goblin Nabob"] = new(ManaCost.Parse("{2}{R}"), null, 1, 1, CardType.Creature)
+            {
+                Subtypes = ["Goblin"],
+                IsLegendary = true,
+            },
+            ["Survival of the Fittest"] = new(ManaCost.Parse("{1}{G}"), null, null, null, CardType.Enchantment),
+            ["Gaea's Cradle"] = new(null, ManaAbility.Dynamic(ManaColor.Green,
+                p => p.Battlefield.Cards.Count(c => c.IsCreature)),
+                null, null, CardType.Land) { IsLegendary = true },
         };
 
         Registry = cards.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
