@@ -4,7 +4,9 @@
         auto          /* opponent info bar */
         1fr           /* opponent battlefield */
         auto          /* phase bar + stack */
-        2fr           /* player battlefield */;
+        2fr           /* player battlefield */
+        auto          /* player info bar */
+        auto;         /* player hand */
     height: calc(100vh - 64px);
     padding: 4px;
     gap: 2px;
@@ -49,9 +51,36 @@
     gap: 2px;
 }
 
-/* Row 4: Player zone */
-.player-battlefield-row {
+/* Row 4: Player battlefield */
+.player-battlefield {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 4px;
     overflow: auto;
+}
+
+/* Row 5: Player info bar */
+.player-info-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    flex-wrap: wrap;
+    min-height: 36px;
+}
+
+/* Row 6: Player hand */
+.player-hand {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 2px;
+    padding: 4px;
+    background: rgba(0, 0, 0, 0.15);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    min-height: 60px;
 }
 
 /* Mana pool inline display */
@@ -127,4 +156,15 @@
     background: var(--mud-palette-surface);
     border-left: 1px solid rgba(255, 255, 255, 0.1);
     overflow-y: auto;
+}
+
+/* Prompt overlay */
+.prompt-overlay {
+    position: absolute;
+    bottom: 200px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 150;
+    max-width: 600px;
+    width: 90%;
 }

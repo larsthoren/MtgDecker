@@ -144,6 +144,16 @@
     background: rgba(25, 118, 210, 0.5) !important;
 }
 
+.skip-btn {
+    background: rgba(158, 158, 158, 0.2);
+    border-color: rgba(158, 158, 158, 0.4);
+    color: #bdbdbd;
+}
+
+.skip-btn:hover {
+    background: rgba(158, 158, 158, 0.35) !important;
+}
+
 .undo-btn .btn-icon,
 .surrender-btn .btn-icon {
     font-size: 0.9rem;

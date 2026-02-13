@@ -35,6 +35,10 @@
     box-shadow: 0 0 10px rgba(68, 136, 255, 0.5);
 }
 
+.card-display.eligible {
+    box-shadow: 0 0 8px rgba(100, 200, 100, 0.6);
+}
+
 .card-display img {
     width: 100%;
     height: auto;

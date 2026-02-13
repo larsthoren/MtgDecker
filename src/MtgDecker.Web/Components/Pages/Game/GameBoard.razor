@@ -102,7 +102,8 @@
                   CanUndo="@(LocalPlayer.ActionHistory.Count > 0)"
                   StackCount="@State.Stack.Count"
                   StopSettings="@_phaseStops"
-                  OnPass="PassPriority"
+                  OnPass="HandlePassOrConfirm"
+                  OnSkipCombat="HandleSkipCombat"
                   OnUndo="() => OnUndo.InvokeAsync()"
                   OnSurrender="() => OnSurrender.InvokeAsync()" />
 
@@ -110,53 +111,244 @@
     </div>
 
     @* Row 4: Player battlefield *@
-    <div class="player-battlefield-row">
-        <PlayerZone PlayerName="@LocalPlayer.Name"
-                    Battlefield="@LocalPlayer.Battlefield.Cards"
-                    Hand="@LocalPlayer.Hand.Cards"
-                    Graveyard="@LocalPlayer.Graveyard.Cards"
-                    Life="@LocalPlayer.Life"
-                    LibraryCount="@LocalPlayer.Library.Count"
-                    Exile="@LocalPlayer.Exile.Cards"
-                    ManaPool="@LocalPlayer.ManaPool"
-                    OnLifeAdjust="(delta) => OnLifeAdjust.InvokeAsync((PlayerSeat, delta))"
-                    OnDrawCard="() => OnDrawCard.InvokeAsync(PlayerSeat)"
-                    IsOpponent="false"
-                    IsActivePlayer="@(State.ActivePlayer == LocalPlayer)"
-                    CanAct="@HasPriority"
-                    PlayerId="@LocalPlayer.Id"
-                    OnAction="OnAction"
-                    IsWaitingForManaColor="@IsWaitingForManaColor"
-                    ManaColorOptions="@ManaColorOptions"
-                    OnManaColorChosen="HandleManaColorChosen"
-                    IsWaitingForTarget="@(Handler?.IsWaitingForTarget == true)"
-                    TargetingSpellName="@Handler?.TargetingSpellName"
-                    EligibleTargets="@Handler?.EligibleTargets"
-                    OnTargetSelected="HandleTargetSelected"
-                    OpponentId="@OpponentPlayer.Id"
-                    IsWaitingForAttackers="@(IsLocalActive && Handler?.IsWaitingForAttackers == true)"
-                    EligibleAttackers="@(IsLocalActive ? Handler?.EligibleAttackers : null)"
-                    OnAttackersChosen="OnAttackersChosen"
-                    CombatState="@State.Combat"
-                    IsWaitingForBlockers="@(IsLocalDefending && Handler?.IsWaitingForBlockers == true)"
-                    EligibleBlockers="@(IsLocalDefending ? Handler?.EligibleBlockers : null)"
-                    CurrentAttackers="@(IsLocalDefending ? Handler?.CurrentAttackers : null)"
-                    OnBlockersChosen="OnBlockersChosen"
-                    IsWaitingForBlockerOrder="@(IsLocalActive && Handler?.IsWaitingForBlockerOrder == true)"
-                    OrderingAttackerId="@(Handler?.OrderingAttackerId)"
-                    BlockersToOrder="@(IsLocalActive ? Handler?.BlockersToOrder : null)"
-                    OnBlockerOrderChosen="OnBlockerOrderChosen"
-                    IsWaitingForCardChoice="@IsWaitingForCardChoice"
-                    CardChoiceOptions="@(Handler?.CardChoiceOptions)"
-                    CardChoicePrompt="@(Handler?.CardChoicePrompt)"
-                    CardChoiceOptional="@(Handler?.CardChoiceOptional ?? false)"
-                    OnCardChosen="OnCardChosen"
-                    IsWaitingForRevealAck="@IsWaitingForRevealAck"
-                    RevealedCards="@(Handler?.RevealedCards)"
-                    KeptCards="@(Handler?.KeptCards)"
-                    RevealPrompt="@(Handler?.RevealPrompt)"
-                    OnRevealAcknowledged="OnRevealAcknowledged" />
+    <div class="player-battlefield">
+        <div class="battlefield-row player-creatures">
+            @foreach (var card in LocalPlayer.Battlefield.Cards.Where(c => !c.IsLand))
+            {
+                var isEligibleAttacker = Handler?.IsWaitingForAttackers == true && IsLocalActive
+                    && Handler?.EligibleAttackers?.Any(c => c.Id == card.Id) == true;
+                var isEligibleBlocker = Handler?.IsWaitingForBlockers == true && IsLocalDefending
+                    && Handler?.EligibleBlockers?.Any(c => c.Id == card.Id) == true;
+                <CardDisplay Name="@card.Name" ImageUrl="@card.ImageUrl" Tapped="@card.IsTapped"
+                             Power="@card.Power" Toughness="@card.Toughness" DamageMarked="@card.DamageMarked"
+                             CardSize="130"
+                             Selected="@(_selectedCard?.Id == card.Id)"
+                             IsAttacking="@(_selectedAttackers.Contains(card.Id) || State.Combat?.Attackers.Contains(card.Id) == true)"
+                             IsBlocking="@(_blockerAssignments.ContainsKey(card.Id) || IsCardBlockingAnywhere(card.Id))"
+                             Eligible="@(isEligibleAttacker || isEligibleBlocker)"
+                             Clickable="true"
+                             OnClick="async () => await HandleBattlefieldClick(card, isEligibleAttacker, isEligibleBlocker)" />
+            }
+        </div>
+        <div class="battlefield-row player-lands">
+            @foreach (var card in LocalPlayer.Battlefield.Cards.Where(c => c.IsLand))
+            {
+                <CardDisplay Name="@card.Name" ImageUrl="@card.ImageUrl" Tapped="@card.IsTapped"
+                             CardSize="130"
+                             Selected="@(_selectedCard?.Id == card.Id)"
+                             Clickable="true"
+                             OnClick="async () => await HandleLandClick(card)" />
+            }
+        </div>
+        @if (LocalPlayer.Battlefield.Cards.Count == 0)
+        {
+            <MudText Typo="Typo.caption" Class="empty-zone">Battlefield</MudText>
+        }
     </div>
+
+    @* Row 5: Player info bar *@
+    <div class="player-info-bar">
+        <MudText Typo="Typo.subtitle2">@LocalPlayer.Name</MudText>
+        <div style="display: flex; align-items: center; gap: 4px;">
+            <MudIconButton Icon="@Icons.Material.Filled.Remove" Size="Size.Small"
+                           OnClick="() => OnLifeAdjust.InvokeAsync((PlayerSeat, -1))" />
+            <MudChip T="string" Size="Size.Small" Color="Color.Error">@LocalPlayer.Life HP</MudChip>
+            <MudIconButton Icon="@Icons.Material.Filled.Add" Size="Size.Small"
+                           OnClick="() => OnLifeAdjust.InvokeAsync((PlayerSeat, 1))" />
+        </div>
+        @if (IsLocalActive)
+        {
+            <MudChip T="string" Size="Size.Small" Color="Color.Primary">Active</MudChip>
+        }
+        @if (LocalPlayer.ManaPool?.Total > 0)
+        {
+            <div class="mana-pool-display">
+                @foreach (var (color, symbol) in ManaSymbols)
+                {
+                    @if (LocalPlayer.ManaPool[color] > 0)
+                    {
+                        <span class="mana-entry">
+                            <img src="https://svgs.scryfall.io/card-symbols/@(symbol).svg"
+                                 alt="@color" class="mana-symbol" />
+                            <span class="mana-count">@LocalPlayer.ManaPool[color]</span>
+                        </span>
+                    }
+                }
+            </div>
+        }
+        <MudChip T="string" Size="Size.Small" Color="Color.Default">Grave: @LocalPlayer.Graveyard.Cards.Count</MudChip>
+        <MudChip T="string" Size="Size.Small" Color="Color.Default">Exile: @LocalPlayer.Exile.Cards.Count</MudChip>
+        <MudChip T="string" Size="Size.Small" Color="Color.Default">Lib: @LocalPlayer.Library.Count</MudChip>
+        <MudIconButton Icon="@Icons.Material.Filled.PostAdd" Size="Size.Small"
+                       Title="Draw a card" Disabled="@(LocalPlayer.Library.Count == 0)"
+                       OnClick="() => OnDrawCard.InvokeAsync(PlayerSeat)" />
+    </div>
+
+    @* Row 6: Player hand *@
+    <div class="player-hand">
+        @foreach (var card in LocalPlayer.Hand.Cards)
+        {
+            <CardDisplay Name="@card.Name" ImageUrl="@card.ImageUrl"
+                         CardSize="130"
+                         Selected="@(_selectedCard?.Id == card.Id)"
+                         Clickable="true"
+                         OnClick="async () => await HandleHandClick(card)" />
+        }
+        @if (LocalPlayer.Hand.Cards.Count == 0)
+        {
+            <MudText Typo="Typo.caption" Class="empty-zone">Hand (empty)</MudText>
+        }
+    </div>
+
+    @* Prompt overlays *@
+
+    @* Action Menu (appears when card is selected) *@
+    @if (_selectedCard != null && HasPriority)
+    {
+        <div class="prompt-overlay">
+            <ActionMenu Visible="true"
+                        CardName="@_selectedCard.Name"
+                        CurrentZone="_selectedZone"
+                        IsOwnCard="true"
+                        IsTapped="@_selectedCard.IsTapped"
+                        OnPlay="HandlePlay"
+                        OnTapToggle="HandleTapToggle"
+                        OnMoveTo="HandleMoveTo"
+                        OnClose="ClearSelection" />
+        </div>
+    }
+
+    @* Blocker ordering prompt *@
+    @if (Handler?.IsWaitingForBlockerOrder == true && IsLocalActive && Handler?.BlockersToOrder != null)
+    {
+        <div class="prompt-overlay">
+            <MudPaper Class="pa-3" Elevation="8">
+                <MudText Typo="Typo.subtitle1">Order Blockers</MudText>
+                <MudText Typo="Typo.body2" Class="mb-2">Click blockers in damage order.</MudText>
+                <div class="blocker-order-list" style="display: flex; flex-wrap: wrap; gap: 4px;">
+                    @foreach (var blocker in Handler.BlockersToOrder)
+                    {
+                        var orderIndex = _blockerOrder.IndexOf(blocker.Id);
+                        <MudChip T="string" Color="@(orderIndex >= 0 ? Color.Primary : Color.Default)"
+                                 OnClick="@(() => AddToBlockerOrder(blocker.Id))">
+                            @if (orderIndex >= 0) { @($"#{orderIndex + 1} ") }
+                            @blocker.Name (@blocker.Power/@blocker.Toughness)
+                        </MudChip>
+                    }
+                </div>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mt-2"
+                           OnClick="ConfirmBlockerOrder">Confirm Order</MudButton>
+            </MudPaper>
+        </div>
+    }
+
+    @* Target picker *@
+    @if (Handler?.IsWaitingForTarget == true && Handler?.EligibleTargets != null)
+    {
+        <div class="prompt-overlay">
+            <MudPaper Class="pa-2" Outlined="true" Style="background-color: rgba(255,165,0,0.15);">
+                <MudText Typo="Typo.body2" Class="mb-1">Choose target for @(Handler.TargetingSpellName):</MudText>
+                @foreach (var target in Handler.EligibleTargets)
+                {
+                    <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Warning"
+                               Class="ma-1" OnClick="@(() => HandleTargetButtonClick(target))">
+                        @target.Name
+                        @if (target.Power.HasValue) { <span> (@target.Power/@target.Toughness)</span> }
+                    </MudButton>
+                }
+            </MudPaper>
+        </div>
+    }
+
+    @* Mana color picker *@
+    @if (IsWaitingForManaColor && ManaColorOptions != null)
+    {
+        <div class="prompt-overlay">
+            <MudPaper Class="pa-2" Elevation="8">
+                <MudText Typo="Typo.caption" Class="mb-1">Choose mana color:</MudText>
+                <div style="display: flex; gap: 8px;">
+                    @foreach (var color in ManaColorOptions)
+                    {
+                        var symbol = ManaSymbols.First(m => m.color == color).symbol;
+                        <MudIconButton OnClick="async () => await OnManaColorChosen.InvokeAsync(color)">
+                            <img src="https://svgs.scryfall.io/card-symbols/@(symbol).svg"
+                                 alt="@color" style="width: 32px; height: 32px;" />
+                        </MudIconButton>
+                    }
+                </div>
+            </MudPaper>
+        </div>
+    }
+
+    @* Card choice prompt (tutor) *@
+    @if (Handler?.IsWaitingForCardChoice == true && Handler?.CardChoiceOptions != null)
+    {
+        <div class="prompt-overlay">
+            <MudPaper Class="pa-3" Elevation="8">
+                <MudText Typo="Typo.body2" Class="mb-2">@(Handler.CardChoicePrompt)</MudText>
+                <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+                    @foreach (var card in Handler.CardChoiceOptions)
+                    {
+                        var isSelected = _selectedChoiceId == card.Id;
+                        <div style="cursor: pointer; @(isSelected ? "outline: 3px solid #C69B3C; border-radius: 8px;" : "")"
+                             @onclick="() => ToggleCardChoice(card.Id)">
+                            <CardDisplay ImageUrl="@card.ImageUrl" Name="@card.Name" Clickable="true" />
+                        </div>
+                    }
+                </div>
+                <div style="display: flex; gap: 8px; margin-top: 8px;">
+                    @if (Handler.CardChoiceOptional)
+                    {
+                        <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="() => SubmitCardChoice(null)">Skip</MudButton>
+                    }
+                    <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary"
+                               Disabled="@(_selectedChoiceId == null)" OnClick="() => SubmitCardChoice(_selectedChoiceId)">Choose</MudButton>
+                </div>
+            </MudPaper>
+        </div>
+    }
+
+    @* Reveal cards prompt *@
+    @if (Handler?.IsWaitingForRevealAck == true && Handler?.RevealedCards != null)
+    {
+        <div class="prompt-overlay">
+            <MudPaper Class="pa-3" Elevation="8">
+                <MudText Typo="Typo.body2" Class="mb-2">@(Handler.RevealPrompt)</MudText>
+                <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+                    @foreach (var card in Handler.RevealedCards)
+                    {
+                        var isKept = Handler.KeptCards?.Any(k => k.Id == card.Id) == true;
+                        <div>
+                            <CardDisplay ImageUrl="@card.ImageUrl" Name="@card.Name" Clickable="false" />
+                            @if (isKept)
+                            {
+                                <MudChip T="string" Size="Size.Small" Color="Color.Success">To Hand</MudChip>
+                            }
+                        </div>
+                    }
+                </div>
+                <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" Class="mt-2"
+                           OnClick="() => OnRevealAcknowledged.InvokeAsync()">OK</MudButton>
+            </MudPaper>
+        </div>
+    }
+
+    @* Blocker assignment prompt (when blocker selected, show attackers to assign to) *@
+    @if (Handler?.IsWaitingForBlockers == true && IsLocalDefending && _selectedBlocker != null && Handler?.CurrentAttackers != null)
+    {
+        <div class="prompt-overlay">
+            <MudPaper Class="pa-2" Elevation="8">
+                <MudText Typo="Typo.body2" Class="mb-1">Click an attacker to assign block:</MudText>
+                @foreach (var attacker in Handler.CurrentAttackers)
+                {
+                    <MudChip T="string" Color="Color.Error" Class="target-highlight"
+                             OnClick="@(() => AssignBlockerToAttacker(attacker.Id))">
+                        @attacker.Name (@attacker.Power/@attacker.Toughness)
+                    </MudChip>
+                }
+            </MudPaper>
+        </div>
+    }
 
     @* Log toggle button *@
     <MudIconButton Icon="@Icons.Material.Filled.Article" Size="Size.Small"
@@ -195,6 +387,19 @@
     private PhaseStopSettings _phaseStops = new();
     private bool _showLog = false;
 
+    // Card selection state
+    private GameCard? _selectedCard;
+    private ZoneType _selectedZone;
+
+    // Combat selection state
+    private HashSet<Guid> _selectedAttackers = new();
+    private Dictionary<Guid, Guid> _blockerAssignments = new(); // blockerId -> attackerId
+    private Guid? _selectedBlocker;
+    private List<Guid> _blockerOrder = new();
+
+    // Card choice state
+    private Guid? _selectedChoiceId;
+
     private Player LocalPlayer => PlayerSeat == 1 ? State.Player1 : State.Player2;
     private Player OpponentPlayer => PlayerSeat == 1 ? State.Player2 : State.Player1;
     private int OpponentSeat => PlayerSeat == 1 ? 2 : 1;
@@ -228,19 +433,206 @@
         }
     }
 
-    private async Task PassPriority()
+    // --- Pass / Combat confirm via PhaseBar ---
+
+    private async Task HandlePassOrConfirm()
     {
-        await OnAction.InvokeAsync(GameAction.Pass(LocalPlayer.Id));
+        if (Handler?.IsWaitingForAttackers == true && IsLocalActive)
+        {
+            await OnAttackersChosen.InvokeAsync(_selectedAttackers.ToList());
+            _selectedAttackers.Clear();
+        }
+        else if (Handler?.IsWaitingForBlockers == true && IsLocalDefending)
+        {
+            await OnBlockersChosen.InvokeAsync(new Dictionary<Guid, Guid>(_blockerAssignments));
+            _blockerAssignments.Clear();
+            _selectedBlocker = null;
+        }
+        else
+        {
+            await OnAction.InvokeAsync(GameAction.Pass(LocalPlayer.Id));
+        }
     }
 
-    private async Task HandleManaColorChosen(ManaColor color)
+    private async Task HandleSkipCombat()
     {
-        await OnManaColorChosen.InvokeAsync(color);
+        if (Handler?.IsWaitingForAttackers == true)
+        {
+            await OnAttackersChosen.InvokeAsync(new List<Guid>());
+            _selectedAttackers.Clear();
+        }
+        else if (Handler?.IsWaitingForBlockers == true)
+        {
+            await OnBlockersChosen.InvokeAsync(new Dictionary<Guid, Guid>());
+            _blockerAssignments.Clear();
+        }
     }
 
-    private void HandleTargetSelected(TargetInfo target)
+    // --- Battlefield interaction ---
+
+    private async Task HandleBattlefieldClick(GameCard card, bool isEligibleAttacker, bool isEligibleBlocker)
     {
-        Handler?.SubmitTarget(target);
+        // If we're targeting, submit target
+        if (Handler?.IsWaitingForTarget == true)
+        {
+            Handler.SubmitTarget(new TargetInfo(card.Id, LocalPlayer.Id, ZoneType.Battlefield));
+            return;
+        }
+
+        if (isEligibleAttacker)
+        {
+            ToggleAttacker(card.Id);
+            return;
+        }
+
+        if (isEligibleBlocker)
+        {
+            SelectBlocker(card.Id);
+            return;
+        }
+
+        await SelectCard(card, ZoneType.Battlefield);
+    }
+
+    private async Task HandleLandClick(GameCard card)
+    {
+        // If we're targeting, submit target
+        if (Handler?.IsWaitingForTarget == true)
+        {
+            Handler.SubmitTarget(new TargetInfo(card.Id, LocalPlayer.Id, ZoneType.Battlefield));
+            return;
+        }
+
+        // Untapped lands with mana ability: tap for mana immediately
+        if (!card.IsTapped && card.ManaAbility != null)
+        {
+            await OnAction.InvokeAsync(GameAction.TapCard(LocalPlayer.Id, card.Id));
+            ClearSelection();
+            return;
+        }
+
+        await SelectCard(card, ZoneType.Battlefield);
+    }
+
+    private async Task HandleHandClick(GameCard card)
+    {
+        if (!HasPriority) return;
+
+        // If we're targeting, submit target
+        if (Handler?.IsWaitingForTarget == true)
+        {
+            Handler.SubmitTarget(new TargetInfo(card.Id, LocalPlayer.Id, ZoneType.Hand));
+            return;
+        }
+
+        await SelectCard(card, ZoneType.Hand);
+    }
+
+    private async Task SelectCard(GameCard card, ZoneType zone)
+    {
+        if (_selectedCard?.Id == card.Id)
+        {
+            ClearSelection();
+            return;
+        }
+        _selectedCard = card;
+        _selectedZone = zone;
+    }
+
+    private void ClearSelection() { _selectedCard = null; }
+
+    // --- Combat: Attacker selection ---
+
+    private void ToggleAttacker(Guid cardId)
+    {
+        if (_selectedAttackers.Contains(cardId))
+            _selectedAttackers.Remove(cardId);
+        else
+            _selectedAttackers.Add(cardId);
+    }
+
+    // --- Combat: Blocker selection ---
+
+    private void SelectBlocker(Guid cardId)
+    {
+        if (_blockerAssignments.ContainsKey(cardId))
+        {
+            _blockerAssignments.Remove(cardId);
+            _selectedBlocker = null;
+        }
+        else
+        {
+            _selectedBlocker = cardId;
+        }
+    }
+
+    private void AssignBlockerToAttacker(Guid attackerId)
+    {
+        if (_selectedBlocker.HasValue)
+        {
+            _blockerAssignments[_selectedBlocker.Value] = attackerId;
+            _selectedBlocker = null;
+        }
+    }
+
+    // --- Combat: Blocker ordering ---
+
+    private void AddToBlockerOrder(Guid blockerId)
+    {
+        if (!_blockerOrder.Contains(blockerId))
+            _blockerOrder.Add(blockerId);
+    }
+
+    private async Task ConfirmBlockerOrder()
+    {
+        if (Handler?.BlockersToOrder != null)
+        {
+            foreach (var b in Handler.BlockersToOrder)
+            {
+                if (!_blockerOrder.Contains(b.Id))
+                    _blockerOrder.Add(b.Id);
+            }
+        }
+        await OnBlockerOrderChosen.InvokeAsync(_blockerOrder.ToList());
+        _blockerOrder.Clear();
+    }
+
+    // --- Card actions (from ActionMenu) ---
+
+    private async Task HandlePlay()
+    {
+        if (_selectedCard == null) return;
+        if (_selectedCard.IsLand)
+            await OnAction.InvokeAsync(GameAction.PlayCard(LocalPlayer.Id, _selectedCard.Id));
+        else
+            await OnAction.InvokeAsync(GameAction.CastSpell(LocalPlayer.Id, _selectedCard.Id));
+        ClearSelection();
+    }
+
+    private async Task HandleTapToggle()
+    {
+        if (_selectedCard == null) return;
+        var action = _selectedCard.IsTapped
+            ? GameAction.UntapCard(LocalPlayer.Id, _selectedCard.Id)
+            : GameAction.TapCard(LocalPlayer.Id, _selectedCard.Id);
+        await OnAction.InvokeAsync(action);
+        ClearSelection();
+    }
+
+    private async Task HandleMoveTo(ZoneType destination)
+    {
+        if (_selectedCard == null) return;
+        await OnAction.InvokeAsync(
+            GameAction.MoveCard(LocalPlayer.Id, _selectedCard.Id, _selectedZone, destination));
+        ClearSelection();
+    }
+
+    // --- Target picker ---
+
+    private void HandleTargetButtonClick(GameCard card)
+    {
+        var ownerId = LocalPlayer.Battlefield.Cards.Any(c => c.Id == card.Id) ? LocalPlayer.Id : OpponentPlayer.Id;
+        Handler?.SubmitTarget(new TargetInfo(card.Id, ownerId, ZoneType.Battlefield));
     }
 
     private async Task HandleOpponentCardClick(GameCard card)
@@ -248,6 +640,18 @@
         if (Handler?.IsWaitingForTarget == true)
             Handler.SubmitTarget(new TargetInfo(card.Id, OpponentPlayer.Id, ZoneType.Battlefield));
     }
+
+    // --- Card choice (tutor) ---
+
+    private void ToggleCardChoice(Guid cardId) => _selectedChoiceId = _selectedChoiceId == cardId ? null : cardId;
+
+    private async Task SubmitCardChoice(Guid? cardId)
+    {
+        _selectedChoiceId = null;
+        await OnCardChosen.InvokeAsync(cardId);
+    }
+
+    // --- Helpers ---
 
     private bool IsCardBlockingAnywhere(Guid cardId) =>
         State.Combat?.Attackers.Any(a => State.Combat.GetBlockers(a).Contains(cardId)) == true;

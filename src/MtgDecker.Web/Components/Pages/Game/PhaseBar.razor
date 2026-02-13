@@ -29,8 +29,12 @@
             <span class="stack-badge">@StackCount</span>
         }
 
-        @if (HasPriority)
+        @if (HasPriority || IsWaitingForAttackers || IsWaitingForBlockers)
         {
+            @if (IsWaitingForAttackers || IsWaitingForBlockers)
+            {
+                <button class="action-btn skip-btn" @onclick="OnSkipCombat">Skip</button>
+            }
             <button class="action-btn pass-btn" @onclick="OnPass">@PassLabel</button>
         }
 

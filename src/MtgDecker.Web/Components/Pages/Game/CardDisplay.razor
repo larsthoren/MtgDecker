@@ -1,6 +1,6 @@
 @namespace MtgDecker.Web.Components.Pages.Game
 
-<div class="card-display @(Tapped ? "tapped" : "") @(Selected ? "selected" : "") @(Clickable ? "clickable" : "") @(IsAttacking ? "attacking" : "") @(IsBlocking ? "blocking" : "")"
+<div class="card-display @(Tapped ? "tapped" : "") @(Selected ? "selected" : "") @(Clickable ? "clickable" : "") @(IsAttacking ? "attacking" : "") @(IsBlocking ? "blocking" : "") @(Eligible ? "eligible" : "")"
      style="width: @(CardSize)px; min-height: @(CardSize * 1.4)px;"
      @onclick="HandleClick">
     @if (IsBack)
@@ -51,6 +51,7 @@
     [Parameter] public int DamageMarked { get; set; }
     [Parameter] public bool IsAttacking { get; set; }
     [Parameter] public bool IsBlocking { get; set; }
+    [Parameter] public bool Eligible { get; set; }
 
     private async Task HandleClick()
     {
