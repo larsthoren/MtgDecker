@@ -19,272 +19,53 @@ public class GameEngineUndoTests
     }
 
     [Fact]
-    public async Task UndoPlayCard_ReturnsCardFromBattlefieldToHand()
+    public async Task UndoTap_UnspentMana_UntapsAndRemovesMana()
     {
         var engine = CreateEngine(out _, out var p1, out _);
-        var card = GameCard.Create("Goblin Lackey", "Creature — Goblin");
-        p1.Hand.Add(card);
-        p1.ManaPool.Add(ManaColor.Red, 1);
-        await engine.ExecuteAction(GameAction.PlayCard(p1.Id, card.Id));
-
-        var result = engine.UndoLastAction(p1.Id);
-
-        result.Should().BeTrue();
-        p1.Battlefield.Count.Should().Be(0);
-        p1.Hand.Count.Should().Be(1);
-        p1.Hand.Cards[0].Should().BeSameAs(card);
-    }
-
-    [Fact]
-    public async Task UndoTapCard_UntapsTheCard()
-    {
-        var engine = CreateEngine(out _, out var p1, out _);
-        var card = new GameCard { Name = "Forest", TypeLine = "Basic Land — Forest" };
-        p1.Battlefield.Add(card);
-        await engine.ExecuteAction(GameAction.TapCard(p1.Id, card.Id));
-
-        var result = engine.UndoLastAction(p1.Id);
-
-        result.Should().BeTrue();
-        card.IsTapped.Should().BeFalse();
-    }
-
-    [Fact]
-    public async Task UndoUntapCard_RetapsTheCard()
-    {
-        var engine = CreateEngine(out _, out var p1, out _);
-        var card = new GameCard { Name = "Forest", TypeLine = "Basic Land — Forest", IsTapped = true };
-        p1.Battlefield.Add(card);
-        await engine.ExecuteAction(GameAction.UntapCard(p1.Id, card.Id));
-
-        var result = engine.UndoLastAction(p1.Id);
-
-        result.Should().BeTrue();
-        card.IsTapped.Should().BeTrue();
-    }
-
-    [Fact]
-    public void Undo_EmptyHistory_ReturnsFalse()
-    {
-        var engine = CreateEngine(out _, out var p1, out _);
-
-        var result = engine.UndoLastAction(p1.Id);
-
-        result.Should().BeFalse();
-    }
-
-    [Fact]
-    public async Task Undo_LogsReversal_PlayCard()
-    {
-        var engine = CreateEngine(out var state, out var p1, out _);
-        var card = GameCard.Create("Goblin Lackey", "Creature — Goblin");
-        p1.Hand.Add(card);
-        p1.ManaPool.Add(ManaColor.Red, 1);
-        await engine.ExecuteAction(GameAction.PlayCard(p1.Id, card.Id));
-        state.GameLog.Clear();
-
-        engine.UndoLastAction(p1.Id);
-
-        state.GameLog.Should().Contain(l => l.Contains("undoes") && l.Contains("Goblin Lackey"));
-    }
-
-    [Fact]
-    public async Task Undo_LogsReversal_TapCard()
-    {
-        var engine = CreateEngine(out var state, out var p1, out _);
-        var card = new GameCard { Name = "Forest", TypeLine = "Basic Land — Forest" };
-        p1.Battlefield.Add(card);
-        await engine.ExecuteAction(GameAction.TapCard(p1.Id, card.Id));
-        state.GameLog.Clear();
-
-        engine.UndoLastAction(p1.Id);
-
-        state.GameLog.Should().Contain(l => l.Contains("undoes tapping") && l.Contains("Forest"));
-    }
-
-    [Fact]
-    public async Task MultipleUndos_ReverseInOrder()
-    {
-        var engine = CreateEngine(out _, out var p1, out _);
-        var card1 = GameCard.Create("Goblin Lackey", "Creature — Goblin");
-        var card2 = GameCard.Create("Mogg Fanatic", "Creature — Goblin");
-        p1.Hand.Add(card1);
-        p1.Hand.Add(card2);
-        p1.ManaPool.Add(ManaColor.Red, 2);
-
-        await engine.ExecuteAction(GameAction.PlayCard(p1.Id, card1.Id));
-        await engine.ExecuteAction(GameAction.PlayCard(p1.Id, card2.Id));
-
-        // Undo Mogg Fanatic first (LIFO)
-        engine.UndoLastAction(p1.Id).Should().BeTrue();
-        p1.Battlefield.Count.Should().Be(1);
-        p1.Battlefield.Cards[0].Name.Should().Be("Goblin Lackey");
-        p1.Hand.Count.Should().Be(1);
-        p1.Hand.Cards[0].Name.Should().Be("Mogg Fanatic");
-
-        // Undo Goblin Lackey
-        engine.UndoLastAction(p1.Id).Should().BeTrue();
-        p1.Battlefield.Count.Should().Be(0);
-        p1.Hand.Count.Should().Be(2);
-    }
-
-    [Fact]
-    public async Task ActionHistory_PushedOnSuccessfulAction()
-    {
-        var engine = CreateEngine(out _, out var p1, out _);
-        var card = GameCard.Create("Goblin Lackey", "Creature — Goblin");
-        p1.Hand.Add(card);
-        p1.ManaPool.Add(ManaColor.Red, 1);
-
-        await engine.ExecuteAction(GameAction.PlayCard(p1.Id, card.Id));
-
-        p1.ActionHistory.Count.Should().Be(1);
-        p1.ActionHistory.Peek().Type.Should().Be(ActionType.PlayCard);
-    }
-
-    [Fact]
-    public async Task ActionHistory_NotPushedOnFailedAction()
-    {
-        var engine = CreateEngine(out _, out var p1, out _);
-        // Try to play a card that's not in hand
-        var fakeId = Guid.NewGuid();
-
-        await engine.ExecuteAction(GameAction.PlayCard(p1.Id, fakeId));
-
-        p1.ActionHistory.Count.Should().Be(0);
-    }
-
-    [Fact]
-    public async Task ActionHistory_PerPlayer_IndependentStacks()
-    {
-        var engine = CreateEngine(out _, out var p1, out var p2);
-        var card1 = GameCard.Create("Goblin Lackey", "Creature — Goblin");
-        var card2 = GameCard.Create("Mogg Fanatic", "Creature — Goblin");
-        p1.Hand.Add(card1);
-        p1.ManaPool.Add(ManaColor.Red, 1);
-        p2.Hand.Add(card2);
-        p2.ManaPool.Add(ManaColor.Red, 1);
-
-        await engine.ExecuteAction(GameAction.PlayCard(p1.Id, card1.Id));
-        await engine.ExecuteAction(GameAction.PlayCard(p2.Id, card2.Id));
-
-        // Player 1 can undo their action even though Player 2 acted last
-        engine.UndoLastAction(p1.Id).Should().BeTrue();
-        p1.Battlefield.Count.Should().Be(0);
-        p1.Hand.Count.Should().Be(1);
-
-        // Player 2's action is unaffected
-        p2.Battlefield.Count.Should().Be(1);
-    }
-
-    [Fact]
-    public async Task Undo_PopOnlyOnSuccess_PlayCard()
-    {
-        var engine = CreateEngine(out _, out var p1, out _);
-        var card = GameCard.Create("Goblin Lackey", "Creature — Goblin");
-        p1.Hand.Add(card);
-        p1.ManaPool.Add(ManaColor.Red, 1);
-        await engine.ExecuteAction(GameAction.PlayCard(p1.Id, card.Id));
-
-        // Manually remove the card from battlefield (simulating external interference)
-        p1.Battlefield.RemoveById(card.Id);
-
-        // Undo should fail because card is gone — and NOT consume the history entry
-        var result = engine.UndoLastAction(p1.Id);
-        result.Should().BeFalse();
-        p1.ActionHistory.Count.Should().Be(1, "history should not be consumed on failed undo");
-    }
-
-    [Fact]
-    public async Task Undo_PopOnlyOnSuccess_TapCard()
-    {
-        var engine = CreateEngine(out _, out var p1, out _);
-        var card = new GameCard { Name = "Forest", TypeLine = "Basic Land — Forest" };
-        p1.Battlefield.Add(card);
-        await engine.ExecuteAction(GameAction.TapCard(p1.Id, card.Id));
-
-        // Manually remove the card from battlefield
-        p1.Battlefield.RemoveById(card.Id);
-
-        // Undo should fail — card not on battlefield
-        var result = engine.UndoLastAction(p1.Id);
-        result.Should().BeFalse();
-        p1.ActionHistory.Count.Should().Be(1, "history should not be consumed on failed undo");
-    }
-
-    [Fact]
-    public async Task Undo_AfterTapThenUntap_UndoesInCorrectOrder()
-    {
-        var engine = CreateEngine(out _, out var p1, out _);
-        var card = new GameCard { Name = "Forest", TypeLine = "Basic Land — Forest" };
-        p1.Battlefield.Add(card);
-
-        await engine.ExecuteAction(GameAction.TapCard(p1.Id, card.Id));
-        await engine.ExecuteAction(GameAction.UntapCard(p1.Id, card.Id));
-
-        // Undo untap → card should be tapped again
-        engine.UndoLastAction(p1.Id).Should().BeTrue();
-        card.IsTapped.Should().BeTrue();
-
-        // Undo tap → card should be untapped
-        engine.UndoLastAction(p1.Id).Should().BeTrue();
-        card.IsTapped.Should().BeFalse();
-    }
-
-    // === Task 1: TapCard undo should remove mana ===
-
-    [Fact]
-    public async Task UndoTapCard_RemovesManaProducedByFixedAbility()
-    {
-        var engine = CreateEngine(out _, out var p1, out _);
-        var mountain = GameCard.Create("Mountain", "Basic Land — Mountain");
-        p1.Battlefield.Add(mountain);
-
-        await engine.ExecuteAction(GameAction.TapCard(p1.Id, mountain.Id));
-        p1.ManaPool[ManaColor.Red].Should().Be(1);
-
-        engine.UndoLastAction(p1.Id).Should().BeTrue();
-        p1.ManaPool[ManaColor.Red].Should().Be(0, "mana should be removed on undo");
-        p1.ManaPool.Total.Should().Be(0);
-    }
-
-    [Fact]
-    public async Task UndoTapCard_RemovesManaProducedByChoiceAbility()
-    {
-        var engine = CreateEngine(out _, out var p1, out _);
-        var handler = (TestDecisionHandler)p1.DecisionHandler;
-        var forest = GameCard.Create("Karplusan Forest", "Land");
+        var forest = GameCard.Create("Forest", "Basic Land — Forest");
+        forest.ManaAbility = ManaAbility.Fixed(ManaColor.Green);
         p1.Battlefield.Add(forest);
-        handler.EnqueueManaColor(ManaColor.Green);
 
         await engine.ExecuteAction(GameAction.TapCard(p1.Id, forest.Id));
+        forest.IsTapped.Should().BeTrue();
         p1.ManaPool[ManaColor.Green].Should().Be(1);
 
-        engine.UndoLastAction(p1.Id).Should().BeTrue();
-        p1.ManaPool[ManaColor.Green].Should().Be(0, "chosen mana should be removed on undo");
+        var result = engine.UndoLastAction(p1.Id);
+
+        result.Should().BeTrue();
+        forest.IsTapped.Should().BeFalse();
+        p1.ManaPool[ManaColor.Green].Should().Be(0);
     }
 
     [Fact]
-    public async Task UndoTapCard_DoesNotRemoveManaWhenNoAbility()
+    public async Task UndoTap_AfterManaSpent_Rejected()
     {
-        var engine = CreateEngine(out _, out var p1, out _);
-        var creature = GameCard.Create("Goblin Lackey", "Creature — Goblin");
-        p1.Battlefield.Add(creature);
-        // Pre-add some mana to ensure undo doesn't touch it
-        p1.ManaPool.Add(ManaColor.Red, 2);
+        var engine = CreateEngine(out var state, out var p1, out _);
+        var mountain = GameCard.Create("Mountain", "Basic Land — Mountain");
+        mountain.ManaAbility = ManaAbility.Fixed(ManaColor.Red);
+        p1.Battlefield.Add(mountain);
 
-        await engine.ExecuteAction(GameAction.TapCard(p1.Id, creature.Id));
+        // Tap mountain for R
+        await engine.ExecuteAction(GameAction.TapCard(p1.Id, mountain.Id));
 
-        engine.UndoLastAction(p1.Id).Should().BeTrue();
-        p1.ManaPool[ManaColor.Red].Should().Be(2, "unrelated mana should not be affected");
+        // Simulate mana being spent by clearing pending taps
+        p1.PendingManaTaps.Clear();
+
+        var result = engine.UndoLastAction(p1.Id);
+
+        result.Should().BeFalse();
+        mountain.IsTapped.Should().BeTrue(); // Still tapped
+        state.GameLog.Should().Contain(l => l.Contains("already spent"));
     }
 
     [Fact]
-    public async Task UndoTapCard_TwiceTwoLands_RemovesAllMana()
+    public async Task UndoTap_MultipleTaps_UndoesInOrder()
     {
         var engine = CreateEngine(out _, out var p1, out _);
         var forest1 = GameCard.Create("Forest", "Basic Land — Forest");
+        forest1.ManaAbility = ManaAbility.Fixed(ManaColor.Green);
         var forest2 = GameCard.Create("Forest", "Basic Land — Forest");
+        forest2.ManaAbility = ManaAbility.Fixed(ManaColor.Green);
         p1.Battlefield.Add(forest1);
         p1.Battlefield.Add(forest2);
 
@@ -292,97 +73,199 @@ public class GameEngineUndoTests
         await engine.ExecuteAction(GameAction.TapCard(p1.Id, forest2.Id));
         p1.ManaPool[ManaColor.Green].Should().Be(2);
 
+        // Undo last tap (forest2)
         engine.UndoLastAction(p1.Id).Should().BeTrue();
+        forest2.IsTapped.Should().BeFalse();
         p1.ManaPool[ManaColor.Green].Should().Be(1);
 
+        // Undo next (forest1)
         engine.UndoLastAction(p1.Id).Should().BeTrue();
+        forest1.IsTapped.Should().BeFalse();
         p1.ManaPool[ManaColor.Green].Should().Be(0);
     }
 
-    // === Task 2: PlayCard undo should handle land drops, mana refund, zones ===
+    [Fact]
+    public void Undo_EmptyHistory_ReturnsFalse()
+    {
+        var engine = CreateEngine(out _, out var p1, out _);
+        var result = engine.UndoLastAction(p1.Id);
+        result.Should().BeFalse();
+    }
 
     [Fact]
-    public async Task UndoPlayLand_DecrementsLandsPlayedThisTurn()
+    public async Task Undo_PlayCard_Rejected()
+    {
+        var engine = CreateEngine(out var state, out var p1, out _);
+        var land = GameCard.Create("Forest", "Basic Land — Forest");
+        p1.Hand.Add(land);
+
+        await engine.ExecuteAction(GameAction.PlayCard(p1.Id, land.Id));
+
+        var result = engine.UndoLastAction(p1.Id);
+
+        result.Should().BeFalse();
+        state.GameLog.Should().Contain(l => l.Contains("Only land taps"));
+    }
+
+    [Fact]
+    public async Task Undo_CastSpell_Rejected()
+    {
+        var engine = CreateEngine(out var state, out var p1, out var p2);
+
+        // Set up a registered spell with mana
+        var bolt = GameCard.Create("Lightning Bolt", "Instant");
+        p1.Hand.Add(bolt);
+        p1.ManaPool.Add(ManaColor.Red);
+
+        // Put a creature on opponent's battlefield for targeting
+        var target = GameCard.Create("Grizzly Bears", "Creature — Bear");
+        target.TurnEnteredBattlefield = state.TurnNumber - 1;
+        p2.Battlefield.Add(target);
+
+        await engine.ExecuteAction(GameAction.CastSpell(p1.Id, bolt.Id));
+
+        var result = engine.UndoLastAction(p1.Id);
+        result.Should().BeFalse();
+        state.GameLog.Should().Contain(l => l.Contains("Only land taps"));
+    }
+
+    [Fact]
+    public async Task Undo_UntapCard_Rejected()
+    {
+        var engine = CreateEngine(out var state, out var p1, out _);
+        var card = new GameCard { Name = "Forest", TypeLine = "Basic Land — Forest", IsTapped = true };
+        p1.Battlefield.Add(card);
+
+        await engine.ExecuteAction(GameAction.UntapCard(p1.Id, card.Id));
+
+        var result = engine.UndoLastAction(p1.Id);
+
+        result.Should().BeFalse();
+        state.GameLog.Should().Contain(l => l.Contains("Only land taps"));
+    }
+
+    [Fact]
+    public async Task UndoTap_CardRemovedFromBattlefield_ReturnsFalse()
     {
         var engine = CreateEngine(out _, out var p1, out _);
         var forest = GameCard.Create("Forest", "Basic Land — Forest");
-        p1.Hand.Add(forest);
+        forest.ManaAbility = ManaAbility.Fixed(ManaColor.Green);
+        p1.Battlefield.Add(forest);
 
-        await engine.ExecuteAction(GameAction.PlayCard(p1.Id, forest.Id));
-        p1.LandsPlayedThisTurn.Should().Be(1);
+        await engine.ExecuteAction(GameAction.TapCard(p1.Id, forest.Id));
 
-        engine.UndoLastAction(p1.Id).Should().BeTrue();
-        p1.LandsPlayedThisTurn.Should().Be(0, "land drop should be reversed on undo");
-        p1.Battlefield.Count.Should().Be(0);
-        p1.Hand.Count.Should().Be(1);
+        // Remove card from battlefield externally
+        p1.Battlefield.RemoveById(forest.Id);
+
+        var result = engine.UndoLastAction(p1.Id);
+        result.Should().BeFalse();
+        p1.ActionHistory.Count.Should().Be(1, "history should not be consumed on failed undo");
     }
 
     [Fact]
-    public async Task UndoPlayLand_ThenPlayAgain_Succeeds()
+    public async Task UndoTap_ChoiceAbility_RemovesMana()
+    {
+        var engine = CreateEngine(out _, out var p1, out _);
+        var handler = (TestDecisionHandler)p1.DecisionHandler;
+        var land = GameCard.Create("Karplusan Forest", "Land");
+        p1.Battlefield.Add(land);
+        handler.EnqueueManaColor(ManaColor.Green);
+
+        await engine.ExecuteAction(GameAction.TapCard(p1.Id, land.Id));
+        p1.ManaPool[ManaColor.Green].Should().Be(1);
+
+        engine.UndoLastAction(p1.Id).Should().BeTrue();
+        p1.ManaPool[ManaColor.Green].Should().Be(0, "chosen mana should be removed on undo");
+    }
+
+    [Fact]
+    public async Task UndoTap_NoManaAbility_StillUntaps()
+    {
+        var engine = CreateEngine(out _, out var p1, out _);
+        var creature = GameCard.Create("Goblin Lackey", "Creature — Goblin");
+        creature.TurnEnteredBattlefield = 0; // not summoning sick
+        p1.Battlefield.Add(creature);
+        // Pre-add some mana to ensure undo doesn't touch it
+        p1.ManaPool.Add(ManaColor.Red, 2);
+
+        await engine.ExecuteAction(GameAction.TapCard(p1.Id, creature.Id));
+
+        engine.UndoLastAction(p1.Id).Should().BeTrue();
+        creature.IsTapped.Should().BeFalse();
+        p1.ManaPool[ManaColor.Red].Should().Be(2, "unrelated mana should not be affected");
+    }
+
+    [Fact]
+    public async Task PendingManaTaps_ClearedOnCastSpell()
+    {
+        var engine = CreateEngine(out _, out var p1, out var p2);
+        var mountain = GameCard.Create("Mountain", "Basic Land — Mountain");
+        mountain.ManaAbility = ManaAbility.Fixed(ManaColor.Red);
+        p1.Battlefield.Add(mountain);
+
+        await engine.ExecuteAction(GameAction.TapCard(p1.Id, mountain.Id));
+        p1.PendingManaTaps.Should().Contain(mountain.Id);
+
+        // Cast a spell that costs {R}
+        var bolt = GameCard.Create("Lightning Bolt", "Instant");
+        p1.Hand.Add(bolt);
+        var target = GameCard.Create("Grizzly Bears", "Creature — Bear");
+        target.TurnEnteredBattlefield = 0;
+        p2.Battlefield.Add(target);
+
+        await engine.ExecuteAction(GameAction.CastSpell(p1.Id, bolt.Id));
+
+        p1.PendingManaTaps.Should().BeEmpty("pending taps should be cleared when mana is spent");
+    }
+
+    [Fact]
+    public async Task PendingManaTaps_ClearedOnPlaySpell()
+    {
+        var engine = CreateEngine(out _, out var p1, out _);
+        var mountain = GameCard.Create("Mountain", "Basic Land — Mountain");
+        mountain.ManaAbility = ManaAbility.Fixed(ManaColor.Red);
+        p1.Battlefield.Add(mountain);
+
+        await engine.ExecuteAction(GameAction.TapCard(p1.Id, mountain.Id));
+        p1.PendingManaTaps.Should().Contain(mountain.Id);
+
+        // Play a creature using PlayCard (which pays mana)
+        var goblin = GameCard.Create("Goblin Lackey", "Creature — Goblin");
+        p1.Hand.Add(goblin);
+
+        await engine.ExecuteAction(GameAction.PlayCard(p1.Id, goblin.Id));
+
+        p1.PendingManaTaps.Should().BeEmpty("pending taps should be cleared when mana is spent via PlayCard");
+    }
+
+    [Fact]
+    public async Task PendingManaTaps_TrackedOnTap()
     {
         var engine = CreateEngine(out _, out var p1, out _);
         var forest = GameCard.Create("Forest", "Basic Land — Forest");
-        p1.Hand.Add(forest);
+        forest.ManaAbility = ManaAbility.Fixed(ManaColor.Green);
+        p1.Battlefield.Add(forest);
 
-        await engine.ExecuteAction(GameAction.PlayCard(p1.Id, forest.Id));
-        engine.UndoLastAction(p1.Id).Should().BeTrue();
+        p1.PendingManaTaps.Should().BeEmpty();
 
-        // Should be able to play a land again after undo
-        await engine.ExecuteAction(GameAction.PlayCard(p1.Id, forest.Id));
-        p1.Battlefield.Count.Should().Be(1);
-        p1.LandsPlayedThisTurn.Should().Be(1);
+        await engine.ExecuteAction(GameAction.TapCard(p1.Id, forest.Id));
+
+        p1.PendingManaTaps.Should().Contain(forest.Id);
     }
 
     [Fact]
-    public async Task UndoCastSpell_RefundsMana()
+    public async Task Undo_LogsUntapMessage()
     {
-        var engine = CreateEngine(out _, out var p1, out _);
-        var lackey = GameCard.Create("Goblin Lackey", "Creature — Goblin");
-        p1.Hand.Add(lackey);
-        p1.ManaPool.Add(ManaColor.Red, 1);
+        var engine = CreateEngine(out var state, out var p1, out _);
+        var forest = GameCard.Create("Forest", "Basic Land — Forest");
+        forest.ManaAbility = ManaAbility.Fixed(ManaColor.Green);
+        p1.Battlefield.Add(forest);
 
-        await engine.ExecuteAction(GameAction.PlayCard(p1.Id, lackey.Id));
-        p1.ManaPool[ManaColor.Red].Should().Be(0);
+        await engine.ExecuteAction(GameAction.TapCard(p1.Id, forest.Id));
+        state.GameLog.Clear();
 
-        engine.UndoLastAction(p1.Id).Should().BeTrue();
-        p1.ManaPool[ManaColor.Red].Should().Be(1, "mana should be refunded on undo");
-        p1.Hand.Count.Should().Be(1);
-    }
+        engine.UndoLastAction(p1.Id);
 
-    [Fact]
-    public async Task UndoCastInstant_ReturnsCardFromGraveyardToHand()
-    {
-        var engine = CreateEngine(out _, out var p1, out _);
-        var swords = GameCard.Create("Swords to Plowshares", "Instant");
-        p1.Hand.Add(swords);
-        p1.ManaPool.Add(ManaColor.White, 1);
-
-        await engine.ExecuteAction(GameAction.PlayCard(p1.Id, swords.Id));
-        p1.Graveyard.Count.Should().Be(1);
-        p1.Battlefield.Count.Should().Be(0);
-
-        engine.UndoLastAction(p1.Id).Should().BeTrue();
-        p1.Graveyard.Count.Should().Be(0, "instant should be removed from graveyard on undo");
-        p1.Hand.Count.Should().Be(1);
-        p1.ManaPool[ManaColor.White].Should().Be(1, "mana should be refunded");
-    }
-
-    [Fact]
-    public async Task UndoCastSorcery_ReturnsCardFromGraveyardToHand()
-    {
-        var engine = CreateEngine(out _, out var p1, out _);
-        var replenish = GameCard.Create("Replenish", "Sorcery");
-        p1.Hand.Add(replenish);
-        p1.ManaPool.Add(ManaColor.White, 1);
-        p1.ManaPool.Add(ManaColor.Colorless, 3);
-
-        await engine.ExecuteAction(GameAction.PlayCard(p1.Id, replenish.Id));
-        p1.Graveyard.Count.Should().Be(1);
-
-        engine.UndoLastAction(p1.Id).Should().BeTrue();
-        p1.Graveyard.Count.Should().Be(0);
-        p1.Hand.Count.Should().Be(1);
-        p1.ManaPool[ManaColor.White].Should().Be(1, "colored mana refunded");
-        p1.ManaPool.Total.Should().Be(4, "all mana refunded");
+        state.GameLog.Should().Contain(l => l.Contains("untaps") && l.Contains("Forest"));
     }
 }

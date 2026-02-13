@@ -17,6 +17,7 @@ public class Player
     public int Life { get; private set; } = 20;
     public Stack<GameAction> ActionHistory { get; } = new();
     public ManaPool ManaPool { get; } = new();
+    public List<Guid> PendingManaTaps { get; } = new();
     public int LandsPlayedThisTurn { get; set; }
     public int MaxLandDrops { get; set; } = 1;
 
