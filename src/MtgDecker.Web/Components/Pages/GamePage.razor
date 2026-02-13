@@ -112,6 +112,10 @@ else if (_session.State != null)
         {
             InvokeAsync(StateHasChanged);
         }
+        else if (handler.IsWaitingForTarget)
+        {
+            InvokeAsync(StateHasChanged);
+        }
         else if (handler.IsWaitingForCardChoice)
         {
             InvokeAsync(StateHasChanged);

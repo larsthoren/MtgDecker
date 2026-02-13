@@ -294,14 +294,38 @@
                 <MudText Typo="Typo.body2" Class="mb-1">Choose target for @TargetingSpellName:</MudText>
                 @foreach (var target in EligibleTargets)
                 {
-                    <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Warning"
-                               Class="ma-1" OnClick="@(() => SelectTarget(target))">
-                        @target.Name
-                        @if (target.Power.HasValue)
-                        {
-                            <span> (@target.Power/@target.Toughness)</span>
-                        }
-                    </MudButton>
+                    @if (target.Id == Guid.Empty)
+                    {
+                        @* Player target (sentinel card) *@
+                        <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Error"
+                                   Class="ma-1" OnClick="@(() => SelectTarget(target))">
+                            @target.Name
+                        </MudButton>
+                    }
+                    else if (target.Power.HasValue)
+                    {
+                        @* Creature target *@
+                        <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Warning"
+                                   Class="ma-1" OnClick="@(() => SelectTarget(target))">
+                            @target.Name (@target.Power/@target.Toughness)
+                        </MudButton>
+                    }
+                    else if (target.IsLand || target.CardTypes.HasFlag(CardType.Enchantment) || target.CardTypes.HasFlag(CardType.Artifact))
+                    {
+                        @* Non-creature permanent target *@
+                        <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Warning"
+                                   Class="ma-1" OnClick="@(() => SelectTarget(target))">
+                            @target.Name
+                        </MudButton>
+                    }
+                    else
+                    {
+                        @* Stack target (spell on the stack) *@
+                        <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Error"
+                                   Class="ma-1" OnClick="@(() => SelectTarget(target))">
+                            @target.Name
+                        </MudButton>
+                    }
                 }
             </MudPaper>
         </div>
@@ -489,9 +513,19 @@
     // Target selection
     private async Task SelectTarget(GameCard card)
     {
-        // Check if card is on our battlefield to determine the owner
-        var ownerId = Battlefield.Any(c => c.Id == card.Id) ? PlayerId : OpponentId;
-        await OnTargetSelected.InvokeAsync(new TargetInfo(card.Id, ownerId, ZoneType.Battlefield));
+        if (card.Id == Guid.Empty)
+        {
+            // Player target sentinel — match player by name to get the correct PlayerId
+            // The engine creates sentinels with the player's name
+            var targetPlayerId = card.Name == PlayerName ? PlayerId : OpponentId;
+            await OnTargetSelected.InvokeAsync(new TargetInfo(Guid.Empty, targetPlayerId, ZoneType.None));
+        }
+        else
+        {
+            // Battlefield or stack target — the engine auto-detects stack targets by card ID
+            var ownerId = Battlefield.Any(c => c.Id == card.Id) ? PlayerId : OpponentId;
+            await OnTargetSelected.InvokeAsync(new TargetInfo(card.Id, ownerId, ZoneType.Battlefield));
+        }
     }
 
     // Card choice state
