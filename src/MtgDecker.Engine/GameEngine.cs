@@ -216,6 +216,13 @@ public class GameEngine
                 var tapTarget = player.Battlefield.Cards.FirstOrDefault(c => c.Id == action.CardId);
                 if (tapTarget != null && !tapTarget.IsTapped)
                 {
+                    // Summoning sickness: creatures that entered this turn can't be tapped (lands/artifacts exempt)
+                    if (tapTarget.IsCreature && tapTarget.HasSummoningSickness(_state.TurnNumber))
+                    {
+                        _state.Log($"{tapTarget.Name} has summoning sickness.");
+                        break;
+                    }
+
                     tapTarget.IsTapped = true;
                     player.ActionHistory.Push(action);
 
