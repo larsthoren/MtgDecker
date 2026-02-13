@@ -1,6 +1,7 @@
 using FluentAssertions;
 using MtgDecker.Engine;
 using MtgDecker.Engine.Enums;
+using MtgDecker.Engine.Mana;
 using MtgDecker.Engine.Tests.Helpers;
 
 namespace MtgDecker.Engine.Tests;
@@ -21,9 +22,9 @@ public class GameEngineActionExecutionTests
     public async Task ExecuteAction_PlayCard_MovesFromHandToBattlefield()
     {
         var engine = CreateEngine(out var state, out var p1);
-        // Use a non-land card without ManaCost to use sandbox path
-        var card = new GameCard { Name = "TestCard", TypeLine = "Creature" };
+        var card = GameCard.Create("Goblin Lackey", "Creature — Goblin");
         p1.Hand.Add(card);
+        p1.ManaPool.Add(ManaColor.Red, 1);
 
         await engine.ExecuteAction(GameAction.PlayCard(p1.Id, card.Id));
 
@@ -36,13 +37,13 @@ public class GameEngineActionExecutionTests
     public async Task ExecuteAction_PlayCard_LogsAction()
     {
         var engine = CreateEngine(out var state, out var p1);
-        // Use a non-land card without ManaCost to use sandbox path
-        var card = new GameCard { Name = "TestCard", TypeLine = "Creature" };
+        var card = GameCard.Create("Goblin Lackey", "Creature — Goblin");
         p1.Hand.Add(card);
+        p1.ManaPool.Add(ManaColor.Red, 1);
 
         await engine.ExecuteAction(GameAction.PlayCard(p1.Id, card.Id));
 
-        state.GameLog.Should().Contain(msg => msg.Contains("Alice") && msg.Contains("TestCard"));
+        state.GameLog.Should().Contain(msg => msg.Contains("Alice") && msg.Contains("Goblin Lackey"));
     }
 
     [Fact]

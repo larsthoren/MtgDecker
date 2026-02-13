@@ -22,9 +22,9 @@ public class GameEngineUndoTests
     public async Task UndoPlayCard_ReturnsCardFromBattlefieldToHand()
     {
         var engine = CreateEngine(out _, out var p1, out _);
-        // Use sandbox card (no ManaCost, not a land) to avoid mana/land-drop logic
-        var card = new GameCard { Name = "Widget", TypeLine = "Artifact" };
+        var card = GameCard.Create("Goblin Lackey", "Creature — Goblin");
         p1.Hand.Add(card);
+        p1.ManaPool.Add(ManaColor.Red, 1);
         await engine.ExecuteAction(GameAction.PlayCard(p1.Id, card.Id));
 
         var result = engine.UndoLastAction(p1.Id);
@@ -77,14 +77,15 @@ public class GameEngineUndoTests
     public async Task Undo_LogsReversal_PlayCard()
     {
         var engine = CreateEngine(out var state, out var p1, out _);
-        var card = new GameCard { Name = "Widget", TypeLine = "Artifact" };
+        var card = GameCard.Create("Goblin Lackey", "Creature — Goblin");
         p1.Hand.Add(card);
+        p1.ManaPool.Add(ManaColor.Red, 1);
         await engine.ExecuteAction(GameAction.PlayCard(p1.Id, card.Id));
         state.GameLog.Clear();
 
         engine.UndoLastAction(p1.Id);
 
-        state.GameLog.Should().Contain(l => l.Contains("undoes") && l.Contains("Widget"));
+        state.GameLog.Should().Contain(l => l.Contains("undoes") && l.Contains("Goblin Lackey"));
     }
 
     [Fact]
@@ -105,23 +106,23 @@ public class GameEngineUndoTests
     public async Task MultipleUndos_ReverseInOrder()
     {
         var engine = CreateEngine(out _, out var p1, out _);
-        // Use non-land sandbox cards so both can be played without land-drop limit
-        var card1 = new GameCard { Name = "Widget1", TypeLine = "Artifact" };
-        var card2 = new GameCard { Name = "Widget2", TypeLine = "Artifact" };
+        var card1 = GameCard.Create("Goblin Lackey", "Creature — Goblin");
+        var card2 = GameCard.Create("Mogg Fanatic", "Creature — Goblin");
         p1.Hand.Add(card1);
         p1.Hand.Add(card2);
+        p1.ManaPool.Add(ManaColor.Red, 2);
 
         await engine.ExecuteAction(GameAction.PlayCard(p1.Id, card1.Id));
         await engine.ExecuteAction(GameAction.PlayCard(p1.Id, card2.Id));
 
-        // Undo Widget2 first (LIFO)
+        // Undo Mogg Fanatic first (LIFO)
         engine.UndoLastAction(p1.Id).Should().BeTrue();
         p1.Battlefield.Count.Should().Be(1);
-        p1.Battlefield.Cards[0].Name.Should().Be("Widget1");
+        p1.Battlefield.Cards[0].Name.Should().Be("Goblin Lackey");
         p1.Hand.Count.Should().Be(1);
-        p1.Hand.Cards[0].Name.Should().Be("Widget2");
+        p1.Hand.Cards[0].Name.Should().Be("Mogg Fanatic");
 
-        // Undo Widget1
+        // Undo Goblin Lackey
         engine.UndoLastAction(p1.Id).Should().BeTrue();
         p1.Battlefield.Count.Should().Be(0);
         p1.Hand.Count.Should().Be(2);
@@ -131,8 +132,9 @@ public class GameEngineUndoTests
     public async Task ActionHistory_PushedOnSuccessfulAction()
     {
         var engine = CreateEngine(out _, out var p1, out _);
-        var card = new GameCard { Name = "Widget", TypeLine = "Artifact" };
+        var card = GameCard.Create("Goblin Lackey", "Creature — Goblin");
         p1.Hand.Add(card);
+        p1.ManaPool.Add(ManaColor.Red, 1);
 
         await engine.ExecuteAction(GameAction.PlayCard(p1.Id, card.Id));
 
@@ -156,11 +158,12 @@ public class GameEngineUndoTests
     public async Task ActionHistory_PerPlayer_IndependentStacks()
     {
         var engine = CreateEngine(out _, out var p1, out var p2);
-        // Use sandbox cards to avoid land-drop issues
-        var card1 = new GameCard { Name = "Widget1", TypeLine = "Artifact" };
-        var card2 = new GameCard { Name = "Widget2", TypeLine = "Artifact" };
+        var card1 = GameCard.Create("Goblin Lackey", "Creature — Goblin");
+        var card2 = GameCard.Create("Mogg Fanatic", "Creature — Goblin");
         p1.Hand.Add(card1);
+        p1.ManaPool.Add(ManaColor.Red, 1);
         p2.Hand.Add(card2);
+        p2.ManaPool.Add(ManaColor.Red, 1);
 
         await engine.ExecuteAction(GameAction.PlayCard(p1.Id, card1.Id));
         await engine.ExecuteAction(GameAction.PlayCard(p2.Id, card2.Id));
@@ -178,8 +181,9 @@ public class GameEngineUndoTests
     public async Task Undo_PopOnlyOnSuccess_PlayCard()
     {
         var engine = CreateEngine(out _, out var p1, out _);
-        var card = new GameCard { Name = "Widget", TypeLine = "Artifact" };
+        var card = GameCard.Create("Goblin Lackey", "Creature — Goblin");
         p1.Hand.Add(card);
+        p1.ManaPool.Add(ManaColor.Red, 1);
         await engine.ExecuteAction(GameAction.PlayCard(p1.Id, card.Id));
 
         // Manually remove the card from battlefield (simulating external interference)

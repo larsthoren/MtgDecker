@@ -206,18 +206,9 @@ public class GameEngine
                 }
                 else
                 {
-                    // Part C: Sandbox — no ManaCost, not a land
-                    player.Hand.RemoveById(playCard.Id);
-                    player.Battlefield.Add(playCard);
-                    playCard.TurnEnteredBattlefield = _state.TurnNumber;
-                    player.ActionHistory.Push(action);
-                    _state.Log($"{player.Name} plays {playCard.Name}.");
-
-                    // Aura attachment: prompt for target after entering battlefield
-                    await TryAttachAuraAsync(playCard, player, ct);
-
-                    await QueueSelfTriggersOnStackAsync(GameEvent.EnterBattlefield, playCard, player, ct);
-                    await OnBoardChangedAsync(ct);
+                    // No ManaCost, not a land — card not supported in engine
+                    _state.Log($"{playCard.Name} is not supported in the engine (no card definition).");
+                    break;
                 }
                 break;
 

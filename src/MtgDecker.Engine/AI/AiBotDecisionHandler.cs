@@ -92,7 +92,7 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
         if (castable != null)
         {
             // Use CastSpell for cards in the registry (proper stack/mana flow),
-            // fall back to PlayCard for sandbox-mode cards (no CardDefinitions entry)
+            // fall back to PlayCard for unregistered cards with ManaCost (immediate mana payment)
             if (CardDefinitions.TryGet(castable.Name, out _))
                 return Task.FromResult(GameAction.CastSpell(playerId, castable.Id));
             return Task.FromResult(GameAction.PlayCard(playerId, castable.Id));

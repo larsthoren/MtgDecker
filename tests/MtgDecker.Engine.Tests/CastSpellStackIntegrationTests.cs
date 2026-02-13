@@ -166,19 +166,4 @@ public class CastSpellStackIntegrationTests
         state.Player1.Battlefield.Cards.Should().Contain(c => c.Id == forest.Id);
     }
 
-    [Fact]
-    public async Task SandboxMode_StillImmediate_NoStack()
-    {
-        var (engine, state, _, _) = CreateSetup();
-        await engine.StartGameAsync();
-        state.CurrentPhase = Phase.MainPhase1;
-
-        var unknownCard = new GameCard { Name = "Unknown Spell", TypeLine = "Creature" };
-        state.Player1.Hand.Add(unknownCard);
-
-        await engine.ExecuteAction(GameAction.PlayCard(state.Player1.Id, unknownCard.Id));
-
-        state.Stack.Should().BeEmpty();
-        state.Player1.Battlefield.Cards.Should().Contain(c => c.Id == unknownCard.Id);
-    }
 }
