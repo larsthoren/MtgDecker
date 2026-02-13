@@ -278,8 +278,7 @@ public class PreordainEffectTests
         await effect.ResolveAsync(state, spell, handler);
 
         // Assert
-        state.GameLog.Should().Contain(l => l.Contains("scries 2") && l.Contains("Preordain"));
-        state.GameLog.Should().Contain(l => l.Contains("draws a card"));
+        state.GameLog.Should().Contain(l => l.Contains("draws a card") && l.Contains("Preordain"));
     }
 
     [Fact]

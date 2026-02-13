@@ -6,47 +6,44 @@ public class PreordainEffect : SpellEffect
         IPlayerDecisionHandler handler, CancellationToken ct = default)
     {
         var player = spell.ControllerId == state.Player1.Id ? state.Player1 : state.Player2;
-        var top2 = player.Library.PeekTop(2).ToList();
 
-        if (top2.Count == 0)
+        // Scry 2: look at top 2 cards
+        var top2 = player.Library.PeekTop(2).ToList();
+        var keptOnTop = new List<GameCard>();
+        var sentToBottom = new List<GameCard>();
+
+        foreach (var card in top2)
         {
-            state.Log($"{player.Name} scries 0 (Preordain) — library empty.");
-            return;
+            // Ask player to keep on top or send to bottom
+            var choice = await handler.ChooseCard(
+                new[] { card },
+                $"Preordain: Keep {card.Name} on top? (Choose to keep, Skip to bottom)",
+                optional: true, ct);
+
+            if (choice != null)
+                keptOnTop.Add(card);
+            else
+                sentToBottom.Add(card);
         }
 
-        // Remove from library temporarily
+        // Remove looked-at cards from library
         foreach (var card in top2)
             player.Library.RemoveById(card.Id);
 
-        var keptOnTop = new List<GameCard>();
-
-        // For each card: choose to keep on top or send to bottom
-        foreach (var card in top2)
-        {
-            // optional=true: choosing the card = keep on top, null/skip = send to bottom
-            var choice = await handler.ChooseCard(
-                new[] { card } as IReadOnlyList<GameCard>,
-                $"Keep {card.Name} on top of library? (Choose = top, Skip = bottom)",
-                optional: true, ct);
-
-            if (choice.HasValue)
-                keptOnTop.Add(card);
-            else
-                player.Library.AddToBottom(card);
-        }
-
-        // Put kept cards back on top (in order they were kept)
+        // Put kept cards back on top (in order chosen)
         foreach (var card in keptOnTop)
             player.Library.AddToTop(card);
 
-        state.Log($"{player.Name} scries {top2.Count} (Preordain).");
+        // Put bottom cards on bottom
+        foreach (var card in sentToBottom)
+            player.Library.AddToBottom(card);
 
         // Draw 1
         var drawn = player.Library.DrawFromTop();
         if (drawn != null)
         {
             player.Hand.Add(drawn);
-            state.Log($"{player.Name} draws a card.");
+            state.Log($"{player.Name} draws a card (Preordain).");
         }
     }
 }
