@@ -149,13 +149,7 @@
     @* Row 5: Player info bar *@
     <div class="player-info-bar">
         <MudText Typo="Typo.subtitle2">@LocalPlayer.Name</MudText>
-        <div style="display: flex; align-items: center; gap: 4px;">
-            <MudIconButton Icon="@Icons.Material.Filled.Remove" Size="Size.Small"
-                           OnClick="() => OnLifeAdjust.InvokeAsync((PlayerSeat, -1))" />
-            <MudChip T="string" Size="Size.Small" Color="Color.Error">@LocalPlayer.Life HP</MudChip>
-            <MudIconButton Icon="@Icons.Material.Filled.Add" Size="Size.Small"
-                           OnClick="() => OnLifeAdjust.InvokeAsync((PlayerSeat, 1))" />
-        </div>
+        <MudChip T="string" Size="Size.Small" Color="Color.Error">@LocalPlayer.Life HP</MudChip>
         @if (IsLocalActive)
         {
             <MudChip T="string" Size="Size.Small" Color="Color.Primary">Active</MudChip>
@@ -179,9 +173,6 @@
         <MudChip T="string" Size="Size.Small" Color="Color.Default">Grave: @LocalPlayer.Graveyard.Cards.Count</MudChip>
         <MudChip T="string" Size="Size.Small" Color="Color.Default">Exile: @LocalPlayer.Exile.Cards.Count</MudChip>
         <MudChip T="string" Size="Size.Small" Color="Color.Default">Lib: @LocalPlayer.Library.Count</MudChip>
-        <MudIconButton Icon="@Icons.Material.Filled.PostAdd" Size="Size.Small"
-                       Title="Draw a card" Disabled="@(LocalPlayer.Library.Count == 0)"
-                       OnClick="() => OnDrawCard.InvokeAsync(PlayerSeat)" />
     </div>
 
     @* Row 6: Player hand *@
@@ -213,7 +204,6 @@
                         IsTapped="@_selectedCard.IsTapped"
                         OnPlay="HandlePlay"
                         OnTapToggle="HandleTapToggle"
-                        OnMoveTo="HandleMoveTo"
                         OnClose="ClearSelection" />
         </div>
     }
@@ -391,8 +381,6 @@
     [Parameter] public EventCallback<GameAction> OnAction { get; set; }
     [Parameter] public EventCallback OnSurrender { get; set; }
     [Parameter] public EventCallback OnUndo { get; set; }
-    [Parameter] public EventCallback<(int seat, int delta)> OnLifeAdjust { get; set; }
-    [Parameter] public EventCallback<int> OnDrawCard { get; set; }
     [Parameter] public bool IsGameOver { get; set; }
     [Parameter] public string? Winner { get; set; }
     [Parameter] public EventCallback<ManaColor> OnManaColorChosen { get; set; }
@@ -632,19 +620,8 @@
     private async Task HandleTapToggle()
     {
         if (_selectedCard == null) return;
-        var action = _selectedCard.IsTapped
-            ? GameAction.UntapCard(LocalPlayer.Id, _selectedCard.Id)
-            : GameAction.TapCard(LocalPlayer.Id, _selectedCard.Id);
-        await OnAction.InvokeAsync(action);
+        await OnAction.InvokeAsync(GameAction.TapCard(LocalPlayer.Id, _selectedCard.Id));
         ClearSelection();
-    }
-
-    private Task HandleMoveTo(ZoneType destination)
-    {
-        // MoveCard action removed — free zone moves no longer supported.
-        // UI elements referencing this will be removed in a later task.
-        ClearSelection();
-        return Task.CompletedTask;
     }
 
     // --- Target picker ---
