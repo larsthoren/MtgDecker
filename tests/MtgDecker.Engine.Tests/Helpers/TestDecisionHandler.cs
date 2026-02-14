@@ -41,8 +41,11 @@ public class TestDecisionHandler : IPlayerDecisionHandler
         return Task.FromResult(_actions.Dequeue());
     }
 
+    public Action? OnBeforeMulliganDecision { get; set; }
+
     public Task<MulliganDecision> GetMulliganDecision(IReadOnlyList<GameCard> hand, int mulliganCount, CancellationToken ct = default)
     {
+        OnBeforeMulliganDecision?.Invoke();
         if (_mulliganDecisions.Count == 0)
             return Task.FromResult(MulliganDecision.Keep);
         return Task.FromResult(_mulliganDecisions.Dequeue());
