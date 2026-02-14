@@ -156,8 +156,8 @@ public class StackTriggerTests
         effect2.Execute(Arg.Any<EffectContext>(), Arg.Any<CancellationToken>()).Returns(Task.CompletedTask);
 
         var source = new GameCard { Name = "Test Source" };
-        state.Stack.Add(new TriggeredAbilityStackObject(source, p1.Id, effect1));
-        state.Stack.Add(new TriggeredAbilityStackObject(source, p1.Id, effect2));
+        state.StackPush(new TriggeredAbilityStackObject(source, p1.Id, effect1));
+        state.StackPush(new TriggeredAbilityStackObject(source, p1.Id, effect2));
 
         await engine.ResolveAllTriggersAsync();
 

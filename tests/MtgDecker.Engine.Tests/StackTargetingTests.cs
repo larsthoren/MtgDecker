@@ -198,7 +198,7 @@ public class StackTargetingTests
                 new Dictionary<ManaColor, int> { [ManaColor.Blue] = 2 },
                 new List<TargetInfo> { new(targetCard.Id, p1.Id, ZoneType.Stack) },
                 0);
-            state.Stack.Add(counterStackObj);
+            state.StackPush(counterStackObj);
 
             // The target spell is NOT on the stack (already resolved)
             // Resolve should cause the counterspell to fizzle
@@ -253,7 +253,7 @@ public class StackTargetingTests
                 new Dictionary<ManaColor, int> { [ManaColor.Red] = 1 },
                 new List<TargetInfo>(),
                 0);
-            state.Stack.Add(boltStackObj);
+            state.StackPush(boltStackObj);
 
             // Then put counterspell on top targeting the bolt
             var counterStackObj = new StackObject(
@@ -261,7 +261,7 @@ public class StackTargetingTests
                 new Dictionary<ManaColor, int> { [ManaColor.Blue] = 2 },
                 new List<TargetInfo> { new(targetCard.Id, p1.Id, ZoneType.Stack) },
                 1);
-            state.Stack.Add(counterStackObj);
+            state.StackPush(counterStackObj);
 
             state.CurrentPhase = Phase.MainPhase1;
             state.ActivePlayer = p1;

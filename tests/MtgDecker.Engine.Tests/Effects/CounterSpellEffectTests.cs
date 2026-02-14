@@ -33,7 +33,7 @@ public class CounterSpellEffectTests
         var creatureCard = GameCard.Create("Grizzly Bears", "Creature - Bear");
         var creatureSpell = new StackObject(creatureCard, p2.Id,
             new Dictionary<ManaColor, int>(), new List<TargetInfo>(), 0);
-        state.Stack.Add(creatureSpell);
+        state.StackPush(creatureSpell);
 
         var target = new TargetInfo(creatureCard.Id, p2.Id, ZoneType.Stack);
         var counterSpell = CreateSpell("Counterspell", p1.Id, new List<TargetInfo> { target });
@@ -55,7 +55,7 @@ public class CounterSpellEffectTests
         var creatureCard = GameCard.Create("Grizzly Bears", "Creature - Bear");
         var creatureSpell = new StackObject(creatureCard, p2.Id,
             new Dictionary<ManaColor, int>(), new List<TargetInfo>(), 0);
-        state.Stack.Add(creatureSpell);
+        state.StackPush(creatureSpell);
 
         var target = new TargetInfo(creatureCard.Id, p2.Id, ZoneType.Stack);
         var counterSpell = CreateSpell("Counterspell", p1.Id, new List<TargetInfo> { target });
@@ -117,7 +117,7 @@ public class CounterSpellEffectTests
         var creatureCard = GameCard.Create("Grizzly Bears", "Creature - Bear");
         var creatureSpell = new StackObject(creatureCard, p2.Id,
             new Dictionary<ManaColor, int>(), new List<TargetInfo>(), 0);
-        state.Stack.Add(creatureSpell);
+        state.StackPush(creatureSpell);
 
         var target = new TargetInfo(creatureCard.Id, p2.Id, ZoneType.Stack);
         var counterSpell = CreateSpell("Counterspell", p1.Id, new List<TargetInfo> { target });
@@ -159,7 +159,7 @@ public class CounterSpellEffectTests
         var sorceryCard = GameCard.Create("Divination", "Sorcery");
         var sorcerySpell = new StackObject(sorceryCard, p1.Id,
             new Dictionary<ManaColor, int>(), new List<TargetInfo>(), 0);
-        state.Stack.Add(sorcerySpell);
+        state.StackPush(sorcerySpell);
 
         var target = new TargetInfo(sorceryCard.Id, p1.Id, ZoneType.Stack);
         var counterSpell = CreateSpell("Cancel", p2.Id, new List<TargetInfo> { target });

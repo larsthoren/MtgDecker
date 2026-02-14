@@ -59,7 +59,7 @@ public class TimingValidationTests
         var (engine, state, _, _) = CreateSetup();
         state.CurrentPhase = Phase.MainPhase1;
         state.ActivePlayer = state.Player1;
-        state.Stack.Add(new StackObject(
+        state.StackPush(new StackObject(
             new GameCard { Name = "Dummy" }, Guid.NewGuid(),
             new Dictionary<ManaColor, int>(), new List<TargetInfo>(), 0));
 

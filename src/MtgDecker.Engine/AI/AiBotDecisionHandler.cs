@@ -109,7 +109,7 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
 
         // Priority 4: Cast most expensive affordable spell (accounting for cost modification)
         // Only attempt sorcery-speed casts when the stack is empty (matches engine's CanCastSorcery check)
-        if (gameState.Stack.Count > 0)
+        if (gameState.StackCount > 0)
             return GameAction.Pass(playerId);
 
         var castable = hand

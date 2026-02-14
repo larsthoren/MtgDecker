@@ -75,7 +75,7 @@ public class GameEngine
 
         // Process delayed triggers at end step (e.g., Goblin Pyromancer destroys all Goblins)
         await QueueDelayedTriggersOnStackAsync(GameEvent.EndStep, ct);
-        if (_state.Stack.Count > 0)
+        if (_state.StackCount > 0)
             await ResolveAllTriggersAsync(ct);
 
         // Clear end-of-turn effects and recalculate
@@ -464,8 +464,8 @@ public class GameEngine
                 castPlayer.PendingManaTaps.Clear();
 
                 castPlayer.Hand.RemoveById(castCard.Id);
-                var stackObj = new StackObject(castCard, castPlayer.Id, manaPaid, targets, _state.Stack.Count);
-                _state.Stack.Add(stackObj);
+                var stackObj = new StackObject(castCard, castPlayer.Id, manaPaid, targets, _state.StackCount);
+                _state.StackPush(stackObj);
 
                 action.ManaCostPaid = castEffectiveCost;
                 castPlayer.ActionHistory.Push(action);
@@ -577,12 +577,38 @@ public class GameEngine
                     abilitySource.RemoveCounter(cost.RemoveCounterType.Value);
                 }
 
-                // Find effect target
+                // Find or prompt for effect target
                 GameCard? effectTarget = null;
                 if (action.TargetCardId.HasValue)
                 {
                     effectTarget = _state.Player1.Battlefield.Cards.FirstOrDefault(c => c.Id == action.TargetCardId.Value)
                                 ?? _state.Player2.Battlefield.Cards.FirstOrDefault(c => c.Id == action.TargetCardId.Value);
+                }
+                else if (ability.TargetFilter != null && !action.TargetPlayerId.HasValue)
+                {
+                    // No target was pre-selected — prompt for one
+                    var opponent = _state.GetOpponent(player);
+                    var eligible = player.Battlefield.Cards
+                        .Concat(opponent.Battlefield.Cards)
+                        .Where(c => ability.TargetFilter(c) && !HasShroud(c))
+                        .ToList();
+
+                    if (eligible.Count == 0)
+                    {
+                        _state.Log($"No legal targets for {abilitySource.Name}.");
+                        break;
+                    }
+
+                    var target = await player.DecisionHandler.ChooseTarget(
+                        abilitySource.Name, eligible, opponent.Id, ct);
+
+                    if (target == null)
+                    {
+                        _state.Log($"{player.Name} cancels activating {abilitySource.Name}.");
+                        break;
+                    }
+
+                    effectTarget = eligible.FirstOrDefault(c => c.Id == target.CardId);
                 }
 
                 // Shroud check: cannot target a permanent with shroud
@@ -655,7 +681,7 @@ public class GameEngine
                 foreach (var trigger in cycleDef.CyclingTriggers)
                 {
                     _state.Log($"{cycleCard.Name} triggers: {trigger.Effect.GetType().Name.Replace("Effect", "")}");
-                    _state.Stack.Add(new TriggeredAbilityStackObject(cycleCard, player.Id, trigger.Effect));
+                    _state.StackPush(new TriggeredAbilityStackObject(cycleCard, player.Id, trigger.Effect));
                 }
 
                 player.ActionHistory.Push(action);
@@ -805,7 +831,7 @@ public class GameEngine
     {
         return _state.ActivePlayer.Id == playerId
             && (_state.CurrentPhase == Phase.MainPhase1 || _state.CurrentPhase == Phase.MainPhase2)
-            && _state.Stack.Count == 0;
+            && _state.StackCount == 0;
     }
 
     public bool UndoLastAction(Guid playerId)
@@ -898,7 +924,7 @@ public class GameEngine
         }
 
         // Priority round after attack triggers
-        if (_state.Stack.Count > 0)
+        if (_state.StackCount > 0)
             await RunPriorityAsync(ct);
 
         // Declare Blockers
@@ -964,7 +990,7 @@ public class GameEngine
         }
 
         // Priority round after combat damage triggers
-        if (_state.Stack.Count > 0)
+        if (_state.StackCount > 0)
             await RunPriorityAsync(ct);
 
         // Process deaths (state-based actions)
@@ -978,7 +1004,7 @@ public class GameEngine
         }
 
         // Priority round after dies triggers
-        if (_state.Stack.Count > 0)
+        if (_state.StackCount > 0)
             await RunPriorityAsync(ct);
 
         // Recalculate effects and check if any player lost due to combat damage
@@ -1406,7 +1432,7 @@ public class GameEngine
             if (trigger.Condition != TriggerCondition.Self) continue;
 
             _state.Log($"{source.Name} triggers: {trigger.Effect.GetType().Name.Replace("Effect", "")}");
-            _state.Stack.Add(new TriggeredAbilityStackObject(source, controller.Id, trigger.Effect));
+            _state.StackPush(new TriggeredAbilityStackObject(source, controller.Id, trigger.Effect));
         }
 
         return Task.CompletedTask;
@@ -1423,10 +1449,10 @@ public class GameEngine
 
         // Active player's triggers go on stack first (resolve last — correct per APNAP)
         foreach (var t in activeTriggers)
-            _state.Stack.Add(t);
+            _state.StackPush(t);
         // Non-active player's triggers on top (resolve first via LIFO)
         foreach (var t in nonActiveTriggers)
-            _state.Stack.Add(t);
+            _state.StackPush(t);
 
         return Task.CompletedTask;
     }
@@ -1492,7 +1518,7 @@ public class GameEngine
             if (trigger.Condition != TriggerCondition.SelfAttacks) continue;
 
             _state.Log($"{attacker.Name} triggers: {trigger.Effect.GetType().Name.Replace("Effect", "")}");
-            _state.Stack.Add(new TriggeredAbilityStackObject(attacker, player.Id, trigger.Effect));
+            _state.StackPush(new TriggeredAbilityStackObject(attacker, player.Id, trigger.Effect));
         }
 
         return Task.CompletedTask;
@@ -1506,7 +1532,7 @@ public class GameEngine
         {
             var controller = delayed.ControllerId == _state.Player1.Id ? _state.Player1 : _state.Player2;
             var source = new GameCard { Name = "Delayed Trigger" };
-            _state.Stack.Add(new TriggeredAbilityStackObject(source, controller.Id, delayed.Effect));
+            _state.StackPush(new TriggeredAbilityStackObject(source, controller.Id, delayed.Effect));
             _state.DelayedTriggers.Remove(delayed);
         }
 
@@ -1522,7 +1548,7 @@ public class GameEngine
             if (trigger.Condition == TriggerCondition.SelfLeavesBattlefield)
             {
                 _state.Log($"{card.Name} triggers: {trigger.Effect.GetType().Name.Replace("Effect", "")}");
-                _state.Stack.Add(new TriggeredAbilityStackObject(card, controller.Id, trigger.Effect));
+                _state.StackPush(new TriggeredAbilityStackObject(card, controller.Id, trigger.Effect));
             }
         }
 
@@ -1532,7 +1558,7 @@ public class GameEngine
     /// <summary>Resolves all items on the stack (for testing).</summary>
     internal async Task ResolveAllTriggersAsync(CancellationToken ct = default)
     {
-        while (_state.Stack.Count > 0)
+        while (_state.StackCount > 0)
             await ResolveTopOfStackAsync(ct);
     }
 
@@ -1559,7 +1585,7 @@ public class GameEngine
 
                 if (activePlayerPassed && nonActivePlayerPassed)
                 {
-                    if (_state.Stack.Count > 0)
+                    if (_state.StackCount > 0)
                     {
                         await ResolveTopOfStackAsync(ct);
                         _state.PriorityPlayer = _state.ActivePlayer;
@@ -1619,10 +1645,10 @@ public class GameEngine
 
     private async Task ResolveTopOfStackAsync(CancellationToken ct = default)
     {
-        if (_state.Stack.Count == 0) return;
+        if (_state.StackCount == 0) return;
 
-        var top = _state.Stack[^1];
-        _state.Stack.RemoveAt(_state.Stack.Count - 1);
+        var top = _state.StackPopTop();
+        if (top == null) return;
         var controller = _state.GetPlayer(top.ControllerId);
 
         if (top is TriggeredAbilityStackObject triggered)

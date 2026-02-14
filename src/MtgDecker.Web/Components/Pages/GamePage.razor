@@ -102,7 +102,7 @@ else if (_session.State != null)
         {
             // Check auto-pass for phase stops
             if (_session.State != null && handler.ShouldAutoPass(
-                _session.State.CurrentPhase, _session.State.CombatStep, _session.State.Stack.Count == 0))
+                _session.State.CurrentPhase, _session.State.CombatStep, _session.State.StackCount == 0))
             {
                 var localPlayer = _playerSeat == 1 ? _session.State.Player1 : _session.State.Player2;
                 if (_session.State.PriorityPlayer == localPlayer)

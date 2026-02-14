@@ -368,7 +368,7 @@ public class DelverIntegrationTests
 
         // Manually remove Brainstorm from the stack (simulating it already resolved)
         var brainstormStack = state.Stack.OfType<StackObject>().First(s => s.Card.Name == "Brainstorm");
-        state.Stack.Remove(brainstormStack);
+        state.StackRemove(brainstormStack);
         state.Player1.Graveyard.Add(brainstormStack.Card);
 
         // Resolve remaining stack via RunPriorityAsync (both auto-pass)
