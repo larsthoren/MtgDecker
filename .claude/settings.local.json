@@ -13,7 +13,14 @@
       "Bash(winget:*)",
       "Bash(cmd //c \"winget --version\")",
       "Bash(powershell:*)",
-      "Bash(export PATH=\"/c/Program Files/dotnet:$PATH\")"
+      "Bash(export PATH=\"/c/Program Files/dotnet:$PATH\")",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(taskkill:*)",
+      "Bash(git worktree remove:*)",
+      "Bash(git branch:*)",
+      "Bash(curl:*)",
+      "Bash(tasklist:*)"
     ]
   }
 }

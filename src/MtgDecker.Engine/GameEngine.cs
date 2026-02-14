@@ -19,6 +19,9 @@ public class GameEngine
         _state.Player1.Library.Shuffle();
         _state.Player2.Library.Shuffle();
 
+        DrawCards(_state.Player1, 7);
+        DrawCards(_state.Player2, 7);
+
         await RunMulliganAsync(_state.Player1, ct);
         await RunMulliganAsync(_state.Player2, ct);
 
@@ -1702,7 +1705,8 @@ public class GameEngine
     {
         int mulliganCount = 0;
 
-        DrawCards(player, 7);
+        if (player.Hand.Count == 0)
+            DrawCards(player, 7);
 
         const int maxMulligans = 7;
 

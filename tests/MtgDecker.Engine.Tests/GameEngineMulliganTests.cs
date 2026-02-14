@@ -105,4 +105,18 @@ public class GameEngineMulliganTests
         state.Player1.Hand.Count.Should().Be(0);
         state.GameLog.Should().Contain(msg => msg.Contains("mulliganed to 0"));
     }
+
+    [Fact]
+    public async Task StartGameAsync_Player2HasOpeningHandDuringPlayer1Mulligan()
+    {
+        var engine = CreateEngineWithDecks(out var state, out var p1Handler, out _);
+
+        int p2HandCountDuringP1Mulligan = -1;
+        p1Handler.OnBeforeMulliganDecision = () => p2HandCountDuringP1Mulligan = state.Player2.Hand.Count;
+
+        await engine.StartGameAsync();
+
+        p2HandCountDuringP1Mulligan.Should().Be(7,
+            "Player 2 should have opening hand drawn before Player 1's mulligan decision");
+    }
 }
