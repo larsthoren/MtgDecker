@@ -786,10 +786,11 @@ public class GameEngine
 
         if (eligible.Count > 0)
         {
-            var chosenId = await player.DecisionHandler.ChooseCard(
-                eligible, $"Choose a target for {playCard.Name}", optional: false, ct);
-            if (chosenId.HasValue)
-                playCard.AttachedTo = chosenId.Value;
+            var opponent = _state.GetOpponent(player);
+            var target = await player.DecisionHandler.ChooseTarget(
+                playCard.Name, eligible, opponent.Id, ct);
+            if (target != null)
+                playCard.AttachedTo = target.CardId;
         }
 
         if (!playCard.AttachedTo.HasValue)
