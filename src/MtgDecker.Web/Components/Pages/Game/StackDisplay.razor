@@ -3,32 +3,66 @@
 
 @if (Stack.Count > 0)
 {
-    <MudPaper Class="pa-2 my-1" Outlined="true" Style="background-color: rgba(128,0,128,0.1);">
-        <MudText Typo="Typo.caption" Class="mb-1">
-            <MudIcon Icon="@Icons.Material.Filled.Layers" Size="Size.Small" /> Stack (@Stack.Count)
-        </MudText>
-        @for (int i = Stack.Count - 1; i >= 0; i--)
-        {
-            var item = Stack[i];
-            var isTop = i == Stack.Count - 1;
-            <MudChip T="string" Color="@(isTop ? Color.Secondary : Color.Default)" Size="Size.Small" Class="ma-1">
+    <div class="stack-floating-box">
+        <div class="stack-header">
+            <MudIcon Icon="@Icons.Material.Filled.Layers" Size="Size.Small" />
+            <span>The Stack (@Stack.Count)</span>
+        </div>
+        <div class="stack-cards">
+            @for (int i = Stack.Count - 1; i >= 0; i--)
+            {
+                var item = Stack[i];
+                var isTop = i == Stack.Count - 1;
+                var isFirst = i == Stack.Count - 1; // first rendered (topmost in stack)
+
                 @if (item is StackObject spell)
                 {
-                    @spell.Card.Name
-                    @if (spell.Targets.Count > 0)
-                    {
-                        <MudText Typo="Typo.caption"> → target</MudText>
-                    }
+                    <div class="stack-card-entry @(isFirst ? "" : "stack-card-overlap") @(IsTargeting ? "stack-targetable" : "")"
+                         @onclick="() => HandleStackClick(spell.Card)">
+                        <CardDisplay Name="@spell.Card.Name"
+                                     ImageUrl="@spell.Card.ImageUrl"
+                                     CardSize="100"
+                                     Clickable="@IsTargeting"
+                                     Power="@spell.Card.Power"
+                                     Toughness="@spell.Card.Toughness" />
+                        @if (spell.Targets.Count > 0)
+                        {
+                            <div class="stack-target-badge">targeted</div>
+                        }
+                        @if (isTop)
+                        {
+                            <div class="stack-resolving-badge">resolves next</div>
+                        }
+                    </div>
                 }
                 else if (item is TriggeredAbilityStackObject triggered)
                 {
-                    @($"{triggered.Source.Name} (trigger)")
+                    <div class="stack-card-entry @(isFirst ? "" : "stack-card-overlap") @(IsTargeting ? "stack-targetable" : "")"
+                         @onclick="() => HandleStackClick(triggered.Source)">
+                        <CardDisplay Name="@triggered.Source.Name"
+                                     ImageUrl="@triggered.Source.ImageUrl"
+                                     CardSize="100"
+                                     Clickable="@IsTargeting" />
+                        <div class="stack-trigger-badge">trigger</div>
+                        @if (isTop)
+                        {
+                            <div class="stack-resolving-badge">resolves next</div>
+                        }
+                    </div>
                 }
-            </MudChip>
-        }
-    </MudPaper>
+            }
+        </div>
+    </div>
 }
 
 @code {
     [Parameter] public List<IStackObject> Stack { get; set; } = new();
+    [Parameter] public bool IsTargeting { get; set; }
+    [Parameter] public EventCallback<GameCard> OnStackCardClicked { get; set; }
+
+    private async Task HandleStackClick(GameCard card)
+    {
+        if (IsTargeting)
+            await OnStackCardClicked.InvokeAsync(card);
+    }
 }

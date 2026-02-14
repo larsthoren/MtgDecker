@@ -1,0 +1,115 @@
+/* Floating stack box */
+.stack-floating-box {
+    position: fixed;
+    top: 50%;
+    right: 16px;
+    transform: translateY(-50%);
+    z-index: 300;
+    border: 2px solid #cc3333;
+    border-radius: 8px;
+    background: rgba(20, 10, 10, 0.95);
+    box-shadow: 0 4px 24px rgba(200, 50, 50, 0.3), 0 0 12px rgba(200, 50, 50, 0.15);
+    padding: 8px;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+/* Header */
+.stack-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px 8px;
+    color: #ff6666;
+    font-weight: 700;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid rgba(200, 50, 50, 0.3);
+    margin-bottom: 8px;
+}
+
+/* Card stack container */
+.stack-cards {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* Each card entry */
+.stack-card-entry {
+    position: relative;
+    z-index: 1;
+    transition: z-index 0s, filter 0.15s ease;
+}
+
+/* Overlapping cards (not the first/top one) */
+.stack-card-overlap {
+    margin-top: -100px;
+}
+
+/* On hover, bring to front */
+.stack-card-entry:hover {
+    z-index: 20;
+    filter: brightness(1.1);
+}
+
+/* Targetable state (glow) */
+.stack-targetable {
+    cursor: pointer;
+}
+
+.stack-targetable:hover {
+    outline: 2px solid #ff9900;
+    outline-offset: 2px;
+    border-radius: 6px;
+}
+
+/* Badge: "targeted" */
+.stack-target-badge {
+    position: absolute;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(255, 136, 0, 0.9);
+    color: white;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    z-index: 5;
+}
+
+/* Badge: "trigger" */
+.stack-trigger-badge {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    background: rgba(128, 0, 200, 0.9);
+    color: white;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    z-index: 5;
+}
+
+/* Badge: "resolves next" */
+.stack-resolving-badge {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    background: rgba(220, 50, 50, 0.9);
+    color: white;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    z-index: 5;
+    animation: pulse-glow 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}

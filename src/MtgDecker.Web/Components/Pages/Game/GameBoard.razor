@@ -54,34 +54,66 @@
         <div class="battlefield-row lands-row">
             @foreach (var card in OpponentPlayer.Battlefield.Cards.Where(c => c.IsLand))
             {
-                <CardDisplay Name="@card.Name"
-                             ImageUrl="@card.ImageUrl"
-                             Tapped="@card.IsTapped"
-                             CardSize="90"
-                             Clickable="@(Handler?.IsWaitingForTarget == true)"
-                             IsAttacking="@(State.Combat?.Attackers.Contains(card.Id) == true)"
-                             IsBlocking="@IsCardBlockingAnywhere(card.Id)"
-                             Power="@card.Power"
-                             Toughness="@card.Toughness"
-                             DamageMarked="@card.DamageMarked"
-                             OnClick="async () => await HandleOpponentCardClick(card)" />
+                var attachments = GetAttachedCards(OpponentPlayer, card.Id);
+                <div class="permanent-stack">
+                    @foreach (var aura in attachments)
+                    {
+                        <div class="attached-aura attached-aura-sm">
+                            <CardDisplay Name="@aura.Name"
+                                         ImageUrl="@aura.ImageUrl"
+                                         Tapped="@aura.IsTapped"
+                                         CardSize="90"
+                                         Clickable="@(Handler?.IsWaitingForTarget == true)"
+                                         OnClick="async () => await HandleOpponentCardClick(aura)" />
+                        </div>
+                    }
+                    <div class="host-card">
+                        <CardDisplay Name="@card.Name"
+                                     ImageUrl="@card.ImageUrl"
+                                     Tapped="@card.IsTapped"
+                                     CardSize="90"
+                                     Clickable="@(Handler?.IsWaitingForTarget == true)"
+                                     IsAttacking="@(State.Combat?.Attackers.Contains(card.Id) == true)"
+                                     IsBlocking="@IsCardBlockingAnywhere(card.Id)"
+                                     Power="@card.Power"
+                                     Toughness="@card.Toughness"
+                                     DamageMarked="@card.DamageMarked"
+                                     OnClick="async () => await HandleOpponentCardClick(card)" />
+                    </div>
+                </div>
             }
         </div>
         <div class="battlefield-row nonlands-row">
-            @foreach (var card in OpponentPlayer.Battlefield.Cards.Where(c => !c.IsLand))
+            @foreach (var card in OpponentPlayer.Battlefield.Cards.Where(c => !c.IsLand && !c.AttachedTo.HasValue))
             {
-                <CardDisplay Name="@card.Name"
-                             ImageUrl="@card.ImageUrl"
-                             Tapped="@card.IsTapped"
-                             CardSize="90"
-                             Clickable="@(Handler?.IsWaitingForTarget == true)"
-                             IsAttacking="@(State.Combat?.Attackers.Contains(card.Id) == true)"
-                             IsBlocking="@IsCardBlockingAnywhere(card.Id)"
-                             Power="@card.Power"
-                             Toughness="@card.Toughness"
-                             DamageMarked="@card.DamageMarked"
-                             SummoningSick="@(card.IsCreature && card.HasSummoningSickness(State.TurnNumber))"
-                             OnClick="async () => await HandleOpponentCardClick(card)" />
+                var attachments = GetAttachedCards(OpponentPlayer, card.Id);
+                <div class="permanent-stack">
+                    @foreach (var aura in attachments)
+                    {
+                        <div class="attached-aura attached-aura-sm">
+                            <CardDisplay Name="@aura.Name"
+                                         ImageUrl="@aura.ImageUrl"
+                                         Tapped="@aura.IsTapped"
+                                         CardSize="90"
+                                         Clickable="@(Handler?.IsWaitingForTarget == true)"
+                                         OnClick="async () => await HandleOpponentCardClick(aura)" />
+                        </div>
+                    }
+                    <div class="host-card">
+                        <CardDisplay Name="@card.Name"
+                                     ImageUrl="@card.ImageUrl"
+                                     Tapped="@card.IsTapped"
+                                     CardSize="90"
+                                     Clickable="@(Handler?.IsWaitingForTarget == true)"
+                                     IsAttacking="@(State.Combat?.Attackers.Contains(card.Id) == true)"
+                                     IsBlocking="@IsCardBlockingAnywhere(card.Id)"
+                                     Power="@card.Power"
+                                     Toughness="@card.Toughness"
+                                     DamageMarked="@card.DamageMarked"
+                                     SummoningSick="@(card.IsCreature && card.HasSummoningSickness(State.TurnNumber))"
+                                     OnClick="async () => await HandleOpponentCardClick(card)" />
+                    </div>
+                </div>
             }
         </div>
         @if (OpponentPlayer.Battlefield.Cards.Count == 0)
@@ -90,7 +122,7 @@
         }
     </div>
 
-    @* Row 3: Phase bar + stack *@
+    @* Row 3: Phase bar *@
     <div class="phase-stack-row">
         <PhaseBar CurrentPhase="@State.CurrentPhase"
                   CurrentCombatStep="@State.CombatStep"
@@ -105,29 +137,47 @@
                   OnPass="HandlePassOrConfirm"
                   OnSkipCombat="HandleSkipCombat"
                   OnSurrender="() => OnSurrender.InvokeAsync()" />
-
-        <StackDisplay Stack="@State.Stack" />
     </div>
+
+    @* Floating stack display (fixed position, right side) *@
+    <StackDisplay Stack="@State.Stack"
+                  IsTargeting="@(Handler?.IsWaitingForTarget == true)"
+                  OnStackCardClicked="HandleStackCardTarget" />
 
     @* Row 4: Player battlefield *@
     <div class="player-battlefield">
         <div class="battlefield-row player-creatures">
-            @foreach (var card in LocalPlayer.Battlefield.Cards.Where(c => !c.IsLand))
+            @foreach (var card in LocalPlayer.Battlefield.Cards.Where(c => !c.IsLand && !c.AttachedTo.HasValue))
             {
                 var isEligibleAttacker = Handler?.IsWaitingForAttackers == true && IsLocalActive
                     && Handler?.EligibleAttackers?.Any(c => c.Id == card.Id) == true;
                 var isEligibleBlocker = Handler?.IsWaitingForBlockers == true && IsLocalDefending
                     && Handler?.EligibleBlockers?.Any(c => c.Id == card.Id) == true;
-                <CardDisplay Name="@card.Name" ImageUrl="@card.ImageUrl" Tapped="@card.IsTapped"
-                             Power="@card.Power" Toughness="@card.Toughness" DamageMarked="@card.DamageMarked"
-                             CardSize="130"
-                             Selected="@(_selectedCard?.Id == card.Id)"
-                             IsAttacking="@(_selectedAttackers.Contains(card.Id) || State.Combat?.Attackers.Contains(card.Id) == true)"
-                             IsBlocking="@(_blockerAssignments.ContainsKey(card.Id) || IsCardBlockingAnywhere(card.Id))"
-                             Eligible="@(isEligibleAttacker || isEligibleBlocker)"
-                             SummoningSick="@(card.IsCreature && card.HasSummoningSickness(State.TurnNumber))"
-                             Clickable="true"
-                             OnClick="async () => await HandleBattlefieldClick(card, isEligibleAttacker, isEligibleBlocker)" />
+                var attachments = GetAttachedCards(LocalPlayer, card.Id);
+                <div class="permanent-stack">
+                    @foreach (var aura in attachments)
+                    {
+                        <div class="attached-aura">
+                            <CardDisplay Name="@aura.Name" ImageUrl="@aura.ImageUrl" Tapped="@aura.IsTapped"
+                                         CardSize="130"
+                                         Selected="@(_selectedCard?.Id == aura.Id)"
+                                         Clickable="true"
+                                         OnClick="async () => await HandleBattlefieldClick(aura, false, false)" />
+                        </div>
+                    }
+                    <div class="host-card">
+                        <CardDisplay Name="@card.Name" ImageUrl="@card.ImageUrl" Tapped="@card.IsTapped"
+                                     Power="@card.Power" Toughness="@card.Toughness" DamageMarked="@card.DamageMarked"
+                                     CardSize="130"
+                                     Selected="@(_selectedCard?.Id == card.Id)"
+                                     IsAttacking="@(_selectedAttackers.Contains(card.Id) || State.Combat?.Attackers.Contains(card.Id) == true)"
+                                     IsBlocking="@(_blockerAssignments.ContainsKey(card.Id) || IsCardBlockingAnywhere(card.Id))"
+                                     Eligible="@(isEligibleAttacker || isEligibleBlocker)"
+                                     SummoningSick="@(card.IsCreature && card.HasSummoningSickness(State.TurnNumber))"
+                                     Clickable="true"
+                                     OnClick="async () => await HandleBattlefieldClick(card, isEligibleAttacker, isEligibleBlocker)" />
+                    </div>
+                </div>
             }
         </div>
         <div class="battlefield-row player-lands">
@@ -138,20 +188,33 @@
                     && LocalPlayer.ActionHistory.Peek().Type == ActionType.TapCard
                     && LocalPlayer.ActionHistory.Peek().CardId == card.Id
                     && LocalPlayer.PendingManaTaps.Contains(card.Id);
-                <div class="land-wrapper">
-                    <CardDisplay Name="@card.Name" ImageUrl="@card.ImageUrl" Tapped="@card.IsTapped"
-                                 CardSize="130"
-                                 Selected="@(_selectedCard?.Id == card.Id)"
-                                 Clickable="true"
-                                 OnClick="async () => await HandleLandClick(card)" />
-                    @if (isUndoCandidate)
+                var attachments = GetAttachedCards(LocalPlayer, card.Id);
+                <div class="permanent-stack">
+                    @foreach (var aura in attachments)
                     {
-                        <button class="untap-affordance" @onclick="HandleUntapLand"
-                                @onclick:stopPropagation="true"
-                                title="Untap (unspent mana)">
-                            &#x21B6;
-                        </button>
+                        <div class="attached-aura">
+                            <CardDisplay Name="@aura.Name" ImageUrl="@aura.ImageUrl" Tapped="@aura.IsTapped"
+                                         CardSize="130"
+                                         Selected="@(_selectedCard?.Id == aura.Id)"
+                                         Clickable="true"
+                                         OnClick="async () => await HandleBattlefieldClick(aura, false, false)" />
+                        </div>
                     }
+                    <div class="land-wrapper host-card">
+                        <CardDisplay Name="@card.Name" ImageUrl="@card.ImageUrl" Tapped="@card.IsTapped"
+                                     CardSize="130"
+                                     Selected="@(_selectedCard?.Id == card.Id)"
+                                     Clickable="true"
+                                     OnClick="async () => await HandleLandClick(card)" />
+                        @if (isUndoCandidate)
+                        {
+                            <button class="untap-affordance" @onclick="HandleUntapLand"
+                                    @onclick:stopPropagation="true"
+                                    title="Untap (unspent mana)">
+                                &#x21B6;
+                            </button>
+                        }
+                    </div>
                 </div>
             }
         </div>
@@ -562,6 +625,14 @@
             return;
         }
 
+        // Untapped fetch lands: activate fetch ability
+        if (!card.IsTapped && card.FetchAbility != null)
+        {
+            await OnAction.InvokeAsync(GameAction.ActivateFetch(LocalPlayer.Id, card.Id));
+            ClearSelection();
+            return;
+        }
+
         await SelectCard(card, ZoneType.Battlefield);
     }
 
@@ -710,6 +781,15 @@
         Handler?.CancelTarget();
     }
 
+    private void HandleStackCardTarget(GameCard card)
+    {
+        if (Handler?.IsWaitingForTarget == true)
+        {
+            var ownerId = LocalPlayer.Id; // Stack spells use controller from stack context
+            Handler.SubmitTarget(new TargetInfo(card.Id, ownerId, ZoneType.Stack));
+        }
+    }
+
     private Task HandleOpponentCardClick(GameCard card)
     {
         if (Handler?.IsWaitingForTarget == true)
@@ -753,6 +833,9 @@
 
     private bool IsCardBlockingAnywhere(Guid cardId) =>
         State.Combat?.Attackers.Any(a => State.Combat.GetBlockers(a).Contains(cardId)) == true;
+
+    private IReadOnlyList<GameCard> GetAttachedCards(Player player, Guid hostId) =>
+        player.Battlefield.Cards.Where(c => c.AttachedTo == hostId).ToList();
 
     private static readonly (ManaColor color, string symbol)[] ManaSymbols =
     [
