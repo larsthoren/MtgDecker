@@ -72,7 +72,7 @@ public class AsyncSpellEffectTests
             var stackObj = new StackObject(spellCard, state.Player1.Id,
                 new Dictionary<ManaColor, int> { [ManaColor.Blue] = 1 },
                 new List<TargetInfo>(), 0);
-            state.Stack.Add(stackObj);
+            state.StackPush(stackObj);
 
             // Both pass priority -> stack resolves
             h1.EnqueueAction(GameAction.Pass(state.Player1.Id));

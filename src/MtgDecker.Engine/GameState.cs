@@ -15,7 +15,40 @@ public class GameState
     public bool IsFirstTurn { get; set; }
     public CombatStep CombatStep { get; set; } = CombatStep.None;
     public CombatState? Combat { get; set; }
-    public List<IStackObject> Stack { get; } = new();
+    private readonly List<IStackObject> _stack = new();
+    private readonly object _stackLock = new();
+
+    /// <summary>
+    /// Thread-safe snapshot of the stack for UI rendering.
+    /// Engine code should use StackPush/StackPopTop/StackPeekTop for mutations.
+    /// </summary>
+    public List<IStackObject> Stack
+    {
+        get { lock (_stackLock) { return _stack.ToList(); } }
+    }
+
+    public int StackCount { get { lock (_stackLock) { return _stack.Count; } } }
+
+    public void StackPush(IStackObject item) { lock (_stackLock) { _stack.Add(item); } }
+
+    public bool StackRemove(IStackObject item) { lock (_stackLock) { return _stack.Remove(item); } }
+
+    public IStackObject? StackPeekTop()
+    {
+        lock (_stackLock) { return _stack.Count > 0 ? _stack[^1] : null; }
+    }
+
+    public IStackObject? StackPopTop()
+    {
+        lock (_stackLock)
+        {
+            if (_stack.Count == 0) return null;
+            var top = _stack[^1];
+            _stack.RemoveAt(_stack.Count - 1);
+            return top;
+        }
+    }
+
     public List<ContinuousEffect> ActiveEffects { get; } = new();
     public List<DelayedTrigger> DelayedTriggers { get; } = new();
     public event Action? OnStateChanged;

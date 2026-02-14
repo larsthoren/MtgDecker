@@ -33,7 +33,7 @@ public class StackResolutionTests
         var goblin = GameCard.Create("Mogg Fanatic", "Creature — Goblin");
         var stackObj = new StackObject(goblin, state.Player1.Id,
             new Dictionary<ManaColor, int>(), new List<TargetInfo>(), 0);
-        state.Stack.Add(stackObj);
+        state.StackPush(stackObj);
 
         // Both pass -> resolve -> creature enters battlefield
         // Then both pass again -> stack empty -> advance
@@ -78,7 +78,7 @@ public class StackResolutionTests
         var stackObj = new StackObject(swords, state.Player1.Id,
             new Dictionary<ManaColor, int> { [ManaColor.White] = 1 },
             new List<TargetInfo> { new(creature.Id, state.Player2.Id, ZoneType.Battlefield) }, 0);
-        state.Stack.Add(stackObj);
+        state.StackPush(stackObj);
 
         h1.EnqueueAction(GameAction.Pass(state.Player1.Id));
         h2.EnqueueAction(GameAction.Pass(state.Player2.Id));
@@ -101,9 +101,9 @@ public class StackResolutionTests
 
         var card1 = GameCard.Create("Mogg Fanatic", "Creature — Goblin");
         var card2 = GameCard.Create("Goblin Lackey", "Creature — Goblin");
-        state.Stack.Add(new StackObject(card1, state.Player1.Id,
+        state.StackPush(new StackObject(card1, state.Player1.Id,
             new Dictionary<ManaColor, int>(), new List<TargetInfo>(), 0));
-        state.Stack.Add(new StackObject(card2, state.Player1.Id,
+        state.StackPush(new StackObject(card2, state.Player1.Id,
             new Dictionary<ManaColor, int>(), new List<TargetInfo>(), 1));
 
         // Both pass -> resolve card2 -> priority -> both pass -> resolve card1 -> both pass -> return
@@ -132,7 +132,7 @@ public class StackResolutionTests
         state.Player2.Battlefield.Add(creature);
 
         var swords = GameCard.Create("Swords to Plowshares");
-        state.Stack.Add(new StackObject(swords, state.Player1.Id,
+        state.StackPush(new StackObject(swords, state.Player1.Id,
             new Dictionary<ManaColor, int> { [ManaColor.White] = 1 },
             new List<TargetInfo> { new(creature.Id, state.Player2.Id, ZoneType.Battlefield) }, 0));
 

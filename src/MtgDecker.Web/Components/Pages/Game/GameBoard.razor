@@ -149,7 +149,7 @@
                   IsWaitingForCombat="@IsWaitingForCombat"
                   IsWaitingForAttackers="@(IsLocalActive && Handler?.IsWaitingForAttackers == true)"
                   IsWaitingForBlockers="@(IsLocalDefending && Handler?.IsWaitingForBlockers == true)"
-                  StackCount="@State.Stack.Count"
+                  StackCount="@State.StackCount"
                   StopSettings="@_phaseStops"
                   OnPass="HandlePassOrConfirm"
                   OnSkipCombat="HandleSkipCombat"

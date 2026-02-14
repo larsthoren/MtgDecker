@@ -18,7 +18,7 @@ public class CounterSpellEffect : SpellEffect
         }
 
         // Remove from stack
-        state.Stack.Remove(targetSpell);
+        state.StackRemove(targetSpell);
 
         // Move countered card to owner's graveyard
         var owner = state.GetPlayer(targetSpell.ControllerId);
