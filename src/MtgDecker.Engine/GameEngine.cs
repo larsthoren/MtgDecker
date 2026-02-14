@@ -235,6 +235,7 @@ public class GameEngine
 
                     if (tapTarget.ManaAbility != null)
                     {
+                        action.IsManaAbility = true;
                         var ability = tapTarget.ManaAbility;
                         if (ability.Type == ManaAbilityType.Fixed)
                         {
@@ -1580,10 +1581,20 @@ public class GameEngine
                 // (ExecuteAction pushes to ActionHistory on success, returns early on failure)
                 if (player.ActionHistory.Count > historyCount)
                 {
-                    activePlayerPassed = false;
-                    nonActivePlayerPassed = false;
-                    consecutiveRejections = 0;
-                    _state.PriorityPlayer = _state.ActivePlayer;
+                    // Mana abilities don't use the stack and don't pass priority (MTG rule 605).
+                    // The player retains priority and can continue acting.
+                    if (action.IsManaAbility)
+                    {
+                        consecutiveRejections = 0;
+                        // Priority stays with the same player — no flag reset
+                    }
+                    else
+                    {
+                        activePlayerPassed = false;
+                        nonActivePlayerPassed = false;
+                        consecutiveRejections = 0;
+                        _state.PriorityPlayer = _state.ActivePlayer;
+                    }
                 }
                 else
                 {

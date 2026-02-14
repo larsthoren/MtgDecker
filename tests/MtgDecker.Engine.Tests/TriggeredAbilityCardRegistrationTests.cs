@@ -116,7 +116,8 @@ public class TriggeredAbilityCardRegistrationTests
     {
         var card = GameCard.Create("Argothian Enchantress");
         card.CardTypes.Should().HaveFlag(CardType.Creature);
-        card.CardTypes.Should().HaveFlag(CardType.Enchantment);
+        card.CardTypes.Should().NotHaveFlag(CardType.Enchantment,
+            "Argothian Enchantress is Creature — Human Druid, not an enchantment creature");
         card.Subtypes.Should().Contain("Human");
         card.Subtypes.Should().Contain("Druid");
     }
