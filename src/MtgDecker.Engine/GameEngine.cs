@@ -1536,6 +1536,7 @@ public class GameEngine
         _state.PriorityPlayer = _state.ActivePlayer;
         bool activePlayerPassed = false;
         bool nonActivePlayerPassed = false;
+        int consecutiveRejections = 0;
 
         while (true)
         {
@@ -1578,17 +1579,24 @@ public class GameEngine
                 {
                     activePlayerPassed = false;
                     nonActivePlayerPassed = false;
+                    consecutiveRejections = 0;
                     _state.PriorityPlayer = _state.ActivePlayer;
                 }
                 else
                 {
-                    // Action was rejected by the engine — treat as pass to avoid infinite loops
-                    if (_state.PriorityPlayer == _state.ActivePlayer)
-                        activePlayerPassed = true;
-                    else
-                        nonActivePlayerPassed = true;
-
-                    _state.PriorityPlayer = _state.GetOpponent(_state.PriorityPlayer);
+                    // Action was rejected — re-prompt same player so they can tap mana
+                    // or choose a different action. After 3 consecutive rejections, auto-pass
+                    // to prevent infinite loops with AI bots.
+                    consecutiveRejections++;
+                    if (consecutiveRejections >= 3)
+                    {
+                        consecutiveRejections = 0;
+                        if (_state.PriorityPlayer == _state.ActivePlayer)
+                            activePlayerPassed = true;
+                        else
+                            nonActivePlayerPassed = true;
+                        _state.PriorityPlayer = _state.GetOpponent(_state.PriorityPlayer);
+                    }
                 }
             }
         }
