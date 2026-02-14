@@ -80,12 +80,13 @@ public class CardDefinitionsTests
     }
 
     [Fact]
-    public void ArgothianEnchantress_HasCreatureAndEnchantmentTypes()
+    public void ArgothianEnchantress_IsCreatureOnly()
     {
         CardDefinitions.TryGet("Argothian Enchantress", out var def);
 
         def!.CardTypes.Should().HaveFlag(CardType.Creature);
-        def.CardTypes.Should().HaveFlag(CardType.Enchantment);
+        def.CardTypes.Should().NotHaveFlag(CardType.Enchantment,
+            "Argothian Enchantress is Creature — Human Druid, not an enchantment creature");
     }
 
     [Fact]

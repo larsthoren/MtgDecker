@@ -34,8 +34,11 @@ public class TestDecisionHandler : IPlayerDecisionHandler
     public void EnqueueTarget(TargetInfo? target) => _targetQueue.Enqueue(target);
     public void EnqueueCardChoice(Guid? cardId) => _cardChoiceQueue.Enqueue(cardId);
 
+    public Action? OnBeforeAction { get; set; }
+
     public Task<GameAction> GetAction(GameState gameState, Guid playerId, CancellationToken ct = default)
     {
+        OnBeforeAction?.Invoke();
         if (_actions.Count == 0)
             return Task.FromResult(GameAction.Pass(playerId));
         return Task.FromResult(_actions.Dequeue());

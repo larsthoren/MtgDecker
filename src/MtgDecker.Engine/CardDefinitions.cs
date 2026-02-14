@@ -118,7 +118,7 @@ public static class CardDefinitions
             },
 
             // === Enchantress deck ===
-            ["Argothian Enchantress"] = new(ManaCost.Parse("{1}{G}"), null, 0, 1, CardType.Creature | CardType.Enchantment)
+            ["Argothian Enchantress"] = new(ManaCost.Parse("{1}{G}"), null, 0, 1, CardType.Creature)
             {
                 Subtypes = ["Human", "Druid"],
                 Triggers = [new Trigger(GameEvent.SpellCast, TriggerCondition.ControllerCastsEnchantment, new DrawCardEffect())],
