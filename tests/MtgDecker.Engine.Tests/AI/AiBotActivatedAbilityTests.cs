@@ -9,8 +9,8 @@ public class AiBotActivatedAbilityTests
 {
     private static (GameState state, Player bot, Player opponent) CreateGameWithBot()
     {
-        var botHandler = new AiBotDecisionHandler();
-        var opponentHandler = new AiBotDecisionHandler();
+        var botHandler = new AiBotDecisionHandler { ActionDelayMs = 0 };
+        var opponentHandler = new AiBotDecisionHandler { ActionDelayMs = 0 };
         var bot = new Player(Guid.NewGuid(), "Bot", botHandler);
         var opponent = new Player(Guid.NewGuid(), "Opponent", opponentHandler);
         var state = new GameState(bot, opponent);

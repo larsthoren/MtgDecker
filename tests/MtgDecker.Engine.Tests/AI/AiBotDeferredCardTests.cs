@@ -9,8 +9,8 @@ public class AiBotDeferredCardTests
 {
     private static (GameState state, Player bot, Player opponent) CreateGameWithBot()
     {
-        var botHandler = new AiBotDecisionHandler();
-        var opponentHandler = new AiBotDecisionHandler();
+        var botHandler = new AiBotDecisionHandler { ActionDelayMs = 0 };
+        var opponentHandler = new AiBotDecisionHandler { ActionDelayMs = 0 };
         var bot = new Player(Guid.NewGuid(), "Bot", botHandler);
         var opponent = new Player(Guid.NewGuid(), "Opponent", opponentHandler);
         var state = new GameState(bot, opponent);
@@ -23,7 +23,7 @@ public class AiBotDeferredCardTests
     {
         // AI's ChooseCard method is used for upkeep costs (e.g., Solitary Confinement discard).
         // When optional=true and the hand has cards, the AI should return a card (not null).
-        var bot = new AiBotDecisionHandler();
+        var bot = new AiBotDecisionHandler { ActionDelayMs = 0 };
 
         var cards = new List<GameCard>
         {
