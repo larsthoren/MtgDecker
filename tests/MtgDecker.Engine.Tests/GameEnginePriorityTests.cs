@@ -77,6 +77,31 @@ public class GameEnginePriorityTests
     }
 
     [Fact]
+    public async Task RunPriorityAsync_RejectedAction_PlayerRetainsPriority()
+    {
+        var engine = CreateEngine(out var state, out var p1Handler, out var p2Handler);
+
+        // Set up: player has Wild Growth in hand but no mana (CastSpell will be rejected)
+        var wildGrowth = GameCard.Create("Wild Growth", "Enchantment");
+        state.Player1.Hand.Add(wildGrowth);
+
+        // Also has a Forest to play after the rejected cast
+        var forest = GameCard.Create("Forest", "Basic Land — Forest");
+        state.Player1.Hand.Add(forest);
+
+        // Action 1: Try to cast Wild Growth with no mana (rejected)
+        // Action 2: Play Forest (should succeed because player retains priority)
+        p1Handler.EnqueueAction(GameAction.CastSpell(state.Player1.Id, wildGrowth.Id));
+        p1Handler.EnqueueAction(GameAction.PlayCard(state.Player1.Id, forest.Id));
+
+        await engine.RunPriorityAsync();
+
+        // Forest should be on battlefield — player got priority back after rejection
+        state.Player1.Battlefield.Cards.Should().Contain(c => c.Name == "Forest");
+        state.GameLog.Should().Contain(l => l.Contains("Not enough mana") || l.Contains("Cannot cast"));
+    }
+
+    [Fact]
     public async Task RunPriorityAsync_ActivePlayerStartsWithPriority()
     {
         var engine = CreateEngine(out var state, out var p1Handler, out _);

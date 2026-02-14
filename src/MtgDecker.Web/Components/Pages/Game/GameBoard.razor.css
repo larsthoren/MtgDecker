@@ -158,6 +158,42 @@
     overflow-y: auto;
 }
 
+/* Permanent stack: host card with attached auras */
+.permanent-stack {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* Aura peek: card rendered above host, mostly hidden behind it */
+.attached-aura {
+    position: relative;
+    z-index: 1;
+    transition: z-index 0s, filter 0.15s ease;
+}
+
+/* Host card baseline — always needs z-index above auras */
+.host-card {
+    position: relative;
+    z-index: 2;
+}
+
+/* Only overlap when there's an aura above (adjacent sibling) */
+.attached-aura + .host-card {
+    margin-top: -152px; /* 130px * 1.4 - 30px peek = ~152px overlap */
+}
+
+/* On hover, aura rises to front — full card visible */
+.attached-aura:hover {
+    z-index: 20;
+    filter: brightness(1.1);
+}
+
+/* Smaller cards (opponent battlefield, 90px) — override the 130px overlap */
+.attached-aura-sm + .host-card {
+    margin-top: -106px !important; /* 90px * 1.4 - 20px peek = ~106px overlap */
+}
+
 /* Land wrapper with untap affordance */
 .land-wrapper {
     position: relative;
