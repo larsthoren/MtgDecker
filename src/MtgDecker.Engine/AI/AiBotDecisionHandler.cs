@@ -12,20 +12,32 @@ namespace MtgDecker.Engine.AI;
 public class AiBotDecisionHandler : IPlayerDecisionHandler
 {
     /// <summary>
+    /// Delay in milliseconds before each AI decision, allowing human players
+    /// to follow the action. Set to 0 for instant decisions (e.g. simulations).
+    /// </summary>
+    public int ActionDelayMs { get; set; } = 1000;
+
+    private async Task DelayAsync(CancellationToken ct)
+    {
+        if (ActionDelayMs > 0)
+            await Task.Delay(ActionDelayMs, ct);
+    }
+
+    /// <summary>
     /// Selects an action using a land-first, fetch, tap-lands, greedy-cast heuristic.
     /// Only acts during main phases. Prioritizes playing a land (if available
     /// and land drop unused), then activates fetch lands if spells are in hand,
     /// then taps untapped lands with mana abilities, then casts the most expensive
     /// affordable spell.
     /// </summary>
-    public Task<GameAction> GetAction(GameState gameState, Guid playerId, CancellationToken ct = default)
+    public async Task<GameAction> GetAction(GameState gameState, Guid playerId, CancellationToken ct = default)
     {
         if (gameState.CurrentPhase != Phase.MainPhase1 && gameState.CurrentPhase != Phase.MainPhase2)
-            return Task.FromResult(GameAction.Pass(playerId));
+            return GameAction.Pass(playerId);
 
         // Non-active player passes priority (this bot doesn't play instants)
         if (gameState.ActivePlayer.Id != playerId)
-            return Task.FromResult(GameAction.Pass(playerId));
+            return GameAction.Pass(playerId);
 
         var player = gameState.Player1.Id == playerId ? gameState.Player1 : gameState.Player2;
         var hand = player.Hand.Cards;
@@ -35,7 +47,10 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
         {
             var land = hand.FirstOrDefault(c => c.IsLand);
             if (land != null)
-                return Task.FromResult(GameAction.PlayCard(playerId, land.Id));
+            {
+                await DelayAsync(ct);
+                return GameAction.PlayCard(playerId, land.Id);
+            }
         }
 
         // Priority 2: Activate a fetch land if we have spells to cast
@@ -45,17 +60,23 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
         {
             var hasSpellInHand = hand.Any(c => !c.IsLand && c.ManaCost != null);
             if (hasSpellInHand)
-                return Task.FromResult(GameAction.ActivateFetch(playerId, fetchLand.Id));
+            {
+                await DelayAsync(ct);
+                return GameAction.ActivateFetch(playerId, fetchLand.Id);
+            }
         }
 
         // Priority 2.5: Activate abilities on permanents (e.g., Mogg Fanatic, Skirk Prospector)
         var opponent = gameState.Player1.Id == playerId ? gameState.Player2 : gameState.Player1;
         var abilityAction = EvaluateActivatedAbilities(player, opponent, gameState);
         if (abilityAction != null)
-            return Task.FromResult(abilityAction);
+        {
+            await DelayAsync(ct);
+            return abilityAction;
+        }
 
         if (hand.Count == 0)
-            return Task.FromResult(GameAction.Pass(playerId));
+            return GameAction.Pass(playerId);
 
         // Priority 3: Tap an untapped land with a mana ability to build up mana pool
         var untappedLand = player.Battlefield.Cards
@@ -66,13 +87,16 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
             // Only tap if there's a spell in hand we could eventually cast
             var hasSpellInHand = hand.Any(c => !c.IsLand && c.ManaCost != null);
             if (hasSpellInHand)
-                return Task.FromResult(GameAction.TapCard(playerId, untappedLand.Id));
+            {
+                await DelayAsync(ct);
+                return GameAction.TapCard(playerId, untappedLand.Id);
+            }
         }
 
         // Priority 4: Cast most expensive affordable spell (accounting for cost modification)
         // Only attempt sorcery-speed casts when the stack is empty (matches engine's CanCastSorcery check)
         if (gameState.Stack.Count > 0)
-            return Task.FromResult(GameAction.Pass(playerId));
+            return GameAction.Pass(playerId);
 
         var castable = hand
             .Where(c => !c.IsLand && c.ManaCost != null)
@@ -91,11 +115,12 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
 
         if (castable != null)
         {
+            await DelayAsync(ct);
             // Use CastSpell for cards in the registry (proper stack/mana flow),
             // fall back to PlayCard for unregistered cards with ManaCost (immediate mana payment)
             if (CardDefinitions.TryGet(castable.Name, out _))
-                return Task.FromResult(GameAction.CastSpell(playerId, castable.Id));
-            return Task.FromResult(GameAction.PlayCard(playerId, castable.Id));
+                return GameAction.CastSpell(playerId, castable.Id);
+            return GameAction.PlayCard(playerId, castable.Id);
         }
 
         // Priority 5: Cycling — if a card can be cycled but not cast, cycle it
@@ -107,12 +132,15 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
                 {
                     // Only cycle if we can't afford to cast it
                     if (card.ManaCost == null || !player.ManaPool.CanPay(card.ManaCost))
-                        return Task.FromResult(GameAction.Cycle(playerId, card.Id));
+                    {
+                        await DelayAsync(ct);
+                        return GameAction.Cycle(playerId, card.Id);
+                    }
                 }
             }
         }
 
-        return Task.FromResult(GameAction.Pass(playerId));
+        return GameAction.Pass(playerId);
     }
 
     /// <summary>
@@ -120,20 +148,20 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
     /// Always keeps at 4 or fewer cards. For larger hands, requires an acceptable
     /// land count range that narrows as the hand gets smaller.
     /// </summary>
-    public Task<MulliganDecision> GetMulliganDecision(IReadOnlyList<GameCard> hand, int mulliganCount, CancellationToken ct = default)
+    public async Task<MulliganDecision> GetMulliganDecision(IReadOnlyList<GameCard> hand, int mulliganCount, CancellationToken ct = default)
     {
+        await DelayAsync(ct);
+
         // Always keep at 4 or fewer cards
         if (hand.Count <= 4)
-            return Task.FromResult(MulliganDecision.Keep);
+            return MulliganDecision.Keep;
 
         var landCount = hand.Count(c => c.IsLand);
         var (minLands, maxLands) = GetAcceptableLandRange(hand.Count);
 
-        var decision = landCount >= minLands && landCount <= maxLands
+        return landCount >= minLands && landCount <= maxLands
             ? MulliganDecision.Keep
             : MulliganDecision.Mulligan;
-
-        return Task.FromResult(decision);
     }
 
     /// <summary>
@@ -245,11 +273,12 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
     /// Attacks with all eligible creatures. The engine already filters for
     /// summoning sickness, so every creature passed here is ready to attack.
     /// </summary>
-    public Task<IReadOnlyList<Guid>> ChooseAttackers(IReadOnlyList<GameCard> eligibleAttackers,
+    public async Task<IReadOnlyList<Guid>> ChooseAttackers(IReadOnlyList<GameCard> eligibleAttackers,
         CancellationToken ct = default)
     {
+        await DelayAsync(ct);
         var attackerIds = eligibleAttackers.Select(c => c.Id).ToList();
-        return Task.FromResult<IReadOnlyList<Guid>>(attackerIds);
+        return attackerIds;
     }
 
     /// <summary>
@@ -257,9 +286,10 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
     /// Uses the smallest sufficient blocker. Prioritizes blocking the biggest
     /// attacker first to maximize value. Each blocker is only assigned once.
     /// </summary>
-    public Task<Dictionary<Guid, Guid>> ChooseBlockers(IReadOnlyList<GameCard> eligibleBlockers,
+    public async Task<Dictionary<Guid, Guid>> ChooseBlockers(IReadOnlyList<GameCard> eligibleBlockers,
         IReadOnlyList<GameCard> attackers, CancellationToken ct = default)
     {
+        await DelayAsync(ct);
         var assignments = new Dictionary<Guid, Guid>();
         var usedBlockers = new HashSet<Guid>();
 
@@ -278,7 +308,7 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
             }
         }
 
-        return Task.FromResult(assignments);
+        return assignments;
     }
 
     /// <summary>
@@ -296,17 +326,19 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
     /// Chooses a card from options, preferring higher CMC creatures.
     /// Returns null if optional and no options are available.
     /// </summary>
-    public Task<Guid?> ChooseCard(IReadOnlyList<GameCard> options, string prompt, bool optional = false, CancellationToken ct = default)
+    public async Task<Guid?> ChooseCard(IReadOnlyList<GameCard> options, string prompt, bool optional = false, CancellationToken ct = default)
     {
         if (options.Count == 0)
-            return Task.FromResult<Guid?>(optional ? null : throw new InvalidOperationException("No options available for required card choice"));
+            return optional ? null : throw new InvalidOperationException("No options available for required card choice");
+
+        await DelayAsync(ct);
 
         // Prefer highest CMC (most impactful card)
         var best = options
             .OrderByDescending(c => c.ManaCost?.ConvertedManaCost ?? 0)
             .First();
 
-        return Task.FromResult<Guid?>(best.Id);
+        return best.Id;
     }
 
     /// <summary>
@@ -321,14 +353,15 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
     /// Chooses a target for a spell. Picks the opponent's creature with highest power,
     /// falling back to the first eligible target.
     /// </summary>
-    public Task<TargetInfo?> ChooseTarget(string spellName, IReadOnlyList<GameCard> eligibleTargets, Guid defaultOwnerId = default, CancellationToken ct = default)
+    public async Task<TargetInfo?> ChooseTarget(string spellName, IReadOnlyList<GameCard> eligibleTargets, Guid defaultOwnerId = default, CancellationToken ct = default)
     {
+        await DelayAsync(ct);
         var best = eligibleTargets
             .OrderByDescending(c => c.Power ?? 0)
             .ThenByDescending(c => c.ManaCost?.ConvertedManaCost ?? 0)
             .First();
 
-        return Task.FromResult<TargetInfo?>(new TargetInfo(best.Id, defaultOwnerId, Enums.ZoneType.Battlefield));
+        return new TargetInfo(best.Id, defaultOwnerId, Enums.ZoneType.Battlefield);
     }
 
     /// <summary>

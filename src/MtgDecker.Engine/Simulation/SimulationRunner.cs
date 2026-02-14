@@ -16,8 +16,8 @@ public class SimulationRunner
     {
         var sw = Stopwatch.StartNew();
 
-        var p1 = new Player(Guid.NewGuid(), player1Name, new AiBotDecisionHandler());
-        var p2 = new Player(Guid.NewGuid(), player2Name, new AiBotDecisionHandler());
+        var p1 = new Player(Guid.NewGuid(), player1Name, new AiBotDecisionHandler { ActionDelayMs = 0 });
+        var p2 = new Player(Guid.NewGuid(), player2Name, new AiBotDecisionHandler { ActionDelayMs = 0 });
 
         foreach (var card in deck1) p1.Library.Add(CloneCard(card));
         foreach (var card in deck2) p2.Library.Add(CloneCard(card));

@@ -9,8 +9,8 @@ public class AiBotFetchTests
 {
     private static (GameState state, Player player, AiBotDecisionHandler bot) CreateGameWithBot()
     {
-        var bot = new AiBotDecisionHandler();
-        var opponent = new Player(Guid.NewGuid(), "Opponent", new AiBotDecisionHandler());
+        var bot = new AiBotDecisionHandler { ActionDelayMs = 0 };
+        var opponent = new Player(Guid.NewGuid(), "Opponent", new AiBotDecisionHandler { ActionDelayMs = 0 });
         var player = new Player(Guid.NewGuid(), "Bot", bot);
         var state = new GameState(player, opponent);
         state.CurrentPhase = Phase.MainPhase1;
@@ -129,9 +129,9 @@ public class AiBotFetchTests
     [Fact]
     public async Task Bot_Casts_Spell_With_Cost_Reduction()
     {
-        var bot = new AiBotDecisionHandler();
+        var bot = new AiBotDecisionHandler { ActionDelayMs = 0 };
         var p1 = new Player(Guid.NewGuid(), "Bot", bot);
-        var p2 = new Player(Guid.NewGuid(), "Opp", new AiBotDecisionHandler());
+        var p2 = new Player(Guid.NewGuid(), "Opp", new AiBotDecisionHandler { ActionDelayMs = 0 });
         var state = new GameState(p1, p2);
         state.CurrentPhase = Phase.MainPhase1;
 

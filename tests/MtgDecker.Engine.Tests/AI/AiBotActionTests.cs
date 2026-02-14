@@ -9,8 +9,8 @@ public class AiBotActionTests
 {
     private static (GameState state, Player player) CreateGameWithBot()
     {
-        var bot = new AiBotDecisionHandler();
-        var opponent = new Player(Guid.NewGuid(), "Opponent", new AiBotDecisionHandler());
+        var bot = new AiBotDecisionHandler { ActionDelayMs = 0 };
+        var opponent = new Player(Guid.NewGuid(), "Opponent", new AiBotDecisionHandler { ActionDelayMs = 0 });
         var player = new Player(Guid.NewGuid(), "Bot", bot);
         var state = new GameState(player, opponent);
         state.CurrentPhase = Phase.MainPhase1;
@@ -151,8 +151,8 @@ public class AiBotActionTests
     public async Task GetAction_Player2AsBot_ResolvesCorrectly()
     {
         // Ensure the bot works when it's Player2 and active player
-        var bot = new AiBotDecisionHandler();
-        var p1 = new Player(Guid.NewGuid(), "Human", new AiBotDecisionHandler());
+        var bot = new AiBotDecisionHandler { ActionDelayMs = 0 };
+        var p1 = new Player(Guid.NewGuid(), "Human", new AiBotDecisionHandler { ActionDelayMs = 0 });
         var p2 = new Player(Guid.NewGuid(), "Bot", bot);
         var state = new GameState(p1, p2);
         state.CurrentPhase = Phase.MainPhase1;
