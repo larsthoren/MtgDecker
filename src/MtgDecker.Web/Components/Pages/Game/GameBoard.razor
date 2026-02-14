@@ -308,8 +308,10 @@
                         IsOwnCard="true"
                         IsTapped="@_selectedCard.IsTapped"
                         HasTapAbility="@(_selectedCard.IsLand || _selectedCard.ManaAbility != null)"
+                        HasActivatedAbility="@HasActivatedAbility(_selectedCard)"
                         OnPlay="HandlePlay"
                         OnTapToggle="HandleTapToggle"
+                        OnActivate="HandleActivate"
                         OnClose="ClearSelection" />
         </div>
     }
@@ -829,6 +831,18 @@
     private async Task HandleUntapLand()
     {
         await OnUndoTap.InvokeAsync();
+    }
+
+    // --- Activated abilities ---
+
+    private bool HasActivatedAbility(GameCard card) =>
+        CardDefinitions.TryGet(card.Name, out var def) && def.ActivatedAbility != null;
+
+    private async Task HandleActivate()
+    {
+        if (_selectedCard == null) return;
+        await OnAction.InvokeAsync(GameAction.ActivateAbility(LocalPlayer.Id, _selectedCard.Id));
+        ClearSelection();
     }
 
     // --- Helpers ---
