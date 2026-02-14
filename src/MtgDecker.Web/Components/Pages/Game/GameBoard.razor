@@ -228,6 +228,7 @@
     <div class="player-info-bar">
         <MudText Typo="Typo.subtitle2">@LocalPlayer.Name</MudText>
         <MudChip T="string" Size="Size.Small" Color="Color.Error">@LocalPlayer.Life HP</MudChip>
+        <MudChip T="string" Size="Size.Small" Color="Color.Default">Hand: @LocalPlayer.Hand.Cards.Count</MudChip>
         @if (IsLocalActive)
         {
             <MudChip T="string" Size="Size.Small" Color="Color.Primary">Active</MudChip>
@@ -471,8 +472,8 @@
     }
 
     @* Log toggle button *@
-    <MudIconButton Icon="@Icons.Material.Filled.Article" Size="Size.Small"
-                   Class="log-toggle-btn" OnClick="ToggleLog" Title="Toggle Game Log" />
+    <MudButton StartIcon="@Icons.Material.Filled.Article" Size="Size.Small"
+               Variant="Variant.Outlined" Class="log-toggle-btn" OnClick="ToggleLog" Title="Toggle Game Log">Log</MudButton>
 
     @* Log overlay *@
     @if (_showLog)
