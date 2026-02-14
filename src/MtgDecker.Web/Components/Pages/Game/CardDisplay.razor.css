@@ -15,7 +15,7 @@
 
 .card-display.tapped {
     transform: rotate(90deg);
-    margin: 20px 24px;
+    margin: 10px 12px;
 }
 
 .card-display.selected {

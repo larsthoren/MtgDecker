@@ -167,3 +167,9 @@
     background: rgba(244, 67, 54, 0.2) !important;
     border-color: rgba(244, 67, 54, 0.6) !important;
 }
+
+.waiting-label {
+    font-size: 0.7rem;
+    color: rgba(255, 255, 255, 0.4);
+    font-style: italic;
+}

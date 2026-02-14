@@ -29,6 +29,11 @@
             <span class="stack-badge">@StackCount</span>
         }
 
+        @if (!HasPriority && !IsWaitingForAttackers && !IsWaitingForBlockers)
+        {
+            <span class="waiting-label">Waiting...</span>
+        }
+
         @if (HasPriority || IsWaitingForAttackers || IsWaitingForBlockers)
         {
             @if (IsWaitingForAttackers || IsWaitingForBlockers)
@@ -74,13 +79,13 @@
         new("Untap", Phase.Untap, CombatStep.None),
         new("Upkeep", Phase.Upkeep, CombatStep.None),
         new("Draw", Phase.Draw, CombatStep.None),
-        new("Main", Phase.MainPhase1, CombatStep.None),
+        new("Main 1", Phase.MainPhase1, CombatStep.None),
         new("Begin Cbt", Phase.Combat, CombatStep.BeginCombat),
         new("Attackers", Phase.Combat, CombatStep.DeclareAttackers),
         new("Blockers", Phase.Combat, CombatStep.DeclareBlockers),
         new("Damage", Phase.Combat, CombatStep.CombatDamage),
         new("End Cbt", Phase.Combat, CombatStep.EndCombat),
-        new("Main", Phase.MainPhase2, CombatStep.None),
+        new("Main 2", Phase.MainPhase2, CombatStep.None),
         new("End", Phase.End, CombatStep.None),
     ];
 

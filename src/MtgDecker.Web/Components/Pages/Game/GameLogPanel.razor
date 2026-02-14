@@ -8,7 +8,8 @@
         {
             @foreach (var entry in GameLog)
             {
-                <div class="log-entry">@entry</div>
+                var isPhase = entry.Contains("Phase:") || entry.Contains("begins") || entry.Contains("Untap step") || entry.Contains("Draw step") || entry.Contains("Upkeep step");
+                <div class="log-entry @(isPhase ? "log-phase" : "")">@entry</div>
             }
         }
     </div>
