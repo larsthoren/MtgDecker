@@ -207,7 +207,7 @@
 
 /* Only overlap when there's an aura above (adjacent sibling) */
 .attached-aura + .host-card {
-    margin-top: -166px; /* 140px * 1.4 - 30px peek = ~166px overlap */
+    margin-top: -174px; /* 146px * 1.4 - 30px peek = ~174px overlap */
 }
 
 /* On hover, aura rises to front — full card visible */
@@ -218,7 +218,7 @@
 
 /* Opponent cards use same size — overlap matches player cards */
 .attached-aura-sm + .host-card {
-    margin-top: -166px !important; /* 140px * 1.4 - 30px peek = ~166px overlap */
+    margin-top: -174px !important; /* 146px * 1.4 - 30px peek = ~174px overlap */
 }
 
 /* Land wrapper with untap affordance */

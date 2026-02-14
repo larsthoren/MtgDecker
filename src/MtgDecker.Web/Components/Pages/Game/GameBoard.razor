@@ -63,7 +63,7 @@
                             <CardDisplay Name="@aura.Name"
                                          ImageUrl="@aura.ImageUrl"
                                          Tapped="@aura.IsTapped"
-                                         CardSize="140"
+                                         CardSize="146"
                                          Clickable="@(IsTargetingMode)"
                                          EligibleTarget="@IsEligibleTarget(aura)"
                                          TargetingDimmed="@IsTargetingDimmed(aura)"
@@ -74,7 +74,7 @@
                         <CardDisplay Name="@card.Name"
                                      ImageUrl="@card.ImageUrl"
                                      Tapped="@card.IsTapped"
-                                     CardSize="140"
+                                     CardSize="146"
                                      Clickable="@(IsTargetingMode)"
                                      EligibleTarget="@IsEligibleTarget(card)"
                                      TargetingDimmed="@IsTargetingDimmed(card)"
@@ -99,7 +99,7 @@
                             <CardDisplay Name="@aura.Name"
                                          ImageUrl="@aura.ImageUrl"
                                          Tapped="@aura.IsTapped"
-                                         CardSize="140"
+                                         CardSize="146"
                                          Clickable="@(IsTargetingMode)"
                                          EligibleTarget="@IsEligibleTarget(aura)"
                                          TargetingDimmed="@IsTargetingDimmed(aura)"
@@ -110,7 +110,7 @@
                         <CardDisplay Name="@card.Name"
                                      ImageUrl="@card.ImageUrl"
                                      Tapped="@card.IsTapped"
-                                     CardSize="140"
+                                     CardSize="146"
                                      Clickable="@(IsTargetingMode)"
                                      EligibleTarget="@IsEligibleTarget(card)"
                                      TargetingDimmed="@IsTargetingDimmed(card)"
@@ -176,7 +176,7 @@
                     {
                         <div class="attached-aura">
                             <CardDisplay Name="@aura.Name" ImageUrl="@aura.ImageUrl" Tapped="@aura.IsTapped"
-                                         CardSize="140"
+                                         CardSize="146"
                                          Selected="@(_selectedCard?.Id == aura.Id)"
                                          EligibleTarget="@IsEligibleTarget(aura)"
                                          TargetingDimmed="@IsTargetingDimmed(aura)"
@@ -187,7 +187,7 @@
                     <div class="host-card">
                         <CardDisplay Name="@card.Name" ImageUrl="@card.ImageUrl" Tapped="@card.IsTapped"
                                      Power="@card.Power" Toughness="@card.Toughness" DamageMarked="@card.DamageMarked"
-                                     CardSize="140"
+                                     CardSize="146"
                                      Selected="@(_selectedCard?.Id == card.Id)"
                                      IsAttacking="@(_selectedAttackers.Contains(card.Id) || State.Combat?.Attackers.Contains(card.Id) == true)"
                                      IsBlocking="@(_blockerAssignments.ContainsKey(card.Id) || IsCardBlockingAnywhere(card.Id))"
@@ -215,7 +215,7 @@
                     {
                         <div class="attached-aura">
                             <CardDisplay Name="@aura.Name" ImageUrl="@aura.ImageUrl" Tapped="@aura.IsTapped"
-                                         CardSize="140"
+                                         CardSize="146"
                                          Selected="@(_selectedCard?.Id == aura.Id)"
                                          EligibleTarget="@IsEligibleTarget(aura)"
                                          TargetingDimmed="@IsTargetingDimmed(aura)"
@@ -225,7 +225,7 @@
                     }
                     <div class="land-wrapper host-card">
                         <CardDisplay Name="@card.Name" ImageUrl="@card.ImageUrl" Tapped="@card.IsTapped"
-                                     CardSize="140"
+                                     CardSize="146"
                                      Selected="@(_selectedCard?.Id == card.Id)"
                                      EligibleTarget="@IsEligibleTarget(card)"
                                      TargetingDimmed="@IsTargetingDimmed(card)"
@@ -285,7 +285,7 @@
         @foreach (var card in LocalPlayer.Hand.Cards)
         {
             <CardDisplay Name="@card.Name" ImageUrl="@card.ImageUrl"
-                         CardSize="140"
+                         CardSize="146"
                          Selected="@(_selectedCard?.Id == card.Id)"
                          Clickable="true"
                          OnClick="async () => await HandleHandClick(card)" />
