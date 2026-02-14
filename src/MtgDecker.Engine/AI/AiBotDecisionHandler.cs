@@ -79,17 +79,31 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
             return GameAction.Pass(playerId);
 
         // Priority 3: Tap an untapped land with a mana ability to build up mana pool
-        var untappedLand = player.Battlefield.Cards
-            .FirstOrDefault(c => c.IsLand && !c.IsTapped && c.ManaAbility != null);
+        // Only tap if the total available mana (pool + all untapped lands) can afford a spell.
+        var untappedLands = player.Battlefield.Cards
+            .Where(c => c.IsLand && !c.IsTapped && c.ManaAbility != null)
+            .ToList();
 
-        if (untappedLand != null)
+        if (untappedLands.Count > 0)
         {
-            // Only tap if there's a spell in hand we could eventually cast
-            var hasSpellInHand = hand.Any(c => !c.IsLand && c.ManaCost != null);
-            if (hasSpellInHand)
+            var potentialMana = player.ManaPool.Total + untappedLands.Count;
+            var cheapestSpellCmc = hand
+                .Where(c => !c.IsLand && c.ManaCost != null)
+                .Select(c =>
+                {
+                    var cost = c.ManaCost!;
+                    var reduction = ComputeCostModification(gameState, c, player);
+                    if (reduction != 0)
+                        cost = cost.WithGenericReduction(-reduction);
+                    return cost.ConvertedManaCost;
+                })
+                .DefaultIfEmpty(int.MaxValue)
+                .Min();
+
+            if (potentialMana >= cheapestSpellCmc)
             {
                 await DelayAsync(ct);
-                return GameAction.TapCard(playerId, untappedLand.Id);
+                return GameAction.TapCard(playerId, untappedLands[0].Id);
             }
         }
 

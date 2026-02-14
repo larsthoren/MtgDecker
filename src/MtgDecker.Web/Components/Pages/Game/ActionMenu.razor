@@ -28,6 +28,14 @@
                            OnClick="() => OnTapToggle.InvokeAsync()">Tap</MudButton>
             }
 
+            @if (IsOwnCard && CurrentZone == ZoneType.Battlefield && HasActivatedAbility)
+            {
+                <MudButton Size="Size.Small" Variant="Variant.Text" FullWidth="true"
+                           StartIcon="@Icons.Material.Filled.FlashOn"
+                           Color="Color.Warning" Style="justify-content: flex-start;"
+                           OnClick="() => OnActivate.InvokeAsync()">Activate</MudButton>
+            }
+
             <MudDivider Class="my-1" />
             <MudButton Size="Size.Small" Variant="Variant.Text" FullWidth="true"
                        StartIcon="@Icons.Material.Filled.Close" Color="Color.Default"
@@ -44,7 +52,9 @@
     [Parameter] public bool IsOwnCard { get; set; }
     [Parameter] public bool IsTapped { get; set; }
     [Parameter] public bool HasTapAbility { get; set; }
+    [Parameter] public bool HasActivatedAbility { get; set; }
     [Parameter] public EventCallback OnPlay { get; set; }
     [Parameter] public EventCallback OnTapToggle { get; set; }
+    [Parameter] public EventCallback OnActivate { get; set; }
     [Parameter] public EventCallback OnClose { get; set; }
 }
