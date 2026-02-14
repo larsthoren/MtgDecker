@@ -223,6 +223,37 @@
         </div>
     }
 
+    @* Pending cast — tap lands to pay mana cost *@
+    @if (_pendingCastCard?.ManaCost != null)
+    {
+        <div class="prompt-overlay">
+            <MudPaper Class="pa-3" Elevation="8" Style="min-width: 220px;">
+                <MudText Typo="Typo.subtitle2" Class="mb-1">Cast @_pendingCastCard.Name</MudText>
+                <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 8px;">
+                    <MudText Typo="Typo.body2">Tap lands to pay</MudText>
+                    @foreach (var (color, symbol) in ManaSymbols)
+                    {
+                        @if (_pendingCastCard.ManaCost.ColorRequirements.TryGetValue(color, out var needed))
+                        {
+                            @for (int i = 0; i < needed; i++)
+                            {
+                                <img src="https://svgs.scryfall.io/card-symbols/@(symbol).svg"
+                                     alt="@color" style="width: 22px; height: 22px;" />
+                            }
+                        }
+                    }
+                    @if (_pendingCastCard.ManaCost.GenericCost > 0)
+                    {
+                        <img src="https://svgs.scryfall.io/card-symbols/@(_pendingCastCard.ManaCost.GenericCost).svg"
+                             alt="generic" style="width: 22px; height: 22px;" />
+                    }
+                </div>
+                <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Default"
+                           OnClick="CancelPendingCast">Cancel</MudButton>
+            </MudPaper>
+        </div>
+    }
+
     @* Blocker ordering prompt *@
     @if (Handler?.IsWaitingForBlockerOrder == true && IsLocalActive && Handler?.BlockersToOrder != null)
     {
@@ -424,6 +455,9 @@
     // Card choice state
     private Guid? _selectedChoiceId;
 
+    // Pending cast state (waiting for player to tap lands)
+    private GameCard? _pendingCastCard;
+
     private Player LocalPlayer => PlayerSeat == 1 ? State.Player1 : State.Player2;
     private Player OpponentPlayer => PlayerSeat == 1 ? State.Player2 : State.Player1;
     private int OpponentSeat => PlayerSeat == 1 ? 2 : 1;
@@ -524,6 +558,7 @@
         {
             await OnAction.InvokeAsync(GameAction.TapCard(LocalPlayer.Id, card.Id));
             ClearSelection();
+            await TryCompletePendingCast();
             return;
         }
 
@@ -620,9 +655,22 @@
     {
         if (_selectedCard == null) return;
         if (_selectedCard.IsLand)
+        {
             await OnAction.InvokeAsync(GameAction.PlayCard(LocalPlayer.Id, _selectedCard.Id));
-        else
-            await OnAction.InvokeAsync(GameAction.CastSpell(LocalPlayer.Id, _selectedCard.Id));
+            ClearSelection();
+            return;
+        }
+
+        // Non-land: check if we can pay the mana cost
+        if (_selectedCard.ManaCost != null && !LocalPlayer.ManaPool.CanPay(_selectedCard.ManaCost))
+        {
+            // Enter pending cast mode — player taps lands to pay
+            _pendingCastCard = _selectedCard;
+            ClearSelection();
+            return;
+        }
+
+        await OnAction.InvokeAsync(GameAction.CastSpell(LocalPlayer.Id, _selectedCard.Id));
         ClearSelection();
     }
 
@@ -631,6 +679,7 @@
         if (_selectedCard == null) return;
         await OnAction.InvokeAsync(GameAction.TapCard(LocalPlayer.Id, _selectedCard.Id));
         ClearSelection();
+        await TryCompletePendingCast();
     }
 
     // --- Target picker ---
@@ -677,6 +726,21 @@
         _selectedChoiceId = null;
         await OnCardChosen.InvokeAsync(cardId);
     }
+
+    // --- Pending cast (tap lands to pay) ---
+
+    private async Task TryCompletePendingCast()
+    {
+        if (_pendingCastCard == null) return;
+        if (_pendingCastCard.ManaCost == null) return;
+        if (!LocalPlayer.ManaPool.CanPay(_pendingCastCard.ManaCost)) return;
+
+        var card = _pendingCastCard;
+        _pendingCastCard = null;
+        await OnAction.InvokeAsync(GameAction.CastSpell(LocalPlayer.Id, card.Id));
+    }
+
+    private void CancelPendingCast() => _pendingCastCard = null;
 
     // --- Untap (pending mana) ---
 
