@@ -254,6 +254,35 @@
     transform: scale(1.15);
 }
 
+/* Targeting mode: info bars clickable */
+.opponent-info-bar.targetable,
+.player-info-bar.targetable {
+    outline: 2px solid orange;
+    cursor: pointer;
+    border-radius: 4px;
+    animation: target-pulse-bar 1.5s ease-in-out infinite;
+}
+
+@keyframes target-pulse-bar {
+    0%, 100% { box-shadow: 0 0 4px rgba(255, 165, 0, 0.3); }
+    50% { box-shadow: 0 0 12px rgba(255, 165, 0, 0.7); }
+}
+
+/* Targeting prompt banner */
+.targeting-banner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 4px 12px;
+    background: rgba(255, 165, 0, 0.15);
+    border: 1px solid rgba(255, 165, 0, 0.4);
+    border-radius: 4px;
+    font-size: 0.85rem;
+    color: orange;
+    font-weight: 600;
+}
+
 /* Prompt overlay */
 .prompt-overlay {
     position: absolute;
