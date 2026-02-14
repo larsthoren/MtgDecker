@@ -20,7 +20,8 @@
     }
 
     @* Row 1: Opponent info bar *@
-    <div class="opponent-info-bar">
+    <div class="opponent-info-bar @(IsPlayerTargetable ? "targetable" : "")"
+         @onclick="HandleOpponentInfoBarClick">
         <MudText Typo="Typo.subtitle2">@OpponentPlayer.Name</MudText>
         <MudChip T="string" Size="Size.Small" Color="Color.Error">@OpponentPlayer.Life HP</MudChip>
         <MudChip T="string" Size="Size.Small" Color="Color.Default">Hand: @OpponentPlayer.Hand.Cards.Count</MudChip>
@@ -63,7 +64,9 @@
                                          ImageUrl="@aura.ImageUrl"
                                          Tapped="@aura.IsTapped"
                                          CardSize="90"
-                                         Clickable="@(Handler?.IsWaitingForTarget == true)"
+                                         Clickable="@(IsTargetingMode)"
+                                         EligibleTarget="@IsEligibleTarget(aura)"
+                                         TargetingDimmed="@IsTargetingDimmed(aura)"
                                          OnClick="async () => await HandleOpponentCardClick(aura)" />
                         </div>
                     }
@@ -72,7 +75,9 @@
                                      ImageUrl="@card.ImageUrl"
                                      Tapped="@card.IsTapped"
                                      CardSize="90"
-                                     Clickable="@(Handler?.IsWaitingForTarget == true)"
+                                     Clickable="@(IsTargetingMode)"
+                                     EligibleTarget="@IsEligibleTarget(card)"
+                                     TargetingDimmed="@IsTargetingDimmed(card)"
                                      IsAttacking="@(State.Combat?.Attackers.Contains(card.Id) == true)"
                                      IsBlocking="@IsCardBlockingAnywhere(card.Id)"
                                      Power="@card.Power"
@@ -95,7 +100,9 @@
                                          ImageUrl="@aura.ImageUrl"
                                          Tapped="@aura.IsTapped"
                                          CardSize="90"
-                                         Clickable="@(Handler?.IsWaitingForTarget == true)"
+                                         Clickable="@(IsTargetingMode)"
+                                         EligibleTarget="@IsEligibleTarget(aura)"
+                                         TargetingDimmed="@IsTargetingDimmed(aura)"
                                          OnClick="async () => await HandleOpponentCardClick(aura)" />
                         </div>
                     }
@@ -104,7 +111,9 @@
                                      ImageUrl="@card.ImageUrl"
                                      Tapped="@card.IsTapped"
                                      CardSize="90"
-                                     Clickable="@(Handler?.IsWaitingForTarget == true)"
+                                     Clickable="@(IsTargetingMode)"
+                                     EligibleTarget="@IsEligibleTarget(card)"
+                                     TargetingDimmed="@IsTargetingDimmed(card)"
                                      IsAttacking="@(State.Combat?.Attackers.Contains(card.Id) == true)"
                                      IsBlocking="@IsCardBlockingAnywhere(card.Id)"
                                      Power="@card.Power"
@@ -124,6 +133,14 @@
 
     @* Row 3: Phase bar *@
     <div class="phase-stack-row">
+        @if (IsTargetingMode)
+        {
+            <div class="targeting-banner">
+                <span>Choose target for @(Handler!.TargetingSpellName)</span>
+                <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Warning"
+                           OnClick="HandleTargetCancel">Cancel</MudButton>
+            </div>
+        }
         <PhaseBar CurrentPhase="@State.CurrentPhase"
                   CurrentCombatStep="@State.CombatStep"
                   TurnNumber="@State.TurnNumber"
@@ -161,6 +178,8 @@
                             <CardDisplay Name="@aura.Name" ImageUrl="@aura.ImageUrl" Tapped="@aura.IsTapped"
                                          CardSize="130"
                                          Selected="@(_selectedCard?.Id == aura.Id)"
+                                         EligibleTarget="@IsEligibleTarget(aura)"
+                                         TargetingDimmed="@IsTargetingDimmed(aura)"
                                          Clickable="true"
                                          OnClick="async () => await HandleBattlefieldClick(aura, false, false)" />
                         </div>
@@ -173,6 +192,8 @@
                                      IsAttacking="@(_selectedAttackers.Contains(card.Id) || State.Combat?.Attackers.Contains(card.Id) == true)"
                                      IsBlocking="@(_blockerAssignments.ContainsKey(card.Id) || IsCardBlockingAnywhere(card.Id))"
                                      Eligible="@(isEligibleAttacker || isEligibleBlocker)"
+                                     EligibleTarget="@IsEligibleTarget(card)"
+                                     TargetingDimmed="@IsTargetingDimmed(card)"
                                      SummoningSick="@(card.IsCreature && card.HasSummoningSickness(State.TurnNumber))"
                                      Clickable="true"
                                      OnClick="async () => await HandleBattlefieldClick(card, isEligibleAttacker, isEligibleBlocker)" />
@@ -196,6 +217,8 @@
                             <CardDisplay Name="@aura.Name" ImageUrl="@aura.ImageUrl" Tapped="@aura.IsTapped"
                                          CardSize="130"
                                          Selected="@(_selectedCard?.Id == aura.Id)"
+                                         EligibleTarget="@IsEligibleTarget(aura)"
+                                         TargetingDimmed="@IsTargetingDimmed(aura)"
                                          Clickable="true"
                                          OnClick="async () => await HandleBattlefieldClick(aura, false, false)" />
                         </div>
@@ -204,6 +227,8 @@
                         <CardDisplay Name="@card.Name" ImageUrl="@card.ImageUrl" Tapped="@card.IsTapped"
                                      CardSize="130"
                                      Selected="@(_selectedCard?.Id == card.Id)"
+                                     EligibleTarget="@IsEligibleTarget(card)"
+                                     TargetingDimmed="@IsTargetingDimmed(card)"
                                      Clickable="true"
                                      OnClick="async () => await HandleLandClick(card)" />
                         @if (isUndoCandidate)
@@ -225,7 +250,8 @@
     </div>
 
     @* Row 5: Player info bar *@
-    <div class="player-info-bar">
+    <div class="player-info-bar @(IsPlayerTargetable ? "targetable" : "")"
+         @onclick="HandlePlayerInfoBarClick">
         <MudText Typo="Typo.subtitle2">@LocalPlayer.Name</MudText>
         <MudChip T="string" Size="Size.Small" Color="Color.Error">@LocalPlayer.Life HP</MudChip>
         <MudChip T="string" Size="Size.Small" Color="Color.Default">Hand: @LocalPlayer.Hand.Cards.Count</MudChip>
@@ -281,6 +307,7 @@
                         CurrentZone="_selectedZone"
                         IsOwnCard="true"
                         IsTapped="@_selectedCard.IsTapped"
+                        HasTapAbility="@(_selectedCard.IsLand || _selectedCard.ManaAbility != null)"
                         OnPlay="HandlePlay"
                         OnTapToggle="HandleTapToggle"
                         OnClose="ClearSelection" />
@@ -338,45 +365,6 @@
                 </div>
                 <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mt-2"
                            OnClick="ConfirmBlockerOrder">Confirm Order</MudButton>
-            </MudPaper>
-        </div>
-    }
-
-    @* Target picker *@
-    @if (Handler?.IsWaitingForTarget == true && Handler?.EligibleTargets != null)
-    {
-        <div class="prompt-overlay">
-            <MudPaper Class="pa-2" Outlined="true" Style="background-color: rgba(255,165,0,0.15);">
-                <MudText Typo="Typo.body2" Class="mb-1">Choose target for @(Handler.TargetingSpellName):</MudText>
-                @foreach (var target in Handler.EligibleTargets)
-                {
-                    @if (target.Id == Guid.Empty)
-                    {
-                        @* Player sentinel target *@
-                        <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Error"
-                                   Class="ma-1" OnClick="@(() => HandleTargetButtonClick(target))">
-                            @target.Name (Player)
-                        </MudButton>
-                    }
-                    else if (State?.Stack?.OfType<MtgDecker.Engine.StackObject>().Any(s => s.Card.Id == target.Id) == true)
-                    {
-                        @* Stack target (for counterspells) *@
-                        <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Error"
-                                   Class="ma-1" OnClick="@(() => HandleTargetButtonClick(target))">
-                            @target.Name (Stack)
-                        </MudButton>
-                    }
-                    else
-                    {
-                        <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Warning"
-                                   Class="ma-1" OnClick="@(() => HandleTargetButtonClick(target))">
-                            @target.Name
-                            @if (target.Power.HasValue) { <span> (@target.Power/@target.Toughness)</span> }
-                        </MudButton>
-                    }
-                }
-                <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Default"
-                           Class="ma-1" OnClick="HandleTargetCancel">Cancel</MudButton>
             </MudPaper>
         </div>
     }
@@ -538,6 +526,18 @@
     private bool IsWaitingForRevealAck => Handler?.IsWaitingForRevealAck == true;
 
     private void ToggleLog() => _showLog = !_showLog;
+
+    // --- Targeting helpers ---
+    private bool IsTargetingMode => Handler?.IsWaitingForTarget == true && Handler?.EligibleTargets != null;
+
+    private bool IsEligibleTarget(GameCard card) =>
+        IsTargetingMode && Handler!.EligibleTargets!.Any(t => t.Id == card.Id);
+
+    private bool IsPlayerTargetable =>
+        IsTargetingMode && Handler!.EligibleTargets!.Any(t => t.Id == Guid.Empty);
+
+    private bool IsTargetingDimmed(GameCard card) =>
+        IsTargetingMode && !IsEligibleTarget(card);
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -761,27 +761,18 @@
         await TryCompletePendingCast();
     }
 
-    // --- Target picker ---
+    // --- Board-based targeting ---
 
-    private void HandleTargetButtonClick(GameCard card)
+    private void HandleOpponentInfoBarClick()
     {
-        if (card.Id == Guid.Empty)
-        {
-            // Player sentinel target
-            var playerId = card.Name == LocalPlayer.Name ? LocalPlayer.Id : OpponentPlayer.Id;
-            Handler?.SubmitTarget(new TargetInfo(Guid.Empty, playerId, ZoneType.None));
-        }
-        else if (State?.Stack?.OfType<MtgDecker.Engine.StackObject>().Any(s => s.Card.Id == card.Id) == true)
-        {
-            // Stack target (for counterspells)
-            var ownerId = LocalPlayer.Id; // Stack spells use controller ID from the stack object
-            Handler?.SubmitTarget(new TargetInfo(card.Id, ownerId, ZoneType.Stack));
-        }
-        else
-        {
-            var ownerId = LocalPlayer.Battlefield.Cards.Any(c => c.Id == card.Id) ? LocalPlayer.Id : OpponentPlayer.Id;
-            Handler?.SubmitTarget(new TargetInfo(card.Id, ownerId, ZoneType.Battlefield));
-        }
+        if (IsPlayerTargetable)
+            Handler?.SubmitTarget(new TargetInfo(Guid.Empty, OpponentPlayer.Id, ZoneType.None));
+    }
+
+    private void HandlePlayerInfoBarClick()
+    {
+        if (IsPlayerTargetable)
+            Handler?.SubmitTarget(new TargetInfo(Guid.Empty, LocalPlayer.Id, ZoneType.None));
     }
 
     private void HandleTargetCancel()

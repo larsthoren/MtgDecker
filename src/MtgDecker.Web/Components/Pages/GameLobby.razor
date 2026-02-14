@@ -25,25 +25,48 @@
             <MudItem xs="12" md="6">
                 <MudPaper Class="pa-4">
                     <MudText Typo="Typo.h6" Class="mb-3">Create New Game</MudText>
-                    <MudSelect T="Guid?" Label="Select Your Deck" @bind-Value="_selectedDeckId" Class="mb-3">
-                        @foreach (var deck in _decks)
+                    <MudSelect T="MtgDecker.Domain.Enums.Format?" Label="Format" Value="_selectedFormat" ValueChanged="OnFormatChanged" Class="mb-3">
+                        @foreach (var fmt in Enum.GetValues<MtgDecker.Domain.Enums.Format>())
                         {
-                            <MudSelectItem T="Guid?" Value="@deck.Id">@deck.Name (@deck.Format)</MudSelectItem>
+                            <MudSelectItem T="MtgDecker.Domain.Enums.Format?" Value="@fmt">@fmt</MudSelectItem>
+                        }
+                    </MudSelect>
+                    <MudSelect T="Guid?" Label="Select Your Deck" @bind-Value="_selectedDeckId" Class="mb-3"
+                               Disabled="@(_selectedFormat == null)">
+                        @foreach (var deck in FilteredDecks)
+                        {
+                            <MudSelectItem T="Guid?" Value="@deck.Id">@deck.Name</MudSelectItem>
                         }
                     </MudSelect>
                     <MudTextField @bind-Value="_playerName" Label="Your Name" Class="mb-3" />
+                    <MudCheckBox T="bool" @bind-Value="_playVsAi" Label="Play vs AI" Color="Color.Secondary" Class="mb-3" />
+                    @if (_playVsAi)
+                    {
+                        <MudSelect T="Guid?" Label="AI Deck" @bind-Value="_aiDeckId" Class="mb-3"
+                                   Disabled="@(_selectedFormat == null)">
+                            @foreach (var deck in FilteredDecks)
+                            {
+                                <MudSelectItem T="Guid?" Value="@deck.Id">@deck.Name</MudSelectItem>
+                            }
+                        </MudSelect>
+                    }
                     <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
-                               Disabled="@(_selectedDeckId == null || string.IsNullOrWhiteSpace(_playerName))"
-                               OnClick="CreateGame">Create Game</MudButton>
+                               Disabled="@(IsCreateDisabled)"
+                               OnClick="CreateGame">@(_playVsAi ? "Start Game" : "Create Game")</MudButton>
                 </MudPaper>
             </MudItem>
 
             <MudItem xs="12" md="6">
                 <MudPaper Class="pa-4">
                     <MudText Typo="Typo.h6" Class="mb-3">Join Existing Game</MudText>
-                    <MudTextField @bind-Value="_joinGameId" Label="Game Code" Class="mb-3" />
+                    <MudTextField @bind-Value="_joinGameId" Label="Game Code" Class="mb-3"
+                                  TextChanged="OnJoinGameIdChanged" />
+                    @if (_joinFormat != null)
+                    {
+                        <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">Format: @_joinFormat</MudAlert>
+                    }
                     <MudSelect T="Guid?" Label="Select Your Deck" @bind-Value="_joinDeckId" Class="mb-3">
-                        @foreach (var deck in _decks)
+                        @foreach (var deck in JoinFilteredDecks)
                         {
                             <MudSelectItem T="Guid?" Value="@deck.Id">@deck.Name (@deck.Format)</MudSelectItem>
                         }
@@ -65,7 +88,10 @@
             <MudText Typo="Typo.h3" Color="Color.Secondary" Class="mb-4"
                      Style="font-family: monospace; letter-spacing: 8px;">@_gameId</MudText>
             <MudText Typo="Typo.body2" Class="mb-2">
-                Or share this link: @(Navigation.BaseUri)game/join/@_gameId
+                Or share this link:
+                <MudLink Href="@($"{Navigation.BaseUri}game/join/{_gameId}")" Target="_blank">
+                    @(Navigation.BaseUri)game/join/@_gameId
+                </MudLink>
             </MudText>
             <MudProgressLinear Indeterminate="true" Class="mt-4" />
             <MudText Typo="Typo.body2" Class="mt-2">Waiting for opponent to join...</MudText>
@@ -77,15 +103,36 @@
     [Parameter] public string? GameId { get; set; }
 
     private List<Deck> _decks = new();
+    private MtgDecker.Domain.Enums.Format? _selectedFormat;
     private Guid? _selectedDeckId;
     private Guid? _joinDeckId;
     private string _playerName = "";
     private string _joinPlayerName = "";
     private string? _joinGameId;
+    private string? _joinFormat;
     private string? _gameId;
     private string? _errorMessage;
     private int _mySeat;
+    private bool _playVsAi;
+    private Guid? _aiDeckId;
     private CancellationTokenSource _pollCts = new();
+
+    private void OnFormatChanged(MtgDecker.Domain.Enums.Format? value)
+    {
+        _selectedFormat = value;
+        _selectedDeckId = null;
+        _aiDeckId = null;
+    }
+
+    private IEnumerable<Deck> FilteredDecks =>
+        _selectedFormat == null ? [] : _decks.Where(d => d.Format == _selectedFormat.Value);
+
+    private IEnumerable<Deck> JoinFilteredDecks =>
+        _joinFormat == null ? _decks : _decks.Where(d => d.Format.ToString() == _joinFormat);
+
+    private bool IsCreateDisabled =>
+        _selectedFormat == null || _selectedDeckId == null || string.IsNullOrWhiteSpace(_playerName)
+        || (_playVsAi && _aiDeckId == null);
 
     // Hardcoded UserId matching existing app pattern
     private static readonly Guid UserId = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -97,6 +144,25 @@
         if (GameId != null)
         {
             _joinGameId = GameId;
+            LookupJoinFormat(GameId);
+        }
+    }
+
+    private void OnJoinGameIdChanged(string value)
+    {
+        _joinGameId = value;
+        _joinDeckId = null;
+        LookupJoinFormat(value);
+    }
+
+    private void LookupJoinFormat(string? gameId)
+    {
+        _joinFormat = null;
+        if (string.IsNullOrWhiteSpace(gameId)) return;
+        var session = SessionManager.GetSession(gameId);
+        if (session != null)
+        {
+            _joinFormat = session.Format;
         }
     }
 
@@ -106,12 +172,25 @@
         if (deck == null) return;
 
         var session = SessionManager.CreateGame();
+        session.Format = _selectedFormat?.ToString();
         var seat = session.JoinPlayer(_playerName, deck);
-        _gameId = session.GameId;
         _mySeat = seat;
 
-        // Poll for second player
-        _ = WaitForOpponentAsync(session);
+        if (_playVsAi)
+        {
+            var aiDeck = await LoadGameDeck(_aiDeckId!.Value);
+            if (aiDeck == null) return;
+
+            session.IsAiOpponent = true;
+            session.JoinPlayer("AI Bot", aiDeck);
+            await session.StartAsync();
+            Navigation.NavigateTo($"/game/{session.GameId}?seat={_mySeat}");
+        }
+        else
+        {
+            _gameId = session.GameId;
+            _ = WaitForOpponentAsync(session);
+        }
     }
 
     private async Task JoinGame()

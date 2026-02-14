@@ -1,3 +1,4 @@
+using MtgDecker.Engine.AI;
 using MtgDecker.Engine.Enums;
 
 namespace MtgDecker.Engine;
@@ -5,6 +6,8 @@ namespace MtgDecker.Engine;
 public class GameSession : IDisposable
 {
     public string GameId { get; }
+    public string? Format { get; set; }
+    public bool IsAiOpponent { get; set; }
     public GameState? State { get; private set; }
     public InteractiveDecisionHandler? Player1Handler { get; private set; }
     public InteractiveDecisionHandler? Player2Handler { get; private set; }
@@ -65,15 +68,34 @@ public class GameSession : IDisposable
             throw new InvalidOperationException("Need two players to start.");
 
         Player1Handler = new InteractiveDecisionHandler();
-        Player2Handler = new InteractiveDecisionHandler();
+        IPlayerDecisionHandler p2Handler;
+        if (IsAiOpponent)
+        {
+            p2Handler = new AiBotDecisionHandler();
+            Player2Handler = null;
+        }
+        else
+        {
+            Player2Handler = new InteractiveDecisionHandler();
+            p2Handler = Player2Handler;
+        }
 
         var p1 = new Player(Guid.NewGuid(), Player1Name!, Player1Handler);
-        var p2 = new Player(Guid.NewGuid(), Player2Name!, Player2Handler);
+        var p2 = new Player(Guid.NewGuid(), Player2Name!, p2Handler);
 
         foreach (var card in _player1Deck!) p1.Library.Add(card);
         foreach (var card in _player2Deck!) p2.Library.Add(card);
 
         State = new GameState(p1, p2);
+
+        // Coin flip: randomize who goes first
+        if (Random.Shared.Next(2) == 1)
+        {
+            State.ActivePlayer = p2;
+            State.PriorityPlayer = p2;
+        }
+        State.Log($"Coin flip: {State.ActivePlayer.Name} goes first.");
+
         State.OnStateChanged += () => OnStateChanged?.Invoke();
         _engine = new GameEngine(State);
 

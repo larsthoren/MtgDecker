@@ -20,7 +20,7 @@
                            OnClick="() => OnPlay.InvokeAsync()">Play</MudButton>
             }
 
-            @if (IsOwnCard && CurrentZone == ZoneType.Battlefield && !IsTapped)
+            @if (IsOwnCard && CurrentZone == ZoneType.Battlefield && !IsTapped && HasTapAbility)
             {
                 <MudButton Size="Size.Small" Variant="Variant.Text" FullWidth="true"
                            StartIcon="@Icons.Material.Filled.RotateRight"
@@ -43,6 +43,7 @@
     [Parameter] public ZoneType CurrentZone { get; set; }
     [Parameter] public bool IsOwnCard { get; set; }
     [Parameter] public bool IsTapped { get; set; }
+    [Parameter] public bool HasTapAbility { get; set; }
     [Parameter] public EventCallback OnPlay { get; set; }
     [Parameter] public EventCallback OnTapToggle { get; set; }
     [Parameter] public EventCallback OnClose { get; set; }
