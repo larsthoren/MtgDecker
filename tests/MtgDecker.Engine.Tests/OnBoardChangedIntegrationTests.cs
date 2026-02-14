@@ -8,7 +8,7 @@ namespace MtgDecker.Engine.Tests;
 public class OnBoardChangedIntegrationTests
 {
     [Fact]
-    public async Task Goblin_King_Buffs_Apply_After_Sandbox_Play()
+    public void Goblin_King_Buffs_Apply_After_Direct_Zone_Add()
     {
         var handler = new TestDecisionHandler();
         var p1 = new Player(Guid.NewGuid(), "P1", handler);
@@ -20,17 +20,18 @@ public class OnBoardChangedIntegrationTests
         var king = GameCard.Create("Goblin King", "Creature — Goblin");
         p1.Battlefield.Add(king);
 
-        // Play a goblin creature via sandbox (no mana cost)
+        // Place a goblin creature directly onto the battlefield
         var grunt = new GameCard
         {
             Name = "Grunt", BasePower = 1, BaseToughness = 1,
             CardTypes = CardType.Creature, Subtypes = ["Goblin"]
         };
-        p1.Hand.Add(grunt);
+        p1.Battlefield.Add(grunt);
+        grunt.TurnEnteredBattlefield = state.TurnNumber;
 
-        await engine.ExecuteAction(GameAction.PlayCard(p1.Id, grunt.Id));
+        // Recalculate to apply buffs
+        engine.RecalculateState();
 
-        // After ETB, OnBoardChanged should have recalculated
         grunt.Power.Should().Be(2);
         grunt.Toughness.Should().Be(2);
     }

@@ -29,6 +29,7 @@ public class TestDecisionHandlerTargetTests
         var eligible = new List<GameCard> { card };
         var result = await handler.ChooseTarget("Swords to Plowshares", eligible, playerId);
 
-        result.CardId.Should().Be(card.Id);
+        result.Should().NotBeNull();
+        result!.CardId.Should().Be(card.Id);
     }
 }

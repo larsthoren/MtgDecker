@@ -92,7 +92,7 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
         if (castable != null)
         {
             // Use CastSpell for cards in the registry (proper stack/mana flow),
-            // fall back to PlayCard for sandbox-mode cards (no CardDefinitions entry)
+            // fall back to PlayCard for unregistered cards with ManaCost (immediate mana payment)
             if (CardDefinitions.TryGet(castable.Name, out _))
                 return Task.FromResult(GameAction.CastSpell(playerId, castable.Id));
             return Task.FromResult(GameAction.PlayCard(playerId, castable.Id));
@@ -321,14 +321,14 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
     /// Chooses a target for a spell. Picks the opponent's creature with highest power,
     /// falling back to the first eligible target.
     /// </summary>
-    public Task<TargetInfo> ChooseTarget(string spellName, IReadOnlyList<GameCard> eligibleTargets, Guid defaultOwnerId = default, CancellationToken ct = default)
+    public Task<TargetInfo?> ChooseTarget(string spellName, IReadOnlyList<GameCard> eligibleTargets, Guid defaultOwnerId = default, CancellationToken ct = default)
     {
         var best = eligibleTargets
             .OrderByDescending(c => c.Power ?? 0)
             .ThenByDescending(c => c.ManaCost?.ConvertedManaCost ?? 0)
             .First();
 
-        return Task.FromResult(new TargetInfo(best.Id, defaultOwnerId, Enums.ZoneType.Battlefield));
+        return Task.FromResult<TargetInfo?>(new TargetInfo(best.Id, defaultOwnerId, Enums.ZoneType.Battlefield));
     }
 
     /// <summary>

@@ -24,7 +24,7 @@ public class StackUndoTests
     }
 
     [Fact]
-    public async Task UndoCastSpell_RemovesFromStack_RefundsMana_ReturnsToHand()
+    public async Task UndoCastSpell_Rejected_OnlyScopedTapUndoAllowed()
     {
         var (engine, state, h1) = CreateSetup();
         await engine.StartGameAsync();
@@ -43,14 +43,13 @@ public class StackUndoTests
 
         var result = engine.UndoLastAction(state.Player1.Id);
 
-        result.Should().BeTrue();
-        state.Stack.Should().BeEmpty();
-        state.Player1.Hand.Cards.Should().Contain(c => c.Id == swords.Id);
-        state.Player1.ManaPool[ManaColor.White].Should().Be(1);
+        result.Should().BeFalse("CastSpell undo is no longer allowed — only scoped tap undo");
+        state.Stack.Should().HaveCount(1, "spell should remain on stack");
+        state.GameLog.Should().Contain(l => l.Contains("Only land taps"));
     }
 
     [Fact]
-    public async Task UndoCastCreature_RemovesFromStack_RefundsMana()
+    public async Task UndoCastCreature_Rejected_OnlyScopedTapUndoAllowed()
     {
         var (engine, state, _) = CreateSetup();
         await engine.StartGameAsync();
@@ -65,9 +64,8 @@ public class StackUndoTests
 
         var result = engine.UndoLastAction(state.Player1.Id);
 
-        result.Should().BeTrue();
-        state.Stack.Should().BeEmpty();
-        state.Player1.Hand.Cards.Should().Contain(c => c.Id == goblin.Id);
-        state.Player1.ManaPool[ManaColor.Red].Should().Be(1);
+        result.Should().BeFalse("CastSpell undo is no longer allowed — only scoped tap undo");
+        state.Stack.Should().HaveCount(1, "creature spell should remain on stack");
+        state.GameLog.Should().Contain(l => l.Contains("Only land taps"));
     }
 }

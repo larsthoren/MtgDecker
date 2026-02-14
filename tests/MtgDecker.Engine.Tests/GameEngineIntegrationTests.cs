@@ -34,6 +34,10 @@ public class GameEngineIntegrationTests
         return new GameEngine(state);
     }
 
+    /// <summary>Find the first land in the player's hand (guaranteed by deck composition).</summary>
+    private static GameCard FindLandInHand(Player player)
+        => player.Hand.Cards.First(c => c.IsLand);
+
     [Fact]
     public async Task FullGame_StartToTwoTurns_CardCountsCorrect()
     {
@@ -67,13 +71,13 @@ public class GameEngineIntegrationTests
     }
 
     [Fact]
-    public async Task Turn1_ActivePlayerPlaysCardFromHand()
+    public async Task Turn1_ActivePlayerPlaysLandFromHand()
     {
         var engine = CreateGame(out var state, out var p1Handler, out _);
         await engine.StartGameAsync();
 
-        // Pick first card in hand to play
-        var cardToPlay = state.Player1.Hand.Cards[0];
+        // Pick first land in hand to play (land drop — no mana needed)
+        var cardToPlay = FindLandInHand(state.Player1);
         p1Handler.EnqueueAction(GameAction.PlayCard(state.Player1.Id, cardToPlay.Id));
 
         state.IsFirstTurn = true;
@@ -90,8 +94,8 @@ public class GameEngineIntegrationTests
         var engine = CreateGame(out var state, out var p1Handler, out _);
         await engine.StartGameAsync();
 
-        // P1 plays a card and taps it on turn 1
-        var cardToPlay = state.Player1.Hand.Cards[0];
+        // P1 plays a land and taps it on turn 1
+        var cardToPlay = FindLandInHand(state.Player1);
         p1Handler.EnqueueAction(GameAction.PlayCard(state.Player1.Id, cardToPlay.Id));
         p1Handler.EnqueueAction(GameAction.TapCard(state.Player1.Id, cardToPlay.Id));
 
@@ -127,8 +131,8 @@ public class GameEngineIntegrationTests
         state.Player2.Hand.Count.Should().Be(7, "P2 kept opening hand");
         (state.Player1.Hand.Count + state.Player1.Library.Count).Should().Be(60, "no cards lost");
 
-        // Play a turn — should work fine after mulligan
-        var cardToPlay = state.Player1.Hand.Cards[0];
+        // Play a land — should work fine after mulligan
+        var cardToPlay = FindLandInHand(state.Player1);
         p1Handler.EnqueueAction(GameAction.PlayCard(state.Player1.Id, cardToPlay.Id));
 
         state.IsFirstTurn = true;
@@ -144,9 +148,9 @@ public class GameEngineIntegrationTests
         var engine = CreateGame(out var state, out var p1Handler, out var p2Handler);
         await engine.StartGameAsync();
 
-        // P1 plays a card, P2 also plays a card (during P1's turn)
-        var p1Card = state.Player1.Hand.Cards[0];
-        var p2Card = state.Player2.Hand.Cards[0];
+        // Both players play a land (land drops — no mana needed)
+        var p1Card = FindLandInHand(state.Player1);
+        var p2Card = FindLandInHand(state.Player2);
         p1Handler.EnqueueAction(GameAction.PlayCard(state.Player1.Id, p1Card.Id));
         p2Handler.EnqueueAction(GameAction.PlayCard(state.Player2.Id, p2Card.Id));
 
@@ -162,30 +166,47 @@ public class GameEngineIntegrationTests
     [Fact]
     public async Task MultiTurn_BoardBuildsUp()
     {
-        var engine = CreateGame(out var state, out var p1Handler, out var p2Handler);
+        // Use all-land decks to ensure we always have lands to play
+        var p1Handler = new TestDecisionHandler();
+        var p2Handler = new TestDecisionHandler();
+        var p1 = new Player(Guid.NewGuid(), "Alice", p1Handler);
+        var p2 = new Player(Guid.NewGuid(), "Bob", p2Handler);
+
+        var deck1 = new DeckBuilder()
+            .AddLand("Forest", 60)
+            .Build();
+        var deck2 = new DeckBuilder()
+            .AddLand("Mountain", 60)
+            .Build();
+
+        foreach (var card in deck1) p1.Library.Add(card);
+        foreach (var card in deck2) p2.Library.Add(card);
+
+        var state = new GameState(p1, p2);
+        var engine = new GameEngine(state);
         await engine.StartGameAsync();
         state.IsFirstTurn = true;
 
-        // Turn 1 (P1): play a card
-        var p1Card1 = state.Player1.Hand.Cards[0];
+        // Turn 1 (P1): play a land
+        var p1Card1 = FindLandInHand(state.Player1);
         p1Handler.EnqueueAction(GameAction.PlayCard(state.Player1.Id, p1Card1.Id));
         await engine.RunTurnAsync();
         state.Player1.Battlefield.Count.Should().Be(1);
 
-        // Turn 2 (P2): play a card
-        var p2Card1 = state.Player2.Hand.Cards[0];
+        // Turn 2 (P2): play a land
+        var p2Card1 = FindLandInHand(state.Player2);
         p2Handler.EnqueueAction(GameAction.PlayCard(state.Player2.Id, p2Card1.Id));
         await engine.RunTurnAsync();
         state.Player2.Battlefield.Count.Should().Be(1);
 
-        // Turn 3 (P1): play another card (drew one in draw step)
-        var p1Card2 = state.Player1.Hand.Cards[0];
+        // Turn 3 (P1): play another land (drew one in draw step)
+        var p1Card2 = FindLandInHand(state.Player1);
         p1Handler.EnqueueAction(GameAction.PlayCard(state.Player1.Id, p1Card2.Id));
         await engine.RunTurnAsync();
         state.Player1.Battlefield.Count.Should().Be(2);
 
-        // Turn 4 (P2): play another card
-        var p2Card2 = state.Player2.Hand.Cards[0];
+        // Turn 4 (P2): play another land
+        var p2Card2 = FindLandInHand(state.Player2);
         p2Handler.EnqueueAction(GameAction.PlayCard(state.Player2.Id, p2Card2.Id));
         await engine.RunTurnAsync();
         state.Player2.Battlefield.Count.Should().Be(2);
@@ -203,8 +224,8 @@ public class GameEngineIntegrationTests
         var engine = CreateGame(out var state, out _, out var p2Handler);
         await engine.StartGameAsync();
 
-        // During P1's turn, P2 plays a card from hand
-        var p2Card = state.Player2.Hand.Cards[0];
+        // During P1's turn, P2 plays a land from hand
+        var p2Card = FindLandInHand(state.Player2);
         p2Handler.EnqueueAction(GameAction.PlayCard(state.Player2.Id, p2Card.Id));
 
         state.IsFirstTurn = true;
@@ -216,19 +237,21 @@ public class GameEngineIntegrationTests
     }
 
     [Fact]
-    public async Task PlayCard_TapIt_MoveToGraveyard_AllInOneTurn()
+    public async Task PlayCard_TapIt_ThenManuallyMoveToGraveyard()
     {
         var engine = CreateGame(out var state, out var p1Handler, out _);
         await engine.StartGameAsync();
 
-        var card = state.Player1.Hand.Cards[0];
+        var card = FindLandInHand(state.Player1);
         p1Handler.EnqueueAction(GameAction.PlayCard(state.Player1.Id, card.Id));
         p1Handler.EnqueueAction(GameAction.TapCard(state.Player1.Id, card.Id));
-        p1Handler.EnqueueAction(
-            GameAction.MoveCard(state.Player1.Id, card.Id, ZoneType.Battlefield, ZoneType.Graveyard));
 
         state.IsFirstTurn = true;
         await engine.RunTurnAsync();
+
+        // Simulate zone move via direct manipulation (MoveCard action was removed)
+        state.Player1.Battlefield.RemoveById(card.Id);
+        state.Player1.Graveyard.Add(card);
 
         state.Player1.Hand.Count.Should().Be(6);
         state.Player1.Battlefield.Count.Should().Be(0);
@@ -242,7 +265,7 @@ public class GameEngineIntegrationTests
         var engine = CreateGame(out var state, out var p1Handler, out _);
         await engine.StartGameAsync();
 
-        var card = state.Player1.Hand.Cards[0];
+        var card = FindLandInHand(state.Player1);
         p1Handler.EnqueueAction(GameAction.PlayCard(state.Player1.Id, card.Id));
 
         state.IsFirstTurn = true;
@@ -266,17 +289,18 @@ public class GameEngineIntegrationTests
     [Fact]
     public async Task MultipleActionsInSamePriorityWindow()
     {
-        // Use a no-land deck so both cards use sandbox path (no land-drop limit)
+        // Test playing two lands in same turn using Exploration for extra land drops
         var p1Handler = new TestDecisionHandler();
         var p2Handler = new TestDecisionHandler();
         var p1 = new Player(Guid.NewGuid(), "Alice", p1Handler);
         var p2 = new Player(Guid.NewGuid(), "Bob", p2Handler);
 
+        // All-land deck so we can play two lands with Exploration
         var deck = new DeckBuilder()
-            .AddCard("Grizzly Bears", 60, "Creature — Bear")
+            .AddLand("Forest", 60)
             .Build();
         var deck2 = new DeckBuilder()
-            .AddCard("Goblin Guide", 60, "Creature — Goblin")
+            .AddLand("Mountain", 60)
             .Build();
 
         foreach (var card in deck) p1.Library.Add(card);
@@ -286,7 +310,12 @@ public class GameEngineIntegrationTests
         var engine = new GameEngine(state);
         await engine.StartGameAsync();
 
-        // P1 plays two cards in the same turn (both creatures, sandbox mode)
+        // Put Exploration on the battlefield to allow two land drops per turn
+        var exploration = GameCard.Create("Exploration", "Enchantment");
+        p1.Battlefield.Add(exploration);
+        engine.RecalculateState(); // set MaxLandDrops = 2
+
+        // P1 plays two lands in the same turn
         var card1 = p1.Hand.Cards[0];
         var card2 = p1.Hand.Cards[1];
         p1Handler.EnqueueAction(GameAction.PlayCard(p1.Id, card1.Id));
@@ -295,7 +324,7 @@ public class GameEngineIntegrationTests
         state.IsFirstTurn = true;
         await engine.RunTurnAsync();
 
-        p1.Battlefield.Count.Should().Be(2);
+        p1.Battlefield.Count.Should().Be(3, "Exploration + 2 lands");
         p1.Hand.Count.Should().Be(5);
     }
 

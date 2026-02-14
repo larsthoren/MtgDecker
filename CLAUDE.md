@@ -94,7 +94,7 @@ tests/
   MtgDecker.Domain.Tests/         91 tests
   MtgDecker.Application.Tests/    143 tests
   MtgDecker.Infrastructure.Tests/ 57 tests
-  MtgDecker.Engine.Tests/         488 tests
+  MtgDecker.Engine.Tests/         940 tests
 ```
 
 ## Key Patterns
@@ -113,11 +113,12 @@ tests/
 The `MtgDecker.Engine` project is a standalone game engine with no database dependency. Key concepts:
 
 - **IPlayerDecisionHandler**: Interface for all player decisions (mulligan, actions, combat, targeting). `InteractiveDecisionHandler` uses TaskCompletionSource for UI; `AiBotDecisionHandler` uses heuristics; `TestDecisionHandler` returns queued responses.
-- **Mana system**: ManaCost parsing from Scryfall strings (`{2}{R}{R}`), ManaPool, ManaAbility on lands, auto-tap support. Cards not in `CardDefinitions` registry work in sandbox mode (no mana required).
+- **Mana system**: ManaCost parsing from Scryfall strings (`{2}{R}{R}`), ManaPool, ManaAbility on lands, auto-tap support. Cards must be registered in `CardDefinitions` to be playable; unregistered cards are rejected with a log message.
 - **Combat**: Full MTG combat — declare attackers/blockers, multi-block ordering, damage assignment, summoning sickness, creature death processing.
 - **Stack**: Spells go on the stack, priority passes, targeted spells with `TargetFilter`/`SpellEffect`, counter-spell support. Stack resolves LIFO.
 - **Triggers**: Event-driven system (`GameEvent` → `Trigger` → `IEffect`). ETB effects for token creation, tutor, reveal-and-filter. `ProcessTriggersAsync` fires at relevant points.
 - **AI simulation**: `AiBotDecisionHandler` (heuristic AI) + `BoardEvaluator` (static scoring) + `SimulationRunner` for bot-vs-bot games with batch statistics.
+- **Enforcement**: Summoning sickness prevents tapping creatures the turn they enter (unless haste). Undo is scoped to mana taps only (untap individual lands via UI affordance). Target cancellation lets players back out of targeting sequences. No sandbox/freeform actions — the engine enforces all rules.
 - **State-based actions**: Deck-out (MTG 104.3c) and life-check after combat. `GameState.Winner` tracks game outcome.
 
 ## Critical: EF Core + Blazor Server Pitfalls

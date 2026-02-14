@@ -179,28 +179,4 @@ public class AuraCastingTests
         p1.ManaPool.Available[ManaColor.Green].Should().Be(1);
     }
 
-    [Fact]
-    public async Task Casting_Aura_In_Sandbox_Mode_Still_Attaches()
-    {
-        var handler = new TestDecisionHandler();
-        var p1 = new Player(Guid.NewGuid(), "P1", handler);
-        var p2 = new Player(Guid.NewGuid(), "P2", new TestDecisionHandler());
-        var state = new GameState(p1, p2);
-        var engine = new GameEngine(state);
-
-        var forest = GameCard.Create("Forest");
-        p1.Battlefield.Add(forest);
-
-        // Create aura without mana cost (sandbox mode)
-        var aura = new GameCard { Name = "Wild Growth", CardTypes = CardType.Enchantment };
-        p1.Hand.Add(aura);
-
-        handler.EnqueueCardChoice(forest.Id);
-
-        var action = GameAction.PlayCard(p1.Id, aura.Id);
-        await engine.ExecuteAction(action);
-
-        aura.AttachedTo.Should().Be(forest.Id);
-        p1.Battlefield.Cards.Should().Contain(aura);
-    }
 }

@@ -65,6 +65,8 @@ public class GameEngine
 
             _state.Player1.ManaPool.Clear();
             _state.Player2.ManaPool.Clear();
+            _state.Player1.PendingManaTaps.Clear();
+            _state.Player2.PendingManaTaps.Clear();
 
         } while (_turnStateMachine.AdvancePhase() != null);
 
@@ -92,6 +94,7 @@ public class GameEngine
             case Phase.Untap:
                 foreach (var card in _state.ActivePlayer.Battlefield.Cards)
                     card.IsTapped = false;
+                _state.ActivePlayer.PendingManaTaps.Clear();
                 _state.Log($"{_state.ActivePlayer.Name} untaps all permanents.");
                 break;
 
@@ -174,6 +177,7 @@ public class GameEngine
                     }
 
                     var playManaPaid = await PayManaCostAsync(effectiveCost, player, ct);
+                    player.PendingManaTaps.Clear();
 
                     // Move card to destination
                     player.Hand.RemoveById(playCard.Id);
@@ -206,18 +210,9 @@ public class GameEngine
                 }
                 else
                 {
-                    // Part C: Sandbox — no ManaCost, not a land
-                    player.Hand.RemoveById(playCard.Id);
-                    player.Battlefield.Add(playCard);
-                    playCard.TurnEnteredBattlefield = _state.TurnNumber;
-                    player.ActionHistory.Push(action);
-                    _state.Log($"{player.Name} plays {playCard.Name}.");
-
-                    // Aura attachment: prompt for target after entering battlefield
-                    await TryAttachAuraAsync(playCard, player, ct);
-
-                    await QueueSelfTriggersOnStackAsync(GameEvent.EnterBattlefield, playCard, player, ct);
-                    await OnBoardChangedAsync(ct);
+                    // No ManaCost, not a land — card not supported in engine
+                    _state.Log($"{playCard.Name} is not supported in the engine (no card definition).");
+                    break;
                 }
                 break;
 
@@ -225,6 +220,13 @@ public class GameEngine
                 var tapTarget = player.Battlefield.Cards.FirstOrDefault(c => c.Id == action.CardId);
                 if (tapTarget != null && !tapTarget.IsTapped)
                 {
+                    // Summoning sickness: creatures that entered this turn can't be tapped (lands/artifacts exempt)
+                    if (tapTarget.IsCreature && tapTarget.HasSummoningSickness(_state.TurnNumber))
+                    {
+                        _state.Log($"{tapTarget.Name} has summoning sickness.");
+                        break;
+                    }
+
                     tapTarget.IsTapped = true;
                     player.ActionHistory.Push(action);
 
@@ -288,6 +290,9 @@ public class GameEngine
                             }
                         }
                     }
+
+                    // Track pending tap for scoped undo
+                    player.PendingManaTaps.Add(tapTarget.Id);
                 }
                 break;
 
@@ -298,18 +303,6 @@ public class GameEngine
                     untapTarget.IsTapped = false;
                     player.ActionHistory.Push(action);
                     _state.Log($"{player.Name} untaps {untapTarget.Name}.");
-                }
-                break;
-
-            case ActionType.MoveCard:
-                var source = player.GetZone(action.SourceZone!.Value);
-                var dest = player.GetZone(action.DestinationZone!.Value);
-                var movedCard = source.RemoveById(action.CardId!.Value);
-                if (movedCard != null)
-                {
-                    dest.Add(movedCard);
-                    player.ActionHistory.Push(action);
-                    _state.Log($"{player.Name} moves {movedCard.Name} from {action.SourceZone} to {action.DestinationZone}.");
                 }
                 break;
 
@@ -439,6 +432,13 @@ public class GameEngine
                     var target = await castPlayer.DecisionHandler.ChooseTarget(
                         castCard.Name, eligible, opponent.Id, ct);
 
+                    // Null target means the player cancelled the spell
+                    if (target == null)
+                    {
+                        _state.Log($"{castPlayer.Name} cancels casting {castCard.Name}.");
+                        return;
+                    }
+
                     // Convert player sentinel targets to proper TargetInfo
                     if (target.Zone == ZoneType.None)
                     {
@@ -457,6 +457,7 @@ public class GameEngine
                 }
 
                 var manaPaid = await PayManaCostAsync(castEffectiveCost, castPlayer, ct);
+                castPlayer.PendingManaTaps.Clear();
 
                 castPlayer.Hand.RemoveById(castCard.Id);
                 var stackObj = new StackObject(castCard, castPlayer.Id, manaPaid, targets, _state.Stack.Count);
@@ -539,7 +540,10 @@ public class GameEngine
 
                 // Pay costs: mana
                 if (cost.ManaCost != null)
+                {
                     await PayManaCostAsync(cost.ManaCost, player, ct);
+                    player.PendingManaTaps.Clear();
+                }
 
                 // Pay costs: tap self
                 if (cost.TapSelf)
@@ -633,6 +637,7 @@ public class GameEngine
 
                 // Pay mana using ManaPool.Pay (handles colored + generic)
                 player.ManaPool.Pay(cyclingCost);
+                player.PendingManaTaps.Clear();
 
                 // Discard to graveyard
                 player.Hand.RemoveById(cycleCard.Id);
@@ -800,76 +805,33 @@ public class GameEngine
 
     public bool UndoLastAction(Guid playerId)
     {
-        var player = playerId == _state.Player1.Id ? _state.Player1 : _state.Player2;
-
+        var player = _state.GetPlayer(playerId);
         if (player.ActionHistory.Count == 0) return false;
 
         var action = player.ActionHistory.Peek();
 
-        switch (action.Type)
+        // Only TapCard can be undone, and only if mana is unspent
+        if (action.Type != ActionType.TapCard)
         {
-            case ActionType.PlayCard:
-                var destZone = action.DestinationZone == ZoneType.Graveyard
-                    ? player.Graveyard : player.Battlefield;
-                var card = destZone.RemoveById(action.CardId!.Value);
-                if (card == null) return false;
-                player.ActionHistory.Pop();
-                player.Hand.Add(card);
-                if (action.IsLandDrop)
-                    player.LandsPlayedThisTurn--;
-                if (action.ActualManaPaid != null)
-                {
-                    foreach (var (color, amount) in action.ActualManaPaid)
-                        player.ManaPool.Add(color, amount);
-                }
-                _state.Log($"{player.Name} undoes playing {card.Name}.");
-                break;
-
-            case ActionType.TapCard:
-                var tapTarget = player.Battlefield.Cards.FirstOrDefault(c => c.Id == action.CardId);
-                if (tapTarget == null) return false;
-                player.ActionHistory.Pop();
-                tapTarget.IsTapped = false;
-                if (action.ManaProduced.HasValue)
-                    player.ManaPool.Deduct(action.ManaProduced.Value, 1);
-                _state.Log($"{player.Name} undoes tapping {tapTarget.Name}.");
-                break;
-
-            case ActionType.UntapCard:
-                var untapTarget = player.Battlefield.Cards.FirstOrDefault(c => c.Id == action.CardId);
-                if (untapTarget == null) return false;
-                player.ActionHistory.Pop();
-                untapTarget.IsTapped = true;
-                _state.Log($"{player.Name} undoes untapping {untapTarget.Name}.");
-                break;
-
-            case ActionType.MoveCard:
-                var dest = player.GetZone(action.DestinationZone!.Value);
-                var movedCard = dest.RemoveById(action.CardId!.Value);
-                if (movedCard == null) return false;
-                player.ActionHistory.Pop();
-                var src = player.GetZone(action.SourceZone!.Value);
-                src.Add(movedCard);
-                _state.Log($"{player.Name} undoes moving {movedCard.Name}.");
-                break;
-
-            case ActionType.CastSpell:
-                var stackIdx = _state.Stack.FindLastIndex(s => s is StackObject so && so.Card.Id == action.CardId);
-                if (stackIdx < 0) return false;
-                var removedStack = (StackObject)_state.Stack[stackIdx];
-                _state.Stack.RemoveAt(stackIdx);
-                player.ActionHistory.Pop();
-                player.Hand.Add(removedStack.Card);
-                foreach (var (color, amount) in removedStack.ManaPaid)
-                    player.ManaPool.Add(color, amount);
-                _state.Log($"{player.Name} undoes casting {removedStack.Card.Name}.");
-                break;
-
-            case ActionType.Cycle:
-                _state.Log("Cycling cannot be undone.");
-                return false;
+            _state.Log("Only land taps with unspent mana can be undone.");
+            return false;
         }
 
+        if (!player.PendingManaTaps.Contains(action.CardId!.Value))
+        {
+            _state.Log("Mana already spent — tap cannot be undone.");
+            return false;
+        }
+
+        var tapTarget = player.Battlefield.Cards.FirstOrDefault(c => c.Id == action.CardId);
+        if (tapTarget == null) return false;
+
+        player.ActionHistory.Pop();
+        tapTarget.IsTapped = false;
+        player.PendingManaTaps.Remove(tapTarget.Id);
+        if (action.ManaProduced.HasValue)
+            player.ManaPool.Deduct(action.ManaProduced.Value, 1);
+        _state.Log($"{player.Name} untaps {tapTarget.Name}.");
         return true;
     }
 

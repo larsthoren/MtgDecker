@@ -39,6 +39,12 @@
     box-shadow: 0 0 8px rgba(100, 200, 100, 0.6);
 }
 
+.card-display.summoning-sick {
+    opacity: 0.6;
+    border: 2px dashed #FFD700 !important;
+    border-radius: 6px;
+}
+
 .card-display img {
     width: 100%;
     height: auto;

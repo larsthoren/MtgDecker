@@ -145,7 +145,6 @@ public class GameSession : IDisposable
 
     public void Surrender(int playerSeat)
     {
-        // Surrender always works regardless of engine state — it cancels the loop.
         lock (_stateLock)
         {
             LastActivity = DateTime.UtcNow;
@@ -165,43 +164,6 @@ public class GameSession : IDisposable
             if (!IsEngineSafeForMutation() || _engine == null || State == null) return false;
             var playerId = playerSeat == 1 ? State.Player1.Id : State.Player2.Id;
             return _engine.UndoLastAction(playerId);
-        }
-    }
-
-    public void AdjustLife(int playerSeat, int delta)
-    {
-        lock (_stateLock)
-        {
-            LastActivity = DateTime.UtcNow;
-            if (!IsEngineSafeForMutation() || State == null) return;
-            var player = playerSeat == 1 ? State.Player1 : State.Player2;
-            var oldLife = player.Life;
-            player.AdjustLife(delta);
-            State.Log($"{player.Name}'s life: {oldLife} \u2192 {player.Life}");
-
-            if (player.Life <= 0)
-            {
-                State.IsGameOver = true;
-                Winner = State.GetOpponent(player).Name;
-                State.Log($"{player.Name} loses \u2014 life reached {player.Life}.");
-                _cts?.Cancel();
-            }
-        }
-    }
-
-    public void DrawCard(int playerSeat)
-    {
-        lock (_stateLock)
-        {
-            LastActivity = DateTime.UtcNow;
-            if (!IsEngineSafeForMutation() || State == null) return;
-            var player = playerSeat == 1 ? State.Player1 : State.Player2;
-            var card = player.Library.DrawFromTop();
-            if (card != null)
-            {
-                player.Hand.Add(card);
-                State.Log($"{player.Name} draws a card.");
-            }
         }
     }
 

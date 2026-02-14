@@ -1,6 +1,7 @@
 using FluentAssertions;
 using MtgDecker.Engine;
 using MtgDecker.Engine.Enums;
+using MtgDecker.Engine.Mana;
 using MtgDecker.Engine.Tests.Helpers;
 
 namespace MtgDecker.Engine.Tests;
@@ -31,7 +32,7 @@ public class GameEnginePriorityTests
     public async Task RunPriorityAsync_ActivePlayerActsThenBothPass_PhaseEnds()
     {
         var engine = CreateEngine(out var state, out var p1Handler, out var p2Handler);
-        var card = new GameCard { Name = "Forest", TypeLine = "Basic Land — Forest" };
+        var card = GameCard.Create("Forest", "Basic Land — Forest");
         state.Player1.Hand.Add(card);
 
         p1Handler.EnqueueAction(GameAction.PlayCard(state.Player1.Id, card.Id));
@@ -46,7 +47,8 @@ public class GameEnginePriorityTests
     public async Task RunPriorityAsync_ActivePlayerPasses_OpponentGetsPriority()
     {
         var engine = CreateEngine(out var state, out var p1Handler, out var p2Handler);
-        var card = new GameCard { Name = "Bear", TypeLine = "Creature — Bear" };
+        // Use a land (land drops don't need mana)
+        var card = GameCard.Create("Mountain", "Basic Land — Mountain");
         state.Player2.Hand.Add(card);
 
         p2Handler.EnqueueAction(GameAction.PlayCard(state.Player2.Id, card.Id));
@@ -60,8 +62,8 @@ public class GameEnginePriorityTests
     public async Task RunPriorityAsync_OpponentActs_ActivePlayerGetsPriorityAgain()
     {
         var engine = CreateEngine(out var state, out var p1Handler, out var p2Handler);
-        var card1 = new GameCard { Name = "Forest", TypeLine = "Basic Land — Forest" };
-        var card2 = new GameCard { Name = "Bear", TypeLine = "Creature — Bear" };
+        var card1 = GameCard.Create("Forest", "Basic Land — Forest");
+        var card2 = GameCard.Create("Mountain", "Basic Land — Mountain");
         state.Player2.Hand.Add(card1);
         state.Player1.Hand.Add(card2);
 

@@ -238,35 +238,22 @@ public class CastSpellTests
         state.GameLog.Should().Contain(m => m.Contains("casts"));
     }
 
-    // --- Part C: Sandbox Fallback ---
+    // --- Part C: Unregistered Card Rejection ---
 
     [Fact]
-    public async Task SandboxCard_NoManaCost_PlaysFreely()
+    public async Task UnregisteredCard_WithoutManaCost_IsRejected()
     {
         var (engine, state, _) = CreateSetup();
         await engine.StartGameAsync();
 
-        var widget = new GameCard { Name = "Unknown Widget" };
-        state.Player1.Hand.Add(widget);
+        var card = GameCard.Create("Unknown Creature", "Creature — Mystery");
+        state.Player1.Hand.Add(card);
 
-        await engine.ExecuteAction(GameAction.PlayCard(state.Player1.Id, widget.Id));
+        await engine.ExecuteAction(GameAction.PlayCard(state.Player1.Id, card.Id));
 
-        state.Player1.Battlefield.Cards.Should().Contain(c => c.Id == widget.Id);
-        state.Player1.Hand.Cards.Should().NotContain(c => c.Id == widget.Id);
-    }
-
-    [Fact]
-    public async Task SandboxCard_GoesToBattlefield()
-    {
-        var (engine, state, _) = CreateSetup();
-        await engine.StartGameAsync();
-
-        var widget = new GameCard { Name = "Unknown Widget" };
-        state.Player1.Hand.Add(widget);
-
-        await engine.ExecuteAction(GameAction.PlayCard(state.Player1.Id, widget.Id));
-
-        state.Player1.Battlefield.Cards.Should().Contain(c => c.Id == widget.Id);
+        state.Player1.Battlefield.Cards.Should().NotContain(c => c.Id == card.Id);
+        state.Player1.Hand.Cards.Should().Contain(c => c.Id == card.Id);
+        state.GameLog.Should().Contain(l => l.Contains("not supported"));
     }
 
     // === Task 3: Generic payment validation ===
