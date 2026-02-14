@@ -546,6 +546,13 @@
         }
     }
 
+    protected override async Task OnParametersSetAsync()
+    {
+        // When state updates arrive (e.g. after a land tap), check if a pending
+        // cast can now be completed with the updated mana pool.
+        await TryCompletePendingCast();
+    }
+
     // --- Pass / Combat confirm via PhaseBar ---
 
     private async Task HandlePassOrConfirm()
@@ -814,6 +821,9 @@
         if (_pendingCastCard == null) return;
         if (_pendingCastCard.ManaCost == null) return;
         if (!LocalPlayer.ManaPool.CanPay(_pendingCastCard.ManaCost)) return;
+        // Only dispatch when the handler is ready to receive the action;
+        // OnParametersSetAsync may fire before the engine creates a new action TCS.
+        if (Handler?.IsWaitingForAction != true) return;
 
         var card = _pendingCastCard;
         _pendingCastCard = null;
