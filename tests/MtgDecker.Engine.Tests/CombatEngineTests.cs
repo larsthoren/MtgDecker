@@ -290,4 +290,42 @@ public class CombatEngineTests
         state.Player1.Graveyard.Cards.Should().NotContain(c => c.Id == token.Id);
         state.Player1.Battlefield.Cards.Should().NotContain(c => c.Id == token.Id);
     }
+
+    [Fact]
+    public async Task Combat_Survives_When_Attacker_Exiled_During_Priority()
+    {
+        var (engine, state, p1Handler, p2Handler) = CreateSetup();
+
+        // P1 attacks with a creature
+        var attacker = new GameCard { Name = "Grizzly Bears", CardTypes = CardType.Creature, BasePower = 2, BaseToughness = 2 };
+        state.Player1.Battlefield.Add(attacker);
+
+        state.ActivePlayer = state.Player1;
+        state.CurrentPhase = Phase.Combat;
+
+        // P1 declares attacker, P2 passes during begin combat priority
+        p1Handler.EnqueueAction(GameAction.Pass(state.Player1.Id)); // begin combat priority
+        p2Handler.EnqueueAction(GameAction.Pass(state.Player2.Id)); // begin combat priority
+        p1Handler.EnqueueAttackers([attacker.Id]);
+
+        // During post-attack-declaration priority, simulate exiling the attacker
+        bool exiled = false;
+        p1Handler.OnBeforeAction = () =>
+        {
+            if (!exiled)
+            {
+                exiled = true;
+                state.Player1.Battlefield.Remove(attacker);
+                state.Player1.Exile.Add(attacker);
+            }
+        };
+
+        p2Handler.EnqueueBlockers(new Dictionary<Guid, Guid>());
+
+        // This should NOT throw — combat should handle missing attacker gracefully
+        await engine.RunCombatAsync(CancellationToken.None);
+
+        // Game should not have ended in error
+        state.IsGameOver.Should().BeFalse();
+    }
 }

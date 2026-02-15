@@ -206,9 +206,14 @@ else if (_session.State != null)
         handler?.SubmitAction(action);
     }
 
-    private void HandleSurrender()
+    private async Task HandleSurrender()
     {
-        _session?.Surrender(_playerSeat);
+        var result = await DialogService.ShowMessageBox(
+            "Surrender",
+            "Are you sure you want to surrender?",
+            yesText: "Surrender", cancelText: "Cancel");
+        if (result == true)
+            _session?.Surrender(_playerSeat);
     }
 
     private void HandleUndoTap()

@@ -16,7 +16,8 @@ public class GameSession : IDisposable
     public bool IsFull => Player1Name != null && Player2Name != null;
     public bool IsStarted { get; private set; }
     public bool IsGameOver => State?.IsGameOver ?? false;
-    public string? Winner { get; private set; }
+    private string? _surrenderWinner;
+    public string? Winner => _surrenderWinner ?? State?.Winner;
     public DateTime LastActivity { get; private set; } = DateTime.UtcNow;
     public event Action? OnStateChanged;
 
@@ -172,7 +173,7 @@ public class GameSession : IDisposable
             LastActivity = DateTime.UtcNow;
             if (State == null) return;
             State.IsGameOver = true;
-            Winner = playerSeat == 1 ? Player2Name : Player1Name;
+            _surrenderWinner = playerSeat == 1 ? Player2Name : Player1Name;
             State.Log($"{(playerSeat == 1 ? Player1Name : Player2Name)} surrenders.");
             _cts?.Cancel();
         }

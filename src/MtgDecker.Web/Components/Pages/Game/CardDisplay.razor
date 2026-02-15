@@ -27,6 +27,14 @@
         </div>
     }
 
+    @if (Counters != null)
+    {
+        @foreach (var counter in Counters)
+        {
+            <div class="counter-badge">@counter.Value @counter.Key</div>
+        }
+    }
+
     @if (IsAttacking)
     {
         <div class="combat-indicator attacking-indicator">ATK</div>
@@ -55,6 +63,7 @@
     [Parameter] public bool EligibleTarget { get; set; }
     [Parameter] public bool TargetingDimmed { get; set; }
     [Parameter] public bool SummoningSick { get; set; }
+    [Parameter] public Dictionary<MtgDecker.Engine.Enums.CounterType, int>? Counters { get; set; }
 
     private async Task HandleClick()
     {
