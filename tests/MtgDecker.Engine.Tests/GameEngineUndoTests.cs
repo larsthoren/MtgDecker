@@ -299,6 +299,31 @@ public class GameEngineUndoTests
     }
 
     [Fact]
+    public async Task UndoTap_DynamicMana_RemovesAllProducedMana()
+    {
+        var engine = CreateEngine(out _, out var p1, out _);
+
+        // Serra's Sanctum produces W for each enchantment you control
+        var sanctum = GameCard.Create("Serra's Sanctum", "Legendary Land");
+        p1.Battlefield.Add(sanctum);
+
+        // Add 3 enchantments so Sanctum produces 3 White
+        for (int i = 0; i < 3; i++)
+        {
+            var ench = new GameCard { Name = $"Enchantment{i}", CardTypes = CardType.Enchantment };
+            p1.Battlefield.Add(ench);
+        }
+
+        await engine.ExecuteAction(GameAction.TapCard(p1.Id, sanctum.Id));
+        p1.ManaPool[ManaColor.White].Should().Be(3, "Sanctum should produce 3 White with 3 enchantments");
+
+        // Undo should remove all 3 White
+        engine.UndoLastAction(p1.Id).Should().BeTrue();
+        sanctum.IsTapped.Should().BeFalse();
+        p1.ManaPool[ManaColor.White].Should().Be(0, "all dynamic mana should be removed on undo");
+    }
+
+    [Fact]
     public async Task Undo_LogsUntapMessage()
     {
         var engine = CreateEngine(out var state, out var p1, out _);

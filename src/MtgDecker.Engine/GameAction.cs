@@ -18,6 +18,7 @@ public class GameAction
     // Undo metadata — set by GameEngine during ExecuteAction
     public bool IsManaAbility { get; internal set; }
     public ManaColor? ManaProduced { get; internal set; }
+    public int ManaProducedAmount { get; internal set; } = 1;
     public List<ManaColor>? BonusManaProduced { get; internal set; }
     public bool PainDamageDealt { get; internal set; }
     public ManaCost? ManaCostPaid { get; internal set; }

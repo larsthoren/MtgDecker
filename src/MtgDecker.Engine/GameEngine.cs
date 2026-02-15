@@ -264,6 +264,8 @@ public class GameEngine
                             if (amount > 0)
                             {
                                 player.ManaPool.Add(ability.DynamicColor!.Value, amount);
+                                action.ManaProduced = ability.DynamicColor!.Value;
+                                action.ManaProducedAmount = amount;
                                 _state.Log($"{player.Name} taps {tapTarget.Name} for {amount} {ability.DynamicColor}.");
                             }
                             else
@@ -867,7 +869,7 @@ public class GameEngine
         tapTarget.IsTapped = false;
         player.PendingManaTaps.Remove(tapTarget.Id);
         if (action.ManaProduced.HasValue)
-            player.ManaPool.Deduct(action.ManaProduced.Value, 1);
+            player.ManaPool.Deduct(action.ManaProduced.Value, action.ManaProducedAmount);
         // Also deduct bonus mana from aura triggers (e.g., Wild Growth)
         if (action.BonusManaProduced != null)
         {
