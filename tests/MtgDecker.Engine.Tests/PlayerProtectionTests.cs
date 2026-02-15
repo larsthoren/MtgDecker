@@ -67,6 +67,7 @@ public class PlayerProtectionTests
         var initialLife = p1.Life;
         await engine.ExecuteAction(
             GameAction.ActivateAbility(p2.Id, fanatic.Id, targetPlayerId: p1.Id), default);
+        await engine.ResolveAllTriggersAsync();
 
         // P1 should have taken damage (no shroud)
         p1.Life.Should().BeLessThan(initialLife);

@@ -627,21 +627,13 @@ public class GameEngine
                     break;
                 }
 
-                // Build context and execute effect
-                var effectContext = new EffectContext(_state, player, abilitySource, player.DecisionHandler)
+                // Push activated ability onto the stack (MTG rules: abilities use the stack)
+                var stackObj = new TriggeredAbilityStackObject(abilitySource, player.Id, ability.Effect, effectTarget)
                 {
-                    Target = effectTarget,
                     TargetPlayerId = action.TargetPlayerId,
-                    FireLeaveBattlefieldTriggers = async card =>
-                    {
-                        var ctrl = _state.Player1.Battlefield.Contains(card.Id) ? _state.Player1
-                            : _state.Player2.Battlefield.Contains(card.Id) ? _state.Player2 : null;
-                        if (ctrl != null) await FireLeaveBattlefieldTriggersAsync(card, ctrl, ct);
-                    },
                 };
-
-                await ability.Effect.Execute(effectContext, ct);
-                await OnBoardChangedAsync(ct);
+                _state.StackPush(stackObj);
+                _state.Log($"{abilitySource.Name}'s ability is put on the stack.");
 
                 player.ActionHistory.Push(action);
                 break;
@@ -1387,10 +1379,10 @@ public class GameEngine
         foreach (var group in legendaries)
         {
             var duplicates = group.ToList();
-            var chosenId = await player.DecisionHandler.ChooseCard(
-                duplicates,
-                $"Choose which {duplicates[0].Name} to keep (legendary rule)",
-                optional: false, ct);
+            var chosen = await player.DecisionHandler.ChooseTarget(
+                $"Legendary rule: choose which {duplicates[0].Name} to keep",
+                duplicates, player.Id, ct);
+            var chosenId = chosen?.CardId ?? duplicates[0].Id;
 
             foreach (var card in duplicates.Where(c => c.Id != chosenId))
             {

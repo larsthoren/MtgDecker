@@ -27,8 +27,8 @@ public class LegendaryRuleTests
         p1.Battlefield.Add(sanctum1);
         p1.Battlefield.Add(sanctum2);
 
-        // Player chooses to keep the first one
-        handler.EnqueueCardChoice(sanctum1.Id);
+        // Player chooses to keep the first one (now uses ChooseTarget instead of ChooseCard)
+        handler.EnqueueTarget(new TargetInfo(sanctum1.Id, p1.Id, ZoneType.Battlefield));
 
         await engine.CheckStateBasedActionsAsync();
 
@@ -81,7 +81,7 @@ public class LegendaryRuleTests
         p1.Battlefield.Add(s2);
         p1.Battlefield.Add(s3);
 
-        handler.EnqueueCardChoice(s2.Id);
+        handler.EnqueueTarget(new TargetInfo(s2.Id, p1.Id, ZoneType.Battlefield));
 
         await engine.CheckStateBasedActionsAsync();
 
@@ -143,7 +143,7 @@ public class LegendaryRuleTests
         p1.Battlefield.Add(sanctum1);
         p1.Battlefield.Add(sanctum2);
 
-        handler.EnqueueCardChoice(sanctum1.Id);
+        handler.EnqueueTarget(new TargetInfo(sanctum1.Id, p1.Id, ZoneType.Battlefield));
 
         await engine.CheckStateBasedActionsAsync();
 

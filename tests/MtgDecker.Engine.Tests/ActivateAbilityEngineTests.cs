@@ -40,6 +40,7 @@ public class ActivateAbilityEngineTests
 
         var action = GameAction.ActivateAbility(p1.Id, fanatic.Id, targetId: target.Id);
         await engine.ExecuteAction(action);
+        await engine.ResolveAllTriggersAsync();
 
         // Fanatic should be sacrificed (in graveyard)
         p1.Battlefield.Cards.Should().NotContain(c => c.Id == fanatic.Id);
@@ -58,6 +59,7 @@ public class ActivateAbilityEngineTests
 
         var action = GameAction.ActivateAbility(p1.Id, fanatic.Id, targetPlayerId: p2.Id);
         await engine.ExecuteAction(action);
+        await engine.ResolveAllTriggersAsync();
 
         p1.Battlefield.Cards.Should().NotContain(c => c.Id == fanatic.Id);
         p2.Life.Should().Be(19);
@@ -78,6 +80,7 @@ public class ActivateAbilityEngineTests
 
         var action = GameAction.ActivateAbility(p1.Id, sharpshooter.Id, targetId: target.Id);
         await engine.ExecuteAction(action);
+        await engine.ResolveAllTriggersAsync();
 
         sharpshooter.IsTapped.Should().BeTrue();
         target.DamageMarked.Should().Be(1);
@@ -118,6 +121,7 @@ public class ActivateAbilityEngineTests
 
         var action = GameAction.ActivateAbility(p1.Id, prospector.Id);
         await engine.ExecuteAction(action);
+        await engine.ResolveAllTriggersAsync();
 
         // Token should be sacrificed
         p1.Battlefield.Cards.Should().NotContain(c => c.Id == goblinToken.Id);
@@ -137,6 +141,7 @@ public class ActivateAbilityEngineTests
 
         var action = GameAction.ActivateAbility(p1.Id, prospector.Id);
         await engine.ExecuteAction(action);
+        await engine.ResolveAllTriggersAsync();
 
         p1.ManaPool[ManaColor.Red].Should().Be(1);
         p1.Battlefield.Cards.Should().NotContain(c => c.Id == prospector.Id);
@@ -158,6 +163,7 @@ public class ActivateAbilityEngineTests
 
         var action = GameAction.ActivateAbility(p1.Id, sgc.Id, targetPlayerId: p2.Id);
         await engine.ExecuteAction(action);
+        await engine.ResolveAllTriggersAsync();
 
         p1.Battlefield.Cards.Should().NotContain(c => c.Id == sgc.Id);
         p2.Life.Should().Be(18);
@@ -188,6 +194,7 @@ public class ActivateAbilityEngineTests
 
         var action = GameAction.ActivateAbility(p1.Id, sgc.Id, targetId: target.Id);
         await engine.ExecuteAction(action);
+        await engine.ResolveAllTriggersAsync();
 
         p1.Battlefield.Cards.Should().NotContain(c => c.Id == goblinToken.Id);
         target.DamageMarked.Should().Be(2);
@@ -233,6 +240,7 @@ public class ActivateAbilityEngineTests
 
         var action = GameAction.ActivateAbility(p1.Id, port.Id, targetId: targetLand.Id);
         await engine.ExecuteAction(action);
+        await engine.ResolveAllTriggersAsync();
 
         port.IsTapped.Should().BeTrue();
         targetLand.IsTapped.Should().BeTrue();
@@ -253,6 +261,7 @@ public class ActivateAbilityEngineTests
 
         var action = GameAction.ActivateAbility(p1.Id, wasteland.Id, targetId: targetLand.Id);
         await engine.ExecuteAction(action);
+        await engine.ResolveAllTriggersAsync();
 
         p1.Battlefield.Cards.Should().NotContain(c => c.Id == wasteland.Id);
         p1.Graveyard.Cards.Should().Contain(c => c.Id == wasteland.Id);
@@ -274,6 +283,7 @@ public class ActivateAbilityEngineTests
 
         var action = GameAction.ActivateAbility(p1.Id, tinkerer.Id, targetId: artifact.Id);
         await engine.ExecuteAction(action);
+        await engine.ResolveAllTriggersAsync();
 
         p1.Battlefield.Cards.Should().NotContain(c => c.Id == tinkerer.Id);
         p2.Battlefield.Cards.Should().NotContain(c => c.Id == artifact.Id);
@@ -294,6 +304,7 @@ public class ActivateAbilityEngineTests
 
         var action = GameAction.ActivateAbility(p1.Id, seal.Id, targetId: enchantment.Id);
         await engine.ExecuteAction(action);
+        await engine.ResolveAllTriggersAsync();
 
         p1.Battlefield.Cards.Should().NotContain(c => c.Id == seal.Id);
         p2.Battlefield.Cards.Should().NotContain(c => c.Id == enchantment.Id);
@@ -318,6 +329,7 @@ public class ActivateAbilityEngineTests
 
         var action = GameAction.ActivateAbility(p1.Id, grove.Id);
         await engine.ExecuteAction(action);
+        await engine.ResolveAllTriggersAsync();
 
         p1.Battlefield.Cards.Should().NotContain(c => c.Id == grove.Id);
         p1.Graveyard.Cards.Should().Contain(c => c.Id == grove.Id);
@@ -366,6 +378,7 @@ public class ActivateAbilityEngineTests
 
         var action = GameAction.ActivateAbility(p1.Id, sharpshooter.Id, targetPlayerId: p2.Id);
         await engine.ExecuteAction(action);
+        await engine.ResolveAllTriggersAsync();
 
         sharpshooter.IsTapped.Should().BeTrue();
         p2.Life.Should().Be(19);

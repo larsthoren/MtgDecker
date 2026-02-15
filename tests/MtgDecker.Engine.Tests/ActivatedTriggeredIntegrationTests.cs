@@ -88,6 +88,7 @@ public class ActivatedTriggeredIntegrationTests
         handler.EnqueueCardChoice(token.Id);
 
         await engine.ExecuteAction(GameAction.ActivateAbility(p1.Id, prospector.Id));
+        await engine.ResolveAllTriggersAsync();
 
         p1.Battlefield.Cards.Should().NotContain(c => c.Id == token.Id);
         p1.ManaPool.Available.Should().ContainKey(ManaColor.Red);
@@ -111,6 +112,7 @@ public class ActivatedTriggeredIntegrationTests
         p2.Battlefield.Add(artifact);
 
         await engine.ExecuteAction(GameAction.ActivateAbility(p1.Id, seal.Id, targetId: artifact.Id));
+        await engine.ResolveAllTriggersAsync();
 
         p1.Battlefield.Cards.Should().NotContain(c => c.Id == seal.Id);
         p2.Battlefield.Cards.Should().NotContain(c => c.Id == artifact.Id);
