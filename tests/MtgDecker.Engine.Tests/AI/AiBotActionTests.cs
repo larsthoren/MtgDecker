@@ -202,4 +202,27 @@ public class AiBotActionTests
         action.Type.Should().Be(ActionType.PlayCard);
         action.CardId.Should().Be(mountain.Id);
     }
+
+    [Fact]
+    public async Task ChooseManaColor_PicksColorNeededBySpellsInHand()
+    {
+        var (state, player) = CreateGameWithBot();
+        player.LandsPlayedThisTurn = 1;
+
+        // Volcanic Island produces [Blue, Red] — Blue is first in list
+        var volcanic = GameCard.Create("Volcanic Island", "Land");
+        player.Battlefield.Add(volcanic);
+
+        // Bot has a Red spell in hand
+        player.Hand.Add(new GameCard { Name = "Lightning Bolt", CardTypes = CardType.Instant, ManaCost = ManaCost.Parse("{R}") });
+
+        // Bot should tap the land
+        var bot = (AiBotDecisionHandler)player.DecisionHandler;
+        var action = await bot.GetAction(state, player.Id);
+        action.Type.Should().Be(ActionType.TapCard);
+
+        // When choosing mana color, bot should pick Red (needed by spell), not Blue (first in list)
+        var chosen = await bot.ChooseManaColor([ManaColor.Blue, ManaColor.Red]);
+        chosen.Should().Be(ManaColor.Red, "bot should pick the color needed by spells in hand");
+    }
 }
