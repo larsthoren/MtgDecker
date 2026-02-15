@@ -17,6 +17,9 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
     /// </summary>
     public int ActionDelayMs { get; set; } = 1000;
 
+    // Colors needed by spells in hand, cached by GetAction for ChooseManaColor to consult
+    private HashSet<ManaColor> _neededColors = new();
+
     private async Task DelayAsync(CancellationToken ct)
     {
         if (ActionDelayMs > 0)
@@ -91,6 +94,12 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
 
             if (CanAffordAnySpell(hand, untappedLands, player, gameState, potentialMana))
             {
+                // Cache needed colors so ChooseManaColor picks the right color
+                _neededColors.Clear();
+                foreach (var spell in hand.Where(c => !c.IsLand && c.ManaCost != null))
+                    foreach (var color in spell.ManaCost!.ColorRequirements.Keys)
+                        _neededColors.Add(color);
+
                 await DelayAsync(ct);
                 return GameAction.TapCard(playerId, untappedLands[0].Id);
             }
@@ -219,14 +228,24 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
     }
 
     /// <summary>
-    /// Prefers colored mana over colorless when given a choice.
+    /// Picks a mana color from the available options, preferring colors needed
+    /// by spells in hand, then any colored mana over colorless.
     /// </summary>
     public Task<ManaColor> ChooseManaColor(IReadOnlyList<ManaColor> options, CancellationToken ct = default)
     {
-        // Prefer colored mana over colorless
-        var colored = options.FirstOrDefault(c => c != ManaColor.Colorless);
-        if (options.Any(c => c != ManaColor.Colorless))
-            return Task.FromResult(colored);
+        // Prefer a color needed by spells in hand
+        foreach (var option in options)
+        {
+            if (_neededColors.Contains(option))
+                return Task.FromResult(option);
+        }
+
+        // Fallback: prefer colored mana over colorless
+        foreach (var option in options)
+        {
+            if (option != ManaColor.Colorless)
+                return Task.FromResult(option);
+        }
 
         return Task.FromResult(options[0]);
     }
