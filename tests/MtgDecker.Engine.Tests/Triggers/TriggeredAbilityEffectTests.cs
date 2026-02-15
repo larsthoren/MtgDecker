@@ -412,8 +412,9 @@ public class TriggeredAbilityEffectTests
         player.Library.Add(card2);
         player.Library.Add(card3); // top
 
-        // Choose card2 to go on top
+        // Choose card2 on top, card3 second (card1 goes last automatically)
         handler.EnqueueCardChoice(card2.Id);
+        handler.EnqueueCardChoice(card3.Id);
 
         var effect = new RearrangeTopEffect(3);
         var source = new GameCard { Name = "Mirri's Guile" };
@@ -428,12 +429,40 @@ public class TriggeredAbilityEffectTests
     }
 
     [Fact]
+    public async Task RearrangeTopEffect_FullOrdering_AllThreeCards()
+    {
+        var (state, player, _, handler, _) = CreateSetup();
+        var card1 = new GameCard { Name = "Card A" };
+        var card2 = new GameCard { Name = "Card B" };
+        var card3 = new GameCard { Name = "Card C" };
+        player.Library.Add(card1); // bottom
+        player.Library.Add(card2);
+        player.Library.Add(card3); // top
+
+        // Choose full ordering: card1 on top, then card3 second (card2 goes last automatically)
+        handler.EnqueueCardChoice(card1.Id);
+        handler.EnqueueCardChoice(card3.Id);
+
+        var effect = new RearrangeTopEffect(3);
+        var source = new GameCard { Name = "Mirri's Guile" };
+        var context = new EffectContext(state, player, source, handler);
+
+        await effect.Execute(context);
+
+        player.Library.Count.Should().Be(3);
+        // Verify full ordering: top=card1, second=card3, bottom=card2
+        player.Library.DrawFromTop()!.Id.Should().Be(card1.Id, "card1 should be on top");
+        player.Library.DrawFromTop()!.Id.Should().Be(card3.Id, "card3 should be second");
+        player.Library.DrawFromTop()!.Id.Should().Be(card2.Id, "card2 should be on bottom");
+    }
+
+    [Fact]
     public async Task RearrangeTopEffect_FewerCardsThanCount_HandlesGracefully()
     {
         var (state, player, _, handler, _) = CreateSetup();
         var card1 = new GameCard { Name = "Card A" };
         player.Library.Add(card1);
-        handler.EnqueueCardChoice(card1.Id);
+        // Only 1 card — no choice needed, goes back automatically
 
         var effect = new RearrangeTopEffect(3);
         var source = new GameCard { Name = "Mirri's Guile" };

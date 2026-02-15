@@ -13,16 +13,34 @@ public class RearrangeTopEffect(int count) : IEffect
 
         if (topCards.Count == 0) return;
 
-        var chosenId = await context.DecisionHandler.ChooseCard(
-            topCards, "Choose a card to put on top", optional: false, ct);
+        // Let the player order all cards (pick top first, then second, etc.)
+        var ordered = new List<GameCard>();
+        var remaining = new List<GameCard>(topCards);
 
-        var chosen = topCards.FirstOrDefault(c => c.Id == chosenId);
-        var rest = topCards.Where(c => c.Id != chosenId).ToList();
+        while (remaining.Count > 1)
+        {
+            var chosenId = await context.DecisionHandler.ChooseCard(
+                remaining, $"Choose card to put on top (position {ordered.Count + 1})", optional: false, ct);
 
-        foreach (var card in rest)
-            context.Controller.Library.AddToTop(card);
-        if (chosen != null)
-            context.Controller.Library.AddToTop(chosen);
+            var chosen = remaining.FirstOrDefault(c => c.Id == chosenId);
+            if (chosen != null)
+            {
+                ordered.Add(chosen);
+                remaining.Remove(chosen);
+            }
+            else
+            {
+                break;
+            }
+        }
+
+        // Last card goes automatically
+        if (remaining.Count == 1)
+            ordered.Add(remaining[0]);
+
+        // Put back in reverse order so first chosen ends up on top
+        for (int i = ordered.Count - 1; i >= 0; i--)
+            context.Controller.Library.AddToTop(ordered[i]);
 
         context.State.Log($"{context.Controller.Name} rearranges top {topCards.Count} cards.");
     }
