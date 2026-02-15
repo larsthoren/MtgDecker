@@ -47,6 +47,7 @@ public class FullPlayIntegrationTests
 
         var action = GameAction.ActivateAbility(p1.Id, aura.Id, target.Id);
         await engine.ExecuteAction(action);
+        await engine.ResolveAllTriggersAsync();
 
         p1.Battlefield.Cards.Should().NotContain(c => c.Name == "Aura of Silence");
         p2.Battlefield.Cards.Should().NotContain(c => c.Name == "Enemy Enchantment");

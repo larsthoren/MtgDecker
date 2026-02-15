@@ -109,6 +109,7 @@ public class DeferredCardsIntegrationTests
         // Activation 1: exile the bear
         await engine.ExecuteAction(
             GameAction.ActivateAbility(state.Player1.Id, wave.Id, targetId: bear.Id));
+        await engine.ResolveAllTriggersAsync();
 
         state.Player2.Battlefield.Contains(bear.Id).Should().BeFalse("bear should be exiled");
         state.Player2.Exile.Contains(bear.Id).Should().BeTrue("bear should be in exile zone");
@@ -117,6 +118,7 @@ public class DeferredCardsIntegrationTests
         // Activation 2: exile the angel
         await engine.ExecuteAction(
             GameAction.ActivateAbility(state.Player1.Id, wave.Id, targetId: angel.Id));
+        await engine.ResolveAllTriggersAsync();
 
         state.Player2.Battlefield.Contains(angel.Id).Should().BeFalse("angel should be exiled");
         state.Player2.Exile.Contains(angel.Id).Should().BeTrue("angel should be in exile zone");
@@ -160,8 +162,10 @@ public class DeferredCardsIntegrationTests
         // Exile both creatures via Wave activations
         await engine.ExecuteAction(
             GameAction.ActivateAbility(state.Player1.Id, wave.Id, targetId: bear.Id));
+        await engine.ResolveAllTriggersAsync();
         await engine.ExecuteAction(
             GameAction.ActivateAbility(state.Player1.Id, wave.Id, targetId: angel.Id));
+        await engine.ResolveAllTriggersAsync();
 
         state.Player2.Exile.Contains(bear.Id).Should().BeTrue("bear should be in exile");
         state.Player2.Exile.Contains(angel.Id).Should().BeTrue("angel should be in exile");

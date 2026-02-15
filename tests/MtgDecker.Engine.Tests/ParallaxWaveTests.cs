@@ -93,6 +93,7 @@ public class ParallaxWaveTests
 
         // Activate ability targeting creature
         await engine.ExecuteAction(GameAction.ActivateAbility(state.Player1.Id, wave.Id, targetId: creature.Id));
+        await engine.ResolveAllTriggersAsync();
 
         // Counter should decrement
         wave.GetCounters(CounterType.Fade).Should().Be(4);
