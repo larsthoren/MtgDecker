@@ -181,4 +181,42 @@ public class OpalescenceTests
         state.Player1.Graveyard.Contains(presence.Id).Should().BeTrue(
             "dead enchantment-creature goes to graveyard");
     }
+
+    [Fact]
+    public void TwoOpalescences_OldOne_NoSummoningSickness()
+    {
+        var handler = new TestDecisionHandler();
+        var state = new GameState(
+            new Player(Guid.NewGuid(), "P1", handler),
+            new Player(Guid.NewGuid(), "P2", handler));
+
+        var engine = new GameEngine(state);
+
+        // First Opalescence entered on turn 1
+        var opalA = GameCard.Create("Opalescence", "Enchantment");
+        opalA.TurnEnteredBattlefield = 1;
+        state.Player1.Battlefield.Add(opalA);
+
+        // Advance state to turn 5
+        state.TurnNumber = 5;
+
+        // Second Opalescence enters on turn 5
+        var opalB = GameCard.Create("Opalescence", "Enchantment");
+        opalB.TurnEnteredBattlefield = 5;
+        state.Player1.Battlefield.Add(opalB);
+
+        engine.RecalculateState();
+
+        // Both should be creatures (each made by the other's effect)
+        opalA.IsCreature.Should().BeTrue("second Opalescence makes first into a creature");
+        opalB.IsCreature.Should().BeTrue("first Opalescence makes second into a creature");
+
+        // Old Opalescence (entered turn 1) should NOT have summoning sickness on turn 5
+        opalA.HasSummoningSickness(state.TurnNumber).Should().BeFalse(
+            "Opalescence A entered on turn 1 — not summoning sick on turn 5");
+
+        // New Opalescence (entered turn 5) SHOULD have summoning sickness
+        opalB.HasSummoningSickness(state.TurnNumber).Should().BeTrue(
+            "Opalescence B entered on turn 5 — summoning sick on turn 5");
+    }
 }
