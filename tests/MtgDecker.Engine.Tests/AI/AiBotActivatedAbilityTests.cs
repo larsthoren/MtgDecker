@@ -124,6 +124,58 @@ public class AiBotActivatedAbilityTests
     }
 
     [Fact]
+    public async Task Bot_Does_Not_Target_Shroud_Creature_With_DealDamageEffect()
+    {
+        var (state, bot, opponent) = CreateGameWithBot();
+
+        var fanatic = GameCard.Create("Mogg Fanatic", "Creature — Goblin");
+        bot.Battlefield.Add(fanatic);
+
+        // Opponent has a 1-toughness creature with shroud — should NOT be targeted
+        var enchantress = new GameCard
+        {
+            Name = "Argothian Enchantress", CardTypes = CardType.Creature,
+            BasePower = 0, BaseToughness = 1
+        };
+        enchantress.ActiveKeywords.Add(Keyword.Shroud);
+        opponent.Battlefield.Add(enchantress);
+
+        bot.Hand.Add(new GameCard { Name = "Filler", CardTypes = CardType.Creature, ManaCost = ManaCost.Parse("{5}{R}{R}") });
+
+        var action = await bot.DecisionHandler.GetAction(state, bot.Id);
+
+        // Should NOT target the shroud creature
+        action.Type.Should().NotBe(ActionType.ActivateAbility);
+    }
+
+    [Fact]
+    public async Task Bot_Does_Not_Target_Shroud_Creature_With_ExileEffect()
+    {
+        var (state, bot, opponent) = CreateGameWithBot();
+
+        // Parallax Wave with a fade counter
+        var wave = GameCard.Create("Parallax Wave");
+        wave.AddCounters(CounterType.Fade, 5);
+        bot.Battlefield.Add(wave);
+
+        // Opponent has only a shrouded creature
+        var shrouded = new GameCard
+        {
+            Name = "Nimble Mongoose", CardTypes = CardType.Creature,
+            BasePower = 1, BaseToughness = 1
+        };
+        shrouded.ActiveKeywords.Add(Keyword.Shroud);
+        opponent.Battlefield.Add(shrouded);
+
+        bot.Hand.Add(new GameCard { Name = "Filler", CardTypes = CardType.Creature, ManaCost = ManaCost.Parse("{5}{R}{R}") });
+
+        var action = await bot.DecisionHandler.GetAction(state, bot.Id);
+
+        // Should NOT target the shroud creature with exile
+        action.Type.Should().NotBe(ActionType.ActivateAbility);
+    }
+
+    [Fact]
     public async Task Bot_Does_Not_Activate_Tapped_Creature()
     {
         var (state, bot, opponent) = CreateGameWithBot();

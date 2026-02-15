@@ -178,6 +178,22 @@ public class ShroudTests
     }
 
     [Fact]
+    public void ArgothianEnchantress_Has_Intrinsic_Shroud()
+    {
+        var p1 = new Player(Guid.NewGuid(), "P1", new TestDecisionHandler());
+        var p2 = new Player(Guid.NewGuid(), "P2", new TestDecisionHandler());
+        var state = new GameState(p1, p2);
+        var engine = new GameEngine(state);
+
+        var enchantress = GameCard.Create("Argothian Enchantress");
+        p1.Battlefield.Add(enchantress);
+
+        engine.RecalculateState();
+
+        enchantress.ActiveKeywords.Should().Contain(Keyword.Shroud);
+    }
+
+    [Fact]
     public async Task CastSpell_Fails_When_All_Targets_Have_Shroud()
     {
         var handler1 = new TestDecisionHandler();

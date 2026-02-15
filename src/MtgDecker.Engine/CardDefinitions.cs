@@ -122,6 +122,12 @@ public static class CardDefinitions
             {
                 Subtypes = ["Human", "Druid"],
                 Triggers = [new Trigger(GameEvent.SpellCast, TriggerCondition.ControllerCastsEnchantment, new DrawCardEffect())],
+                ContinuousEffects =
+                [
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
+                        (card, _) => card.Name == "Argothian Enchantress",
+                        GrantedKeyword: Keyword.Shroud),
+                ],
             },
             ["Swords to Plowshares"] = new(ManaCost.Parse("{W}"), null, null, null, CardType.Instant,
                 TargetFilter.Creature(), new SwordsToPlowsharesEffect()),
