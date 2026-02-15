@@ -129,6 +129,42 @@ public class TapForManaTests
     }
 
     [Fact]
+    public async Task TapPainLand_ColoredChoice_Deals1Damage()
+    {
+        var (engine, state, handler) = CreateSetup();
+        await engine.StartGameAsync();
+
+        var brushland = GameCard.Create("Brushland", "Land");
+        state.Player1.Battlefield.Add(brushland);
+
+        handler.EnqueueManaColor(ManaColor.Green);
+
+        var initialLife = state.Player1.Life;
+        await engine.ExecuteAction(GameAction.TapCard(state.Player1.Id, brushland.Id));
+
+        state.Player1.ManaPool[ManaColor.Green].Should().Be(1);
+        state.Player1.Life.Should().Be(initialLife - 1, "painland should deal 1 damage when tapped for colored mana");
+    }
+
+    [Fact]
+    public async Task TapPainLand_ColorlessChoice_NoDamage()
+    {
+        var (engine, state, handler) = CreateSetup();
+        await engine.StartGameAsync();
+
+        var brushland = GameCard.Create("Brushland", "Land");
+        state.Player1.Battlefield.Add(brushland);
+
+        handler.EnqueueManaColor(ManaColor.Colorless);
+
+        var initialLife = state.Player1.Life;
+        await engine.ExecuteAction(GameAction.TapCard(state.Player1.Id, brushland.Id));
+
+        state.Player1.ManaPool[ManaColor.Colorless].Should().Be(1);
+        state.Player1.Life.Should().Be(initialLife, "painland should not deal damage when tapped for colorless mana");
+    }
+
+    [Fact]
     public async Task TapAlreadyTappedCard_DoesNothing()
     {
         var (engine, state, _) = CreateSetup();
