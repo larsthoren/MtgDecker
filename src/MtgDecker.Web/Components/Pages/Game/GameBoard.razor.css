@@ -205,9 +205,14 @@
     z-index: 2;
 }
 
-/* Only overlap when there's an aura above (adjacent sibling) */
+/* Overlap when there's an aura above (adjacent sibling) */
 .attached-aura + .host-card {
     margin-top: -174px; /* 146px * 1.4 - 30px peek = ~174px overlap */
+}
+
+/* Multiple auras stacked: each subsequent aura overlaps the previous */
+.attached-aura + .attached-aura {
+    margin-top: -174px;
 }
 
 /* On hover, aura rises to front — full card visible */
@@ -219,6 +224,10 @@
 /* Opponent cards use same size — overlap matches player cards */
 .attached-aura-sm + .host-card {
     margin-top: -174px !important; /* 146px * 1.4 - 30px peek = ~174px overlap */
+}
+
+.attached-aura-sm + .attached-aura-sm {
+    margin-top: -174px !important;
 }
 
 /* Land wrapper with untap affordance */
