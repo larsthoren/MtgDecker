@@ -24,6 +24,7 @@ public class PutCreatureFromHandEffect(string subtype) : IEffect
             {
                 context.Controller.Battlefield.Add(chosen);
                 chosen.TurnEnteredBattlefield = context.State.TurnNumber;
+                if (chosen.EntersTapped) chosen.IsTapped = true;
                 context.State.Log($"{context.Controller.Name} puts {chosen.Name} onto the battlefield.");
             }
         }

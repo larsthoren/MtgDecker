@@ -20,6 +20,7 @@ public class GameCard
     public IReadOnlyList<Trigger> Triggers { get; init; } = [];
     public bool IsToken { get; init; }
     public bool IsLegendary { get; init; }
+    public bool EntersTapped { get; init; }
     public FetchAbility? FetchAbility { get; init; }
 
     // Base power/toughness from the card definition
@@ -119,6 +120,7 @@ public class GameCard
                 Subtypes = def.Subtypes,
                 Triggers = def.Triggers,
                 IsLegendary = def.IsLegendary,
+                EntersTapped = def.EntersTapped,
                 FetchAbility = def.FetchAbility,
             };
         }
@@ -154,6 +156,7 @@ public class GameCard
                 Subtypes = def.Subtypes,
                 Triggers = def.Triggers,
                 IsLegendary = def.IsLegendary,
+                EntersTapped = def.EntersTapped,
                 FetchAbility = def.FetchAbility,
             };
         }

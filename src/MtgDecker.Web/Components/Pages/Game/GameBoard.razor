@@ -630,7 +630,8 @@
         }
 
         // Untapped lands with mana ability: tap for mana immediately
-        if (!card.IsTapped && card.ManaAbility != null)
+        // Unless the land also has an activated ability (e.g. Mishra's Factory) — show action menu
+        if (!card.IsTapped && card.ManaAbility != null && !HasActivatedAbility(card))
         {
             await OnAction.InvokeAsync(GameAction.TapCard(LocalPlayer.Id, card.Id));
             ClearSelection();
