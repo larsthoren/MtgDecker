@@ -249,6 +249,13 @@ public class GameEngine
                                 ability.ChoiceColors!, ct);
                             player.ManaPool.Add(chosen);
                             action.ManaProduced = chosen;
+                            // Painland: deal 1 damage for colored mana choices
+                            if (ability.PainColors != null && ability.PainColors.Contains(chosen))
+                            {
+                                player.AdjustLife(-1);
+                                action.PainDamageDealt = true;
+                                _state.Log($"{tapTarget.Name} deals 1 damage to {player.Name}.");
+                            }
                             _state.Log($"{player.Name} taps {tapTarget.Name} for {chosen}.");
                         }
                         else if (ability.Type == ManaAbilityType.Dynamic)
@@ -281,6 +288,13 @@ public class GameEngine
                         {
                             if (trigger.Condition == TriggerCondition.AttachedPermanentTapped)
                             {
+                                // Track bonus mana for undo
+                                if (trigger.Effect is Triggers.Effects.AddBonusManaEffect bonusMana)
+                                {
+                                    action.BonusManaProduced ??= [];
+                                    action.BonusManaProduced.Add(bonusMana.Color);
+                                }
+
                                 var ctx = new EffectContext(_state, player, aura, player.DecisionHandler)
                                 {
                                     FireLeaveBattlefieldTriggers = async card =>
@@ -854,6 +868,15 @@ public class GameEngine
         player.PendingManaTaps.Remove(tapTarget.Id);
         if (action.ManaProduced.HasValue)
             player.ManaPool.Deduct(action.ManaProduced.Value, 1);
+        // Also deduct bonus mana from aura triggers (e.g., Wild Growth)
+        if (action.BonusManaProduced != null)
+        {
+            foreach (var bonusColor in action.BonusManaProduced)
+                player.ManaPool.Deduct(bonusColor, 1);
+        }
+        // Restore pain damage from painlands
+        if (action.PainDamageDealt)
+            player.AdjustLife(1);
         _state.Log($"{player.Name} untaps {tapTarget.Name}.");
         return true;
     }

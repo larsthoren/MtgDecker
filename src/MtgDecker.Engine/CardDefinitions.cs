@@ -106,7 +106,9 @@ public static class CardDefinitions
             // === Goblins lands ===
             ["Mountain"] = new(null, ManaAbility.Fixed(ManaColor.Red), null, null, CardType.Land) { Subtypes = ["Mountain"] },
             ["Forest"] = new(null, ManaAbility.Fixed(ManaColor.Green), null, null, CardType.Land) { Subtypes = ["Forest"] },
-            ["Karplusan Forest"] = new(null, ManaAbility.Choice(ManaColor.Colorless, ManaColor.Red, ManaColor.Green), null, null, CardType.Land),
+            ["Karplusan Forest"] = new(null, ManaAbility.PainChoice(
+                [ManaColor.Colorless, ManaColor.Red, ManaColor.Green],
+                [ManaColor.Red, ManaColor.Green]), null, null, CardType.Land),
             ["Wooded Foothills"] = new(null, null, null, null, CardType.Land) { FetchAbility = new FetchAbility(["Mountain", "Forest"]) },
             ["Rishadan Port"] = new(null, null, null, null, CardType.Land)
             {
@@ -223,7 +225,9 @@ public static class CardDefinitions
 
             // === Enchantress lands ===
             ["Plains"] = new(null, ManaAbility.Fixed(ManaColor.White), null, null, CardType.Land) { Subtypes = ["Plains"] },
-            ["Brushland"] = new(null, ManaAbility.Choice(ManaColor.Colorless, ManaColor.Green, ManaColor.White), null, null, CardType.Land),
+            ["Brushland"] = new(null, ManaAbility.PainChoice(
+                [ManaColor.Colorless, ManaColor.Green, ManaColor.White],
+                [ManaColor.Green, ManaColor.White]), null, null, CardType.Land),
             ["Windswept Heath"] = new(null, null, null, null, CardType.Land) { FetchAbility = new FetchAbility(["Plains", "Forest"]) },
             ["Serra's Sanctum"] = new(null, ManaAbility.Dynamic(ManaColor.White,
                 p => p.Battlefield.Cards.Count(c => c.CardTypes.HasFlag(CardType.Enchantment))),

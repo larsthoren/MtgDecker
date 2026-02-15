@@ -254,6 +254,51 @@ public class GameEngineUndoTests
     }
 
     [Fact]
+    public async Task UndoTap_LandWithWildGrowth_RemovesBonusMana()
+    {
+        var engine = CreateEngine(out _, out var p1, out _);
+        var forest = GameCard.Create("Forest", "Basic Land — Forest");
+        p1.Battlefield.Add(forest);
+
+        // Attach Wild Growth aura to the forest
+        var wildGrowth = GameCard.Create("Wild Growth", "Enchantment — Aura");
+        wildGrowth.AttachedTo = forest.Id;
+        p1.Battlefield.Add(wildGrowth);
+
+        // Tap forest — should produce G (land) + G (Wild Growth trigger)
+        await engine.ExecuteAction(GameAction.TapCard(p1.Id, forest.Id));
+        p1.ManaPool[ManaColor.Green].Should().Be(2, "forest produces G + Wild Growth adds G");
+
+        // Undo the tap — should remove ALL mana produced (land + bonus)
+        var result = engine.UndoLastAction(p1.Id);
+
+        result.Should().BeTrue();
+        forest.IsTapped.Should().BeFalse();
+        p1.ManaPool[ManaColor.Green].Should().Be(0, "both land mana and Wild Growth bonus should be removed on undo");
+    }
+
+    [Fact]
+    public async Task UndoTap_Painland_RestoresLife()
+    {
+        var engine = CreateEngine(out _, out var p1, out _);
+        var handler = (TestDecisionHandler)p1.DecisionHandler;
+        var brushland = GameCard.Create("Brushland", "Land");
+        p1.Battlefield.Add(brushland);
+        handler.EnqueueManaColor(ManaColor.Green);
+
+        var initialLife = p1.Life;
+        await engine.ExecuteAction(GameAction.TapCard(p1.Id, brushland.Id));
+
+        p1.Life.Should().Be(initialLife - 1, "painland should deal 1 damage for colored mana");
+        p1.ManaPool[ManaColor.Green].Should().Be(1);
+
+        // Undo should restore life
+        engine.UndoLastAction(p1.Id).Should().BeTrue();
+        p1.Life.Should().Be(initialLife, "undo should restore the 1 damage from painland");
+        p1.ManaPool[ManaColor.Green].Should().Be(0);
+    }
+
+    [Fact]
     public async Task Undo_LogsUntapMessage()
     {
         var engine = CreateEngine(out var state, out var p1, out _);
