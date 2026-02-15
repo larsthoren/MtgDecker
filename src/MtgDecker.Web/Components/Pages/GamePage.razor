@@ -78,11 +78,16 @@ else if (_session.State != null)
         if (firstRender)
         {
             _componentRendered = true;
-            // Check if handler is already waiting (event fired before we subscribed or before first render)
+            // Check if handler is already waiting (event fired before we subscribed or before first render).
+            // This recovers from circuit reconnects where OnWaitingForInput was missed.
             var handler = _session?.GetHandler(_playerSeat);
             if (handler?.IsWaitingForMulligan == true)
             {
                 await ShowMulliganDialog(0);
+            }
+            else if (handler?.IsWaitingForInput == true)
+            {
+                HandleWaitingForInput();
             }
         }
     }
