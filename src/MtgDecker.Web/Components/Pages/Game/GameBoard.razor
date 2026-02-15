@@ -83,6 +83,7 @@
                                      Power="@card.Power"
                                      Toughness="@card.Toughness"
                                      DamageMarked="@card.DamageMarked"
+                                     Counters="@(card.Counters.Count > 0 ? card.Counters : null)"
                                      OnClick="async () => await HandleOpponentCardClick(card)" />
                     </div>
                 </div>
@@ -120,6 +121,7 @@
                                      Toughness="@card.Toughness"
                                      DamageMarked="@card.DamageMarked"
                                      SummoningSick="@(card.IsCreature && card.HasSummoningSickness(State.TurnNumber))"
+                                     Counters="@(card.Counters.Count > 0 ? card.Counters : null)"
                                      OnClick="async () => await HandleOpponentCardClick(card)" />
                     </div>
                 </div>
@@ -195,6 +197,7 @@
                                      EligibleTarget="@IsEligibleTarget(card)"
                                      TargetingDimmed="@IsTargetingDimmed(card)"
                                      SummoningSick="@(card.IsCreature && card.HasSummoningSickness(State.TurnNumber))"
+                                     Counters="@(card.Counters.Count > 0 ? card.Counters : null)"
                                      Clickable="true"
                                      OnClick="async () => await HandleBattlefieldClick(card, isEligibleAttacker, isEligibleBlocker)" />
                     </div>

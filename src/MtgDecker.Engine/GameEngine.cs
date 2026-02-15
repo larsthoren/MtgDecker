@@ -876,6 +876,9 @@ public class GameEngine
         _state.Combat = new CombatState(attacker.Id, defender.Id);
         _state.Log("Beginning of combat.");
 
+        // Priority at beginning of combat (allows phase stops and instant-speed plays)
+        await RunPriorityAsync(ct);
+
         // Declare Attackers
         _state.CombatStep = CombatStep.DeclareAttackers;
 
@@ -927,6 +930,18 @@ public class GameEngine
         if (_state.StackCount > 0)
             await RunPriorityAsync(ct);
 
+        // Re-validate attackers — creatures may have been exiled during priority
+        validAttackerIds = validAttackerIds
+            .Where(id => attacker.Battlefield.Cards.Any(c => c.Id == id))
+            .ToList();
+        if (validAttackerIds.Count == 0)
+        {
+            _state.Log("All attackers removed from combat.");
+            _state.CombatStep = CombatStep.None;
+            _state.Combat = null;
+            return;
+        }
+
         // Declare Blockers
         _state.CombatStep = CombatStep.DeclareBlockers;
 
@@ -947,7 +962,9 @@ public class GameEngine
             {
                 if (eligibleBlockers.Any(c => c.Id == blockerId) && validAttackerIds.Contains(attackerCardId))
                 {
-                    var attackerCard = attacker.Battlefield.Cards.First(c => c.Id == attackerCardId);
+                    var attackerCard = attacker.Battlefield.Cards.FirstOrDefault(c => c.Id == attackerCardId);
+                    var blockerCard = defender.Battlefield.Cards.FirstOrDefault(c => c.Id == blockerId);
+                    if (attackerCard == null || blockerCard == null) continue;
 
                     // Mountainwalk: cannot be blocked if defender controls a Mountain
                     if (attackerCard.ActiveKeywords.Contains(Keyword.Mountainwalk)
@@ -958,7 +975,6 @@ public class GameEngine
                     }
 
                     _state.Combat.DeclareBlocker(blockerId, attackerCardId);
-                    var blockerCard = defender.Battlefield.Cards.First(c => c.Id == blockerId);
                     _state.Log($"{defender.Name} blocks {attackerCard.Name} with {blockerCard.Name}.");
                 }
             }
@@ -971,11 +987,15 @@ public class GameEngine
             if (blockers.Count > 1)
             {
                 var blockerCards = blockers
-                    .Select(id => defender.Battlefield.Cards.First(c => c.Id == id))
+                    .Select(id => defender.Battlefield.Cards.FirstOrDefault(c => c.Id == id))
+                    .Where(c => c != null)
                     .ToList();
 
-                var orderedIds = await attacker.DecisionHandler.OrderBlockers(attackerId, blockerCards, ct);
-                _state.Combat.SetBlockerOrder(attackerId, orderedIds.ToList());
+                if (blockerCards.Count > 1)
+                {
+                    var orderedIds = await attacker.DecisionHandler.OrderBlockers(attackerId, blockerCards!, ct);
+                    _state.Combat.SetBlockerOrder(attackerId, orderedIds.ToList());
+                }
             }
         }
 
