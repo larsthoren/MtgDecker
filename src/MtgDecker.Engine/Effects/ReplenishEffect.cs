@@ -26,6 +26,7 @@ public class ReplenishEffect : SpellEffect
 
             controller.Battlefield.Add(card);
             card.TurnEnteredBattlefield = state.TurnNumber;
+            if (card.EntersTapped) card.IsTapped = true;
             state.Log($"{card.Name} returns to the battlefield.");
         }
     }

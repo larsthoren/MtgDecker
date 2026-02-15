@@ -165,6 +165,24 @@ public class TapForManaTests
     }
 
     [Fact]
+    public async Task TapCityOfBrass_DealsOneDamage()
+    {
+        var (engine, state, handler) = CreateSetup();
+        await engine.StartGameAsync();
+
+        var city = GameCard.Create("City of Brass", "Land");
+        state.Player1.Battlefield.Add(city);
+
+        handler.EnqueueManaColor(ManaColor.Blue);
+
+        var initialLife = state.Player1.Life;
+        await engine.ExecuteAction(GameAction.TapCard(state.Player1.Id, city.Id));
+
+        state.Player1.ManaPool[ManaColor.Blue].Should().Be(1);
+        state.Player1.Life.Should().Be(initialLife - 1, "City of Brass should deal 1 damage when tapped for any color");
+    }
+
+    [Fact]
     public async Task TapAlreadyTappedCard_DoesNothing()
     {
         var (engine, state, _) = CreateSetup();

@@ -148,6 +148,42 @@ public class AiBotActionTests
     }
 
     [Fact]
+    public async Task GetAction_GreenLands_RedSpells_DoesNotTap()
+    {
+        var (state, player) = CreateGameWithBot();
+        player.LandsPlayedThisTurn = 1; // already played land
+
+        // Only green lands on battlefield
+        var forest = GameCard.Create("Forest", "Basic Land — Forest");
+        player.Battlefield.Add(forest);
+
+        // Only red spells in hand
+        player.Hand.Add(new GameCard { Name = "Lightning Bolt", CardTypes = CardType.Instant, ManaCost = ManaCost.Parse("{R}") });
+
+        var action = await ((AiBotDecisionHandler)player.DecisionHandler).GetAction(state, player.Id);
+
+        action.Type.Should().Be(ActionType.PassPriority, "bot should not tap lands when no spell's color requirements can be satisfied");
+    }
+
+    [Fact]
+    public async Task GetAction_MixedLands_MatchingSpell_TapsLand()
+    {
+        var (state, player) = CreateGameWithBot();
+        player.LandsPlayedThisTurn = 1;
+
+        // Two forests on battlefield (Naturalize costs {1}{G})
+        player.Battlefield.Add(GameCard.Create("Forest", "Basic Land — Forest"));
+        player.Battlefield.Add(GameCard.Create("Forest", "Basic Land — Forest"));
+
+        // Green spell in hand
+        player.Hand.Add(new GameCard { Name = "Naturalize", CardTypes = CardType.Instant, ManaCost = ManaCost.Parse("{1}{G}") });
+
+        var action = await ((AiBotDecisionHandler)player.DecisionHandler).GetAction(state, player.Id);
+
+        action.Type.Should().Be(ActionType.TapCard, "bot should tap lands when a spell's color can be satisfied");
+    }
+
+    [Fact]
     public async Task GetAction_Player2AsBot_ResolvesCorrectly()
     {
         // Ensure the bot works when it's Player2 and active player

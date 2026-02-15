@@ -24,6 +24,7 @@ public class ReturnExiledCardsEffect : IEffect
             if (card != null && owner != null)
             {
                 owner.Battlefield.Add(card);
+                if (card.EntersTapped) card.IsTapped = true;
                 context.State.Log($"{card.Name} returns to the battlefield.");
             }
         }

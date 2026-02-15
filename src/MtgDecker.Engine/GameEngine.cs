@@ -156,6 +156,7 @@ public class GameEngine
                     player.Hand.RemoveById(playCard.Id);
                     player.Battlefield.Add(playCard);
                     playCard.TurnEnteredBattlefield = _state.TurnNumber;
+                    if (playCard.EntersTapped) playCard.IsTapped = true;
                     player.LandsPlayedThisTurn++;
                     action.IsLandDrop = true;
                     action.DestinationZone = ZoneType.Battlefield;
@@ -196,6 +197,7 @@ public class GameEngine
                     {
                         player.Battlefield.Add(playCard);
                         playCard.TurnEnteredBattlefield = _state.TurnNumber;
+                        if (playCard.EntersTapped) playCard.IsTapped = true;
                         action.DestinationZone = ZoneType.Battlefield;
                         _state.Log($"{player.Name} casts {playCard.Name}.");
 
@@ -362,6 +364,7 @@ public class GameEngine
                         {
                             player.Battlefield.Add(land);
                             land.TurnEnteredBattlefield = _state.TurnNumber;
+                            if (land.EntersTapped) land.IsTapped = true;
                             _state.Log($"{player.Name} fetches {land.Name}.");
                             await QueueSelfTriggersOnStackAsync(GameEvent.EnterBattlefield, land, player, ct);
                             await OnBoardChangedAsync(ct);
@@ -1760,6 +1763,7 @@ public class GameEngine
                     || spell.Card.CardTypes.HasFlag(CardType.Artifact))
                 {
                     spell.Card.TurnEnteredBattlefield = _state.TurnNumber;
+                    if (spell.Card.EntersTapped) spell.Card.IsTapped = true;
                     controller.Battlefield.Add(spell.Card);
 
                     // Aura attachment on stack resolution

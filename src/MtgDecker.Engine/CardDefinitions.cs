@@ -286,13 +286,15 @@ public static class CardDefinitions
             ["Llanowar Wastes"] = new(null, ManaAbility.Choice(ManaColor.Colorless, ManaColor.Black, ManaColor.Green), null, null, CardType.Land),
             ["Battlefield Forge"] = new(null, ManaAbility.Choice(ManaColor.Colorless, ManaColor.Red, ManaColor.White), null, null, CardType.Land),
             ["Tainted Field"] = new(null, ManaAbility.Choice(ManaColor.White, ManaColor.Black), null, null, CardType.Land),
-            ["Coastal Tower"] = new(null, ManaAbility.Choice(ManaColor.White, ManaColor.Blue), null, null, CardType.Land),
+            ["Coastal Tower"] = new(null, ManaAbility.Choice(ManaColor.White, ManaColor.Blue), null, null, CardType.Land) { EntersTapped = true },
             ["Skycloud Expanse"] = new(null, ManaAbility.Choice(ManaColor.White, ManaColor.Blue), null, null, CardType.Land),
             ["Adarkar Wastes"] = new(null, ManaAbility.Choice(ManaColor.Colorless, ManaColor.White, ManaColor.Blue), null, null, CardType.Land),
             ["Gemstone Mine"] = new(null, ManaAbility.Choice(ManaColor.White, ManaColor.Blue, ManaColor.Black, ManaColor.Red, ManaColor.Green), null, null, CardType.Land),
-            ["City of Brass"] = new(null, ManaAbility.Choice(ManaColor.White, ManaColor.Blue, ManaColor.Black, ManaColor.Red, ManaColor.Green), null, null, CardType.Land),
-            ["Darigaaz's Caldera"] = new(null, ManaAbility.Choice(ManaColor.Black, ManaColor.Red, ManaColor.Green), null, null, CardType.Land),
-            ["Treva's Ruins"] = new(null, ManaAbility.Choice(ManaColor.White, ManaColor.Blue, ManaColor.Green), null, null, CardType.Land),
+            ["City of Brass"] = new(null, ManaAbility.PainChoice(
+                [ManaColor.White, ManaColor.Blue, ManaColor.Black, ManaColor.Red, ManaColor.Green],
+                [ManaColor.White, ManaColor.Blue, ManaColor.Black, ManaColor.Red, ManaColor.Green]), null, null, CardType.Land),
+            ["Darigaaz's Caldera"] = new(null, ManaAbility.Choice(ManaColor.Black, ManaColor.Red, ManaColor.Green), null, null, CardType.Land) { EntersTapped = true },
+            ["Treva's Ruins"] = new(null, ManaAbility.Choice(ManaColor.White, ManaColor.Blue, ManaColor.Green), null, null, CardType.Land) { EntersTapped = true },
 
             // Fetch lands
             ["Flooded Strand"] = new(null, null, null, null, CardType.Land) { FetchAbility = new FetchAbility(["Plains", "Island"]) },
@@ -422,6 +424,7 @@ public static class CardDefinitions
             },
             ["Spawning Pool"] = new(null, ManaAbility.Fixed(ManaColor.Black), null, null, CardType.Land)
             {
+                EntersTapped = true,
                 ActivatedAbility = new(new ActivatedAbilityCost(ManaCost: ManaCost.Parse("{1}{B}")), new BecomeCreatureEffect(1, 1, "Skeleton")),
             },
             ["Skeletal Scrying"] = new(ManaCost.Parse("{1}{B}"), null, null, null, CardType.Instant,
@@ -458,6 +461,7 @@ public static class CardDefinitions
             ["Phyrexian Furnace"] = new(ManaCost.Parse("{1}"), null, null, null, CardType.Artifact),
             ["Faerie Conclave"] = new(null, ManaAbility.Fixed(ManaColor.Blue), null, null, CardType.Land)
             {
+                EntersTapped = true,
                 ActivatedAbility = new(new ActivatedAbilityCost(ManaCost: ManaCost.Parse("{1}{U}")), new BecomeCreatureEffect(2, 1, "Faerie")),
             },
             ["Mishra's Factory"] = new(null, ManaAbility.Fixed(ManaColor.Colorless), null, null, CardType.Land)
@@ -481,6 +485,7 @@ public static class CardDefinitions
             ["Funeral Pyre"] = new(ManaCost.Parse("{W}"), null, null, null, CardType.Instant),
             ["Treetop Village"] = new(null, ManaAbility.Fixed(ManaColor.Green), null, null, CardType.Land)
             {
+                EntersTapped = true,
                 ActivatedAbility = new(new ActivatedAbilityCost(ManaCost: ManaCost.Parse("{1}{G}")), new BecomeCreatureEffect(3, 3, "Ape")),
             },
 

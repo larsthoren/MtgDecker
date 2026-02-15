@@ -79,7 +79,8 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
             return GameAction.Pass(playerId);
 
         // Priority 3: Tap an untapped land with a mana ability to build up mana pool
-        // Only tap if the total available mana (pool + all untapped lands) can afford a spell.
+        // Only tap if the total available mana (pool + all untapped lands) can afford a spell
+        // AND the producible colors can satisfy at least one spell's color requirements.
         var untappedLands = player.Battlefield.Cards
             .Where(c => c.IsLand && !c.IsTapped && c.ManaAbility != null)
             .ToList();
@@ -87,20 +88,8 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
         if (untappedLands.Count > 0)
         {
             var potentialMana = player.ManaPool.Total + untappedLands.Count;
-            var cheapestSpellCmc = hand
-                .Where(c => !c.IsLand && c.ManaCost != null)
-                .Select(c =>
-                {
-                    var cost = c.ManaCost!;
-                    var reduction = ComputeCostModification(gameState, c, player);
-                    if (reduction != 0)
-                        cost = cost.WithGenericReduction(-reduction);
-                    return cost.ConvertedManaCost;
-                })
-                .DefaultIfEmpty(int.MaxValue)
-                .Min();
 
-            if (potentialMana >= cheapestSpellCmc)
+            if (CanAffordAnySpell(hand, untappedLands, player, gameState, potentialMana))
             {
                 await DelayAsync(ct);
                 return GameAction.TapCard(playerId, untappedLands[0].Id);
@@ -486,6 +475,50 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Checks whether at least one spell in hand can be cast given the producible colors
+    /// from the mana pool and all untapped lands' mana abilities.
+    /// </summary>
+    private static bool CanAffordAnySpell(IReadOnlyList<GameCard> hand, List<GameCard> untappedLands,
+        Player player, GameState gameState, int potentialMana)
+    {
+        // Collect all producible colors from pool + untapped land abilities
+        var producibleColors = new HashSet<ManaColor>();
+        foreach (var (color, _) in player.ManaPool.Available)
+        {
+            producibleColors.Add(color);
+        }
+        foreach (var land in untappedLands)
+        {
+            if (land.ManaAbility == null) continue;
+            if (land.ManaAbility.FixedColor.HasValue)
+                producibleColors.Add(land.ManaAbility.FixedColor.Value);
+            if (land.ManaAbility.ChoiceColors != null)
+                foreach (var c in land.ManaAbility.ChoiceColors)
+                    producibleColors.Add(c);
+            if (land.ManaAbility.DynamicColor.HasValue)
+                producibleColors.Add(land.ManaAbility.DynamicColor.Value);
+        }
+
+        return hand
+            .Where(c => !c.IsLand && c.ManaCost != null)
+            .Any(c =>
+            {
+                var cost = c.ManaCost!;
+                var reduction = ComputeCostModification(gameState, c, player);
+                if (reduction != 0)
+                    cost = cost.WithGenericReduction(-reduction);
+
+                // Check CMC affordability
+                if (cost.ConvertedManaCost > potentialMana)
+                    return false;
+
+                // Check all color requirements can be produced
+                return cost.ColorRequirements.All(kvp =>
+                    producibleColors.Contains(kvp.Key));
+            });
     }
 
     private static int ComputeCostModification(GameState gameState, GameCard card, Player caster)
