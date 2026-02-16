@@ -49,15 +49,17 @@ public class SkeletalScryingEffect : SpellEffect
         state.Log($"{player.Name} exiles {x} card(s) from graveyard (Skeletal Scrying).");
 
         // Draw X cards
+        var drawn = 0;
         for (int i = 0; i < x; i++)
         {
             var card = player.Library.DrawFromTop();
             if (card == null) break;
             player.Hand.Add(card);
+            drawn++;
         }
 
         // Lose X life
         player.AdjustLife(-x);
-        state.Log($"{player.Name} draws {x} card(s) and loses {x} life (Skeletal Scrying). Life: {player.Life}.");
+        state.Log($"{player.Name} draws {drawn} card(s) and loses {x} life (Skeletal Scrying). Life: {player.Life}.");
     }
 }
