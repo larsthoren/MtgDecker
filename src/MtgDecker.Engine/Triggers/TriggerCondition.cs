@@ -10,4 +10,6 @@ public enum TriggerCondition
     Upkeep,
     AttachedPermanentTapped,
     SelfLeavesBattlefield,
+    AnySpellCastCmc3OrLess,
+    SelfInGraveyardDuringUpkeep,
 }
