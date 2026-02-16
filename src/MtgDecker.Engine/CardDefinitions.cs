@@ -427,7 +427,12 @@ public static class CardDefinitions
                         new DamageAllCreaturesTriggerEffect(1, includePlayers: true)),
                 ],
             },
-            ["Withered Wretch"] = new(ManaCost.Parse("{B}{B}"), null, 2, 2, CardType.Creature) { Subtypes = ["Zombie", "Cleric"] },
+            ["Withered Wretch"] = new(ManaCost.Parse("{B}{B}"), null, 2, 2, CardType.Creature)
+            {
+                Subtypes = ["Zombie", "Cleric"],
+                ActivatedAbility = new(new ActivatedAbilityCost(ManaCost: ManaCost.Parse("{1}")),
+                    new ExileFromOpponentGraveyardEffect()),
+            },
             ["Funeral Charm"] = new(ManaCost.Parse("{B}"), null, null, null, CardType.Instant,
                 TargetFilter.Player(), new DiscardEffect(1)),
             ["Bottomless Pit"] = new(ManaCost.Parse("{1}{B}{B}"), null, null, null, CardType.Enchantment)
@@ -440,7 +445,15 @@ public static class CardDefinitions
             },
             ["Powder Keg"] = new(ManaCost.Parse("{2}"), null, null, null, CardType.Artifact),
             ["Cabal Pit"] = new(null, ManaAbility.Fixed(ManaColor.Black), null, null, CardType.Land),
-            ["Dust Bowl"] = new(null, ManaAbility.Fixed(ManaColor.Colorless), null, null, CardType.Land),
+            ["Dust Bowl"] = new(null, ManaAbility.Fixed(ManaColor.Colorless), null, null, CardType.Land)
+            {
+                ActivatedAbility = new(
+                    new ActivatedAbilityCost(TapSelf: true, SacrificeSelf: true, ManaCost: ManaCost.Parse("{3}")),
+                    new DestroyTargetEffect(),
+                    TargetFilter: c => c.CardTypes.HasFlag(CardType.Land)
+                        && c.Name != "Plains" && c.Name != "Island" && c.Name != "Swamp"
+                        && c.Name != "Mountain" && c.Name != "Forest"),
+            },
 
             // === Mono Black Aggro deck ===
             ["Hypnotic Specter"] = new(ManaCost.Parse("{1}{B}{B}"), null, 2, 2, CardType.Creature)
@@ -454,7 +467,12 @@ public static class CardDefinitions
                 ],
                 Triggers = [new Trigger(GameEvent.CombatDamageDealt, TriggerCondition.SelfDealsCombatDamage, new OpponentDiscardsEffect(1))],
             },
-            ["Nantuko Shade"] = new(ManaCost.Parse("{B}{B}"), null, 2, 1, CardType.Creature) { Subtypes = ["Insect", "Shade"] },
+            ["Nantuko Shade"] = new(ManaCost.Parse("{B}{B}"), null, 2, 1, CardType.Creature)
+            {
+                Subtypes = ["Insect", "Shade"],
+                ActivatedAbility = new(new ActivatedAbilityCost(ManaCost: ManaCost.Parse("{B}")),
+                    new PumpSelfEffect(1, 1)),
+            },
             ["Ravenous Rats"] = new(ManaCost.Parse("{1}{B}"), null, 1, 1, CardType.Creature)
             {
                 Subtypes = ["Rat"],
@@ -536,7 +554,14 @@ public static class CardDefinitions
             },
 
             // === Terrageddon deck ===
-            ["Mother of Runes"] = new(ManaCost.Parse("{W}"), null, 1, 1, CardType.Creature) { Subtypes = ["Human", "Cleric"] },
+            ["Mother of Runes"] = new(ManaCost.Parse("{W}"), null, 1, 1, CardType.Creature)
+            {
+                Subtypes = ["Human", "Cleric"],
+                ActivatedAbility = new(
+                    new ActivatedAbilityCost(TapSelf: true),
+                    new GrantProtectionEffect(),
+                    TargetFilter: c => c.IsCreature),
+            },
             ["Nimble Mongoose"] = new(ManaCost.Parse("{G}"), null, 1, 1, CardType.Creature)
             {
                 Subtypes = ["Mongoose"],
@@ -547,7 +572,11 @@ public static class CardDefinitions
                         GrantedKeyword: Keyword.Shroud),
                 ],
             },
-            ["Zuran Orb"] = new(ManaCost.Parse("{0}"), null, null, null, CardType.Artifact),
+            ["Zuran Orb"] = new(ManaCost.Parse("{0}"), null, null, null, CardType.Artifact)
+            {
+                ActivatedAbility = new(new ActivatedAbilityCost(SacrificeCardType: CardType.Land),
+                    new Triggers.Effects.GainLifeEffect(2)),
+            },
 
             // === Elves deck ===
             ["Llanowar Elves"] = new(ManaCost.Parse("{G}"), null, 1, 1, CardType.Creature)
@@ -589,7 +618,12 @@ public static class CardDefinitions
                 ],
             },
             ["Wall of Roots"] = new(ManaCost.Parse("{1}{G}"), null, 0, 5, CardType.Creature) { Subtypes = ["Plant", "Wall"] },
-            ["Ravenous Baloth"] = new(ManaCost.Parse("{2}{G}{G}"), null, 4, 4, CardType.Creature) { Subtypes = ["Beast"] },
+            ["Ravenous Baloth"] = new(ManaCost.Parse("{2}{G}{G}"), null, 4, 4, CardType.Creature)
+            {
+                Subtypes = ["Beast"],
+                ActivatedAbility = new(new ActivatedAbilityCost(SacrificeSubtype: "Beast"),
+                    new Triggers.Effects.GainLifeEffect(4)),
+            },
             ["Caller of the Claw"] = new(ManaCost.Parse("{2}{G}"), null, 2, 2, CardType.Creature) { Subtypes = ["Elf"] },
             ["Masticore"] = new(ManaCost.Parse("{4}"), null, 4, 4, CardType.Artifact | CardType.Creature),
             ["Nantuko Vigilante"] = new(ManaCost.Parse("{3}{G}"), null, 3, 2, CardType.Creature) { Subtypes = ["Insect", "Druid"] },
