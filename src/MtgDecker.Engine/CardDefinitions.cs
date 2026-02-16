@@ -110,11 +110,11 @@ public static class CardDefinitions
                 [ManaColor.Colorless, ManaColor.Red, ManaColor.Green],
                 [ManaColor.Red, ManaColor.Green]), null, null, CardType.Land),
             ["Wooded Foothills"] = new(null, null, null, null, CardType.Land) { FetchAbility = new FetchAbility(["Mountain", "Forest"]) },
-            ["Rishadan Port"] = new(null, null, null, null, CardType.Land)
+            ["Rishadan Port"] = new(null, ManaAbility.Fixed(ManaColor.Colorless), null, null, CardType.Land)
             {
                 ActivatedAbility = new(new ActivatedAbilityCost(TapSelf: true, ManaCost: ManaCost.Parse("{1}")), new TapTargetEffect(), c => c.IsLand),
             },
-            ["Wasteland"] = new(null, null, null, null, CardType.Land)
+            ["Wasteland"] = new(null, ManaAbility.Fixed(ManaColor.Colorless), null, null, CardType.Land)
             {
                 ActivatedAbility = new(new ActivatedAbilityCost(TapSelf: true, SacrificeSelf: true), new DestroyTargetEffect(), c => c.IsLand && !c.IsBasicLand),
             },
@@ -271,9 +271,9 @@ public static class CardDefinitions
             ["Dragon's Rage Channeler"] = new(ManaCost.Parse("{R}"), null, 1, 1, CardType.Creature) { Subtypes = ["Human", "Shaman"] },
 
             // === UR Delver lands ===
-            ["Island"] = new(null, ManaAbility.Fixed(ManaColor.Blue), null, null, CardType.Land),
-            ["Volcanic Island"] = new(null, ManaAbility.Choice(ManaColor.Blue, ManaColor.Red), null, null, CardType.Land),
-            ["Scalding Tarn"] = new(null, null, null, null, CardType.Land),
+            ["Island"] = new(null, ManaAbility.Fixed(ManaColor.Blue), null, null, CardType.Land) { Subtypes = ["Island"] },
+            ["Volcanic Island"] = new(null, ManaAbility.Choice(ManaColor.Blue, ManaColor.Red), null, null, CardType.Land) { Subtypes = ["Island", "Mountain"] },
+            ["Scalding Tarn"] = new(null, null, null, null, CardType.Land) { FetchAbility = new FetchAbility(["Island", "Mountain"]) },
             ["Mystic Sanctuary"] = new(null, ManaAbility.Fixed(ManaColor.Blue), null, null, CardType.Land),
 
             // === Shared Premodern cards ===
@@ -282,13 +282,13 @@ public static class CardDefinitions
             ["Swamp"] = new(null, ManaAbility.Fixed(ManaColor.Black), null, null, CardType.Land) { Subtypes = ["Swamp"] },
 
             // Dual/Pain lands
-            ["Caves of Koilos"] = new(null, ManaAbility.Choice(ManaColor.Colorless, ManaColor.White, ManaColor.Black), null, null, CardType.Land),
-            ["Llanowar Wastes"] = new(null, ManaAbility.Choice(ManaColor.Colorless, ManaColor.Black, ManaColor.Green), null, null, CardType.Land),
-            ["Battlefield Forge"] = new(null, ManaAbility.Choice(ManaColor.Colorless, ManaColor.Red, ManaColor.White), null, null, CardType.Land),
+            ["Caves of Koilos"] = new(null, ManaAbility.PainChoice([ManaColor.Colorless, ManaColor.White, ManaColor.Black], [ManaColor.White, ManaColor.Black]), null, null, CardType.Land),
+            ["Llanowar Wastes"] = new(null, ManaAbility.PainChoice([ManaColor.Colorless, ManaColor.Black, ManaColor.Green], [ManaColor.Black, ManaColor.Green]), null, null, CardType.Land),
+            ["Battlefield Forge"] = new(null, ManaAbility.PainChoice([ManaColor.Colorless, ManaColor.Red, ManaColor.White], [ManaColor.Red, ManaColor.White]), null, null, CardType.Land),
             ["Tainted Field"] = new(null, ManaAbility.Choice(ManaColor.White, ManaColor.Black), null, null, CardType.Land),
             ["Coastal Tower"] = new(null, ManaAbility.Choice(ManaColor.White, ManaColor.Blue), null, null, CardType.Land) { EntersTapped = true },
             ["Skycloud Expanse"] = new(null, ManaAbility.Choice(ManaColor.White, ManaColor.Blue), null, null, CardType.Land),
-            ["Adarkar Wastes"] = new(null, ManaAbility.Choice(ManaColor.Colorless, ManaColor.White, ManaColor.Blue), null, null, CardType.Land),
+            ["Adarkar Wastes"] = new(null, ManaAbility.PainChoice([ManaColor.Colorless, ManaColor.White, ManaColor.Blue], [ManaColor.White, ManaColor.Blue]), null, null, CardType.Land),
             ["Gemstone Mine"] = new(null, ManaAbility.Choice(ManaColor.White, ManaColor.Blue, ManaColor.Black, ManaColor.Red, ManaColor.Green), null, null, CardType.Land),
             ["City of Brass"] = new(null, ManaAbility.PainChoice(
                 [ManaColor.White, ManaColor.Blue, ManaColor.Black, ManaColor.Red, ManaColor.Green],

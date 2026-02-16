@@ -215,4 +215,70 @@ public class CardDefinitionsTests
         def!.Effect.Should().BeOfType<BrainstormEffect>();
         def.TargetFilter.Should().BeNull();
     }
+
+    [Fact]
+    public void Island_HasIslandSubtype()
+    {
+        CardDefinitions.TryGet("Island", out var def);
+
+        def!.Subtypes.Should().Contain("Island",
+            because: "Island has the Island land subtype for fetchland interactions");
+    }
+
+    [Fact]
+    public void VolcanicIsland_HasDualSubtypes()
+    {
+        CardDefinitions.TryGet("Volcanic Island", out var def);
+
+        def!.Subtypes.Should().Contain("Island");
+        def.Subtypes.Should().Contain("Mountain");
+    }
+
+    [Theory]
+    [InlineData("Caves of Koilos")]
+    [InlineData("Llanowar Wastes")]
+    [InlineData("Battlefield Forge")]
+    [InlineData("Adarkar Wastes")]
+    public void PainLand_HasPainColors(string cardName)
+    {
+        CardDefinitions.TryGet(cardName, out var def);
+
+        def!.ManaAbility.Should().NotBeNull();
+        def.ManaAbility!.PainColors.Should().NotBeNull(
+            because: $"{cardName} should deal damage when tapping for colored mana");
+        def.ManaAbility.PainColors!.Count.Should().BeGreaterThan(0);
+    }
+
+    // === Card audit: lands with missing abilities ===
+
+    [Fact]
+    public void RishadanPort_HasColorlessManaAbility()
+    {
+        CardDefinitions.TryGet("Rishadan Port", out var def);
+
+        def!.ManaAbility.Should().NotBeNull(
+            because: "Rishadan Port taps for {C}");
+        def.ManaAbility!.FixedColor.Should().Be(ManaColor.Colorless);
+    }
+
+    [Fact]
+    public void Wasteland_HasColorlessManaAbility()
+    {
+        CardDefinitions.TryGet("Wasteland", out var def);
+
+        def!.ManaAbility.Should().NotBeNull(
+            because: "Wasteland taps for {C}");
+        def.ManaAbility!.FixedColor.Should().Be(ManaColor.Colorless);
+    }
+
+    [Fact]
+    public void ScaldingTarn_HasFetchAbility()
+    {
+        CardDefinitions.TryGet("Scalding Tarn", out var def);
+
+        def!.FetchAbility.Should().NotBeNull(
+            because: "Scalding Tarn fetches Island or Mountain");
+        def.FetchAbility!.SearchTypes.Should().BeEquivalentTo(
+            new[] { "Island", "Mountain" });
+    }
 }
