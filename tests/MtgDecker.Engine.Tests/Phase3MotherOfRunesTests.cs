@@ -60,6 +60,30 @@ public class Phase3MotherOfRunesTests
     }
 
     [Fact]
+    public async Task GrantProtection_StoresChosenColor()
+    {
+        var h1 = new TestDecisionHandler();
+        var p1 = new Player(Guid.NewGuid(), "P1", h1);
+        var p2 = new Player(Guid.NewGuid(), "P2", new TestDecisionHandler());
+        var state = new GameState(p1, p2);
+
+        var creature = new GameCard { Name = "Bear", CardTypes = CardType.Creature };
+        p1.Battlefield.Add(creature);
+
+        h1.EnqueueManaColor(ManaColor.Black);
+
+        var mother = new GameCard { Name = "Mother of Runes" };
+        var context = new EffectContext(state, p1, mother, h1) { Target = creature };
+
+        var effect = new GrantProtectionEffect();
+        await effect.Execute(context);
+
+        state.ActiveEffects.Should().Contain(e =>
+            e.GrantedKeyword == Keyword.Protection
+            && e.ProtectionColor == ManaColor.Black);
+    }
+
+    [Fact]
     public async Task GrantProtection_NoTarget_DoesNothing()
     {
         var h1 = new TestDecisionHandler();

@@ -20,7 +20,8 @@ public class GrantProtectionEffect : IEffect
             ContinuousEffectType.GrantKeyword,
             (card, _) => card.Id == targetId,
             GrantedKeyword: Keyword.Protection,
-            UntilEndOfTurn: true);
+            UntilEndOfTurn: true,
+            ProtectionColor: color);
         context.State.ActiveEffects.Add(protection);
 
         context.State.Log($"{context.Target.Name} gains protection from {color} until end of turn.");

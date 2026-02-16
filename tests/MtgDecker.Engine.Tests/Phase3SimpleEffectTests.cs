@@ -132,4 +132,28 @@ public class Phase3SimpleEffectTests
 
         p1.Battlefield.Count.Should().Be(0);
     }
+
+    [Fact]
+    public async Task SacrificeSpecificCard_CallsFireLeaveBattlefieldTriggers()
+    {
+        var (state, p1, _, h1) = Setup();
+        var creature = new GameCard { Name = "Ball Lightning", CardTypes = CardType.Creature };
+        p1.Battlefield.Add(creature);
+
+        var triggerFired = false;
+        var context = new EffectContext(state, p1, new GameCard { Name = "Delayed Trigger" }, h1)
+        {
+            FireLeaveBattlefieldTriggers = _ =>
+            {
+                triggerFired = true;
+                return Task.CompletedTask;
+            }
+        };
+
+        var effect = new SacrificeSpecificCardEffect(creature.Id);
+        await effect.Execute(context);
+
+        triggerFired.Should().BeTrue(
+            "sacrificing should fire leave-battlefield triggers for 'dies' effects");
+    }
 }

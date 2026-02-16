@@ -1,4 +1,5 @@
 using MtgDecker.Engine.Enums;
+using MtgDecker.Engine.Mana;
 
 namespace MtgDecker.Engine;
 
@@ -28,4 +29,5 @@ public record ContinuousEffect(
     bool CostAppliesToOpponent = false,
     bool ExcludeSelf = false,
     bool ControllerOnly = false,
-    bool SetPowerToughnessToCMC = false);
+    bool SetPowerToughnessToCMC = false,
+    ManaColor? ProtectionColor = null);
