@@ -4,6 +4,8 @@ using MtgDecker.Engine.Enums;
 using MtgDecker.Engine.Mana;
 using MtgDecker.Engine.Triggers.Effects;
 
+// ReSharper disable InconsistentNaming
+
 namespace MtgDecker.Engine.Tests;
 
 public class CardDefinitionsTests
@@ -362,5 +364,34 @@ public class CardDefinitionsTests
             because: "Goblin Tinkerer costs {R} to activate");
         def.ActivatedAbility.Cost.ManaCost!.ColorRequirements.Should()
             .ContainKey(ManaColor.Red);
+    }
+
+    // === Card audit Phase 2: correct card selection effects ===
+
+    [Fact]
+    public void Impulse_HasImpulseEffect()
+    {
+        CardDefinitions.TryGet("Impulse", out var def);
+
+        def!.Effect.Should().BeOfType<ImpulseEffect>(
+            because: "Impulse looks at top 4, picks 1, not just draw 1");
+    }
+
+    [Fact]
+    public void FactOrFiction_HasFactOrFictionEffect()
+    {
+        CardDefinitions.TryGet("Fact or Fiction", out var def);
+
+        def!.Effect.Should().BeOfType<FactOrFictionEffect>(
+            because: "Fact or Fiction reveals 5, opponent splits, caster picks pile");
+    }
+
+    [Fact]
+    public void SkeletalScrying_HasSkeletalScryingEffect()
+    {
+        CardDefinitions.TryGet("Skeletal Scrying", out var def);
+
+        def!.Effect.Should().BeOfType<SkeletalScryingEffect>(
+            because: "Skeletal Scrying exiles from graveyard, draws X, loses X life");
     }
 }
