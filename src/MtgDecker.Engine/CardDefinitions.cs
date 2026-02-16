@@ -365,9 +365,9 @@ public static class CardDefinitions
 
             // Common utility
             ["Fact or Fiction"] = new(ManaCost.Parse("{3}{U}"), null, null, null, CardType.Instant,
-                Effect: new DrawCardsEffect(3)),
+                Effect: new FactOrFictionEffect()),
             ["Impulse"] = new(ManaCost.Parse("{1}{U}"), null, null, null, CardType.Instant,
-                Effect: new DrawCardsEffect(1)),
+                Effect: new ImpulseEffect()),
             ["Deep Analysis"] = new(ManaCost.Parse("{3}{U}"), null, null, null, CardType.Sorcery,
                 Effect: new DrawCardsEffect(2)),
 
@@ -456,7 +456,7 @@ public static class CardDefinitions
                 ActivatedAbility = new(new ActivatedAbilityCost(ManaCost: ManaCost.Parse("{1}{B}")), new BecomeCreatureEffect(1, 1, "Skeleton")),
             },
             ["Skeletal Scrying"] = new(ManaCost.Parse("{1}{B}"), null, null, null, CardType.Instant,
-                Effect: new DrawCardsEffect(2)),
+                Effect: new SkeletalScryingEffect()),
 
             // === Deadguy Ale deck ===
             ["Exalted Angel"] = new(ManaCost.Parse("{4}{W}{W}"), null, 4, 5, CardType.Creature)
