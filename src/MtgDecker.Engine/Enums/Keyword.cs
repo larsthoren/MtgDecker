@@ -13,4 +13,6 @@ public enum Keyword
     Forestwalk,
     Islandwalk,
     Plainswalk,
+    Lifelink,
+    Defender,
 }

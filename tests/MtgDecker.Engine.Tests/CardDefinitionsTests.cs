@@ -2,6 +2,7 @@ using FluentAssertions;
 using MtgDecker.Engine.Effects;
 using MtgDecker.Engine.Enums;
 using MtgDecker.Engine.Mana;
+using MtgDecker.Engine.Triggers.Effects;
 
 namespace MtgDecker.Engine.Tests;
 
@@ -214,5 +215,152 @@ public class CardDefinitionsTests
         CardDefinitions.TryGet("Brainstorm", out var def);
         def!.Effect.Should().BeOfType<BrainstormEffect>();
         def.TargetFilter.Should().BeNull();
+    }
+
+    [Fact]
+    public void Island_HasIslandSubtype()
+    {
+        CardDefinitions.TryGet("Island", out var def);
+
+        def!.Subtypes.Should().Contain("Island",
+            because: "Island has the Island land subtype for fetchland interactions");
+    }
+
+    [Fact]
+    public void VolcanicIsland_HasDualSubtypes()
+    {
+        CardDefinitions.TryGet("Volcanic Island", out var def);
+
+        def!.Subtypes.Should().Contain("Island");
+        def.Subtypes.Should().Contain("Mountain");
+    }
+
+    [Theory]
+    [InlineData("Caves of Koilos")]
+    [InlineData("Llanowar Wastes")]
+    [InlineData("Battlefield Forge")]
+    [InlineData("Adarkar Wastes")]
+    public void PainLand_HasPainColors(string cardName)
+    {
+        CardDefinitions.TryGet(cardName, out var def);
+
+        def!.ManaAbility.Should().NotBeNull();
+        def.ManaAbility!.PainColors.Should().NotBeNull(
+            because: $"{cardName} should deal damage when tapping for colored mana");
+        def.ManaAbility.PainColors!.Count.Should().BeGreaterThan(0);
+    }
+
+    // === Card audit: lands with missing abilities ===
+
+    [Fact]
+    public void RishadanPort_HasColorlessManaAbility()
+    {
+        CardDefinitions.TryGet("Rishadan Port", out var def);
+
+        def!.ManaAbility.Should().NotBeNull(
+            because: "Rishadan Port taps for {C}");
+        def.ManaAbility!.FixedColor.Should().Be(ManaColor.Colorless);
+    }
+
+    [Fact]
+    public void Wasteland_HasColorlessManaAbility()
+    {
+        CardDefinitions.TryGet("Wasteland", out var def);
+
+        def!.ManaAbility.Should().NotBeNull(
+            because: "Wasteland taps for {C}");
+        def.ManaAbility!.FixedColor.Should().Be(ManaColor.Colorless);
+    }
+
+    [Fact]
+    public void ScaldingTarn_HasFetchAbility()
+    {
+        CardDefinitions.TryGet("Scalding Tarn", out var def);
+
+        def!.FetchAbility.Should().NotBeNull(
+            because: "Scalding Tarn fetches Island or Mountain");
+        def.FetchAbility!.SearchTypes.Should().BeEquivalentTo(
+            new[] { "Island", "Mountain" });
+    }
+
+    // === Card audit: missing Haste keywords ===
+
+    [Theory]
+    [InlineData("Goblin Guide")]
+    [InlineData("Goblin Ringleader")]
+    [InlineData("Monastery Swiftspear")]
+    [InlineData("Anger")]
+    public void Card_HasHaste(string cardName)
+    {
+        CardDefinitions.TryGet(cardName, out var def);
+
+        def!.ContinuousEffects.Should().Contain(e =>
+            e.Type == ContinuousEffectType.GrantKeyword
+            && e.GrantedKeyword == Keyword.Haste,
+            because: $"{cardName} should have haste");
+    }
+
+    // === Card audit: Exalted Angel Lifelink + Wall of Blossoms Defender ===
+
+    [Fact]
+    public void ExaltedAngel_HasLifelink()
+    {
+        CardDefinitions.TryGet("Exalted Angel", out var def);
+
+        def!.ContinuousEffects.Should().Contain(e =>
+            e.Type == ContinuousEffectType.GrantKeyword
+            && e.GrantedKeyword == Keyword.Lifelink,
+            because: "Exalted Angel has lifelink");
+    }
+
+    [Fact]
+    public void WallOfBlossoms_HasDefender()
+    {
+        CardDefinitions.TryGet("Wall of Blossoms", out var def);
+
+        def!.ContinuousEffects.Should().Contain(e =>
+            e.Type == ContinuousEffectType.GrantKeyword
+            && e.GrantedKeyword == Keyword.Defender,
+            because: "Wall of Blossoms has defender");
+    }
+
+    // === Card audit: Grim Lavamancer fix ===
+
+    [Fact]
+    public void GrimLavamancer_Deals2Damage()
+    {
+        CardDefinitions.TryGet("Grim Lavamancer", out var def);
+
+        def!.ActivatedAbility.Should().NotBeNull();
+        var effect = def.ActivatedAbility!.Effect as DealDamageEffect;
+        effect.Should().NotBeNull();
+        effect!.Amount.Should().Be(2,
+            because: "Grim Lavamancer deals 2 damage, not 1");
+    }
+
+    [Fact]
+    public void GrimLavamancer_CostsRedMana()
+    {
+        CardDefinitions.TryGet("Grim Lavamancer", out var def);
+
+        def!.ActivatedAbility.Should().NotBeNull();
+        def.ActivatedAbility!.Cost.ManaCost.Should().NotBeNull(
+            because: "Grim Lavamancer costs {R} to activate");
+        def.ActivatedAbility.Cost.ManaCost!.ColorRequirements.Should()
+            .ContainKey(ManaColor.Red);
+    }
+
+    // === Card audit: Goblin Tinkerer fix ===
+
+    [Fact]
+    public void GoblinTinkerer_CostsRedMana()
+    {
+        CardDefinitions.TryGet("Goblin Tinkerer", out var def);
+
+        def!.ActivatedAbility.Should().NotBeNull();
+        def.ActivatedAbility!.Cost.ManaCost.Should().NotBeNull(
+            because: "Goblin Tinkerer costs {R} to activate");
+        def.ActivatedAbility.Cost.ManaCost!.ColorRequirements.Should()
+            .ContainKey(ManaColor.Red);
     }
 }

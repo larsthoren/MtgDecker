@@ -903,7 +903,8 @@ public class GameEngine
         _state.CombatStep = CombatStep.DeclareAttackers;
 
         var eligibleAttackers = attacker.Battlefield.Cards
-            .Where(c => c.IsCreature && !c.IsTapped && !c.HasSummoningSickness(_state.TurnNumber))
+            .Where(c => c.IsCreature && !c.IsTapped && !c.HasSummoningSickness(_state.TurnNumber)
+                && !c.ActiveKeywords.Contains(Keyword.Defender))
             .ToList();
 
         if (eligibleAttackers.Count == 0)
@@ -1085,6 +1086,13 @@ public class GameEngine
                         defender.AdjustLife(-damage);
                         _state.Log($"{attackerCard.Name} deals {damage} damage to {defender.Name}. ({defender.Life} life)");
                         unblockedAttackers.Add(attackerCard);
+
+                        // Lifelink: controller gains life equal to damage dealt
+                        if (attackerCard.ActiveKeywords.Contains(Keyword.Lifelink))
+                        {
+                            attacker.AdjustLife(damage);
+                            _state.Log($"{attackerCard.Name} has lifelink — {attacker.Name} gains {damage} life. ({attacker.Life} life)");
+                        }
                     }
                 }
             }
@@ -1107,6 +1115,13 @@ public class GameEngine
                     blockerCard.DamageMarked += assigned;
                     remainingDamage -= assigned;
                     _state.Log($"{attackerCard.Name} deals {assigned} damage to {blockerCard.Name}.");
+
+                    // Lifelink on attacker dealing damage to blockers
+                    if (assigned > 0 && attackerCard.ActiveKeywords.Contains(Keyword.Lifelink))
+                    {
+                        attacker.AdjustLife(assigned);
+                        _state.Log($"{attackerCard.Name} has lifelink — {attacker.Name} gains {assigned} life. ({attacker.Life} life)");
+                    }
                 }
 
                 // All blockers deal damage to attacker simultaneously
@@ -1120,6 +1135,13 @@ public class GameEngine
                     {
                         attackerCard.DamageMarked += blockerDamage;
                         _state.Log($"{blockerCard.Name} deals {blockerDamage} damage to {attackerCard.Name}.");
+
+                        // Lifelink on blocker dealing damage to attacker
+                        if (blockerCard.ActiveKeywords.Contains(Keyword.Lifelink))
+                        {
+                            defender.AdjustLife(blockerDamage);
+                            _state.Log($"{blockerCard.Name} has lifelink — {defender.Name} gains {blockerDamage} life. ({defender.Life} life)");
+                        }
                     }
                 }
             }
