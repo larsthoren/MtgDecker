@@ -263,6 +263,8 @@ public static class CardDefinitions
                         (card, _) => card.Name == "Goblin Guide",
                         GrantedKeyword: Keyword.Haste),
                 ],
+                Triggers = [new Trigger(GameEvent.BeginCombat, TriggerCondition.SelfAttacks,
+                    new GoblinGuideRevealEffect())],
             },
             ["Monastery Swiftspear"] = new(ManaCost.Parse("{R}"), null, 1, 2, CardType.Creature)
             {
@@ -275,7 +277,12 @@ public static class CardDefinitions
                 ],
             },
             ["Eidolon of the Great Revel"] = new(ManaCost.Parse("{R}{R}"), null, 2, 2,
-                CardType.Creature | CardType.Enchantment) { Subtypes = ["Spirit"] },
+                CardType.Creature | CardType.Enchantment)
+            {
+                Subtypes = ["Spirit"],
+                Triggers = [new Trigger(GameEvent.SpellCast,
+                    TriggerCondition.AnySpellCastCmc3OrLess, new DealDamageEffect(2))],
+            },
             ["Searing Blood"] = new(ManaCost.Parse("{R}{R}"), null, null, null, CardType.Instant,
                 TargetFilter.Creature(), new DamageEffect(2, canTargetPlayer: false)),
             ["Flame Rift"] = new(ManaCost.Parse("{1}{R}"), null, null, null, CardType.Sorcery,
@@ -384,6 +391,8 @@ public static class CardDefinitions
                         (card, _) => card.Name == "Ball Lightning",
                         GrantedKeyword: Keyword.Trample),
                 ],
+                Triggers = [new Trigger(GameEvent.EnterBattlefield, TriggerCondition.Self,
+                    new RegisterEndOfTurnSacrificeEffect())],
             },
             ["Grim Lavamancer"] = new(ManaCost.Parse("{R}"), null, 1, 1, CardType.Creature)
             {
@@ -410,7 +419,13 @@ public static class CardDefinitions
             ["Plague Spitter"] = new(ManaCost.Parse("{2}{B}"), null, 2, 2, CardType.Creature)
             {
                 Subtypes = ["Zombie"],
-                Triggers = [new Trigger(GameEvent.Upkeep, TriggerCondition.Upkeep, new DamageAllCreaturesTriggerEffect(1, includePlayers: true))],
+                Triggers =
+                [
+                    new Trigger(GameEvent.Upkeep, TriggerCondition.Upkeep,
+                        new DamageAllCreaturesTriggerEffect(1, includePlayers: true)),
+                    new Trigger(GameEvent.LeavesBattlefield, TriggerCondition.SelfLeavesBattlefield,
+                        new DamageAllCreaturesTriggerEffect(1, includePlayers: true)),
+                ],
             },
             ["Withered Wretch"] = new(ManaCost.Parse("{B}{B}"), null, 2, 2, CardType.Creature) { Subtypes = ["Zombie", "Cleric"] },
             ["Funeral Charm"] = new(ManaCost.Parse("{B}"), null, null, null, CardType.Instant,
@@ -597,6 +612,9 @@ public static class CardDefinitions
             {
                 Subtypes = ["Goblin"],
                 IsLegendary = true,
+                Triggers = [new Trigger(GameEvent.Upkeep,
+                    TriggerCondition.SelfInGraveyardDuringUpkeep,
+                    new ReturnSelfFromGraveyardEffect())],
             },
             ["Survival of the Fittest"] = new(ManaCost.Parse("{1}{G}"), null, null, null, CardType.Enchantment),
             ["Gaea's Cradle"] = new(null, ManaAbility.Dynamic(ManaColor.Green,
