@@ -281,6 +281,9 @@ public class ActivateAbilityEngineTests
         var artifact = new GameCard { Name = "Sol Ring", CardTypes = CardType.Artifact };
         p2.Battlefield.Add(artifact);
 
+        // Goblin Tinkerer costs {R} to activate
+        p1.ManaPool.Add(ManaColor.Red, 1);
+
         var action = GameAction.ActivateAbility(p1.Id, tinkerer.Id, targetId: artifact.Id);
         await engine.ExecuteAction(action);
         await engine.ResolveAllTriggersAsync();

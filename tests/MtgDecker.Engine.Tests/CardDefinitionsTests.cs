@@ -2,6 +2,7 @@ using FluentAssertions;
 using MtgDecker.Engine.Effects;
 using MtgDecker.Engine.Enums;
 using MtgDecker.Engine.Mana;
+using MtgDecker.Engine.Triggers.Effects;
 
 namespace MtgDecker.Engine.Tests;
 
@@ -280,5 +281,86 @@ public class CardDefinitionsTests
             because: "Scalding Tarn fetches Island or Mountain");
         def.FetchAbility!.SearchTypes.Should().BeEquivalentTo(
             new[] { "Island", "Mountain" });
+    }
+
+    // === Card audit: missing Haste keywords ===
+
+    [Theory]
+    [InlineData("Goblin Guide")]
+    [InlineData("Goblin Ringleader")]
+    [InlineData("Monastery Swiftspear")]
+    [InlineData("Anger")]
+    public void Card_HasHaste(string cardName)
+    {
+        CardDefinitions.TryGet(cardName, out var def);
+
+        def!.ContinuousEffects.Should().Contain(e =>
+            e.Type == ContinuousEffectType.GrantKeyword
+            && e.GrantedKeyword == Keyword.Haste,
+            because: $"{cardName} should have haste");
+    }
+
+    // === Card audit: Exalted Angel Lifelink + Wall of Blossoms Defender ===
+
+    [Fact]
+    public void ExaltedAngel_HasLifelink()
+    {
+        CardDefinitions.TryGet("Exalted Angel", out var def);
+
+        def!.ContinuousEffects.Should().Contain(e =>
+            e.Type == ContinuousEffectType.GrantKeyword
+            && e.GrantedKeyword == Keyword.Lifelink,
+            because: "Exalted Angel has lifelink");
+    }
+
+    [Fact]
+    public void WallOfBlossoms_HasDefender()
+    {
+        CardDefinitions.TryGet("Wall of Blossoms", out var def);
+
+        def!.ContinuousEffects.Should().Contain(e =>
+            e.Type == ContinuousEffectType.GrantKeyword
+            && e.GrantedKeyword == Keyword.Defender,
+            because: "Wall of Blossoms has defender");
+    }
+
+    // === Card audit: Grim Lavamancer fix ===
+
+    [Fact]
+    public void GrimLavamancer_Deals2Damage()
+    {
+        CardDefinitions.TryGet("Grim Lavamancer", out var def);
+
+        def!.ActivatedAbility.Should().NotBeNull();
+        var effect = def.ActivatedAbility!.Effect as DealDamageEffect;
+        effect.Should().NotBeNull();
+        effect!.Amount.Should().Be(2,
+            because: "Grim Lavamancer deals 2 damage, not 1");
+    }
+
+    [Fact]
+    public void GrimLavamancer_CostsRedMana()
+    {
+        CardDefinitions.TryGet("Grim Lavamancer", out var def);
+
+        def!.ActivatedAbility.Should().NotBeNull();
+        def.ActivatedAbility!.Cost.ManaCost.Should().NotBeNull(
+            because: "Grim Lavamancer costs {R} to activate");
+        def.ActivatedAbility.Cost.ManaCost!.ColorRequirements.Should()
+            .ContainKey(ManaColor.Red);
+    }
+
+    // === Card audit: Goblin Tinkerer fix ===
+
+    [Fact]
+    public void GoblinTinkerer_CostsRedMana()
+    {
+        CardDefinitions.TryGet("Goblin Tinkerer", out var def);
+
+        def!.ActivatedAbility.Should().NotBeNull();
+        def.ActivatedAbility!.Cost.ManaCost.Should().NotBeNull(
+            because: "Goblin Tinkerer costs {R} to activate");
+        def.ActivatedAbility.Cost.ManaCost!.ColorRequirements.Should()
+            .ContainKey(ManaColor.Red);
     }
 }

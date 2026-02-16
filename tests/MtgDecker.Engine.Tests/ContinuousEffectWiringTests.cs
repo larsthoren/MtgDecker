@@ -105,4 +105,27 @@ public class ContinuousEffectWiringTests
 
         p1.MaxLandDrops.Should().Be(3);
     }
+
+    [Fact]
+    public void Goblin_King_Grants_Mountainwalk_To_Other_Goblins()
+    {
+        var (engine, state, p1, _) = Setup();
+
+        var king = GameCard.Create("Goblin King", "Creature — Goblin");
+        var grunt = new GameCard
+        {
+            Name = "Goblin Grunt", BasePower = 1, BaseToughness = 1,
+            CardTypes = CardType.Creature, Subtypes = ["Goblin"]
+        };
+
+        p1.Battlefield.Add(king);
+        p1.Battlefield.Add(grunt);
+
+        engine.RecalculateState();
+
+        grunt.ActiveKeywords.Should().Contain(Keyword.Mountainwalk,
+            "other Goblins should get mountainwalk from Goblin King");
+        king.ActiveKeywords.Should().NotContain(Keyword.Mountainwalk,
+            "Goblin King doesn't give mountainwalk to itself");
+    }
 }

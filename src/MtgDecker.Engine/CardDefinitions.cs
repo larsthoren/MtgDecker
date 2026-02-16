@@ -38,6 +38,12 @@ public static class CardDefinitions
             {
                 Subtypes = ["Goblin"],
                 Triggers = [new Trigger(GameEvent.EnterBattlefield, TriggerCondition.Self, new RevealAndFilterEffect(4, "Goblin"))],
+                ContinuousEffects =
+                [
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
+                        (card, _) => card.Name == "Goblin Ringleader",
+                        GrantedKeyword: Keyword.Haste),
+                ],
             },
             ["Goblin Warchief"] = new(ManaCost.Parse("{1}{R}{R}"), null, 2, 2, CardType.Creature)
             {
@@ -77,6 +83,10 @@ public static class CardDefinitions
                     new ContinuousEffect(Guid.Empty, ContinuousEffectType.ModifyPowerToughness,
                         (card, _) => card.IsCreature && card.Subtypes.Contains("Goblin"),
                         PowerMod: 1, ToughnessMod: 1),
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
+                        (card, _) => card.IsCreature && card.Subtypes.Contains("Goblin"),
+                        GrantedKeyword: Keyword.Mountainwalk,
+                        ExcludeSelf: true),
                 ],
             },
             ["Goblin Pyromancer"] = new(ManaCost.Parse("{3}{R}"), null, 2, 2, CardType.Creature)
@@ -93,7 +103,7 @@ public static class CardDefinitions
             ["Goblin Tinkerer"] = new(ManaCost.Parse("{1}{R}"), null, 1, 1, CardType.Creature)
             {
                 Subtypes = ["Goblin"],
-                ActivatedAbility = new(new ActivatedAbilityCost(SacrificeSelf: true), new DestroyTargetEffect(), c => c.CardTypes.HasFlag(CardType.Artifact)),
+                ActivatedAbility = new(new ActivatedAbilityCost(SacrificeSelf: true, ManaCost: ManaCost.Parse("{R}")), new DestroyTargetEffect(), c => c.CardTypes.HasFlag(CardType.Artifact)),
             },
             ["Skirk Prospector"] = new(ManaCost.Parse("{R}"), null, 1, 1, CardType.Creature)
             {
@@ -244,8 +254,26 @@ public static class CardDefinitions
                 TargetFilter.CreatureOrPlayer(), new DamageEffect(3)),
             ["Fireblast"] = new(ManaCost.Parse("{4}{R}{R}"), null, null, null, CardType.Instant,
                 TargetFilter.CreatureOrPlayer(), new DamageEffect(4)),
-            ["Goblin Guide"] = new(ManaCost.Parse("{R}"), null, 2, 2, CardType.Creature) { Subtypes = ["Goblin"] },
-            ["Monastery Swiftspear"] = new(ManaCost.Parse("{R}"), null, 1, 2, CardType.Creature) { Subtypes = ["Human", "Monk"] },
+            ["Goblin Guide"] = new(ManaCost.Parse("{R}"), null, 2, 2, CardType.Creature)
+            {
+                Subtypes = ["Goblin"],
+                ContinuousEffects =
+                [
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
+                        (card, _) => card.Name == "Goblin Guide",
+                        GrantedKeyword: Keyword.Haste),
+                ],
+            },
+            ["Monastery Swiftspear"] = new(ManaCost.Parse("{R}"), null, 1, 2, CardType.Creature)
+            {
+                Subtypes = ["Human", "Monk"],
+                ContinuousEffects =
+                [
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
+                        (card, _) => card.Name == "Monastery Swiftspear",
+                        GrantedKeyword: Keyword.Haste),
+                ],
+            },
             ["Eidolon of the Great Revel"] = new(ManaCost.Parse("{R}{R}"), null, 2, 2,
                 CardType.Creature | CardType.Enchantment) { Subtypes = ["Spirit"] },
             ["Searing Blood"] = new(ManaCost.Parse("{R}{R}"), null, null, null, CardType.Instant,
@@ -360,7 +388,7 @@ public static class CardDefinitions
             ["Grim Lavamancer"] = new(ManaCost.Parse("{R}"), null, 1, 1, CardType.Creature)
             {
                 Subtypes = ["Human", "Wizard"],
-                ActivatedAbility = new(new ActivatedAbilityCost(TapSelf: true), new DealDamageEffect(1), c => c.IsCreature, CanTargetPlayer: true),
+                ActivatedAbility = new(new ActivatedAbilityCost(TapSelf: true, ManaCost: ManaCost.Parse("{R}")), new DealDamageEffect(2), c => c.IsCreature, CanTargetPlayer: true),
             },
             ["Jackal Pup"] = new(ManaCost.Parse("{R}"), null, 2, 1, CardType.Creature) { Subtypes = ["Hound"] },
             ["Incinerate"] = new(ManaCost.Parse("{1}{R}"), null, null, null, CardType.Instant,
@@ -439,6 +467,9 @@ public static class CardDefinitions
                     new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
                         (card, _) => card.Name == "Exalted Angel",
                         GrantedKeyword: Keyword.Flying),
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
+                        (card, _) => card.Name == "Exalted Angel",
+                        GrantedKeyword: Keyword.Lifelink),
                 ],
             },
             ["Knight of Stromgald"] = new(ManaCost.Parse("{B}{B}"), null, 2, 1, CardType.Creature) { Subtypes = ["Human", "Knight"] },
@@ -535,6 +566,12 @@ public static class CardDefinitions
             {
                 Subtypes = ["Plant", "Wall"],
                 Triggers = [new Trigger(GameEvent.EnterBattlefield, TriggerCondition.Self, new DrawCardEffect())],
+                ContinuousEffects =
+                [
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
+                        (card, _) => card.Name == "Wall of Blossoms",
+                        GrantedKeyword: Keyword.Defender),
+                ],
             },
             ["Wall of Roots"] = new(ManaCost.Parse("{1}{G}"), null, 0, 5, CardType.Creature) { Subtypes = ["Plant", "Wall"] },
             ["Ravenous Baloth"] = new(ManaCost.Parse("{2}{G}{G}"), null, 4, 4, CardType.Creature) { Subtypes = ["Beast"] },
@@ -546,7 +583,16 @@ public static class CardDefinitions
                 Subtypes = ["Elf"],
                 Triggers = [new Trigger(GameEvent.EnterBattlefield, TriggerCondition.Self, new SearchLibraryEffect("Forest", optional: true))],
             },
-            ["Anger"] = new(ManaCost.Parse("{3}{R}"), null, 2, 2, CardType.Creature) { Subtypes = ["Incarnation"] },
+            ["Anger"] = new(ManaCost.Parse("{3}{R}"), null, 2, 2, CardType.Creature)
+            {
+                Subtypes = ["Incarnation"],
+                ContinuousEffects =
+                [
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
+                        (card, _) => card.Name == "Anger",
+                        GrantedKeyword: Keyword.Haste),
+                ],
+            },
             ["Squee, Goblin Nabob"] = new(ManaCost.Parse("{2}{R}"), null, 1, 1, CardType.Creature)
             {
                 Subtypes = ["Goblin"],
