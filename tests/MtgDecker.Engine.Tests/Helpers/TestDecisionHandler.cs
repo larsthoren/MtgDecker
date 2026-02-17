@@ -16,6 +16,7 @@ public class TestDecisionHandler : IPlayerDecisionHandler
     private readonly Queue<IReadOnlyList<Guid>> _blockerOrderQueue = new();
     private readonly Queue<TargetInfo?> _targetQueue = new();
     private readonly Queue<Guid?> _cardChoiceQueue = new();
+    private readonly Queue<Func<IReadOnlyList<GameCard>, int, IReadOnlyList<GameCard>>> _discardChoices = new();
 
     public void EnqueueAction(GameAction action) => _actions.Enqueue(action);
 
@@ -33,6 +34,9 @@ public class TestDecisionHandler : IPlayerDecisionHandler
     public void EnqueueBlockerOrder(IReadOnlyList<Guid> order) => _blockerOrderQueue.Enqueue(order);
     public void EnqueueTarget(TargetInfo? target) => _targetQueue.Enqueue(target);
     public void EnqueueCardChoice(Guid? cardId) => _cardChoiceQueue.Enqueue(cardId);
+
+    public void EnqueueDiscardChoice(Func<IReadOnlyList<GameCard>, int, IReadOnlyList<GameCard>> chooser) =>
+        _discardChoices.Enqueue(chooser);
 
     public Action? OnBeforeAction { get; set; }
 
@@ -120,5 +124,12 @@ public class TestDecisionHandler : IPlayerDecisionHandler
     {
         // Test handler auto-acknowledges reveals
         return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlyList<GameCard>> ChooseCardsToDiscard(IReadOnlyList<GameCard> hand, int discardCount, CancellationToken ct = default)
+    {
+        if (_discardChoices.Count == 0)
+            return Task.FromResult<IReadOnlyList<GameCard>>(hand.Take(discardCount).ToList());
+        return Task.FromResult(_discardChoices.Dequeue()(hand, discardCount));
     }
 }

@@ -372,6 +372,39 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
     }
 
     /// <summary>
+    /// Discards cards to meet maximum hand size. Prioritizes discarding
+    /// highest CMC spells first (least likely to cast), then excess lands.
+    /// </summary>
+    public async Task<IReadOnlyList<GameCard>> ChooseCardsToDiscard(IReadOnlyList<GameCard> hand, int discardCount, CancellationToken ct = default)
+    {
+        await DelayAsync(ct);
+        var result = new List<GameCard>();
+        var remaining = new List<GameCard>(hand);
+
+        // Discard highest CMC non-land cards first
+        var spellsByDescCmc = remaining
+            .Where(c => !c.IsLand)
+            .OrderByDescending(c => c.ManaCost?.ConvertedManaCost ?? 0)
+            .ToList();
+
+        foreach (var spell in spellsByDescCmc)
+        {
+            if (result.Count >= discardCount) break;
+            result.Add(spell);
+            remaining.Remove(spell);
+        }
+
+        // Then excess lands
+        foreach (var land in remaining.Where(c => c.IsLand).ToList())
+        {
+            if (result.Count >= discardCount) break;
+            result.Add(land);
+        }
+
+        return result;
+    }
+
+    /// <summary>
     /// Chooses a target for a spell. Picks the opponent's creature with highest power,
     /// falling back to the first eligible target.
     /// </summary>

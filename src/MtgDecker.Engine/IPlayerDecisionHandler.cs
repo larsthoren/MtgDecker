@@ -20,4 +20,6 @@ public interface IPlayerDecisionHandler
 
     Task RevealCards(IReadOnlyList<GameCard> cards, IReadOnlyList<GameCard> kept,
         string prompt, CancellationToken ct = default);
+
+    Task<IReadOnlyList<GameCard>> ChooseCardsToDiscard(IReadOnlyList<GameCard> hand, int discardCount, CancellationToken ct = default);
 }
