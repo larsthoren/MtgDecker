@@ -339,6 +339,68 @@ public class ActivateAbilityEngineTests
         p1.Hand.Cards.Should().Contain(c => c.Id == enchantmentInLib.Id);
     }
 
+    // === Summoning sickness: creatures with TapSelf abilities ===
+
+    [Fact]
+    public async Task TapSelfAbility_CreatureWithSummoningSickness_CannotActivate()
+    {
+        var (engine, state, p1, p2, h1, _) = CreateSetup();
+        var sharpshooter = GameCard.Create("Goblin Sharpshooter");
+        sharpshooter.TurnEnteredBattlefield = state.TurnNumber; // entered this turn
+        p1.Battlefield.Add(sharpshooter);
+
+        var target = new GameCard { Name = "Bear", CardTypes = CardType.Creature, BasePower = 2, BaseToughness = 3 };
+        p2.Battlefield.Add(target);
+
+        var action = GameAction.ActivateAbility(p1.Id, sharpshooter.Id, targetId: target.Id);
+        await engine.ExecuteAction(action);
+
+        sharpshooter.IsTapped.Should().BeFalse("creature with summoning sickness can't use tap abilities");
+        target.DamageMarked.Should().Be(0);
+        state.GameLog.Should().Contain(l => l.Contains("summoning sickness"));
+    }
+
+    [Fact]
+    public async Task TapSelfAbility_CreatureWithHaste_CanActivateDespiteSummoningSickness()
+    {
+        var (engine, state, p1, p2, h1, _) = CreateSetup();
+        var sharpshooter = GameCard.Create("Goblin Sharpshooter");
+        sharpshooter.TurnEnteredBattlefield = state.TurnNumber;
+        sharpshooter.ActiveKeywords.Add(Keyword.Haste);
+        p1.Battlefield.Add(sharpshooter);
+
+        var target = new GameCard { Name = "Bear", CardTypes = CardType.Creature, BasePower = 2, BaseToughness = 3 };
+        p2.Battlefield.Add(target);
+
+        var action = GameAction.ActivateAbility(p1.Id, sharpshooter.Id, targetId: target.Id);
+        await engine.ExecuteAction(action);
+        await engine.ResolveAllTriggersAsync();
+
+        sharpshooter.IsTapped.Should().BeTrue("haste bypasses summoning sickness");
+        target.DamageMarked.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task TapSelfAbility_NonCreature_CanActivateOnEntryTurn()
+    {
+        var (engine, state, p1, p2, h1, _) = CreateSetup();
+        var port = GameCard.Create("Rishadan Port");
+        port.TurnEnteredBattlefield = state.TurnNumber; // entered this turn — but lands don't get summoning sickness
+        p1.Battlefield.Add(port);
+
+        p1.ManaPool.Add(ManaColor.Colorless, 1);
+
+        var targetLand = new GameCard { Name = "Island", CardTypes = CardType.Land };
+        p2.Battlefield.Add(targetLand);
+
+        var action = GameAction.ActivateAbility(p1.Id, port.Id, targetId: targetLand.Id);
+        await engine.ExecuteAction(action);
+        await engine.ResolveAllTriggersAsync();
+
+        port.IsTapped.Should().BeTrue("non-creature permanents don't have summoning sickness");
+        targetLand.IsTapped.Should().BeTrue();
+    }
+
     // === Card not on battlefield ===
 
     [Fact]

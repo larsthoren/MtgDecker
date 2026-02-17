@@ -16,7 +16,14 @@ else
     <MudStack Row="true" Class="mb-3" AlignItems="AlignItems.Center">
         <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" OnClick="@(() => Navigation.NavigateTo("/decks"))" />
         <MudText Typo="Typo.h5">@_deck.Name</MudText>
-        <MudChip T="string" Size="Size.Small" Color="Color.Primary">@_deck.Format</MudChip>
+        <MudSelect T="MtgDecker.Domain.Enums.Format" Value="_deck.Format" ValueChanged="OnFormatChanged"
+                   Variant="Variant.Outlined" Dense="true" Margin="Margin.Dense"
+                   Style="max-width: 160px;">
+            @foreach (var fmt in Enum.GetValues<MtgDecker.Domain.Enums.Format>())
+            {
+                <MudSelectItem Value="fmt">@fmt</MudSelectItem>
+            }
+        </MudSelect>
         <MudButton Variant="Variant.Outlined" Color="Color.Tertiary"
                    StartIcon="@Icons.Material.Filled.Casino"
                    OnClick="OpenPlaytest" Size="Size.Small">
@@ -450,6 +457,21 @@ else
                 DeckId, entry.CardId, MtgDecker.Domain.Enums.DeckCategory.Maybeboard, MtgDecker.Domain.Enums.DeckCategory.MainDeck));
             await LoadStats();
             Snackbar.Add($"Moved {GetCardName(entry.CardId)} to main deck", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+
+    private async Task OnFormatChanged(MtgDecker.Domain.Enums.Format newFormat)
+    {
+        if (_deck == null || _deck.Format == newFormat) return;
+
+        try
+        {
+            _deck = await Mediator.Send(new MtgDecker.Application.Decks.UpdateDeckFormatCommand(DeckId, newFormat));
+            Snackbar.Add($"Format changed to {newFormat}", Severity.Success);
         }
         catch (Exception ex)
         {
