@@ -422,6 +422,36 @@
         </div>
     }
 
+    @* Discard to hand size prompt *@
+    @if (Handler?.IsWaitingForDiscard == true && Handler?.DiscardOptions != null)
+    {
+        <div class="prompt-overlay">
+            <MudPaper Class="pa-3" Elevation="8">
+                <MudText Typo="Typo.body2" Class="mb-2">
+                    Discard @Handler.DiscardCount card(s) to hand size
+                </MudText>
+                <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+                    @foreach (var card in Handler.DiscardOptions)
+                    {
+                        var isSelected = _selectedDiscards.Contains(card.Id);
+                        <div style="cursor: pointer; @(isSelected ? "outline: 3px solid #F44336; border-radius: 8px;" : "")"
+                             @onclick="() => ToggleDiscardSelection(card.Id)">
+                            <CardDisplay ImageUrl="@card.ImageUrl" Name="@card.Name" Clickable="true" />
+                        </div>
+                    }
+                </div>
+                <div style="display: flex; gap: 8px; margin-top: 8px; align-items: center;">
+                    <MudText Typo="Typo.caption">
+                        Selected: @_selectedDiscards.Count / @Handler.DiscardCount
+                    </MudText>
+                    <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Error"
+                               Disabled="@(_selectedDiscards.Count != Handler.DiscardCount)"
+                               OnClick="SubmitDiscard">Discard</MudButton>
+                </div>
+            </MudPaper>
+        </div>
+    }
+
     @* Reveal cards prompt *@
     @if (Handler?.IsWaitingForRevealAck == true && Handler?.RevealedCards != null)
     {
@@ -512,6 +542,9 @@
     // Card choice state
     private Guid? _selectedChoiceId;
 
+    // Discard selection state
+    private HashSet<Guid> _selectedDiscards = new();
+
     // Pending cast state (waiting for player to tap lands)
     private GameCard? _pendingCastCard;
 
@@ -529,6 +562,7 @@
         Handler?.IsWaitingForBlockerOrder == true;
     private bool IsWaitingForCardChoice => Handler?.IsWaitingForCardChoice == true;
     private bool IsWaitingForRevealAck => Handler?.IsWaitingForRevealAck == true;
+    private bool IsWaitingForDiscard => Handler?.IsWaitingForDiscard == true;
 
     private void ToggleLog() => _showLog = !_showLog;
 
@@ -810,6 +844,26 @@
     {
         _selectedChoiceId = null;
         await OnCardChosen.InvokeAsync(cardId);
+    }
+
+    // --- Discard selection ---
+
+    private void ToggleDiscardSelection(Guid cardId)
+    {
+        if (_selectedDiscards.Contains(cardId))
+            _selectedDiscards.Remove(cardId);
+        else if (_selectedDiscards.Count < (Handler?.DiscardCount ?? 0))
+            _selectedDiscards.Add(cardId);
+    }
+
+    private void SubmitDiscard()
+    {
+        if (Handler?.DiscardOptions == null) return;
+        var chosen = Handler.DiscardOptions
+            .Where(c => _selectedDiscards.Contains(c.Id))
+            .ToList();
+        Handler.SubmitDiscard(chosen);
+        _selectedDiscards.Clear();
     }
 
     // --- Pending cast (tap lands to pay) ---

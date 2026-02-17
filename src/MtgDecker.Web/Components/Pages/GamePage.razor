@@ -138,6 +138,10 @@ else if (_session.State != null)
         {
             InvokeAsync(StateHasChanged);
         }
+        else if (handler.IsWaitingForDiscard)
+        {
+            InvokeAsync(StateHasChanged);
+        }
     }
 
     private async Task ShowMulliganDialog(int mulliganCount)
