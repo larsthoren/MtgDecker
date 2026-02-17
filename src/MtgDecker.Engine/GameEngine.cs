@@ -424,10 +424,27 @@ public class GameEngine
                 if (castCostReduction != 0)
                     castEffectiveCost = castEffectiveCost.WithGenericReduction(-castCostReduction);
 
-                if (!castPlayer.ManaPool.CanPay(castEffectiveCost))
+                // Determine payment method: mana vs alternate cost
+                bool canPayMana = castPlayer.ManaPool.CanPay(castEffectiveCost);
+                bool canPayAlternate = def.AlternateCost != null && CanPayAlternateCost(def.AlternateCost, castPlayer, castCard);
+                bool useAlternateCost = false;
+
+                if (!canPayMana && !canPayAlternate)
                 {
                     _state.Log($"Not enough mana to cast {castCard.Name}.");
                     return;
+                }
+
+                if (canPayAlternate && !canPayMana)
+                {
+                    useAlternateCost = true;
+                }
+                else if (canPayAlternate && canPayMana)
+                {
+                    // Ask player: choose card = pay mana, skip (null) = use alternate cost
+                    var choice = await castPlayer.DecisionHandler.ChooseCard(
+                        [castCard], $"Pay mana for {castCard.Name}? (skip to use alternate cost)", optional: true, ct);
+                    useAlternateCost = !choice.HasValue;
                 }
 
                 var targets = new List<TargetInfo>();
@@ -493,8 +510,17 @@ public class GameEngine
                     }
                 }
 
-                var manaPaid = await PayManaCostAsync(castEffectiveCost, castPlayer, ct);
-                castPlayer.PendingManaTaps.Clear();
+                Dictionary<ManaColor, int> manaPaid;
+                if (useAlternateCost)
+                {
+                    await PayAlternateCostAsync(def.AlternateCost!, castPlayer, castCard, ct);
+                    manaPaid = new Dictionary<ManaColor, int>(); // No mana spent
+                }
+                else
+                {
+                    manaPaid = await PayManaCostAsync(castEffectiveCost, castPlayer, ct);
+                    castPlayer.PendingManaTaps.Clear();
+                }
 
                 castPlayer.Hand.RemoveById(castCard.Id);
                 var stackObj = new StackObject(castCard, castPlayer.Id, manaPaid, targets, _state.StackCount);
@@ -835,6 +861,127 @@ public class GameEngine
         }
 
         return manaPaid;
+    }
+
+    internal bool CanPayAlternateCost(AlternateCost alt, Player player, GameCard castCard)
+    {
+        // Life check: must have strictly more life than the cost
+        if (alt.LifeCost > 0 && player.Life <= alt.LifeCost) return false;
+
+        // Exile a card of the required color from hand (not the spell itself)
+        if (alt.ExileCardColor.HasValue)
+        {
+            var hasColoredCard = player.Hand.Cards.Any(c =>
+                c.Id != castCard.Id && c.ManaCost != null &&
+                c.ManaCost.ColorRequirements.ContainsKey(alt.ExileCardColor.Value));
+            if (!hasColoredCard) return false;
+        }
+
+        // Return land with matching subtype from battlefield
+        if (alt.ReturnLandSubtype != null)
+        {
+            var hasLand = player.Battlefield.Cards.Any(c =>
+                c.IsLand && c.Subtypes.Contains(alt.ReturnLandSubtype));
+            if (!hasLand) return false;
+        }
+
+        // Sacrifice lands with matching subtype
+        if (alt.SacrificeLandSubtype != null)
+        {
+            var landCount = player.Battlefield.Cards.Count(c =>
+                c.IsLand && c.Subtypes.Contains(alt.SacrificeLandSubtype));
+            if (landCount < alt.SacrificeLandCount) return false;
+        }
+
+        // Requires controlling a permanent with the given subtype
+        if (alt.RequiresControlSubtype != null)
+        {
+            var hasControlled = player.Battlefield.Cards.Any(c =>
+                c.Subtypes.Contains(alt.RequiresControlSubtype));
+            if (!hasControlled) return false;
+        }
+
+        return true;
+    }
+
+    private async Task PayAlternateCostAsync(AlternateCost alt, Player player, GameCard castCard, CancellationToken ct)
+    {
+        // Pay life
+        if (alt.LifeCost > 0)
+        {
+            player.AdjustLife(-alt.LifeCost);
+            _state.Log($"{player.Name} pays {alt.LifeCost} life.");
+        }
+
+        // Exile card from hand
+        if (alt.ExileCardColor.HasValue)
+        {
+            var eligible = player.Hand.Cards.Where(c =>
+                c.Id != castCard.Id && c.ManaCost != null &&
+                c.ManaCost.ColorRequirements.ContainsKey(alt.ExileCardColor.Value)).ToList();
+
+            var chosenId = await player.DecisionHandler.ChooseCard(
+                eligible, $"Choose a {alt.ExileCardColor} card to exile", optional: false, ct);
+
+            if (chosenId.HasValue)
+            {
+                var exiled = player.Hand.Cards.FirstOrDefault(c => c.Id == chosenId.Value);
+                if (exiled != null)
+                {
+                    player.Hand.RemoveById(exiled.Id);
+                    player.Exile.Add(exiled);
+                    _state.Log($"{player.Name} exiles {exiled.Name} from hand.");
+                }
+            }
+        }
+
+        // Return land to hand
+        if (alt.ReturnLandSubtype != null)
+        {
+            var eligible = player.Battlefield.Cards.Where(c =>
+                c.IsLand && c.Subtypes.Contains(alt.ReturnLandSubtype)).ToList();
+
+            var chosenId = await player.DecisionHandler.ChooseCard(
+                eligible, $"Choose an {alt.ReturnLandSubtype} to return", optional: false, ct);
+
+            if (chosenId.HasValue)
+            {
+                var land = player.Battlefield.Cards.FirstOrDefault(c => c.Id == chosenId.Value);
+                if (land != null)
+                {
+                    player.Battlefield.RemoveById(land.Id);
+                    player.Hand.Add(land);
+                    _state.Log($"{player.Name} returns {land.Name} to hand.");
+                }
+            }
+        }
+
+        // Sacrifice lands
+        if (alt.SacrificeLandSubtype != null)
+        {
+            for (int i = 0; i < alt.SacrificeLandCount; i++)
+            {
+                var eligible = player.Battlefield.Cards.Where(c =>
+                    c.IsLand && c.Subtypes.Contains(alt.SacrificeLandSubtype)).ToList();
+
+                if (eligible.Count == 0) break;
+
+                var chosenId = await player.DecisionHandler.ChooseCard(
+                    eligible, $"Choose a {alt.SacrificeLandSubtype} to sacrifice ({i + 1}/{alt.SacrificeLandCount})", optional: false, ct);
+
+                if (chosenId.HasValue)
+                {
+                    var land = player.Battlefield.Cards.FirstOrDefault(c => c.Id == chosenId.Value);
+                    if (land != null)
+                    {
+                        await FireLeaveBattlefieldTriggersAsync(land, player, ct);
+                        player.Battlefield.RemoveById(land.Id);
+                        player.Graveyard.Add(land);
+                        _state.Log($"{player.Name} sacrifices {land.Name}.");
+                    }
+                }
+            }
+        }
     }
 
     private bool HasShroud(GameCard card) => card.ActiveKeywords.Contains(Keyword.Shroud);

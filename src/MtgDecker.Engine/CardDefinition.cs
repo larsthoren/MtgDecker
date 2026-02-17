@@ -26,4 +26,5 @@ public record CardDefinition(
     public IReadOnlyList<Trigger> CyclingTriggers { get; init; } = [];
     public ManaCost? EchoCost { get; init; }
     public bool EntersTapped { get; init; }
+    public AlternateCost? AlternateCost { get; init; }
 }
