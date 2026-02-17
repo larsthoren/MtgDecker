@@ -635,6 +635,33 @@ public class GameEngine
                     }
                 }
 
+                // Validate: discard card type from hand
+                GameCard? discardTarget = null;
+                if (cost.DiscardCardType.HasValue)
+                {
+                    var eligible = player.Hand.Cards
+                        .Where(c => c.CardTypes.HasFlag(cost.DiscardCardType.Value))
+                        .ToList();
+
+                    if (eligible.Count == 0)
+                    {
+                        _state.Log($"Cannot activate {abilitySource.Name} — no {cost.DiscardCardType.Value} in hand to discard.");
+                        break;
+                    }
+
+                    var chosenId = await player.DecisionHandler.ChooseCard(
+                        eligible, $"Choose a {cost.DiscardCardType.Value} to discard", optional: false, ct);
+
+                    if (chosenId.HasValue)
+                        discardTarget = eligible.FirstOrDefault(c => c.Id == chosenId.Value);
+
+                    if (discardTarget == null)
+                    {
+                        _state.Log($"Cannot activate {abilitySource.Name} — no discard target chosen.");
+                        break;
+                    }
+                }
+
                 // Pay costs: mana
                 if (cost.ManaCost != null)
                 {
@@ -677,6 +704,14 @@ public class GameEngine
                 if (cost.RemoveCounterType.HasValue)
                 {
                     abilitySource.RemoveCounter(cost.RemoveCounterType.Value);
+                }
+
+                // Pay costs: discard card type
+                if (discardTarget != null)
+                {
+                    player.Hand.RemoveById(discardTarget.Id);
+                    player.Graveyard.Add(discardTarget);
+                    _state.Log($"{player.Name} discards {discardTarget.Name}.");
                 }
 
                 // Find or prompt for effect target

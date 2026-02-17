@@ -755,7 +755,12 @@ public static class CardDefinitions
                     TriggerCondition.SelfInGraveyardDuringUpkeep,
                     new ReturnSelfFromGraveyardEffect())],
             },
-            ["Survival of the Fittest"] = new(ManaCost.Parse("{1}{G}"), null, null, null, CardType.Enchantment),
+            ["Survival of the Fittest"] = new(ManaCost.Parse("{1}{G}"), null, null, null, CardType.Enchantment)
+            {
+                ActivatedAbility = new(
+                    new ActivatedAbilityCost(ManaCost: ManaCost.Parse("{G}"), DiscardCardType: CardType.Creature),
+                    new SearchLibraryByTypeEffect(CardType.Creature)),
+            },
             ["Gaea's Cradle"] = new(null, ManaAbility.Dynamic(ManaColor.Green,
                 p => p.Battlefield.Cards.Count(c => c.IsCreature)),
                 null, null, CardType.Land) { IsLegendary = true },
