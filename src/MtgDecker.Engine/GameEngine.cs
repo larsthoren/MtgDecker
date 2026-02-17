@@ -580,6 +580,13 @@ public class GameEngine
                     break;
                 }
 
+                // Validate: summoning sickness prevents creatures from using tap abilities
+                if (cost.TapSelf && abilitySource.IsCreature && abilitySource.HasSummoningSickness(_state.TurnNumber))
+                {
+                    _state.Log($"{abilitySource.Name} has summoning sickness.");
+                    break;
+                }
+
                 // Validate: mana cost
                 if (cost.ManaCost != null && !player.ManaPool.CanPay(cost.ManaCost))
                 {
