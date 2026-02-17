@@ -726,7 +726,14 @@ public static class CardDefinitions
                     new Triggers.Effects.GainLifeEffect(4)),
             },
             ["Caller of the Claw"] = new(ManaCost.Parse("{2}{G}"), null, 2, 2, CardType.Creature) { Subtypes = ["Elf"] },
-            ["Masticore"] = new(ManaCost.Parse("{4}"), null, 4, 4, CardType.Artifact | CardType.Creature),
+            ["Masticore"] = new(ManaCost.Parse("{4}"), null, 4, 4, CardType.Artifact | CardType.Creature)
+            {
+                Triggers = [new Trigger(GameEvent.Upkeep, TriggerCondition.Upkeep, new MasticoreUpkeepEffect())],
+                ActivatedAbility = new(
+                    new ActivatedAbilityCost(ManaCost: ManaCost.Parse("{2}")),
+                    new DealDamageEffect(1),
+                    TargetFilter: c => c.IsCreature),
+            },
             ["Nantuko Vigilante"] = new(ManaCost.Parse("{3}{G}"), null, 3, 2, CardType.Creature) { Subtypes = ["Insect", "Druid"] },
             ["Yavimaya Granger"] = new(ManaCost.Parse("{2}{G}"), null, 2, 2, CardType.Creature)
             {
