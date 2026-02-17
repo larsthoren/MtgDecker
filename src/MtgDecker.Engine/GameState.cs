@@ -51,6 +51,7 @@ public class GameState
 
     public List<ContinuousEffect> ActiveEffects { get; } = new();
     public List<DelayedTrigger> DelayedTriggers { get; } = new();
+    public long NextEffectTimestamp { get; set; } = 1;
     public event Action? OnStateChanged;
 
     private readonly object _logLock = new();

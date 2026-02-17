@@ -81,6 +81,7 @@ public class GameCard
     // Combat tracking
     public int? TurnEnteredBattlefield { get; set; }
     public int DamageMarked { get; set; }
+    public bool AbilitiesRemoved { get; set; }
 
     public bool HasSummoningSickness(int currentTurn) =>
         IsCreature

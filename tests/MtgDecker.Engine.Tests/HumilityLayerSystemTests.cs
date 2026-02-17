@@ -43,4 +43,24 @@ public class HumilityLayerSystemTests
         effect.SetPower.Should().Be(1);
         effect.SetToughness.Should().Be(1);
     }
+
+    [Fact]
+    public void GameCard_HasAbilitiesRemovedField()
+    {
+        var card = new GameCard();
+        card.AbilitiesRemoved.Should().BeFalse();
+        card.AbilitiesRemoved = true;
+        card.AbilitiesRemoved.Should().BeTrue();
+    }
+
+    [Fact]
+    public void GameState_HasNextEffectTimestamp()
+    {
+        var p1 = new Player(Guid.NewGuid(), "P1", new TestDecisionHandler());
+        var p2 = new Player(Guid.NewGuid(), "P2", new TestDecisionHandler());
+        var state = new GameState(p1, p2);
+        state.NextEffectTimestamp.Should().Be(1);
+        state.NextEffectTimestamp++;
+        state.NextEffectTimestamp.Should().Be(2);
+    }
 }
