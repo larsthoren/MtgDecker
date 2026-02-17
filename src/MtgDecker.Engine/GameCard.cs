@@ -22,6 +22,7 @@ public class GameCard
     public bool IsLegendary { get; init; }
     public bool EntersTapped { get; init; }
     public FetchAbility? FetchAbility { get; init; }
+    public bool EchoPaid { get; set; } = true;
 
     // Base power/toughness from the card definition
     public int? BasePower { get; set; }
@@ -122,6 +123,7 @@ public class GameCard
                 IsLegendary = def.IsLegendary,
                 EntersTapped = def.EntersTapped,
                 FetchAbility = def.FetchAbility,
+                EchoPaid = def.EchoCost == null,
             };
         }
         return new GameCard
@@ -158,6 +160,7 @@ public class GameCard
                 IsLegendary = def.IsLegendary,
                 EntersTapped = def.EntersTapped,
                 FetchAbility = def.FetchAbility,
+                EchoPaid = def.EchoCost == null,
             };
         }
 

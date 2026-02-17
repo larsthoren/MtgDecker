@@ -629,12 +629,20 @@ public static class CardDefinitions
             ["Multani's Acolyte"] = new(ManaCost.Parse("{G}{G}"), null, 2, 1, CardType.Creature)
             {
                 Subtypes = ["Elf"],
+                EchoCost = ManaCost.Parse("{G}{G}"),
                 Triggers = [new Trigger(GameEvent.EnterBattlefield, TriggerCondition.Self, new DrawCardEffect())],
             },
             ["Deranged Hermit"] = new(ManaCost.Parse("{3}{G}{G}"), null, 1, 1, CardType.Creature)
             {
                 Subtypes = ["Elf"],
+                EchoCost = ManaCost.Parse("{3}{G}{G}"),
                 Triggers = [new Trigger(GameEvent.EnterBattlefield, TriggerCondition.Self, new CreateTokensEffect("Squirrel", 1, 1, CardType.Creature, ["Squirrel"], count: 4))],
+                ContinuousEffects =
+                [
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.ModifyPowerToughness,
+                        (card, _) => card.Subtypes.Contains("Squirrel"),
+                        PowerMod: 1, ToughnessMod: 1),
+                ],
             },
             ["Wall of Blossoms"] = new(ManaCost.Parse("{1}{G}"), null, 0, 4, CardType.Creature)
             {
@@ -660,6 +668,7 @@ public static class CardDefinitions
             ["Yavimaya Granger"] = new(ManaCost.Parse("{2}{G}"), null, 2, 2, CardType.Creature)
             {
                 Subtypes = ["Elf"],
+                EchoCost = ManaCost.Parse("{2}{G}"),
                 Triggers = [new Trigger(GameEvent.EnterBattlefield, TriggerCondition.Self, new SearchLibraryEffect("Forest", optional: true))],
             },
             ["Anger"] = new(ManaCost.Parse("{3}{R}"), null, 2, 2, CardType.Creature)
