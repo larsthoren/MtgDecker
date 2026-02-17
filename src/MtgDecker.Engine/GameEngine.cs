@@ -32,6 +32,8 @@ public class GameEngine
     {
         _turnStateMachine.Reset();
         _state.ActivePlayer.LandsPlayedThisTurn = 0;
+        _state.Player1.CreaturesDiedThisTurn = 0;
+        _state.Player2.CreaturesDiedThisTurn = 0;
         _state.Log($"Turn {_state.TurnNumber}: {_state.ActivePlayer.Name}'s turn.");
 
         do
@@ -1554,6 +1556,7 @@ public class GameEngine
 
         foreach (var card in dead)
         {
+            TrackCreatureDeath(card, player);
             player.Battlefield.RemoveById(card.Id);
             // MTG rules: tokens go to graveyard then cease to exist (SBA 704.5d)
             player.Graveyard.Add(card);
@@ -1566,6 +1569,11 @@ public class GameEngine
         return dead;
     }
 
+    private void TrackCreatureDeath(GameCard card, Player owner)
+    {
+        if (card.IsCreature && !card.IsToken)
+            owner.CreaturesDiedThisTurn++;
+    }
 
     public void ClearDamage()
     {
@@ -1887,6 +1895,7 @@ public class GameEngine
 
         foreach (var card in dead)
         {
+            TrackCreatureDeath(card, player);
             await FireLeaveBattlefieldTriggersAsync(card, player, ct);
             player.Battlefield.RemoveById(card.Id);
             player.Graveyard.Add(card);
@@ -1904,6 +1913,7 @@ public class GameEngine
 
         foreach (var card in dead)
         {
+            TrackCreatureDeath(card, player);
             await FireLeaveBattlefieldTriggersAsync(card, player, ct);
             player.Battlefield.RemoveById(card.Id);
             // MTG rules: tokens go to graveyard then cease to exist (SBA 704.5d)

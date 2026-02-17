@@ -725,7 +725,17 @@ public static class CardDefinitions
                 ActivatedAbility = new(new ActivatedAbilityCost(SacrificeSubtype: "Beast"),
                     new Triggers.Effects.GainLifeEffect(4)),
             },
-            ["Caller of the Claw"] = new(ManaCost.Parse("{2}{G}"), null, 2, 2, CardType.Creature) { Subtypes = ["Elf"] },
+            ["Caller of the Claw"] = new(ManaCost.Parse("{2}{G}"), null, 2, 2, CardType.Creature)
+            {
+                Subtypes = ["Elf"],
+                ContinuousEffects =
+                [
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
+                        (card, _) => card.Name == "Caller of the Claw",
+                        GrantedKeyword: Keyword.Flash),
+                ],
+                Triggers = [new Trigger(GameEvent.EnterBattlefield, TriggerCondition.Self, new CallerOfTheClawEffect())],
+            },
             ["Masticore"] = new(ManaCost.Parse("{4}"), null, 4, 4, CardType.Artifact | CardType.Creature)
             {
                 Triggers = [new Trigger(GameEvent.Upkeep, TriggerCondition.Upkeep, new MasticoreUpkeepEffect())],
