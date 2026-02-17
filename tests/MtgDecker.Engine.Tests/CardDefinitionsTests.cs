@@ -394,4 +394,33 @@ public class CardDefinitionsTests
         def!.Effect.Should().BeOfType<SkeletalScryingEffect>(
             because: "Skeletal Scrying exiles from graveyard, draws X, loses X life");
     }
+
+    // === Card audit Phase 3: triggers and activated abilities ===
+
+    [Theory]
+    [InlineData("Eidolon of the Great Revel")]
+    [InlineData("Ball Lightning")]
+    [InlineData("Goblin Guide")]
+    [InlineData("Squee, Goblin Nabob")]
+    [InlineData("Plague Spitter")]
+    public void Phase3Card_HasTriggers(string cardName)
+    {
+        CardDefinitions.TryGet(cardName, out var def);
+        def!.Triggers.Should().NotBeEmpty(
+            because: $"{cardName} should have at least one trigger");
+    }
+
+    [Theory]
+    [InlineData("Nantuko Shade")]
+    [InlineData("Ravenous Baloth")]
+    [InlineData("Zuran Orb")]
+    [InlineData("Withered Wretch")]
+    [InlineData("Dust Bowl")]
+    [InlineData("Mother of Runes")]
+    public void Phase3Card_HasActivatedAbility(string cardName)
+    {
+        CardDefinitions.TryGet(cardName, out var def);
+        def!.ActivatedAbility.Should().NotBeNull(
+            because: $"{cardName} should have an activated ability");
+    }
 }

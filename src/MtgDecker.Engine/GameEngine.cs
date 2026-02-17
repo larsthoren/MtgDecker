@@ -53,6 +53,7 @@ public class GameEngine
             if (phase.Phase == Phase.Upkeep)
             {
                 await QueueBoardTriggersOnStackAsync(GameEvent.Upkeep, null, ct);
+                await QueueGraveyardTriggersOnStackAsync(GameEvent.Upkeep, ct);
             }
 
             if (phase.Phase == Phase.Combat)
@@ -561,6 +562,33 @@ public class GameEngine
                     }
                 }
 
+                // Validate: sacrifice card type
+                GameCard? sacrificeByType = null;
+                if (cost.SacrificeCardType.HasValue)
+                {
+                    var eligible = player.Battlefield.Cards
+                        .Where(c => c.CardTypes.HasFlag(cost.SacrificeCardType.Value))
+                        .ToList();
+
+                    if (eligible.Count == 0)
+                    {
+                        _state.Log($"Cannot activate {abilitySource.Name} — no {cost.SacrificeCardType.Value} to sacrifice.");
+                        break;
+                    }
+
+                    var chosenId = await player.DecisionHandler.ChooseCard(
+                        eligible, $"Choose a {cost.SacrificeCardType.Value} to sacrifice", optional: false, ct);
+
+                    if (chosenId.HasValue)
+                        sacrificeByType = eligible.FirstOrDefault(c => c.Id == chosenId.Value);
+
+                    if (sacrificeByType == null)
+                    {
+                        _state.Log($"Cannot activate {abilitySource.Name} — no sacrifice target chosen.");
+                        break;
+                    }
+                }
+
                 // Pay costs: mana
                 if (cost.ManaCost != null)
                 {
@@ -588,6 +616,15 @@ public class GameEngine
                     player.Battlefield.RemoveById(sacrificeTarget.Id);
                     player.Graveyard.Add(sacrificeTarget);
                     _state.Log($"{player.Name} sacrifices {sacrificeTarget.Name}.");
+                }
+
+                // Pay costs: sacrifice card type target
+                if (sacrificeByType != null)
+                {
+                    await FireLeaveBattlefieldTriggersAsync(sacrificeByType, player, ct);
+                    player.Battlefield.RemoveById(sacrificeByType.Id);
+                    player.Graveyard.Add(sacrificeByType);
+                    _state.Log($"{player.Name} sacrifices {sacrificeByType.Name}.");
                 }
 
                 // Pay costs: remove counter
@@ -1552,6 +1589,10 @@ public class GameEngine
                     TriggerCondition.Upkeep =>
                         evt == GameEvent.Upkeep
                         && _state.ActivePlayer == player,
+                    TriggerCondition.AnySpellCastCmc3OrLess =>
+                        evt == GameEvent.SpellCast
+                        && relevantCard != null
+                        && (relevantCard.ManaCost?.ConvertedManaCost ?? 0) <= 3,
                     TriggerCondition.SelfAttacks => false,
                     _ => false,
                 };
@@ -1559,7 +1600,14 @@ public class GameEngine
                 if (matches)
                 {
                     _state.Log($"{permanent.Name} triggers: {trigger.Effect.GetType().Name.Replace("Effect", "")}");
-                    result.Add(new TriggeredAbilityStackObject(permanent, player.Id, trigger.Effect));
+                    var stackObj = new TriggeredAbilityStackObject(permanent, player.Id, trigger.Effect);
+
+                    // For spell-cast triggers that target the caster
+                    if (trigger.Condition == TriggerCondition.AnySpellCastCmc3OrLess)
+                        stackObj = new TriggeredAbilityStackObject(permanent, player.Id, trigger.Effect)
+                            { TargetPlayerId = _state.ActivePlayer.Id };
+
+                    result.Add(stackObj);
                 }
             }
         }
@@ -1581,6 +1629,30 @@ public class GameEngine
 
             _state.Log($"{attacker.Name} triggers: {trigger.Effect.GetType().Name.Replace("Effect", "")}");
             _state.StackPush(new TriggeredAbilityStackObject(attacker, player.Id, trigger.Effect));
+        }
+
+        return Task.CompletedTask;
+    }
+
+    /// <summary>Queues triggers from cards in active player's graveyard (e.g., Squee).</summary>
+    internal Task QueueGraveyardTriggersOnStackAsync(GameEvent evt, CancellationToken ct = default)
+    {
+        var activePlayer = _state.ActivePlayer;
+
+        foreach (var card in activePlayer.Graveyard.Cards)
+        {
+            var triggers = card.Triggers.Count > 0
+                ? card.Triggers
+                : (CardDefinitions.TryGet(card.Name, out var def) ? def.Triggers : []);
+
+            foreach (var trigger in triggers)
+            {
+                if (trigger.Event != evt) continue;
+                if (trigger.Condition != TriggerCondition.SelfInGraveyardDuringUpkeep) continue;
+
+                _state.Log($"{card.Name} triggers from graveyard: {trigger.Effect.GetType().Name.Replace("Effect", "")}");
+                _state.StackPush(new TriggeredAbilityStackObject(card, activePlayer.Id, trigger.Effect));
+            }
         }
 
         return Task.CompletedTask;
