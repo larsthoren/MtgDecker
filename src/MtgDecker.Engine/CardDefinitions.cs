@@ -358,17 +358,17 @@ public static class CardDefinitions
 
             // Common discard
             ["Duress"] = new(ManaCost.Parse("{B}"), null, null, null, CardType.Sorcery,
-                TargetFilter.Player(), new DiscardEffect(1, c => !c.IsCreature && !c.IsLand)),
+                TargetFilter.Player(), new DuressEffect()),
             ["Cabal Therapy"] = new(ManaCost.Parse("{B}"), null, null, null, CardType.Sorcery,
-                TargetFilter.Player(), new DiscardEffect(1)),
+                TargetFilter.Player(), new CabalTherapyEffect()),
             ["Gerrard's Verdict"] = new(ManaCost.Parse("{W}{B}"), null, null, null, CardType.Sorcery,
-                TargetFilter.Player(), new DiscardEffect(2)),
+                TargetFilter.Player(), new GerrardVerdictEffect()),
 
             // Common counterspells
             ["Mana Leak"] = new(ManaCost.Parse("{1}{U}"), null, null, null, CardType.Instant,
-                TargetFilter.Spell(), new CounterSpellEffect()),
+                TargetFilter.Spell(), new ConditionalCounterEffect(3)),
             ["Absorb"] = new(ManaCost.Parse("{W}{U}{U}"), null, null, null, CardType.Instant,
-                TargetFilter.Spell(), new CounterSpellEffect()),
+                TargetFilter.Spell(), new CounterAndGainLifeEffect(3)),
 
             // Common utility
             ["Fact or Fiction"] = new(ManaCost.Parse("{3}{U}"), null, null, null, CardType.Instant,
@@ -518,7 +518,7 @@ public static class CardDefinitions
 
             // === Landstill deck ===
             ["Prohibit"] = new(ManaCost.Parse("{1}{U}"), null, null, null, CardType.Instant,
-                TargetFilter.Spell(), new CounterSpellEffect()),
+                TargetFilter.Spell(), new ConditionalCounterEffect(2)),
             ["Standstill"] = new(ManaCost.Parse("{1}{U}"), null, null, null, CardType.Enchantment),
             ["Humility"] = new(ManaCost.Parse("{2}{W}{W}"), null, null, null, CardType.Enchantment),
             ["Decree of Justice"] = new(ManaCost.Parse("{2}{W}{W}"), null, null, null, CardType.Sorcery),
