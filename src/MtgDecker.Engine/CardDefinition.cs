@@ -28,4 +28,6 @@ public record CardDefinition(
     public ManaCost? EchoCost { get; init; }
     public bool EntersTapped { get; init; }
     public AlternateCost? AlternateCost { get; init; }
+    public Func<GameState, int>? DynamicBasePower { get; init; }
+    public Func<GameState, int>? DynamicBaseToughness { get; init; }
 }

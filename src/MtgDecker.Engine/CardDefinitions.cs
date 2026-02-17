@@ -600,7 +600,12 @@ public static class CardDefinitions
             },
 
             // === Oath of Druids deck ===
-            ["Terravore"] = new(ManaCost.Parse("{1}{G}{G}"), null, 3, 3, CardType.Creature) { Subtypes = ["Lhurgoyf"] },
+            ["Terravore"] = new(ManaCost.Parse("{1}{G}{G}"), null, null, null, CardType.Creature)
+            {
+                Subtypes = ["Lhurgoyf"],
+                DynamicBasePower = state => CountLandsInAllGraveyards(state),
+                DynamicBaseToughness = state => CountLandsInAllGraveyards(state),
+            },
             ["Call of the Herd"] = new(ManaCost.Parse("{2}{G}"), null, null, null, CardType.Sorcery,
                 Effect: new CreateTokenSpellEffect("Elephant", 3, 3, CardType.Creature, ["Elephant"]))
             {
@@ -772,5 +777,11 @@ public static class CardDefinitions
     public static bool Unregister(string cardName)
     {
         return RuntimeOverrides.TryRemove(cardName, out _);
+    }
+
+    private static int CountLandsInAllGraveyards(GameState state)
+    {
+        return state.Player1.Graveyard.Cards.Count(c => c.IsLand)
+             + state.Player2.Graveyard.Cards.Count(c => c.IsLand);
     }
 }

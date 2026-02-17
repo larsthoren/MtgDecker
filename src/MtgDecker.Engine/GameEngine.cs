@@ -1571,6 +1571,21 @@ public class GameEngine
             player.MaxLandDrops = 1;
         }
 
+        // Layer 0: Characteristic-defining abilities (dynamic base P/T)
+        foreach (var player in new[] { _state.Player1, _state.Player2 })
+        {
+            foreach (var card in player.Battlefield.Cards)
+            {
+                if (CardDefinitions.TryGet(card.Name, out var def))
+                {
+                    if (def.DynamicBasePower != null)
+                        card.BasePower = def.DynamicBasePower(_state);
+                    if (def.DynamicBaseToughness != null)
+                        card.BaseToughness = def.DynamicBaseToughness(_state);
+                }
+            }
+        }
+
         // Layer 1: Type-changing effects (BecomeCreature)
         foreach (var effect in _state.ActiveEffects.Where(e => e.Type == ContinuousEffectType.BecomeCreature))
         {
