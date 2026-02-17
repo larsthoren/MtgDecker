@@ -82,6 +82,9 @@ public class GameEngine
         if (_state.StackCount > 0)
             await ResolveAllTriggersAsync(ct);
 
+        // Cleanup: discard to maximum hand size (MTG rule 514.1)
+        await DiscardToHandSizeAsync(_state.ActivePlayer, ct);
+
         // Clear end-of-turn effects and recalculate
         StripEndOfTurnEffects();
         RecalculateState();
@@ -92,6 +95,25 @@ public class GameEngine
         _state.IsFirstTurn = false;
         _state.TurnNumber++;
         _state.ActivePlayer = _state.GetOpponent(_state.ActivePlayer);
+    }
+
+    private async Task DiscardToHandSizeAsync(Player player, CancellationToken ct)
+    {
+        const int maxHandSize = 7;
+        var excess = player.Hand.Cards.Count - maxHandSize;
+        if (excess <= 0) return;
+
+        _state.Log($"{player.Name} must discard {excess} card(s) to hand size.");
+
+        var chosen = await player.DecisionHandler.ChooseCardsToDiscard(
+            player.Hand.Cards, excess, ct);
+
+        foreach (var card in chosen.Take(excess))
+        {
+            player.Hand.Remove(card);
+            player.Graveyard.Add(card);
+            _state.Log($"{player.Name} discards {card.Name}.");
+        }
     }
 
     internal void ExecuteTurnBasedAction(Phase phase)

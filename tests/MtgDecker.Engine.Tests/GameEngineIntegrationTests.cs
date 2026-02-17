@@ -61,11 +61,12 @@ public class GameEngineIntegrationTests
         state.ActivePlayer.Should().BeSameAs(state.Player2, "active player switches after turn");
         state.TurnNumber.Should().Be(2);
 
-        // Turn 2: P2's turn, draws a card
+        // Turn 2: P2's turn, draws a card then discards to hand size
         await engine.RunTurnAsync();
 
-        state.Player2.Hand.Count.Should().Be(8, "P2 draws on turn 2");
+        state.Player2.Hand.Count.Should().Be(7, "P2 draws on turn 2 then discards to hand size");
         state.Player2.Library.Count.Should().Be(52);
+        state.Player2.Graveyard.Count.Should().Be(1, "1 card discarded to hand size");
         state.ActivePlayer.Should().BeSameAs(state.Player1);
         state.TurnNumber.Should().Be(3);
     }
@@ -344,30 +345,34 @@ public class GameEngineIntegrationTests
         await engine.StartGameAsync();
         state.IsFirstTurn = true;
 
-        // Turn 1 (P1): no draw (first turn)
+        // Turn 1 (P1): no draw (first turn), no discard needed (hand = 7)
         await engine.RunTurnAsync();
         state.Player1.Hand.Count.Should().Be(7);
         state.Player1.Library.Count.Should().Be(53);
 
-        // Turn 2 (P2): draws
+        // Turn 2 (P2): draws to 8, discards to 7
         await engine.RunTurnAsync();
-        state.Player2.Hand.Count.Should().Be(8);
+        state.Player2.Hand.Count.Should().Be(7);
         state.Player2.Library.Count.Should().Be(52);
+        state.Player2.Graveyard.Count.Should().Be(1);
 
-        // Turn 3 (P1): draws
+        // Turn 3 (P1): draws to 8, discards to 7
         await engine.RunTurnAsync();
-        state.Player1.Hand.Count.Should().Be(8);
+        state.Player1.Hand.Count.Should().Be(7);
         state.Player1.Library.Count.Should().Be(52);
+        state.Player1.Graveyard.Count.Should().Be(1);
 
-        // Turn 4 (P2): draws
+        // Turn 4 (P2): draws to 8, discards to 7
         await engine.RunTurnAsync();
-        state.Player2.Hand.Count.Should().Be(9);
+        state.Player2.Hand.Count.Should().Be(7);
         state.Player2.Library.Count.Should().Be(51);
+        state.Player2.Graveyard.Count.Should().Be(2);
 
-        // Turn 5 (P1): draws
+        // Turn 5 (P1): draws to 8, discards to 7
         await engine.RunTurnAsync();
-        state.Player1.Hand.Count.Should().Be(9);
+        state.Player1.Hand.Count.Should().Be(7);
         state.Player1.Library.Count.Should().Be(51);
+        state.Player1.Graveyard.Count.Should().Be(2);
 
         state.TurnNumber.Should().Be(6);
         state.ActivePlayer.Should().BeSameAs(state.Player2);
