@@ -447,4 +447,81 @@ public class HumilityLayerSystemTests
 
         state.StackCount.Should().Be(0, "ETB trigger is suppressed — creature has AbilitiesRemoved");
     }
+
+    [Fact]
+    public async Task Humility_SuppressesManaAbilities()
+    {
+        var handler = new TestDecisionHandler();
+        var p1 = new Player(Guid.NewGuid(), "P1", handler);
+        var p2 = new Player(Guid.NewGuid(), "P2", new TestDecisionHandler());
+        var state = new GameState(p1, p2);
+        var engine = new GameEngine(state);
+
+        var humility = GameCard.Create("Humility");
+        p1.Battlefield.Add(humility);
+
+        var elves = GameCard.Create("Llanowar Elves");
+        p1.Battlefield.Add(elves);
+        state.ActivePlayer = p1;
+        state.PriorityPlayer = p1;
+        state.CurrentPhase = Phase.MainPhase1;
+
+        engine.RecalculateState();
+
+        await engine.ExecuteAction(GameAction.TapCard(p1.Id, elves.Id));
+
+        elves.IsTapped.Should().BeTrue("tapping still works");
+        p1.ManaPool.Total.Should().Be(0, "mana ability is suppressed — no mana produced");
+    }
+
+    [Fact]
+    public async Task Humility_SuppressesActivatedAbilities()
+    {
+        var handler = new TestDecisionHandler();
+        var p1 = new Player(Guid.NewGuid(), "P1", handler);
+        var p2 = new Player(Guid.NewGuid(), "P2", new TestDecisionHandler());
+        var state = new GameState(p1, p2);
+        var engine = new GameEngine(state);
+
+        var humility = GameCard.Create("Humility");
+        p1.Battlefield.Add(humility);
+
+        var fanatic = GameCard.Create("Mogg Fanatic");
+        p1.Battlefield.Add(fanatic);
+        state.ActivePlayer = p1;
+        state.PriorityPlayer = p1;
+        state.CurrentPhase = Phase.MainPhase1;
+
+        engine.RecalculateState();
+
+        await engine.ExecuteAction(GameAction.ActivateAbility(p1.Id, fanatic.Id));
+
+        p1.Battlefield.Cards.Should().Contain(c => c.Id == fanatic.Id,
+            "ability activation was blocked — creature not sacrificed");
+    }
+
+    [Fact]
+    public async Task Humility_LandManaAbility_NotAffected()
+    {
+        var handler = new TestDecisionHandler();
+        var p1 = new Player(Guid.NewGuid(), "P1", handler);
+        var p2 = new Player(Guid.NewGuid(), "P2", new TestDecisionHandler());
+        var state = new GameState(p1, p2);
+        var engine = new GameEngine(state);
+
+        var humility = GameCard.Create("Humility");
+        p1.Battlefield.Add(humility);
+
+        var mountain = GameCard.Create("Mountain");
+        p1.Battlefield.Add(mountain);
+        state.ActivePlayer = p1;
+        state.PriorityPlayer = p1;
+        state.CurrentPhase = Phase.MainPhase1;
+
+        engine.RecalculateState();
+
+        await engine.ExecuteAction(GameAction.TapCard(p1.Id, mountain.Id));
+
+        p1.ManaPool.Total.Should().Be(1, "land mana abilities are not affected by Humility");
+    }
 }

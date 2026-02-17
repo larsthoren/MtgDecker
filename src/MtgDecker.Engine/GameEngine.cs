@@ -239,6 +239,13 @@ public class GameEngine
                     tapTarget.IsTapped = true;
                     player.ActionHistory.Push(action);
 
+                    // Suppression: creatures that lost abilities can't produce mana
+                    if (tapTarget.IsCreature && tapTarget.AbilitiesRemoved)
+                    {
+                        _state.Log($"{tapTarget.Name} has lost its abilities — no mana produced.");
+                        break;
+                    }
+
                     if (tapTarget.ManaAbility != null)
                     {
                         action.IsManaAbility = true;
@@ -542,6 +549,13 @@ public class GameEngine
             {
                 var abilitySource = player.Battlefield.Cards.FirstOrDefault(c => c.Id == action.CardId);
                 if (abilitySource == null) break;
+
+                // Suppression: creatures that lost abilities can't activate abilities
+                if (abilitySource.IsCreature && abilitySource.AbilitiesRemoved)
+                {
+                    _state.Log($"{abilitySource.Name} has lost its abilities — cannot activate.");
+                    break;
+                }
 
                 if (!CardDefinitions.TryGet(abilitySource.Name, out var abilityDef) || abilityDef.ActivatedAbility == null)
                 {
