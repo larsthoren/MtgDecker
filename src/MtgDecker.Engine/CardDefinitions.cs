@@ -415,7 +415,15 @@ public static class CardDefinitions
             {
                 ActivatedAbility = new(new ActivatedAbilityCost(TapSelf: true, ManaCost: ManaCost.Parse("{3}")), new DealDamageEffect(2), c => c.IsCreature, CanTargetPlayer: true),
             },
-            ["Barbarian Ring"] = new(null, ManaAbility.Fixed(ManaColor.Red), null, null, CardType.Land),
+            ["Barbarian Ring"] = new(null, ManaAbility.Fixed(ManaColor.Red), null, null, CardType.Land)
+            {
+                ActivatedAbility = new(
+                    new ActivatedAbilityCost(TapSelf: true, SacrificeSelf: true, ManaCost: ManaCost.Parse("{R}")),
+                    new DealDamageEffect(2),
+                    TargetFilter: c => c.IsCreature,
+                    CanTargetPlayer: true,
+                    Condition: p => p.Graveyard.Count >= 7),
+            },
 
             // === Mono Black Control deck ===
             ["Bane of the Living"] = new(ManaCost.Parse("{2}{B}{B}"), null, 4, 3, CardType.Creature) { Subtypes = ["Zombie"] },
@@ -447,7 +455,14 @@ public static class CardDefinitions
                 Triggers = [new Trigger(GameEvent.Upkeep, TriggerCondition.Upkeep, new RackDamageEffect())],
             },
             ["Powder Keg"] = new(ManaCost.Parse("{2}"), null, null, null, CardType.Artifact),
-            ["Cabal Pit"] = new(null, ManaAbility.Fixed(ManaColor.Black), null, null, CardType.Land),
+            ["Cabal Pit"] = new(null, ManaAbility.Fixed(ManaColor.Black), null, null, CardType.Land)
+            {
+                ActivatedAbility = new(
+                    new ActivatedAbilityCost(TapSelf: true, SacrificeSelf: true, ManaCost: ManaCost.Parse("{B}")),
+                    new WeakenTargetEffect(-2, -2),
+                    TargetFilter: c => c.IsCreature,
+                    Condition: p => p.Graveyard.Count >= 7),
+            },
             ["Dust Bowl"] = new(null, ManaAbility.Fixed(ManaColor.Colorless), null, null, CardType.Land)
             {
                 ActivatedAbility = new(
@@ -580,6 +595,9 @@ public static class CardDefinitions
                     new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
                         (card, _) => card.Name == "Nimble Mongoose",
                         GrantedKeyword: Keyword.Shroud),
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.ModifyPowerToughness,
+                        (card, player) => card.Name == "Nimble Mongoose" && player.Graveyard.Count >= 7,
+                        PowerMod: 2, ToughnessMod: 2),
                 ],
             },
             ["Zuran Orb"] = new(ManaCost.Parse("{0}"), null, null, null, CardType.Artifact)

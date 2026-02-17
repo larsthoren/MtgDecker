@@ -523,6 +523,13 @@ public class GameEngine
                 var ability = abilityDef.ActivatedAbility;
                 var cost = ability.Cost;
 
+                // Validate: activation condition (e.g., threshold)
+                if (ability.Condition != null && !ability.Condition(player))
+                {
+                    _state.Log($"Cannot activate {abilitySource.Name} — condition not met.");
+                    break;
+                }
+
                 // Validate: tap cost when already tapped
                 if (cost.TapSelf && abilitySource.IsTapped)
                 {
