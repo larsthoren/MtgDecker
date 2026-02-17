@@ -150,4 +150,212 @@ public class HumilityLayerSystemTests
         // Timestamps should be identical across calls (counter resets)
         firstCallTimestamps.Should().BeEquivalentTo(secondCallTimestamps);
     }
+
+    [Fact]
+    public void Humility_MakesAllCreatures_1_1()
+    {
+        var p1 = new Player(Guid.NewGuid(), "P1", new TestDecisionHandler());
+        var p2 = new Player(Guid.NewGuid(), "P2", new TestDecisionHandler());
+        var state = new GameState(p1, p2);
+        var engine = new GameEngine(state);
+
+        var humility = GameCard.Create("Humility");
+        p1.Battlefield.Add(humility);
+
+        var ball = GameCard.Create("Ball Lightning");
+        var king = GameCard.Create("Goblin King");
+        var baloth = GameCard.Create("Ravenous Baloth");
+        p1.Battlefield.Add(ball);
+        p1.Battlefield.Add(king);
+        p2.Battlefield.Add(baloth);
+
+        engine.RecalculateState();
+
+        ball.Power.Should().Be(1);
+        ball.Toughness.Should().Be(1);
+        king.Power.Should().Be(1);
+        king.Toughness.Should().Be(1);
+        baloth.Power.Should().Be(1);
+        baloth.Toughness.Should().Be(1);
+    }
+
+    [Fact]
+    public void Humility_RemovesKeywords()
+    {
+        var p1 = new Player(Guid.NewGuid(), "P1", new TestDecisionHandler());
+        var p2 = new Player(Guid.NewGuid(), "P2", new TestDecisionHandler());
+        var state = new GameState(p1, p2);
+        var engine = new GameEngine(state);
+
+        var humility = GameCard.Create("Humility");
+        p1.Battlefield.Add(humility);
+
+        var ball = GameCard.Create("Ball Lightning");
+        var specter = GameCard.Create("Hypnotic Specter");
+        p1.Battlefield.Add(ball);
+        p1.Battlefield.Add(specter);
+
+        engine.RecalculateState();
+
+        ball.ActiveKeywords.Should().BeEmpty("Humility removes all abilities");
+        specter.ActiveKeywords.Should().BeEmpty("Humility removes all abilities");
+    }
+
+    [Fact]
+    public void Humility_SuppressesLordPTBuffs()
+    {
+        var p1 = new Player(Guid.NewGuid(), "P1", new TestDecisionHandler());
+        var p2 = new Player(Guid.NewGuid(), "P2", new TestDecisionHandler());
+        var state = new GameState(p1, p2);
+        var engine = new GameEngine(state);
+
+        var humility = GameCard.Create("Humility");
+        var king = GameCard.Create("Goblin King");
+        var lackey = GameCard.Create("Goblin Lackey");
+        p1.Battlefield.Add(humility);
+        p1.Battlefield.Add(king);
+        p1.Battlefield.Add(lackey);
+
+        engine.RecalculateState();
+
+        king.Power.Should().Be(1);
+        king.Toughness.Should().Be(1);
+        lackey.Power.Should().Be(1);
+        lackey.Toughness.Should().Be(1);
+    }
+
+    [Fact]
+    public void Humility_SuppressesLordKeywordGrants()
+    {
+        var p1 = new Player(Guid.NewGuid(), "P1", new TestDecisionHandler());
+        var p2 = new Player(Guid.NewGuid(), "P2", new TestDecisionHandler());
+        var state = new GameState(p1, p2);
+        var engine = new GameEngine(state);
+
+        var humility = GameCard.Create("Humility");
+        var king = GameCard.Create("Goblin King");
+        var lackey = GameCard.Create("Goblin Lackey");
+        p1.Battlefield.Add(humility);
+        p1.Battlefield.Add(king);
+        p1.Battlefield.Add(lackey);
+
+        engine.RecalculateState();
+
+        lackey.ActiveKeywords.Should().NotContain(Keyword.Mountainwalk);
+    }
+
+    [Fact]
+    public void Humility_SuppressesCDA_Terravore()
+    {
+        var p1 = new Player(Guid.NewGuid(), "P1", new TestDecisionHandler());
+        var p2 = new Player(Guid.NewGuid(), "P2", new TestDecisionHandler());
+        var state = new GameState(p1, p2);
+        var engine = new GameEngine(state);
+
+        var humility = GameCard.Create("Humility");
+        var terravore = GameCard.Create("Terravore");
+        p1.Battlefield.Add(humility);
+        p1.Battlefield.Add(terravore);
+
+        p1.Graveyard.Add(new GameCard { Name = "Forest", CardTypes = CardType.Land });
+        p1.Graveyard.Add(new GameCard { Name = "Mountain", CardTypes = CardType.Land });
+        p1.Graveyard.Add(new GameCard { Name = "Island", CardTypes = CardType.Land });
+
+        engine.RecalculateState();
+
+        terravore.Power.Should().Be(1);
+        terravore.Toughness.Should().Be(1);
+    }
+
+    [Fact]
+    public void Humility_NonCreatureEffectsStillWork()
+    {
+        var p1 = new Player(Guid.NewGuid(), "P1", new TestDecisionHandler());
+        var p2 = new Player(Guid.NewGuid(), "P2", new TestDecisionHandler());
+        var state = new GameState(p1, p2);
+        var engine = new GameEngine(state);
+
+        var humility = GameCard.Create("Humility");
+        var exploration = GameCard.Create("Exploration");
+        p1.Battlefield.Add(humility);
+        p1.Battlefield.Add(exploration);
+
+        engine.RecalculateState();
+
+        p1.MaxLandDrops.Should().Be(2);
+    }
+
+    [Fact]
+    public void Humility_EnchantmentKeywordsStillWork()
+    {
+        var p1 = new Player(Guid.NewGuid(), "P1", new TestDecisionHandler());
+        var p2 = new Player(Guid.NewGuid(), "P2", new TestDecisionHandler());
+        var state = new GameState(p1, p2);
+        var engine = new GameEngine(state);
+
+        var humility = GameCard.Create("Humility");
+        var grove = GameCard.Create("Sterling Grove");
+        var enchantress = GameCard.Create("Enchantress's Presence");
+        p1.Battlefield.Add(humility);
+        p1.Battlefield.Add(grove);
+        p1.Battlefield.Add(enchantress);
+
+        engine.RecalculateState();
+
+        enchantress.ActiveKeywords.Should().Contain(Keyword.Shroud);
+    }
+
+    [Fact]
+    public void Humility_GraveyardHaste_StillWorks()
+    {
+        var p1 = new Player(Guid.NewGuid(), "P1", new TestDecisionHandler());
+        var p2 = new Player(Guid.NewGuid(), "P2", new TestDecisionHandler());
+        var state = new GameState(p1, p2);
+        var engine = new GameEngine(state);
+
+        var humility = GameCard.Create("Humility");
+        p1.Battlefield.Add(humility);
+
+        var anger = GameCard.Create("Anger");
+        p1.Graveyard.Add(anger);
+        var mountain = GameCard.Create("Mountain");
+        p1.Battlefield.Add(mountain);
+
+        var creature = GameCard.Create("Goblin Lackey");
+        p1.Battlefield.Add(creature);
+
+        engine.RecalculateState();
+
+        creature.ActiveKeywords.Should().Contain(Keyword.Haste);
+    }
+
+    [Fact]
+    public void Humility_PumpSpellStillWorks()
+    {
+        var p1 = new Player(Guid.NewGuid(), "P1", new TestDecisionHandler());
+        var p2 = new Player(Guid.NewGuid(), "P2", new TestDecisionHandler());
+        var state = new GameState(p1, p2);
+        var engine = new GameEngine(state);
+
+        var humility = GameCard.Create("Humility");
+        p1.Battlefield.Add(humility);
+
+        var creature = GameCard.Create("Goblin Lackey");
+        p1.Battlefield.Add(creature);
+
+        // Simulate a +3/+3 pump effect (like Giant Growth — UntilEndOfTurn)
+        state.ActiveEffects.Add(new ContinuousEffect(
+            Guid.Empty,
+            ContinuousEffectType.ModifyPowerToughness,
+            (card, _) => card.Id == creature.Id,
+            PowerMod: 3, ToughnessMod: 3,
+            UntilEndOfTurn: true,
+            Layer: EffectLayer.Layer7c_ModifyPT));
+
+        engine.RecalculateState();
+
+        // Base 1/1 (from Humility) + 3/3 pump = 4/4
+        creature.Power.Should().Be(4);
+        creature.Toughness.Should().Be(4);
+    }
 }

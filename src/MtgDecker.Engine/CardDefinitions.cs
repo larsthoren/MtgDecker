@@ -601,7 +601,19 @@ public static class CardDefinitions
             {
                 Triggers = [new Trigger(GameEvent.SpellCast, TriggerCondition.AnyPlayerCastsSpell, new StandstillEffect())],
             },
-            ["Humility"] = new(ManaCost.Parse("{2}{W}{W}"), null, null, null, CardType.Enchantment),
+            ["Humility"] = new(ManaCost.Parse("{2}{W}{W}"), null, null, null, CardType.Enchantment)
+            {
+                ContinuousEffects =
+                [
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.RemoveAbilities,
+                        (card, _) => card.IsCreature,
+                        Layer: EffectLayer.Layer6_AbilityAddRemove),
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.SetBasePowerToughness,
+                        (card, _) => card.IsCreature,
+                        SetPower: 1, SetToughness: 1,
+                        Layer: EffectLayer.Layer7b_SetPT),
+                ],
+            },
             ["Decree of Justice"] = new(ManaCost.Parse("{2}{W}{W}"), null, null, null, CardType.Sorcery,
                 Effect: new DecreeOfJusticeEffect())
             {
