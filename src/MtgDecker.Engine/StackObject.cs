@@ -11,6 +11,7 @@ public class StackObject : IStackObject
     public IReadOnlyDictionary<ManaColor, int> ManaPaid { get; }
     public IReadOnlyList<TargetInfo> Targets { get; }
     public int Timestamp { get; }
+    public bool IsFlashback { get; init; }
 
     public StackObject(GameCard card, Guid controllerId, Dictionary<ManaColor, int> manaPaid, List<TargetInfo> targets, int timestamp)
     {

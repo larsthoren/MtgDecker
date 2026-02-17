@@ -9,5 +9,6 @@ public enum ActionType
     CastSpell,
     ActivateFetch,
     ActivateAbility,
-    Cycle
+    Cycle,
+    Flashback
 }

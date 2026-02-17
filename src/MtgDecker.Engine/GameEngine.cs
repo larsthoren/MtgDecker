@@ -781,6 +781,160 @@ public class GameEngine
                 player.ActionHistory.Push(action);
                 break;
             }
+
+            case ActionType.Flashback:
+            {
+                var fbPlayer = _state.GetPlayer(action.PlayerId);
+                var fbCard = fbPlayer.Graveyard.Cards.FirstOrDefault(c => c.Id == action.CardId);
+                if (fbCard == null)
+                {
+                    _state.Log("Card not found in graveyard.");
+                    return;
+                }
+
+                if (!CardDefinitions.TryGet(fbCard.Name, out var fbDef) || fbDef.FlashbackCost == null)
+                {
+                    _state.Log($"{fbCard.Name} has no flashback.");
+                    return;
+                }
+
+                bool fbIsInstant = fbDef.CardTypes.HasFlag(CardType.Instant);
+                if (!fbIsInstant && !CanCastSorcery(fbPlayer.Id))
+                {
+                    _state.Log($"Cannot cast {fbCard.Name} at this time (sorcery-speed only).");
+                    return;
+                }
+
+                var fbCost = fbDef.FlashbackCost;
+
+                // Validate flashback mana cost
+                if (fbCost.ManaCost != null && !fbPlayer.ManaPool.CanPay(fbCost.ManaCost))
+                {
+                    _state.Log($"Not enough mana for flashback of {fbCard.Name}.");
+                    return;
+                }
+
+                // Validate life cost
+                if (fbCost.LifeCost > 0 && fbPlayer.Life <= fbCost.LifeCost)
+                {
+                    _state.Log($"Not enough life for flashback of {fbCard.Name}.");
+                    return;
+                }
+
+                // Validate sacrifice creature cost
+                GameCard? fbSacTarget = null;
+                if (fbCost.SacrificeCreature)
+                {
+                    var fbCreatures = fbPlayer.Battlefield.Cards.Where(c => c.IsCreature).ToList();
+                    if (fbCreatures.Count == 0)
+                    {
+                        _state.Log($"No creature to sacrifice for flashback of {fbCard.Name}.");
+                        return;
+                    }
+                    var chosenId = await fbPlayer.DecisionHandler.ChooseCard(
+                        fbCreatures, "Choose a creature to sacrifice for flashback", optional: false, ct);
+                    if (chosenId.HasValue)
+                        fbSacTarget = fbCreatures.FirstOrDefault(c => c.Id == chosenId.Value);
+                    if (fbSacTarget == null)
+                    {
+                        _state.Log($"No creature chosen for flashback sacrifice.");
+                        return;
+                    }
+                }
+
+                // Find targets (same logic as CastSpell)
+                var fbTargets = new List<TargetInfo>();
+                if (fbDef.TargetFilter != null)
+                {
+                    var fbOpponent = _state.GetOpponent(fbPlayer);
+                    var fbEligible = new List<GameCard>();
+
+                    foreach (var c in fbPlayer.Battlefield.Cards)
+                        if (fbDef.TargetFilter.IsLegal(c, ZoneType.Battlefield) && !HasShroud(c))
+                            fbEligible.Add(c);
+                    foreach (var c in fbOpponent.Battlefield.Cards)
+                        if (fbDef.TargetFilter.IsLegal(c, ZoneType.Battlefield) && !HasShroud(c))
+                            fbEligible.Add(c);
+
+                    // Player sentinels
+                    var dummyCard = new GameCard { Name = "Player" };
+                    if (fbDef.TargetFilter.IsLegal(dummyCard, ZoneType.None))
+                    {
+                        fbEligible.Add(new GameCard { Id = Guid.Empty, Name = fbPlayer.Name });
+                        fbEligible.Add(new GameCard { Id = Guid.Empty, Name = fbOpponent.Name });
+                    }
+
+                    // Stack targets
+                    if (fbDef.TargetFilter.IsLegal(dummyCard, ZoneType.Stack))
+                    {
+                        foreach (var so in _state.Stack.OfType<StackObject>())
+                            if (fbDef.TargetFilter.IsLegal(so.Card, ZoneType.Stack))
+                                fbEligible.Add(so.Card);
+                    }
+
+                    if (fbEligible.Count == 0)
+                    {
+                        _state.Log($"No legal targets for {fbCard.Name}.");
+                        return;
+                    }
+
+                    var fbTarget = await fbPlayer.DecisionHandler.ChooseTarget(
+                        fbCard.Name, fbEligible, fbOpponent.Id, ct);
+                    if (fbTarget == null)
+                    {
+                        _state.Log($"{fbPlayer.Name} cancels casting {fbCard.Name}.");
+                        return;
+                    }
+
+                    if (fbTarget.Zone == ZoneType.None)
+                        fbTargets.Add(new TargetInfo(Guid.Empty, fbTarget.PlayerId, ZoneType.None));
+                    else
+                    {
+                        var stackTarget = _state.Stack.OfType<StackObject>().FirstOrDefault(s => s.Card.Id == fbTarget.CardId);
+                        if (stackTarget != null)
+                            fbTargets.Add(new TargetInfo(stackTarget.Card.Id, stackTarget.ControllerId, ZoneType.Stack));
+                        else
+                            fbTargets.Add(fbTarget);
+                    }
+                }
+
+                // Pay all costs
+                Dictionary<ManaColor, int> fbManaPaid = new();
+                if (fbCost.ManaCost != null)
+                {
+                    fbManaPaid = await PayManaCostAsync(fbCost.ManaCost, fbPlayer, ct);
+                    fbPlayer.PendingManaTaps.Clear();
+                }
+
+                if (fbCost.LifeCost > 0)
+                {
+                    fbPlayer.AdjustLife(-fbCost.LifeCost);
+                    _state.Log($"{fbPlayer.Name} pays {fbCost.LifeCost} life for flashback.");
+                }
+
+                if (fbSacTarget != null)
+                {
+                    await FireLeaveBattlefieldTriggersAsync(fbSacTarget, fbPlayer, ct);
+                    fbPlayer.Battlefield.RemoveById(fbSacTarget.Id);
+                    fbPlayer.Graveyard.Add(fbSacTarget);
+                    _state.Log($"{fbPlayer.Name} sacrifices {fbSacTarget.Name} for flashback.");
+                }
+
+                // Move from graveyard to stack
+                fbPlayer.Graveyard.RemoveById(fbCard.Id);
+                var fbStackObj = new StackObject(fbCard, fbPlayer.Id, fbManaPaid, fbTargets, _state.StackCount)
+                {
+                    IsFlashback = true,
+                };
+                _state.StackPush(fbStackObj);
+
+                action.ManaCostPaid = fbCost.ManaCost;
+                fbPlayer.ActionHistory.Push(action);
+
+                _state.Log($"{fbPlayer.Name} casts {fbCard.Name} (flashback).");
+                await QueueBoardTriggersOnStackAsync(GameEvent.SpellCast, fbCard, ct);
+                break;
+            }
         }
     }
 
@@ -2026,13 +2180,29 @@ public class GameEngine
                     if (!allTargetsLegal)
                     {
                         _state.Log($"{spell.Card.Name} fizzles (illegal target).");
-                        controller.Graveyard.Add(spell.Card);
+                        if (spell.IsFlashback)
+                        {
+                            controller.Exile.Add(spell.Card);
+                            _state.Log($"{spell.Card.Name} is exiled (flashback).");
+                        }
+                        else
+                        {
+                            controller.Graveyard.Add(spell.Card);
+                        }
                         return;
                     }
                 }
 
                 await def.Effect.ResolveAsync(_state, spell, controller.DecisionHandler, ct);
-                controller.Graveyard.Add(spell.Card);
+                if (spell.IsFlashback)
+                {
+                    controller.Exile.Add(spell.Card);
+                    _state.Log($"{spell.Card.Name} is exiled (flashback).");
+                }
+                else
+                {
+                    controller.Graveyard.Add(spell.Card);
+                }
                 await OnBoardChangedAsync(ct);
             }
             else
@@ -2052,7 +2222,15 @@ public class GameEngine
                 }
                 else
                 {
-                    controller.Graveyard.Add(spell.Card);
+                    if (spell.IsFlashback)
+                    {
+                        controller.Exile.Add(spell.Card);
+                        _state.Log($"{spell.Card.Name} is exiled (flashback).");
+                    }
+                    else
+                    {
+                        controller.Graveyard.Add(spell.Card);
+                    }
                 }
             }
         }
