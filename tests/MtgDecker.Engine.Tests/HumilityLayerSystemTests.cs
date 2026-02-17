@@ -63,4 +63,44 @@ public class HumilityLayerSystemTests
         state.NextEffectTimestamp++;
         state.NextEffectTimestamp.Should().Be(2);
     }
+
+    [Theory]
+    [InlineData("Goblin King", ContinuousEffectType.ModifyPowerToughness, EffectLayer.Layer7c_ModifyPT)]
+    [InlineData("Goblin King", ContinuousEffectType.GrantKeyword, EffectLayer.Layer6_AbilityAddRemove)]
+    [InlineData("Goblin Warchief", ContinuousEffectType.GrantKeyword, EffectLayer.Layer6_AbilityAddRemove)]
+    [InlineData("Deranged Hermit", ContinuousEffectType.ModifyPowerToughness, EffectLayer.Layer7c_ModifyPT)]
+    [InlineData("Opalescence", ContinuousEffectType.BecomeCreature, EffectLayer.Layer4_TypeChanging)]
+    [InlineData("Goblin Guide", ContinuousEffectType.GrantKeyword, EffectLayer.Layer6_AbilityAddRemove)]
+    [InlineData("Nimble Mongoose", ContinuousEffectType.GrantKeyword, EffectLayer.Layer6_AbilityAddRemove)]
+    [InlineData("Nimble Mongoose", ContinuousEffectType.ModifyPowerToughness, EffectLayer.Layer7c_ModifyPT)]
+    [InlineData("Argothian Enchantress", ContinuousEffectType.GrantKeyword, EffectLayer.Layer6_AbilityAddRemove)]
+    [InlineData("Sterling Grove", ContinuousEffectType.GrantKeyword, EffectLayer.Layer6_AbilityAddRemove)]
+    public void CardDefinition_ContinuousEffects_HaveCorrectLayer(string cardName, ContinuousEffectType effectType, EffectLayer expectedLayer)
+    {
+        CardDefinitions.TryGet(cardName, out var def).Should().BeTrue($"{cardName} should exist");
+        var matching = def!.ContinuousEffects.Where(e => e.Type == effectType).ToList();
+        matching.Should().NotBeEmpty($"{cardName} should have {effectType} effect");
+        matching.First().Layer.Should().Be(expectedLayer, $"{cardName}'s {effectType} should be in {expectedLayer}");
+    }
+
+    [Fact]
+    public void CardDefinition_NonLayeredEffects_HaveNullLayer()
+    {
+        // Exploration's ExtraLandDrop effect should not have a layer
+        CardDefinitions.TryGet("Exploration", out var def).Should().BeTrue();
+        def!.ContinuousEffects.Should().ContainSingle();
+        def.ContinuousEffects[0].Layer.Should().BeNull();
+
+        // Solitary Confinement's effects should not have layers
+        CardDefinitions.TryGet("Solitary Confinement", out var solDef).Should().BeTrue();
+        solDef!.ContinuousEffects.Should().AllSatisfy(e => e.Layer.Should().BeNull());
+    }
+
+    [Fact]
+    public void CardDefinition_GraveyardAbilities_HaveCorrectLayer()
+    {
+        CardDefinitions.TryGet("Anger", out var def).Should().BeTrue();
+        def!.GraveyardAbilities.Should().ContainSingle();
+        def.GraveyardAbilities[0].Layer.Should().Be(EffectLayer.Layer6_AbilityAddRemove);
+    }
 }
