@@ -423,4 +423,50 @@ public class CardDefinitionsTests
         def!.ActivatedAbility.Should().NotBeNull(
             because: $"{cardName} should have an activated ability");
     }
+
+    // === Card audit Phase 4: conditional counters + correct discard ===
+
+    [Theory]
+    [InlineData("Mana Leak", 3)]
+    [InlineData("Prohibit", 2)]
+    public void ConditionalCounter_HasCorrectCost(string cardName, int expectedCost)
+    {
+        CardDefinitions.TryGet(cardName, out var def);
+        var effect = def!.Effect as ConditionalCounterEffect;
+        effect.Should().NotBeNull(
+            because: $"{cardName} should use ConditionalCounterEffect");
+        effect!.GenericCost.Should().Be(expectedCost);
+    }
+
+    [Fact]
+    public void Absorb_HasCounterAndGainLifeEffect()
+    {
+        CardDefinitions.TryGet("Absorb", out var def);
+        def!.Effect.Should().BeOfType<CounterAndGainLifeEffect>(
+            because: "Absorb counters and gains 3 life");
+    }
+
+    [Fact]
+    public void Duress_HasDuressEffect()
+    {
+        CardDefinitions.TryGet("Duress", out var def);
+        def!.Effect.Should().BeOfType<DuressEffect>(
+            because: "Duress reveals hand and lets caster choose noncreature/nonland");
+    }
+
+    [Fact]
+    public void CabalTherapy_HasCabalTherapyEffect()
+    {
+        CardDefinitions.TryGet("Cabal Therapy", out var def);
+        def!.Effect.Should().BeOfType<CabalTherapyEffect>(
+            because: "Cabal Therapy names a card and discards all copies");
+    }
+
+    [Fact]
+    public void GerrardsVerdict_HasGerrardVerdictEffect()
+    {
+        CardDefinitions.TryGet("Gerrard's Verdict", out var def);
+        def!.Effect.Should().BeOfType<GerrardVerdictEffect>(
+            because: "Gerrard's Verdict target discards 2, caster gains 3 life per land");
+    }
 }
