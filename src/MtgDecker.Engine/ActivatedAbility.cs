@@ -16,4 +16,5 @@ public record ActivatedAbility(
     ActivatedAbilityCost Cost,
     IEffect Effect,
     Func<GameCard, bool>? TargetFilter = null,
-    bool CanTargetPlayer = false);
+    bool CanTargetPlayer = false,
+    Func<Player, bool>? Condition = null);
