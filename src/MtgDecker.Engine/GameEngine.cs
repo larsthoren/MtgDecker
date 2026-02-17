@@ -1930,6 +1930,8 @@ public class GameEngine
                         && relevantCard != null
                         && !relevantCard.CardTypes.HasFlag(CardType.Creature)
                         && _state.ActivePlayer == player,
+                    TriggerCondition.AnyPlayerCastsSpell =>
+                        evt == GameEvent.SpellCast,
                     TriggerCondition.AnySpellCastCmc3OrLess =>
                         evt == GameEvent.SpellCast
                         && relevantCard != null
