@@ -526,7 +526,12 @@ public static class CardDefinitions
                 TargetFilter.Spell(), new ConditionalCounterEffect(2)),
             ["Standstill"] = new(ManaCost.Parse("{1}{U}"), null, null, null, CardType.Enchantment),
             ["Humility"] = new(ManaCost.Parse("{2}{W}{W}"), null, null, null, CardType.Enchantment),
-            ["Decree of Justice"] = new(ManaCost.Parse("{2}{W}{W}"), null, null, null, CardType.Sorcery),
+            ["Decree of Justice"] = new(ManaCost.Parse("{2}{W}{W}"), null, null, null, CardType.Sorcery,
+                Effect: new DecreeOfJusticeEffect())
+            {
+                CyclingCost = ManaCost.Parse("{2}{W}"),
+                CyclingTriggers = [new Trigger(GameEvent.Cycle, TriggerCondition.Self, new DecreeOfJusticeCyclingEffect())],
+            },
             ["Phyrexian Furnace"] = new(ManaCost.Parse("{1}"), null, null, null, CardType.Artifact),
             ["Faerie Conclave"] = new(null, ManaAbility.Fixed(ManaColor.Blue), null, null, CardType.Land)
             {
@@ -543,7 +548,7 @@ public static class CardDefinitions
             ["Call of the Herd"] = new(ManaCost.Parse("{2}{G}"), null, null, null, CardType.Sorcery,
                 Effect: new CreateTokenSpellEffect("Elephant", 3, 3, CardType.Creature, ["Elephant"])),
             ["Cataclysm"] = new(ManaCost.Parse("{2}{W}{W}"), null, null, null, CardType.Sorcery,
-                Effect: new DestroyAllCreaturesEffect()),
+                Effect: new CataclysmEffect()),
             ["Oath of Druids"] = new(ManaCost.Parse("{1}{G}"), null, null, null, CardType.Enchantment),
             ["Ray of Revelation"] = new(ManaCost.Parse("{1}{W}"), null, null, null, CardType.Instant,
                 TargetFilter.EnchantmentOrArtifact(), new NaturalizeEffect()),
