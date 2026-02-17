@@ -616,7 +616,10 @@ public static class CardDefinitions
             },
             ["Cataclysm"] = new(ManaCost.Parse("{2}{W}{W}"), null, null, null, CardType.Sorcery,
                 Effect: new CataclysmEffect()),
-            ["Oath of Druids"] = new(ManaCost.Parse("{1}{G}"), null, null, null, CardType.Enchantment),
+            ["Oath of Druids"] = new(ManaCost.Parse("{1}{G}"), null, null, null, CardType.Enchantment)
+            {
+                Triggers = [new Trigger(GameEvent.Upkeep, TriggerCondition.AnyUpkeep, new OathOfDruidsEffect())],
+            },
             ["Ray of Revelation"] = new(ManaCost.Parse("{1}{W}"), null, null, null, CardType.Instant,
                 TargetFilter.EnchantmentOrArtifact(), new NaturalizeEffect())
             {

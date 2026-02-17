@@ -1957,6 +1957,8 @@ public class GameEngine
                         && _state.ActivePlayer == player,
                     TriggerCondition.AnyPlayerCastsSpell =>
                         evt == GameEvent.SpellCast,
+                    TriggerCondition.AnyUpkeep =>
+                        evt == GameEvent.Upkeep,
                     TriggerCondition.AnySpellCastCmc3OrLess =>
                         evt == GameEvent.SpellCast
                         && relevantCard != null

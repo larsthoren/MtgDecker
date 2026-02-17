@@ -14,4 +14,5 @@ public enum TriggerCondition
     SelfInGraveyardDuringUpkeep,
     ControllerCastsNoncreature,
     AnyPlayerCastsSpell,
+    AnyUpkeep,
 }
