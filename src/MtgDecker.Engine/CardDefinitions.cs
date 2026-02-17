@@ -32,6 +32,12 @@ public static class CardDefinitions
             ["Goblin Piledriver"] = new(ManaCost.Parse("{1}{R}"), null, 1, 2, CardType.Creature)
             {
                 Subtypes = ["Goblin"],
+                ContinuousEffects =
+                [
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
+                        (card, _) => card.Name == "Goblin Piledriver",
+                        GrantedKeyword: Keyword.ProtectionFromBlue),
+                ],
                 Triggers = [new Trigger(GameEvent.BeginCombat, TriggerCondition.SelfAttacks, new PiledriverPumpEffect())],
             },
             ["Goblin Ringleader"] = new(ManaCost.Parse("{3}{R}"), null, 2, 2, CardType.Creature)
@@ -278,6 +284,7 @@ public static class CardDefinitions
                         (card, _) => card.Name == "Monastery Swiftspear",
                         GrantedKeyword: Keyword.Haste),
                 ],
+                Triggers = [new Trigger(GameEvent.SpellCast, TriggerCondition.ControllerCastsNoncreature, new ProwessEffect())],
             },
             ["Eidolon of the Great Revel"] = new(ManaCost.Parse("{R}{R}"), null, 2, 2,
                 CardType.Creature | CardType.Enchantment)
@@ -546,7 +553,20 @@ public static class CardDefinitions
                         GrantedKeyword: Keyword.Lifelink),
                 ],
             },
-            ["Knight of Stromgald"] = new(ManaCost.Parse("{B}{B}"), null, 2, 1, CardType.Creature) { Subtypes = ["Human", "Knight"] },
+            ["Knight of Stromgald"] = new(ManaCost.Parse("{B}{B}"), null, 2, 1, CardType.Creature)
+            {
+                Subtypes = ["Human", "Knight"],
+                ContinuousEffects =
+                [
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
+                        (card, _) => card.Name == "Knight of Stromgald",
+                        GrantedKeyword: Keyword.FirstStrike),
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
+                        (card, _) => card.Name == "Knight of Stromgald",
+                        GrantedKeyword: Keyword.ProtectionFromWhite),
+                ],
+                ActivatedAbility = new(new ActivatedAbilityCost(ManaCost: ManaCost.Parse("{B}")), new PumpSelfEffect(1, 0)),
+            },
             ["Phyrexian Rager"] = new(ManaCost.Parse("{2}{B}"), null, 2, 2, CardType.Creature)
             {
                 Subtypes = ["Horror"],
