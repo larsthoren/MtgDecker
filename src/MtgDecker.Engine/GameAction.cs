@@ -86,4 +86,12 @@ public class GameAction
         CardId = cardId,
         SourceZone = ZoneType.Hand,
     };
+
+    public static GameAction Flashback(Guid playerId, Guid cardId) => new()
+    {
+        Type = ActionType.Flashback,
+        PlayerId = playerId,
+        CardId = cardId,
+        SourceZone = ZoneType.Graveyard,
+    };
 }

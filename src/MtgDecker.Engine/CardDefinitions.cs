@@ -378,7 +378,10 @@ public static class CardDefinitions
             ["Duress"] = new(ManaCost.Parse("{B}"), null, null, null, CardType.Sorcery,
                 TargetFilter.Player(), new DuressEffect()),
             ["Cabal Therapy"] = new(ManaCost.Parse("{B}"), null, null, null, CardType.Sorcery,
-                TargetFilter.Player(), new CabalTherapyEffect()),
+                TargetFilter.Player(), new CabalTherapyEffect())
+            {
+                FlashbackCost = new FlashbackCost(SacrificeCreature: true),
+            },
             ["Gerrard's Verdict"] = new(ManaCost.Parse("{W}{B}"), null, null, null, CardType.Sorcery,
                 TargetFilter.Player(), new GerrardVerdictEffect()),
 
@@ -394,7 +397,10 @@ public static class CardDefinitions
             ["Impulse"] = new(ManaCost.Parse("{1}{U}"), null, null, null, CardType.Instant,
                 Effect: new ImpulseEffect()),
             ["Deep Analysis"] = new(ManaCost.Parse("{3}{U}"), null, null, null, CardType.Sorcery,
-                Effect: new DrawCardsEffect(2)),
+                Effect: new DrawCardsEffect(2))
+            {
+                FlashbackCost = new FlashbackCost(ManaCost.Parse("{1}{U}"), LifeCost: 3),
+            },
 
             // === Sligh (RDW) deck ===
             ["Ball Lightning"] = new(ManaCost.Parse("{R}{R}{R}"), null, 6, 1, CardType.Creature)
@@ -576,16 +582,27 @@ public static class CardDefinitions
             // === Oath of Druids deck ===
             ["Terravore"] = new(ManaCost.Parse("{1}{G}{G}"), null, 3, 3, CardType.Creature) { Subtypes = ["Lhurgoyf"] },
             ["Call of the Herd"] = new(ManaCost.Parse("{2}{G}"), null, null, null, CardType.Sorcery,
-                Effect: new CreateTokenSpellEffect("Elephant", 3, 3, CardType.Creature, ["Elephant"])),
+                Effect: new CreateTokenSpellEffect("Elephant", 3, 3, CardType.Creature, ["Elephant"]))
+            {
+                FlashbackCost = new FlashbackCost(ManaCost.Parse("{3}{G}")),
+            },
             ["Cataclysm"] = new(ManaCost.Parse("{2}{W}{W}"), null, null, null, CardType.Sorcery,
                 Effect: new CataclysmEffect()),
             ["Oath of Druids"] = new(ManaCost.Parse("{1}{G}"), null, null, null, CardType.Enchantment),
             ["Ray of Revelation"] = new(ManaCost.Parse("{1}{W}"), null, null, null, CardType.Instant,
-                TargetFilter.EnchantmentOrArtifact(), new NaturalizeEffect()),
-            ["Reckless Charge"] = new(ManaCost.Parse("{R}"), null, null, null, CardType.Sorcery),
+                TargetFilter.EnchantmentOrArtifact(), new NaturalizeEffect())
+            {
+                FlashbackCost = new FlashbackCost(ManaCost.Parse("{G}")),
+            },
+            ["Reckless Charge"] = new(ManaCost.Parse("{R}"), null, null, null, CardType.Sorcery,
+                TargetFilter.Creature(), new RecklessChargeEffect())
+            {
+                FlashbackCost = new FlashbackCost(ManaCost.Parse("{2}{R}")),
+            },
             ["Volcanic Spray"] = new(ManaCost.Parse("{1}{R}"), null, null, null, CardType.Sorcery,
                 Effect: new DamageAllCreaturesEffect(1)),
-            ["Quiet Speculation"] = new(ManaCost.Parse("{1}{U}"), null, null, null, CardType.Sorcery),
+            ["Quiet Speculation"] = new(ManaCost.Parse("{1}{U}"), null, null, null, CardType.Sorcery,
+                Effect: new QuietSpeculationEffect()),
             ["Funeral Pyre"] = new(ManaCost.Parse("{W}"), null, null, null, CardType.Instant),
             ["Treetop Village"] = new(null, ManaAbility.Fixed(ManaColor.Green), null, null, CardType.Land)
             {
