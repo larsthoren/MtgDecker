@@ -1555,6 +1555,10 @@ public class GameEngine
         RebuildActiveEffects(_state.Player1);
         RebuildActiveEffects(_state.Player2);
 
+        // Graveyard-based abilities (e.g., Anger grants haste while in graveyard)
+        RebuildGraveyardAbilities(_state.Player1);
+        RebuildGraveyardAbilities(_state.Player2);
+
         // Re-add temporary effects
         _state.ActiveEffects.AddRange(tempEffects);
 
@@ -1672,6 +1676,27 @@ public class GameEngine
             {
                 var effect = templateEffect with { SourceId = card.Id };
                 _state.ActiveEffects.Add(effect);
+            }
+        }
+    }
+
+    private void RebuildGraveyardAbilities(Player player)
+    {
+        foreach (var card in player.Graveyard.Cards)
+        {
+            if (!CardDefinitions.TryGet(card.Name, out var def)) continue;
+            if (def.GraveyardAbilities.Count == 0) continue;
+
+            var ownerId = player.Id;
+            foreach (var ability in def.GraveyardAbilities)
+            {
+                // Wrap Applies to restrict to this player's creatures only
+                var originalApplies = ability.Applies;
+                _state.ActiveEffects.Add(ability with
+                {
+                    SourceId = card.Id,
+                    Applies = (c, p) => p.Id == ownerId && originalApplies(c, p)
+                });
             }
         }
     }

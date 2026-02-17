@@ -291,7 +291,6 @@ public class CardDefinitionsTests
     [InlineData("Goblin Guide")]
     [InlineData("Goblin Ringleader")]
     [InlineData("Monastery Swiftspear")]
-    [InlineData("Anger")]
     public void Card_HasHaste(string cardName)
     {
         CardDefinitions.TryGet(cardName, out var def);

@@ -734,10 +734,13 @@ public static class CardDefinitions
             ["Anger"] = new(ManaCost.Parse("{3}{R}"), null, 2, 2, CardType.Creature)
             {
                 Subtypes = ["Incarnation"],
-                ContinuousEffects =
+                GraveyardAbilities =
                 [
                     new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
-                        (card, _) => card.Name == "Anger",
+                        (card, player) => card.IsCreature
+                            && player.Battlefield.Cards.Any(c =>
+                                c.Name == "Mountain"
+                                || c.Subtypes.Contains("Mountain", StringComparer.OrdinalIgnoreCase)),
                         GrantedKeyword: Keyword.Haste),
                 ],
             },

@@ -20,6 +20,7 @@ public record CardDefinition(
     public bool IsLegendary { get; init; }
     public FetchAbility? FetchAbility { get; init; }
     public IReadOnlyList<ContinuousEffect> ContinuousEffects { get; init; } = [];
+    public IReadOnlyList<ContinuousEffect> GraveyardAbilities { get; init; } = [];
     public ActivatedAbility? ActivatedAbility { get; init; }
     public AuraTarget? AuraTarget { get; init; }
     public ManaCost? CyclingCost { get; init; }
