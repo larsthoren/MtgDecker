@@ -1593,6 +1593,9 @@ public class GameEngine
         // Preserve temporary (UntilEndOfTurn) effects before rebuild
         var tempEffects = _state.ActiveEffects.Where(e => e.UntilEndOfTurn).ToList();
 
+        // Reset timestamp counter
+        _state.NextEffectTimestamp = 1;
+
         // Rebuild ActiveEffects from CardDefinitions on the battlefield
         _state.ActiveEffects.Clear();
         RebuildActiveEffects(_state.Player1);
@@ -1602,8 +1605,11 @@ public class GameEngine
         RebuildGraveyardAbilities(_state.Player1);
         RebuildGraveyardAbilities(_state.Player2);
 
-        // Re-add temporary effects
-        _state.ActiveEffects.AddRange(tempEffects);
+        // Re-add temporary effects with fresh timestamps
+        foreach (var temp in tempEffects)
+        {
+            _state.ActiveEffects.Add(temp with { Timestamp = _state.NextEffectTimestamp++ });
+        }
 
         // Reset all effective values for both players
         foreach (var player in new[] { _state.Player1, _state.Player2 })
@@ -1614,15 +1620,63 @@ public class GameEngine
                 card.EffectiveToughness = null;
                 card.EffectiveCardTypes = null;
                 card.ActiveKeywords.Clear();
+                card.AbilitiesRemoved = false;
             }
             player.MaxLandDrops = 1;
         }
 
-        // Layer 0: Characteristic-defining abilities (dynamic base P/T)
+        // Build suppression tracking set
+        var abilitiesRemovedFrom = new HashSet<Guid>();
+
+        // === LAYER 4: Type-changing effects (BecomeCreature) ===
+        foreach (var effect in _state.ActiveEffects
+            .Where(e => e.Layer == EffectLayer.Layer4_TypeChanging)
+            .OrderBy(e => e.Timestamp))
+        {
+            ApplyBecomeCreatureEffect(effect, _state.Player1);
+            ApplyBecomeCreatureEffect(effect, _state.Player2);
+        }
+
+        // === LAYER 6: Ability add/remove ===
+        // First: process RemoveAbilities effects
+        foreach (var effect in _state.ActiveEffects
+            .Where(e => e.Type == ContinuousEffectType.RemoveAbilities
+                     && e.Layer == EffectLayer.Layer6_AbilityAddRemove)
+            .OrderBy(e => e.Timestamp))
+        {
+            foreach (var player in new[] { _state.Player1, _state.Player2 })
+            {
+                foreach (var card in player.Battlefield.Cards)
+                {
+                    if (!effect.Applies(card, player)) continue;
+                    card.AbilitiesRemoved = true;
+                    abilitiesRemovedFrom.Add(card.Id);
+                }
+            }
+        }
+
+        // Then: process GrantKeyword effects (skip if source creature lost abilities)
+        foreach (var effect in _state.ActiveEffects
+            .Where(e => e.Type == ContinuousEffectType.GrantKeyword
+                     && (e.Layer == EffectLayer.Layer6_AbilityAddRemove || e.Layer == null))
+            .OrderBy(e => e.Timestamp))
+        {
+            // Skip if the SOURCE of this effect is a creature that lost its abilities
+            if (abilitiesRemovedFrom.Contains(effect.SourceId))
+                continue;
+
+            ApplyKeywordEffect(effect, _state.Player1);
+            ApplyKeywordEffect(effect, _state.Player2);
+        }
+
+        // === LAYER 7a: CDA (characteristic-defining abilities) ===
         foreach (var player in new[] { _state.Player1, _state.Player2 })
         {
             foreach (var card in player.Battlefield.Cards)
             {
+                // Skip CDA if the creature lost abilities
+                if (abilitiesRemovedFrom.Contains(card.Id)) continue;
+
                 if (CardDefinitions.TryGet(card.Name, out var def))
                 {
                     if (def.DynamicBasePower != null)
@@ -1633,28 +1687,40 @@ public class GameEngine
             }
         }
 
-        // Layer 1: Type-changing effects (BecomeCreature)
-        foreach (var effect in _state.ActiveEffects.Where(e => e.Type == ContinuousEffectType.BecomeCreature))
+        // === LAYER 7b: Set base P/T ===
+        foreach (var effect in _state.ActiveEffects
+            .Where(e => e.Type == ContinuousEffectType.SetBasePowerToughness
+                     && e.Layer == EffectLayer.Layer7b_SetPT)
+            .OrderBy(e => e.Timestamp))
         {
-            ApplyBecomeCreatureEffect(effect, _state.Player1);
-            ApplyBecomeCreatureEffect(effect, _state.Player2);
+            foreach (var player in new[] { _state.Player1, _state.Player2 })
+            {
+                foreach (var card in player.Battlefield.Cards)
+                {
+                    if (!effect.Applies(card, player)) continue;
+                    if (effect.SetPower.HasValue)
+                        card.EffectivePower = effect.SetPower.Value;
+                    if (effect.SetToughness.HasValue)
+                        card.EffectiveToughness = effect.SetToughness.Value;
+                }
+            }
         }
 
-        // Layer 2: P/T modification
-        foreach (var effect in _state.ActiveEffects.Where(e => e.Type == ContinuousEffectType.ModifyPowerToughness))
+        // === LAYER 7c: Modify P/T (additive) ===
+        foreach (var effect in _state.ActiveEffects
+            .Where(e => e.Type == ContinuousEffectType.ModifyPowerToughness
+                     && (e.Layer == EffectLayer.Layer7c_ModifyPT || e.Layer == null))
+            .OrderBy(e => e.Timestamp))
         {
+            // Skip if the SOURCE of this effect is a creature that lost its abilities
+            if (abilitiesRemovedFrom.Contains(effect.SourceId))
+                continue;
+
             ApplyPowerToughnessEffect(effect, _state.Player1);
             ApplyPowerToughnessEffect(effect, _state.Player2);
         }
 
-        // Layer 3: Keywords
-        foreach (var effect in _state.ActiveEffects.Where(e => e.Type == ContinuousEffectType.GrantKeyword))
-        {
-            ApplyKeywordEffect(effect, _state.Player1);
-            ApplyKeywordEffect(effect, _state.Player2);
-        }
-
-        // Non-layered effects
+        // === Non-layered effects ===
         foreach (var effect in _state.ActiveEffects.Where(e => e.Type == ContinuousEffectType.ExtraLandDrop))
         {
             var sourceOwner = _state.Player1.Battlefield.Cards.Any(c => c.Id == effect.SourceId)
@@ -1717,7 +1783,11 @@ public class GameEngine
             if (!CardDefinitions.TryGet(card.Name, out var def)) continue;
             foreach (var templateEffect in def.ContinuousEffects)
             {
-                var effect = templateEffect with { SourceId = card.Id };
+                var effect = templateEffect with
+                {
+                    SourceId = card.Id,
+                    Timestamp = _state.NextEffectTimestamp++
+                };
                 _state.ActiveEffects.Add(effect);
             }
         }
@@ -1733,11 +1803,11 @@ public class GameEngine
             var ownerId = player.Id;
             foreach (var ability in def.GraveyardAbilities)
             {
-                // Wrap Applies to restrict to this player's creatures only
                 var originalApplies = ability.Applies;
                 _state.ActiveEffects.Add(ability with
                 {
                     SourceId = card.Id,
+                    Timestamp = _state.NextEffectTimestamp++,
                     Applies = (c, p) => p.Id == ownerId && originalApplies(c, p)
                 });
             }

@@ -103,4 +103,51 @@ public class HumilityLayerSystemTests
         def!.GraveyardAbilities.Should().ContainSingle();
         def.GraveyardAbilities[0].Layer.Should().Be(EffectLayer.Layer6_AbilityAddRemove);
     }
+
+    [Fact]
+    public void RecalculateState_AssignsTimestamps_InBattlefieldOrder()
+    {
+        var p1 = new Player(Guid.NewGuid(), "P1", new TestDecisionHandler());
+        var p2 = new Player(Guid.NewGuid(), "P2", new TestDecisionHandler());
+        var state = new GameState(p1, p2);
+        var engine = new GameEngine(state);
+
+        // Add two lords — first added should have lower timestamp
+        var king = GameCard.Create("Goblin King");
+        var hermit = GameCard.Create("Deranged Hermit");
+        p1.Battlefield.Add(king);
+        p1.Battlefield.Add(hermit);
+
+        engine.RecalculateState();
+
+        var kingEffects = state.ActiveEffects.Where(e => e.SourceId == king.Id).ToList();
+        var hermitEffects = state.ActiveEffects.Where(e => e.SourceId == hermit.Id).ToList();
+
+        kingEffects.Should().NotBeEmpty();
+        hermitEffects.Should().NotBeEmpty();
+
+        // King was added first — should have lower timestamps
+        kingEffects.Max(e => e.Timestamp).Should().BeLessThan(hermitEffects.Min(e => e.Timestamp));
+    }
+
+    [Fact]
+    public void RecalculateState_ResetsNextEffectTimestamp_EachCall()
+    {
+        var p1 = new Player(Guid.NewGuid(), "P1", new TestDecisionHandler());
+        var p2 = new Player(Guid.NewGuid(), "P2", new TestDecisionHandler());
+        var state = new GameState(p1, p2);
+        var engine = new GameEngine(state);
+
+        var king = GameCard.Create("Goblin King");
+        p1.Battlefield.Add(king);
+
+        engine.RecalculateState();
+        var firstCallTimestamps = state.ActiveEffects.Select(e => e.Timestamp).ToList();
+
+        engine.RecalculateState();
+        var secondCallTimestamps = state.ActiveEffects.Select(e => e.Timestamp).ToList();
+
+        // Timestamps should be identical across calls (counter resets)
+        firstCallTimestamps.Should().BeEquivalentTo(secondCallTimestamps);
+    }
 }
