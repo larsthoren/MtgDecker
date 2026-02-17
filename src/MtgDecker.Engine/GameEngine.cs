@@ -1910,6 +1910,11 @@ public class GameEngine
                     TriggerCondition.Upkeep =>
                         evt == GameEvent.Upkeep
                         && _state.ActivePlayer == player,
+                    TriggerCondition.ControllerCastsNoncreature =>
+                        evt == GameEvent.SpellCast
+                        && relevantCard != null
+                        && !relevantCard.CardTypes.HasFlag(CardType.Creature)
+                        && _state.ActivePlayer == player,
                     TriggerCondition.AnySpellCastCmc3OrLess =>
                         evt == GameEvent.SpellCast
                         && relevantCard != null

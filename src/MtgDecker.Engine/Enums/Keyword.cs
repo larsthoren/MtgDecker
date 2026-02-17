@@ -15,4 +15,6 @@ public enum Keyword
     Plainswalk,
     Lifelink,
     Defender,
+    ProtectionFromBlue,
+    ProtectionFromWhite,
 }

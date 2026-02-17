@@ -12,4 +12,5 @@ public enum TriggerCondition
     SelfLeavesBattlefield,
     AnySpellCastCmc3OrLess,
     SelfInGraveyardDuringUpkeep,
+    ControllerCastsNoncreature,
 }
