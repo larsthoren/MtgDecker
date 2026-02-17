@@ -1,6 +1,7 @@
 using FluentAssertions;
 using MtgDecker.Engine;
 using MtgDecker.Engine.Enums;
+using MtgDecker.Engine.Mana;
 using MtgDecker.Engine.Tests.Helpers;
 
 namespace MtgDecker.Engine.Tests;
@@ -357,5 +358,93 @@ public class HumilityLayerSystemTests
         // Base 1/1 (from Humility) + 3/3 pump = 4/4
         creature.Power.Should().Be(4);
         creature.Toughness.Should().Be(4);
+    }
+
+    [Fact]
+    public void Humility_SuppressesBoardTriggers()
+    {
+        var p1 = new Player(Guid.NewGuid(), "P1", new TestDecisionHandler());
+        var p2 = new Player(Guid.NewGuid(), "P2", new TestDecisionHandler());
+        var state = new GameState(p1, p2);
+        var engine = new GameEngine(state);
+
+        var humility = GameCard.Create("Humility");
+        p1.Battlefield.Add(humility);
+
+        var eidolon = GameCard.Create("Eidolon of the Great Revel");
+        p1.Battlefield.Add(eidolon);
+
+        engine.RecalculateState();
+
+        var bolt = GameCard.Create("Lightning Bolt");
+        var triggers = engine.CollectBoardTriggersForTest(GameEvent.SpellCast, bolt, p1);
+
+        triggers.Should().BeEmpty("Eidolon has AbilitiesRemoved — its triggers are suppressed");
+    }
+
+    [Fact]
+    public async Task Humility_SuppressesAttackTriggers()
+    {
+        var p1 = new Player(Guid.NewGuid(), "P1", new TestDecisionHandler());
+        var p2 = new Player(Guid.NewGuid(), "P2", new TestDecisionHandler());
+        var state = new GameState(p1, p2);
+        var engine = new GameEngine(state);
+
+        var humility = GameCard.Create("Humility");
+        p1.Battlefield.Add(humility);
+
+        var guide = GameCard.Create("Goblin Guide");
+        p1.Battlefield.Add(guide);
+        state.ActivePlayer = p1;
+
+        engine.RecalculateState();
+
+        await engine.QueueAttackTriggersOnStackAsync(guide);
+
+        state.StackCount.Should().Be(0, "Goblin Guide's attack trigger is suppressed by Humility");
+    }
+
+    [Fact]
+    public async Task Humility_SuppressesEchoTriggers()
+    {
+        var p1 = new Player(Guid.NewGuid(), "P1", new TestDecisionHandler());
+        var p2 = new Player(Guid.NewGuid(), "P2", new TestDecisionHandler());
+        var state = new GameState(p1, p2);
+        var engine = new GameEngine(state);
+
+        var humility = GameCard.Create("Humility");
+        p1.Battlefield.Add(humility);
+
+        var acolyte = GameCard.Create("Multani's Acolyte");
+        acolyte.EchoPaid = false;
+        p1.Battlefield.Add(acolyte);
+        state.ActivePlayer = p1;
+
+        engine.RecalculateState();
+
+        await engine.QueueEchoTriggersOnStackAsync();
+
+        state.StackCount.Should().Be(0, "Echo trigger is suppressed — creature lost all abilities");
+    }
+
+    [Fact]
+    public async Task Humility_SuppressesSelfETBTriggers()
+    {
+        var p1 = new Player(Guid.NewGuid(), "P1", new TestDecisionHandler());
+        var p2 = new Player(Guid.NewGuid(), "P2", new TestDecisionHandler());
+        var state = new GameState(p1, p2);
+        var engine = new GameEngine(state);
+
+        var humility = GameCard.Create("Humility");
+        p1.Battlefield.Add(humility);
+
+        var rager = GameCard.Create("Phyrexian Rager");
+        p1.Battlefield.Add(rager);
+
+        engine.RecalculateState();
+
+        await engine.QueueSelfTriggersOnStackAsync(GameEvent.EnterBattlefield, rager, p1);
+
+        state.StackCount.Should().Be(0, "ETB trigger is suppressed — creature has AbilitiesRemoved");
     }
 }

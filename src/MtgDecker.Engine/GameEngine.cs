@@ -1814,6 +1814,10 @@ public class GameEngine
         }
     }
 
+    /// <summary>Test accessor for CollectBoardTriggers.</summary>
+    internal List<TriggeredAbilityStackObject> CollectBoardTriggersForTest(GameEvent evt, GameCard? relevantCard, Player player)
+        => CollectBoardTriggers(evt, relevantCard, player);
+
     internal int ComputeCostModification(GameCard card, Player caster)
     {
         return _state.ActiveEffects
@@ -2000,6 +2004,8 @@ public class GameEngine
     internal Task QueueSelfTriggersOnStackAsync(GameEvent evt, GameCard source, Player controller, CancellationToken ct = default)
     {
         if (source.Triggers.Count == 0) return Task.CompletedTask;
+        // Suppression: if source creature lost abilities, skip self triggers
+        if (source.IsCreature && source.AbilitiesRemoved) return Task.CompletedTask;
 
         foreach (var trigger in source.Triggers)
         {
@@ -2043,6 +2049,8 @@ public class GameEngine
                 ? permanent.Triggers
                 : (CardDefinitions.TryGet(permanent.Name, out var def) ? def.Triggers : []);
             if (triggers.Count == 0) continue;
+            // Suppression: if this permanent is a creature that lost abilities, skip its triggers
+            if (permanent.IsCreature && permanent.AbilitiesRemoved) continue;
 
             foreach (var trigger in triggers)
             {
@@ -2103,6 +2111,9 @@ public class GameEngine
     /// <summary>Queues attack triggers onto the stack.</summary>
     internal Task QueueAttackTriggersOnStackAsync(GameCard attacker, CancellationToken ct = default)
     {
+        // Suppression: if attacker lost abilities, skip attack triggers
+        if (attacker.AbilitiesRemoved) return Task.CompletedTask;
+
         var player = _state.ActivePlayer;
         var triggers = attacker.Triggers.Count > 0
             ? attacker.Triggers
@@ -2151,6 +2162,8 @@ public class GameEngine
         foreach (var card in activePlayer.Battlefield.Cards.ToList())
         {
             if (card.EchoPaid) continue;
+            // Suppression: if creature lost abilities, skip echo
+            if (card.AbilitiesRemoved) continue;
             if (!CardDefinitions.TryGet(card.Name, out var def) || def.EchoCost == null) continue;
 
             _state.Log($"{card.Name} echo trigger.");
