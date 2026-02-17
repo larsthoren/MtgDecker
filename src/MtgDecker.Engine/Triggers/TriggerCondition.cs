@@ -13,4 +13,6 @@ public enum TriggerCondition
     AnySpellCastCmc3OrLess,
     SelfInGraveyardDuringUpkeep,
     ControllerCastsNoncreature,
+    AnyPlayerCastsSpell,
+    AnyUpkeep,
 }

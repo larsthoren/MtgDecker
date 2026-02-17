@@ -580,7 +580,10 @@ public static class CardDefinitions
             // === Landstill deck ===
             ["Prohibit"] = new(ManaCost.Parse("{1}{U}"), null, null, null, CardType.Instant,
                 TargetFilter.Spell(), new ConditionalCounterEffect(2)),
-            ["Standstill"] = new(ManaCost.Parse("{1}{U}"), null, null, null, CardType.Enchantment),
+            ["Standstill"] = new(ManaCost.Parse("{1}{U}"), null, null, null, CardType.Enchantment)
+            {
+                Triggers = [new Trigger(GameEvent.SpellCast, TriggerCondition.AnyPlayerCastsSpell, new StandstillEffect())],
+            },
             ["Humility"] = new(ManaCost.Parse("{2}{W}{W}"), null, null, null, CardType.Enchantment),
             ["Decree of Justice"] = new(ManaCost.Parse("{2}{W}{W}"), null, null, null, CardType.Sorcery,
                 Effect: new DecreeOfJusticeEffect())
@@ -600,7 +603,12 @@ public static class CardDefinitions
             },
 
             // === Oath of Druids deck ===
-            ["Terravore"] = new(ManaCost.Parse("{1}{G}{G}"), null, 3, 3, CardType.Creature) { Subtypes = ["Lhurgoyf"] },
+            ["Terravore"] = new(ManaCost.Parse("{1}{G}{G}"), null, null, null, CardType.Creature)
+            {
+                Subtypes = ["Lhurgoyf"],
+                DynamicBasePower = state => CountLandsInAllGraveyards(state),
+                DynamicBaseToughness = state => CountLandsInAllGraveyards(state),
+            },
             ["Call of the Herd"] = new(ManaCost.Parse("{2}{G}"), null, null, null, CardType.Sorcery,
                 Effect: new CreateTokenSpellEffect("Elephant", 3, 3, CardType.Creature, ["Elephant"]))
             {
@@ -608,7 +616,10 @@ public static class CardDefinitions
             },
             ["Cataclysm"] = new(ManaCost.Parse("{2}{W}{W}"), null, null, null, CardType.Sorcery,
                 Effect: new CataclysmEffect()),
-            ["Oath of Druids"] = new(ManaCost.Parse("{1}{G}"), null, null, null, CardType.Enchantment),
+            ["Oath of Druids"] = new(ManaCost.Parse("{1}{G}"), null, null, null, CardType.Enchantment)
+            {
+                Triggers = [new Trigger(GameEvent.Upkeep, TriggerCondition.AnyUpkeep, new OathOfDruidsEffect())],
+            },
             ["Ray of Revelation"] = new(ManaCost.Parse("{1}{W}"), null, null, null, CardType.Instant,
                 TargetFilter.EnchantmentOrArtifact(), new NaturalizeEffect())
             {
@@ -714,8 +725,25 @@ public static class CardDefinitions
                 ActivatedAbility = new(new ActivatedAbilityCost(SacrificeSubtype: "Beast"),
                     new Triggers.Effects.GainLifeEffect(4)),
             },
-            ["Caller of the Claw"] = new(ManaCost.Parse("{2}{G}"), null, 2, 2, CardType.Creature) { Subtypes = ["Elf"] },
-            ["Masticore"] = new(ManaCost.Parse("{4}"), null, 4, 4, CardType.Artifact | CardType.Creature),
+            ["Caller of the Claw"] = new(ManaCost.Parse("{2}{G}"), null, 2, 2, CardType.Creature)
+            {
+                Subtypes = ["Elf"],
+                ContinuousEffects =
+                [
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
+                        (card, _) => card.Name == "Caller of the Claw",
+                        GrantedKeyword: Keyword.Flash),
+                ],
+                Triggers = [new Trigger(GameEvent.EnterBattlefield, TriggerCondition.Self, new CallerOfTheClawEffect())],
+            },
+            ["Masticore"] = new(ManaCost.Parse("{4}"), null, 4, 4, CardType.Artifact | CardType.Creature)
+            {
+                Triggers = [new Trigger(GameEvent.Upkeep, TriggerCondition.Upkeep, new MasticoreUpkeepEffect())],
+                ActivatedAbility = new(
+                    new ActivatedAbilityCost(ManaCost: ManaCost.Parse("{2}")),
+                    new DealDamageEffect(1),
+                    TargetFilter: c => c.IsCreature),
+            },
             ["Nantuko Vigilante"] = new(ManaCost.Parse("{3}{G}"), null, 3, 2, CardType.Creature) { Subtypes = ["Insect", "Druid"] },
             ["Yavimaya Granger"] = new(ManaCost.Parse("{2}{G}"), null, 2, 2, CardType.Creature)
             {
@@ -726,10 +754,13 @@ public static class CardDefinitions
             ["Anger"] = new(ManaCost.Parse("{3}{R}"), null, 2, 2, CardType.Creature)
             {
                 Subtypes = ["Incarnation"],
-                ContinuousEffects =
+                GraveyardAbilities =
                 [
                     new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
-                        (card, _) => card.Name == "Anger",
+                        (card, player) => card.IsCreature
+                            && player.Battlefield.Cards.Any(c =>
+                                c.Name == "Mountain"
+                                || c.Subtypes.Contains("Mountain", StringComparer.OrdinalIgnoreCase)),
                         GrantedKeyword: Keyword.Haste),
                 ],
             },
@@ -741,7 +772,12 @@ public static class CardDefinitions
                     TriggerCondition.SelfInGraveyardDuringUpkeep,
                     new ReturnSelfFromGraveyardEffect())],
             },
-            ["Survival of the Fittest"] = new(ManaCost.Parse("{1}{G}"), null, null, null, CardType.Enchantment),
+            ["Survival of the Fittest"] = new(ManaCost.Parse("{1}{G}"), null, null, null, CardType.Enchantment)
+            {
+                ActivatedAbility = new(
+                    new ActivatedAbilityCost(ManaCost: ManaCost.Parse("{G}"), DiscardCardType: CardType.Creature),
+                    new SearchLibraryByTypeEffect(CardType.Creature)),
+            },
             ["Gaea's Cradle"] = new(null, ManaAbility.Dynamic(ManaColor.Green,
                 p => p.Battlefield.Cards.Count(c => c.IsCreature)),
                 null, null, CardType.Land) { IsLegendary = true },
@@ -772,5 +808,11 @@ public static class CardDefinitions
     public static bool Unregister(string cardName)
     {
         return RuntimeOverrides.TryRemove(cardName, out _);
+    }
+
+    private static int CountLandsInAllGraveyards(GameState state)
+    {
+        return state.Player1.Graveyard.Cards.Count(c => c.IsLand)
+             + state.Player2.Graveyard.Cards.Count(c => c.IsLand);
     }
 }

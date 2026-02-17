@@ -10,7 +10,8 @@ public record ActivatedAbilityCost(
     string? SacrificeSubtype = null,
     ManaCost? ManaCost = null,
     CounterType? RemoveCounterType = null,
-    CardType? SacrificeCardType = null);
+    CardType? SacrificeCardType = null,
+    CardType? DiscardCardType = null);
 
 public record ActivatedAbility(
     ActivatedAbilityCost Cost,

@@ -32,6 +32,8 @@ public class GameEngine
     {
         _turnStateMachine.Reset();
         _state.ActivePlayer.LandsPlayedThisTurn = 0;
+        _state.Player1.CreaturesDiedThisTurn = 0;
+        _state.Player2.CreaturesDiedThisTurn = 0;
         _state.Log($"Turn {_state.TurnNumber}: {_state.ActivePlayer.Name}'s turn.");
 
         do
@@ -635,6 +637,33 @@ public class GameEngine
                     }
                 }
 
+                // Validate: discard card type from hand
+                GameCard? discardTarget = null;
+                if (cost.DiscardCardType.HasValue)
+                {
+                    var eligible = player.Hand.Cards
+                        .Where(c => c.CardTypes.HasFlag(cost.DiscardCardType.Value))
+                        .ToList();
+
+                    if (eligible.Count == 0)
+                    {
+                        _state.Log($"Cannot activate {abilitySource.Name} — no {cost.DiscardCardType.Value} in hand to discard.");
+                        break;
+                    }
+
+                    var chosenId = await player.DecisionHandler.ChooseCard(
+                        eligible, $"Choose a {cost.DiscardCardType.Value} to discard", optional: false, ct);
+
+                    if (chosenId.HasValue)
+                        discardTarget = eligible.FirstOrDefault(c => c.Id == chosenId.Value);
+
+                    if (discardTarget == null)
+                    {
+                        _state.Log($"Cannot activate {abilitySource.Name} — no discard target chosen.");
+                        break;
+                    }
+                }
+
                 // Pay costs: mana
                 if (cost.ManaCost != null)
                 {
@@ -677,6 +706,14 @@ public class GameEngine
                 if (cost.RemoveCounterType.HasValue)
                 {
                     abilitySource.RemoveCounter(cost.RemoveCounterType.Value);
+                }
+
+                // Pay costs: discard card type
+                if (discardTarget != null)
+                {
+                    player.Hand.RemoveById(discardTarget.Id);
+                    player.Graveyard.Add(discardTarget);
+                    _state.Log($"{player.Name} discards {discardTarget.Name}.");
                 }
 
                 // Find or prompt for effect target
@@ -1519,6 +1556,7 @@ public class GameEngine
 
         foreach (var card in dead)
         {
+            TrackCreatureDeath(card, player);
             player.Battlefield.RemoveById(card.Id);
             // MTG rules: tokens go to graveyard then cease to exist (SBA 704.5d)
             player.Graveyard.Add(card);
@@ -1531,6 +1569,11 @@ public class GameEngine
         return dead;
     }
 
+    private void TrackCreatureDeath(GameCard card, Player owner)
+    {
+        if (card.IsCreature && !card.IsToken)
+            owner.CreaturesDiedThisTurn++;
+    }
 
     public void ClearDamage()
     {
@@ -1555,6 +1598,10 @@ public class GameEngine
         RebuildActiveEffects(_state.Player1);
         RebuildActiveEffects(_state.Player2);
 
+        // Graveyard-based abilities (e.g., Anger grants haste while in graveyard)
+        RebuildGraveyardAbilities(_state.Player1);
+        RebuildGraveyardAbilities(_state.Player2);
+
         // Re-add temporary effects
         _state.ActiveEffects.AddRange(tempEffects);
 
@@ -1569,6 +1616,21 @@ public class GameEngine
                 card.ActiveKeywords.Clear();
             }
             player.MaxLandDrops = 1;
+        }
+
+        // Layer 0: Characteristic-defining abilities (dynamic base P/T)
+        foreach (var player in new[] { _state.Player1, _state.Player2 })
+        {
+            foreach (var card in player.Battlefield.Cards)
+            {
+                if (CardDefinitions.TryGet(card.Name, out var def))
+                {
+                    if (def.DynamicBasePower != null)
+                        card.BasePower = def.DynamicBasePower(_state);
+                    if (def.DynamicBaseToughness != null)
+                        card.BaseToughness = def.DynamicBaseToughness(_state);
+                }
+            }
         }
 
         // Layer 1: Type-changing effects (BecomeCreature)
@@ -1657,6 +1719,27 @@ public class GameEngine
             {
                 var effect = templateEffect with { SourceId = card.Id };
                 _state.ActiveEffects.Add(effect);
+            }
+        }
+    }
+
+    private void RebuildGraveyardAbilities(Player player)
+    {
+        foreach (var card in player.Graveyard.Cards)
+        {
+            if (!CardDefinitions.TryGet(card.Name, out var def)) continue;
+            if (def.GraveyardAbilities.Count == 0) continue;
+
+            var ownerId = player.Id;
+            foreach (var ability in def.GraveyardAbilities)
+            {
+                // Wrap Applies to restrict to this player's creatures only
+                var originalApplies = ability.Applies;
+                _state.ActiveEffects.Add(ability with
+                {
+                    SourceId = card.Id,
+                    Applies = (c, p) => p.Id == ownerId && originalApplies(c, p)
+                });
             }
         }
     }
@@ -1812,6 +1895,7 @@ public class GameEngine
 
         foreach (var card in dead)
         {
+            TrackCreatureDeath(card, player);
             await FireLeaveBattlefieldTriggersAsync(card, player, ct);
             player.Battlefield.RemoveById(card.Id);
             player.Graveyard.Add(card);
@@ -1829,6 +1913,7 @@ public class GameEngine
 
         foreach (var card in dead)
         {
+            TrackCreatureDeath(card, player);
             await FireLeaveBattlefieldTriggersAsync(card, player, ct);
             player.Battlefield.RemoveById(card.Id);
             // MTG rules: tokens go to graveyard then cease to exist (SBA 704.5d)
@@ -1915,6 +2000,10 @@ public class GameEngine
                         && relevantCard != null
                         && !relevantCard.CardTypes.HasFlag(CardType.Creature)
                         && _state.ActivePlayer == player,
+                    TriggerCondition.AnyPlayerCastsSpell =>
+                        evt == GameEvent.SpellCast,
+                    TriggerCondition.AnyUpkeep =>
+                        evt == GameEvent.Upkeep,
                     TriggerCondition.AnySpellCastCmc3OrLess =>
                         evt == GameEvent.SpellCast
                         && relevantCard != null

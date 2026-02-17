@@ -20,6 +20,7 @@ public class Player
     public List<Guid> PendingManaTaps { get; } = new();
     public int LandsPlayedThisTurn { get; set; }
     public int MaxLandDrops { get; set; } = 1;
+    public int CreaturesDiedThisTurn { get; set; }
 
     public void AdjustLife(int delta)
     {

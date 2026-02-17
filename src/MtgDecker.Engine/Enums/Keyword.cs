@@ -17,4 +17,5 @@ public enum Keyword
     Defender,
     ProtectionFromBlue,
     ProtectionFromWhite,
+    Flash,
 }
