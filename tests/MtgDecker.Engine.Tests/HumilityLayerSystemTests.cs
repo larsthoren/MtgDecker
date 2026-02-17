@@ -524,4 +524,79 @@ public class HumilityLayerSystemTests
 
         p1.ManaPool.Total.Should().Be(1, "land mana abilities are not affected by Humility");
     }
+
+    [Fact]
+    public void Opalescence_Plus_Humility_HumilityIs1_1Creature()
+    {
+        var p1 = new Player(Guid.NewGuid(), "P1", new TestDecisionHandler());
+        var p2 = new Player(Guid.NewGuid(), "P2", new TestDecisionHandler());
+        var state = new GameState(p1, p2);
+        var engine = new GameEngine(state);
+
+        // Opalescence entered first — lower timestamp
+        var opalescence = GameCard.Create("Opalescence");
+        p1.Battlefield.Add(opalescence);
+
+        var humility = GameCard.Create("Humility");
+        p1.Battlefield.Add(humility);
+
+        engine.RecalculateState();
+
+        // Opalescence (Layer 4): makes non-Aura enchantments into creatures with P/T = CMC
+        // Humility becomes a creature (CMC 4 → 4/4 from Opalescence)
+        // BUT Humility (Layer 7b): sets all creatures to 1/1
+        // Layer 7b overwrites the Layer 4 P/T → Humility is 1/1
+        humility.IsCreature.Should().BeTrue("Opalescence makes Humility a creature");
+        humility.Power.Should().Be(1, "Layer 7b overrides Layer 4 P/T");
+        humility.Toughness.Should().Be(1, "Layer 7b overrides Layer 4 P/T");
+
+        // Opalescence says "each other" — it does NOT make itself a creature
+        opalescence.IsCreature.Should().BeFalse("Opalescence excludes itself");
+    }
+
+    [Fact]
+    public void DoubleHumility_CreaturesStill1_1()
+    {
+        var p1 = new Player(Guid.NewGuid(), "P1", new TestDecisionHandler());
+        var p2 = new Player(Guid.NewGuid(), "P2", new TestDecisionHandler());
+        var state = new GameState(p1, p2);
+        var engine = new GameEngine(state);
+
+        var humility1 = GameCard.Create("Humility");
+        var humility2 = GameCard.Create("Humility");
+        p1.Battlefield.Add(humility1);
+        p1.Battlefield.Add(humility2);
+
+        var creature = GameCard.Create("Ball Lightning");
+        p1.Battlefield.Add(creature);
+
+        engine.RecalculateState();
+
+        creature.Power.Should().Be(1);
+        creature.Toughness.Should().Be(1);
+        creature.ActiveKeywords.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void RecalculateState_WithoutHumility_WorksIdentically()
+    {
+        // Regression: lord effects still work without Humility
+        var p1 = new Player(Guid.NewGuid(), "P1", new TestDecisionHandler());
+        var p2 = new Player(Guid.NewGuid(), "P2", new TestDecisionHandler());
+        var state = new GameState(p1, p2);
+        var engine = new GameEngine(state);
+
+        var king = GameCard.Create("Goblin King");
+        var lackey = GameCard.Create("Goblin Lackey");
+        p1.Battlefield.Add(king);
+        p1.Battlefield.Add(lackey);
+
+        engine.RecalculateState();
+
+        // Goblin King gives +1/+1 to Goblins
+        lackey.Power.Should().Be(2); // 1 base + 1 from King
+        lackey.Toughness.Should().Be(2); // 1 base + 1 from King
+        // Goblin King gives mountainwalk to Goblins (excludeSelf)
+        lackey.ActiveKeywords.Should().Contain(Keyword.Mountainwalk);
+    }
 }
