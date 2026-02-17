@@ -13,6 +13,8 @@ public enum ContinuousEffectType
     GrantPlayerShroud,
     PreventDamageToPlayer,
     BecomeCreature,
+    SetBasePowerToughness,
+    RemoveAbilities,
 }
 
 public record ContinuousEffect(
@@ -30,4 +32,8 @@ public record ContinuousEffect(
     bool ExcludeSelf = false,
     bool ControllerOnly = false,
     bool SetPowerToughnessToCMC = false,
-    ManaColor? ProtectionColor = null);
+    ManaColor? ProtectionColor = null,
+    EffectLayer? Layer = null,
+    long Timestamp = 0,
+    int? SetPower = null,
+    int? SetToughness = null);
