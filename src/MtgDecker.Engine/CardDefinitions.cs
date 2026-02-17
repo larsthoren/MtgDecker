@@ -253,7 +253,10 @@ public static class CardDefinitions
             ["Rift Bolt"] = new(ManaCost.Parse("{1}{R}"), null, null, null, CardType.Sorcery,
                 TargetFilter.CreatureOrPlayer(), new DamageEffect(3)),
             ["Fireblast"] = new(ManaCost.Parse("{4}{R}{R}"), null, null, null, CardType.Instant,
-                TargetFilter.CreatureOrPlayer(), new DamageEffect(4)),
+                TargetFilter.CreatureOrPlayer(), new DamageEffect(4))
+            {
+                AlternateCost = new AlternateCost(SacrificeLandSubtype: "Mountain", SacrificeLandCount: 2),
+            },
             ["Goblin Guide"] = new(ManaCost.Parse("{R}"), null, 2, 2, CardType.Creature)
             {
                 Subtypes = ["Goblin"],
@@ -298,9 +301,15 @@ public static class CardDefinitions
             ["Counterspell"] = new(ManaCost.Parse("{U}{U}"), null, null, null, CardType.Instant,
                 TargetFilter.Spell(), new CounterSpellEffect()),
             ["Daze"] = new(ManaCost.Parse("{1}{U}"), null, null, null, CardType.Instant,
-                TargetFilter.Spell(), new CounterSpellEffect()),
+                TargetFilter.Spell(), new CounterSpellEffect())
+            {
+                AlternateCost = new AlternateCost(ReturnLandSubtype: "Island"),
+            },
             ["Force of Will"] = new(ManaCost.Parse("{3}{U}{U}"), null, null, null, CardType.Instant,
-                TargetFilter.Spell(), new CounterSpellEffect()),
+                TargetFilter.Spell(), new CounterSpellEffect())
+            {
+                AlternateCost = new AlternateCost(LifeCost: 1, ExileCardColor: ManaColor.Blue),
+            },
             ["Delver of Secrets"] = new(ManaCost.Parse("{U}"), null, 1, 1, CardType.Creature) { Subtypes = ["Human", "Wizard"] },
             ["Murktide Regent"] = new(ManaCost.Parse("{5}{U}{U}"), null, 3, 3, CardType.Creature) { Subtypes = ["Dragon"] },
             ["Dragon's Rage Channeler"] = new(ManaCost.Parse("{R}"), null, 1, 1, CardType.Creature) { Subtypes = ["Human", "Shaman"] },
@@ -341,7 +350,10 @@ public static class CardDefinitions
             // Mana
             ["Dark Ritual"] = new(ManaCost.Parse("{B}"), null, null, null, CardType.Instant,
                 Effect: new AddManaSpellEffect(ManaColor.Black, 3)),
-            ["Mox Diamond"] = new(ManaCost.Parse("{0}"), null, null, null, CardType.Artifact),
+            ["Mox Diamond"] = new(ManaCost.Parse("{0}"), ManaAbility.Choice(ManaColor.White, ManaColor.Blue, ManaColor.Black, ManaColor.Red, ManaColor.Green), null, null, CardType.Artifact)
+            {
+                Triggers = [new Trigger(GameEvent.EnterBattlefield, TriggerCondition.Self, new MoxDiamondETBEffect())],
+            },
 
             // Common removal
             ["Disenchant"] = new(ManaCost.Parse("{1}{W}"), null, null, null, CardType.Instant,
@@ -351,7 +363,10 @@ public static class CardDefinitions
             ["Smother"] = new(ManaCost.Parse("{1}{B}"), null, null, null, CardType.Instant,
                 TargetFilter.CreatureWithCMCAtMost(3), new DestroyCreatureEffect()),
             ["Snuff Out"] = new(ManaCost.Parse("{3}{B}"), null, null, null, CardType.Instant,
-                TargetFilter.NonBlackCreature(), new DestroyCreatureEffect()),
+                TargetFilter.NonBlackCreature(), new DestroyCreatureEffect())
+            {
+                AlternateCost = new AlternateCost(LifeCost: 4, RequiresControlSubtype: "Swamp"),
+            },
             ["Diabolic Edict"] = new(ManaCost.Parse("{1}{B}"), null, null, null, CardType.Instant,
                 TargetFilter.Player(), new EdictEffect()),
             ["Wrath of God"] = new(ManaCost.Parse("{2}{W}{W}"), null, null, null, CardType.Sorcery,
