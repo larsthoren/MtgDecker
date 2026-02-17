@@ -282,6 +282,18 @@ public class GameEngine
                         _state.Log($"{player.Name} taps {tapTarget.Name}.");
                     }
 
+                    // Depletion counter: remove a counter when tapped for mana, sacrifice if empty
+                    if (tapTarget.ManaAbility?.RemovesCounterOnTap is { } depletionType)
+                    {
+                        tapTarget.RemoveCounter(depletionType);
+                        if (tapTarget.GetCounters(depletionType) <= 0)
+                        {
+                            player.Battlefield.RemoveById(tapTarget.Id);
+                            player.Graveyard.Add(tapTarget);
+                            _state.Log($"{tapTarget.Name} is sacrificed (no {depletionType} counters remaining).");
+                        }
+                    }
+
                     // Fire mana triggers from auras attached to this permanent (immediate — mana abilities don't use stack)
                     foreach (var aura in player.Battlefield.Cards.Where(c => c.AttachedTo == tapTarget.Id).ToList())
                     {

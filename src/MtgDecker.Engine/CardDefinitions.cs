@@ -324,7 +324,10 @@ public static class CardDefinitions
             ["Coastal Tower"] = new(null, ManaAbility.Choice(ManaColor.White, ManaColor.Blue), null, null, CardType.Land) { EntersTapped = true },
             ["Skycloud Expanse"] = new(null, ManaAbility.Choice(ManaColor.White, ManaColor.Blue), null, null, CardType.Land),
             ["Adarkar Wastes"] = new(null, ManaAbility.PainChoice([ManaColor.Colorless, ManaColor.White, ManaColor.Blue], [ManaColor.White, ManaColor.Blue]), null, null, CardType.Land),
-            ["Gemstone Mine"] = new(null, ManaAbility.Choice(ManaColor.White, ManaColor.Blue, ManaColor.Black, ManaColor.Red, ManaColor.Green), null, null, CardType.Land),
+            ["Gemstone Mine"] = new(null, ManaAbility.DepletionChoice(CounterType.Mining, ManaColor.White, ManaColor.Blue, ManaColor.Black, ManaColor.Red, ManaColor.Green), null, null, CardType.Land)
+            {
+                Triggers = [new Trigger(GameEvent.EnterBattlefield, TriggerCondition.Self, new AddCountersEffect(CounterType.Mining, 3))],
+            },
             ["City of Brass"] = new(null, ManaAbility.PainChoice(
                 [ManaColor.White, ManaColor.Blue, ManaColor.Black, ManaColor.Red, ManaColor.Green],
                 [ManaColor.White, ManaColor.Blue, ManaColor.Black, ManaColor.Red, ManaColor.Green]), null, null, CardType.Land),
@@ -481,7 +484,9 @@ public static class CardDefinitions
             ["Graveborn Muse"] = new(ManaCost.Parse("{2}{B}{B}"), null, 3, 3, CardType.Creature)
             {
                 Subtypes = ["Zombie", "Spirit"],
-                Triggers = [new Trigger(GameEvent.Upkeep, TriggerCondition.Upkeep, new DrawAndLoseLifeEffect(1, 1))],
+                Triggers = [new Trigger(GameEvent.Upkeep, TriggerCondition.Upkeep,
+                    new DynamicDrawAndLoseLifeEffect(
+                        p => p.Battlefield.Cards.Count(c => c.Subtypes.Contains("Zombie", StringComparer.OrdinalIgnoreCase))))],
             },
             ["Spawning Pool"] = new(null, ManaAbility.Fixed(ManaColor.Black), null, null, CardType.Land)
             {
@@ -592,7 +597,9 @@ public static class CardDefinitions
             ["Priest of Titania"] = new(ManaCost.Parse("{1}{G}"), null, 1, 1, CardType.Creature)
             {
                 Subtypes = ["Elf", "Druid"],
-                ActivatedAbility = new(new ActivatedAbilityCost(TapSelf: true), new AddManaEffect(ManaColor.Green)),
+                ActivatedAbility = new(new ActivatedAbilityCost(TapSelf: true),
+                    new DynamicAddManaEffect(ManaColor.Green,
+                        p => p.Battlefield.Cards.Count(c => c.Subtypes.Contains("Elf", StringComparer.OrdinalIgnoreCase)))),
             },
             ["Quirion Ranger"] = new(ManaCost.Parse("{G}"), null, 1, 1, CardType.Creature) { Subtypes = ["Elf"] },
             ["Wirewood Symbiote"] = new(ManaCost.Parse("{G}"), null, 1, 1, CardType.Creature) { Subtypes = ["Insect"] },
