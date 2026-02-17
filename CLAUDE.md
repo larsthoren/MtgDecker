@@ -94,7 +94,7 @@ tests/
   MtgDecker.Domain.Tests/         91 tests
   MtgDecker.Application.Tests/    143 tests
   MtgDecker.Infrastructure.Tests/ 57 tests
-  MtgDecker.Engine.Tests/         940 tests
+  MtgDecker.Engine.Tests/         1248 tests
 ```
 
 ## Key Patterns
