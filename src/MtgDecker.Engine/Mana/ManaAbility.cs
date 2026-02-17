@@ -10,9 +10,11 @@ public class ManaAbility
     public ManaColor? DynamicColor { get; }
     public Func<Player, int>? CountFunc { get; }
     public IReadOnlySet<ManaColor>? PainColors { get; }
+    public CounterType? RemovesCounterOnTap { get; }
 
     private ManaAbility(ManaAbilityType type, ManaColor? fixedColor, IReadOnlyList<ManaColor>? choiceColors,
-        ManaColor? dynamicColor = null, Func<Player, int>? countFunc = null, IReadOnlySet<ManaColor>? painColors = null)
+        ManaColor? dynamicColor = null, Func<Player, int>? countFunc = null,
+        IReadOnlySet<ManaColor>? painColors = null, CounterType? removesCounterOnTap = null)
     {
         Type = type;
         FixedColor = fixedColor;
@@ -20,6 +22,7 @@ public class ManaAbility
         DynamicColor = dynamicColor;
         CountFunc = countFunc;
         PainColors = painColors;
+        RemovesCounterOnTap = removesCounterOnTap;
     }
 
     public static ManaAbility Fixed(ManaColor color) =>
@@ -34,6 +37,9 @@ public class ManaAbility
 
     public static ManaAbility Dynamic(ManaColor color, Func<Player, int> countFunc) =>
         new(ManaAbilityType.Dynamic, null, null, color, countFunc);
+
+    public static ManaAbility DepletionChoice(CounterType counterType, params ManaColor[] colors) =>
+        new(ManaAbilityType.Choice, null, colors.ToList().AsReadOnly(), removesCounterOnTap: counterType);
 }
 
 public enum ManaAbilityType
