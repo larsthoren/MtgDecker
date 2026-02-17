@@ -36,7 +36,8 @@ public static class CardDefinitions
                 [
                     new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
                         (card, _) => card.Name == "Goblin Piledriver",
-                        GrantedKeyword: Keyword.ProtectionFromBlue),
+                        GrantedKeyword: Keyword.ProtectionFromBlue,
+                        Layer: EffectLayer.Layer6_AbilityAddRemove),
                 ],
                 Triggers = [new Trigger(GameEvent.BeginCombat, TriggerCondition.SelfAttacks, new PiledriverPumpEffect())],
             },
@@ -48,7 +49,8 @@ public static class CardDefinitions
                 [
                     new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
                         (card, _) => card.Name == "Goblin Ringleader",
-                        GrantedKeyword: Keyword.Haste),
+                        GrantedKeyword: Keyword.Haste,
+                        Layer: EffectLayer.Layer6_AbilityAddRemove),
                 ],
             },
             ["Goblin Warchief"] = new(ManaCost.Parse("{1}{R}{R}"), null, 2, 2, CardType.Creature)
@@ -58,7 +60,8 @@ public static class CardDefinitions
                 [
                     new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
                         (card, _) => card.IsCreature && card.Subtypes.Contains("Goblin"),
-                        GrantedKeyword: Keyword.Haste),
+                        GrantedKeyword: Keyword.Haste,
+                        Layer: EffectLayer.Layer6_AbilityAddRemove),
                     new ContinuousEffect(Guid.Empty, ContinuousEffectType.ModifyCost,
                         (_, _) => true, CostMod: -1,
                         CostApplies: c => c.Subtypes.Contains("Goblin")),
@@ -88,11 +91,13 @@ public static class CardDefinitions
                 [
                     new ContinuousEffect(Guid.Empty, ContinuousEffectType.ModifyPowerToughness,
                         (card, _) => card.IsCreature && card.Subtypes.Contains("Goblin"),
-                        PowerMod: 1, ToughnessMod: 1),
+                        PowerMod: 1, ToughnessMod: 1,
+                        Layer: EffectLayer.Layer7c_ModifyPT),
                     new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
                         (card, _) => card.IsCreature && card.Subtypes.Contains("Goblin"),
                         GrantedKeyword: Keyword.Mountainwalk,
-                        ExcludeSelf: true),
+                        ExcludeSelf: true,
+                        Layer: EffectLayer.Layer6_AbilityAddRemove),
                 ],
             },
             ["Goblin Pyromancer"] = new(ManaCost.Parse("{3}{R}"), null, 2, 2, CardType.Creature)
@@ -144,7 +149,8 @@ public static class CardDefinitions
                 [
                     new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
                         (card, _) => card.Name == "Argothian Enchantress",
-                        GrantedKeyword: Keyword.Shroud),
+                        GrantedKeyword: Keyword.Shroud,
+                        Layer: EffectLayer.Layer6_AbilityAddRemove),
                 ],
             },
             ["Swords to Plowshares"] = new(ManaCost.Parse("{W}"), null, null, null, CardType.Instant,
@@ -180,7 +186,8 @@ public static class CardDefinitions
                     new ContinuousEffect(Guid.Empty, ContinuousEffectType.BecomeCreature,
                         (card, _) => card.CardTypes.HasFlag(CardType.Enchantment)
                             && !card.Subtypes.Contains("Aura"),
-                        SetPowerToughnessToCMC: true),
+                        SetPowerToughnessToCMC: true,
+                        Layer: EffectLayer.Layer4_TypeChanging),
                 ],
             },
             ["Parallax Wave"] = new(ManaCost.Parse("{2}{W}{W}"), null, null, null, CardType.Enchantment)
@@ -203,7 +210,8 @@ public static class CardDefinitions
                         (card, _) => card.CardTypes.HasFlag(CardType.Enchantment),
                         GrantedKeyword: Keyword.Shroud,
                         ExcludeSelf: true,
-                        ControllerOnly: true),
+                        ControllerOnly: true,
+                        Layer: EffectLayer.Layer6_AbilityAddRemove),
                 ],
                 ActivatedAbility = new(new ActivatedAbilityCost(SacrificeSelf: true, ManaCost: ManaCost.Parse("{1}")), new SearchLibraryByTypeEffect(CardType.Enchantment)),
             },
@@ -270,7 +278,8 @@ public static class CardDefinitions
                 [
                     new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
                         (card, _) => card.Name == "Goblin Guide",
-                        GrantedKeyword: Keyword.Haste),
+                        GrantedKeyword: Keyword.Haste,
+                        Layer: EffectLayer.Layer6_AbilityAddRemove),
                 ],
                 Triggers = [new Trigger(GameEvent.BeginCombat, TriggerCondition.SelfAttacks,
                     new GoblinGuideRevealEffect())],
@@ -282,7 +291,8 @@ public static class CardDefinitions
                 [
                     new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
                         (card, _) => card.Name == "Monastery Swiftspear",
-                        GrantedKeyword: Keyword.Haste),
+                        GrantedKeyword: Keyword.Haste,
+                        Layer: EffectLayer.Layer6_AbilityAddRemove),
                 ],
                 Triggers = [new Trigger(GameEvent.SpellCast, TriggerCondition.ControllerCastsNoncreature, new ProwessEffect())],
             },
@@ -417,10 +427,12 @@ public static class CardDefinitions
                 [
                     new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
                         (card, _) => card.Name == "Ball Lightning",
-                        GrantedKeyword: Keyword.Haste),
+                        GrantedKeyword: Keyword.Haste,
+                        Layer: EffectLayer.Layer6_AbilityAddRemove),
                     new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
                         (card, _) => card.Name == "Ball Lightning",
-                        GrantedKeyword: Keyword.Trample),
+                        GrantedKeyword: Keyword.Trample,
+                        Layer: EffectLayer.Layer6_AbilityAddRemove),
                 ],
                 Triggers = [new Trigger(GameEvent.EnterBattlefield, TriggerCondition.Self,
                     new RegisterEndOfTurnSacrificeEffect())],
@@ -509,7 +521,8 @@ public static class CardDefinitions
                 [
                     new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
                         (card, _) => card.Name == "Hypnotic Specter",
-                        GrantedKeyword: Keyword.Flying),
+                        GrantedKeyword: Keyword.Flying,
+                        Layer: EffectLayer.Layer6_AbilityAddRemove),
                 ],
                 Triggers = [new Trigger(GameEvent.CombatDamageDealt, TriggerCondition.SelfDealsCombatDamage, new OpponentDiscardsEffect(1))],
             },
@@ -547,10 +560,12 @@ public static class CardDefinitions
                 [
                     new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
                         (card, _) => card.Name == "Exalted Angel",
-                        GrantedKeyword: Keyword.Flying),
+                        GrantedKeyword: Keyword.Flying,
+                        Layer: EffectLayer.Layer6_AbilityAddRemove),
                     new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
                         (card, _) => card.Name == "Exalted Angel",
-                        GrantedKeyword: Keyword.Lifelink),
+                        GrantedKeyword: Keyword.Lifelink,
+                        Layer: EffectLayer.Layer6_AbilityAddRemove),
                 ],
             },
             ["Knight of Stromgald"] = new(ManaCost.Parse("{B}{B}"), null, 2, 1, CardType.Creature)
@@ -560,10 +575,12 @@ public static class CardDefinitions
                 [
                     new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
                         (card, _) => card.Name == "Knight of Stromgald",
-                        GrantedKeyword: Keyword.FirstStrike),
+                        GrantedKeyword: Keyword.FirstStrike,
+                        Layer: EffectLayer.Layer6_AbilityAddRemove),
                     new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
                         (card, _) => card.Name == "Knight of Stromgald",
-                        GrantedKeyword: Keyword.ProtectionFromWhite),
+                        GrantedKeyword: Keyword.ProtectionFromWhite,
+                        Layer: EffectLayer.Layer6_AbilityAddRemove),
                 ],
                 ActivatedAbility = new(new ActivatedAbilityCost(ManaCost: ManaCost.Parse("{B}")), new PumpSelfEffect(1, 0)),
             },
@@ -584,7 +601,19 @@ public static class CardDefinitions
             {
                 Triggers = [new Trigger(GameEvent.SpellCast, TriggerCondition.AnyPlayerCastsSpell, new StandstillEffect())],
             },
-            ["Humility"] = new(ManaCost.Parse("{2}{W}{W}"), null, null, null, CardType.Enchantment),
+            ["Humility"] = new(ManaCost.Parse("{2}{W}{W}"), null, null, null, CardType.Enchantment)
+            {
+                ContinuousEffects =
+                [
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.RemoveAbilities,
+                        (card, _) => card.IsCreature,
+                        Layer: EffectLayer.Layer6_AbilityAddRemove),
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.SetBasePowerToughness,
+                        (card, _) => card.IsCreature,
+                        SetPower: 1, SetToughness: 1,
+                        Layer: EffectLayer.Layer7b_SetPT),
+                ],
+            },
             ["Decree of Justice"] = new(ManaCost.Parse("{2}{W}{W}"), null, null, null, CardType.Sorcery,
                 Effect: new DecreeOfJusticeEffect())
             {
@@ -657,10 +686,12 @@ public static class CardDefinitions
                 [
                     new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
                         (card, _) => card.Name == "Nimble Mongoose",
-                        GrantedKeyword: Keyword.Shroud),
+                        GrantedKeyword: Keyword.Shroud,
+                        Layer: EffectLayer.Layer6_AbilityAddRemove),
                     new ContinuousEffect(Guid.Empty, ContinuousEffectType.ModifyPowerToughness,
                         (card, player) => card.Name == "Nimble Mongoose" && player.Graveyard.Count >= 7,
-                        PowerMod: 2, ToughnessMod: 2),
+                        PowerMod: 2, ToughnessMod: 2,
+                        Layer: EffectLayer.Layer7c_ModifyPT),
                 ],
             },
             ["Zuran Orb"] = new(ManaCost.Parse("{0}"), null, null, null, CardType.Artifact)
@@ -704,7 +735,8 @@ public static class CardDefinitions
                 [
                     new ContinuousEffect(Guid.Empty, ContinuousEffectType.ModifyPowerToughness,
                         (card, _) => card.Subtypes.Contains("Squirrel"),
-                        PowerMod: 1, ToughnessMod: 1),
+                        PowerMod: 1, ToughnessMod: 1,
+                        Layer: EffectLayer.Layer7c_ModifyPT),
                 ],
             },
             ["Wall of Blossoms"] = new(ManaCost.Parse("{1}{G}"), null, 0, 4, CardType.Creature)
@@ -715,7 +747,8 @@ public static class CardDefinitions
                 [
                     new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
                         (card, _) => card.Name == "Wall of Blossoms",
-                        GrantedKeyword: Keyword.Defender),
+                        GrantedKeyword: Keyword.Defender,
+                        Layer: EffectLayer.Layer6_AbilityAddRemove),
                 ],
             },
             ["Wall of Roots"] = new(ManaCost.Parse("{1}{G}"), null, 0, 5, CardType.Creature) { Subtypes = ["Plant", "Wall"] },
@@ -732,7 +765,8 @@ public static class CardDefinitions
                 [
                     new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
                         (card, _) => card.Name == "Caller of the Claw",
-                        GrantedKeyword: Keyword.Flash),
+                        GrantedKeyword: Keyword.Flash,
+                        Layer: EffectLayer.Layer6_AbilityAddRemove),
                 ],
                 Triggers = [new Trigger(GameEvent.EnterBattlefield, TriggerCondition.Self, new CallerOfTheClawEffect())],
             },
@@ -761,7 +795,8 @@ public static class CardDefinitions
                             && player.Battlefield.Cards.Any(c =>
                                 c.Name == "Mountain"
                                 || c.Subtypes.Contains("Mountain", StringComparer.OrdinalIgnoreCase)),
-                        GrantedKeyword: Keyword.Haste),
+                        GrantedKeyword: Keyword.Haste,
+                        Layer: EffectLayer.Layer6_AbilityAddRemove),
                 ],
             },
             ["Squee, Goblin Nabob"] = new(ManaCost.Parse("{2}{R}"), null, 1, 1, CardType.Creature)
