@@ -79,13 +79,14 @@ public class GameEngineGameLoopTests
     {
         var engine = CreateEngineWithDecks(out var state, out _, out _);
         await engine.StartGameAsync();
-        var handBefore = state.Player1.Hand.Count;
         var libraryBefore = state.Player1.Library.Count;
 
         await engine.RunTurnAsync();
 
-        state.Player1.Hand.Count.Should().Be(handBefore + 1);
+        // Draw happened (library decreased), but discard step trims hand back to 7
         state.Player1.Library.Count.Should().Be(libraryBefore - 1);
+        state.Player1.Hand.Count.Should().Be(7, "discard step trims hand to max size");
+        state.Player1.Graveyard.Count.Should().Be(1, "1 card discarded to hand size");
     }
 
     [Fact]
@@ -109,11 +110,14 @@ public class GameEngineGameLoopTests
         state.IsFirstTurn = true;
 
         await engine.RunTurnAsync();
-        var handBefore = state.Player2.Hand.Count;
+        var libraryBefore = state.Player2.Library.Count;
 
         await engine.RunTurnAsync();
 
-        state.Player2.Hand.Count.Should().Be(handBefore + 1);
+        // Draw happened (library decreased), discard step trims hand back to 7
+        state.Player2.Library.Count.Should().Be(libraryBefore - 1);
+        state.Player2.Hand.Count.Should().Be(7, "discard step trims hand to max size");
+        state.Player2.Graveyard.Count.Should().Be(1, "1 card discarded to hand size");
     }
 
     [Fact]
