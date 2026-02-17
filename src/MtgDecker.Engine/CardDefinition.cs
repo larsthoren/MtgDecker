@@ -24,5 +24,6 @@ public record CardDefinition(
     public AuraTarget? AuraTarget { get; init; }
     public ManaCost? CyclingCost { get; init; }
     public IReadOnlyList<Trigger> CyclingTriggers { get; init; } = [];
+    public ManaCost? EchoCost { get; init; }
     public bool EntersTapped { get; init; }
 }

@@ -54,6 +54,7 @@ public class GameEngine
             {
                 await QueueBoardTriggersOnStackAsync(GameEvent.Upkeep, null, ct);
                 await QueueGraveyardTriggersOnStackAsync(GameEvent.Upkeep, ct);
+                await QueueEchoTriggersOnStackAsync(ct);
             }
 
             if (phase.Phase == Phase.Combat)
@@ -1672,6 +1673,23 @@ public class GameEngine
                 _state.Log($"{card.Name} triggers from graveyard: {trigger.Effect.GetType().Name.Replace("Effect", "")}");
                 _state.StackPush(new TriggeredAbilityStackObject(card, activePlayer.Id, trigger.Effect));
             }
+        }
+
+        return Task.CompletedTask;
+    }
+
+    /// <summary>Queues echo triggers for permanents with unpaid echo cost.</summary>
+    internal Task QueueEchoTriggersOnStackAsync(CancellationToken ct = default)
+    {
+        var activePlayer = _state.ActivePlayer;
+
+        foreach (var card in activePlayer.Battlefield.Cards.ToList())
+        {
+            if (card.EchoPaid) continue;
+            if (!CardDefinitions.TryGet(card.Name, out var def) || def.EchoCost == null) continue;
+
+            _state.Log($"{card.Name} echo trigger.");
+            _state.StackPush(new TriggeredAbilityStackObject(card, activePlayer.Id, new Triggers.Effects.EchoEffect(def.EchoCost)));
         }
 
         return Task.CompletedTask;
