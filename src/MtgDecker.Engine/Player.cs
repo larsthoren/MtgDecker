@@ -21,6 +21,8 @@ public class Player
     public int LandsPlayedThisTurn { get; set; }
     public int MaxLandDrops { get; set; } = 1;
     public int CreaturesDiedThisTurn { get; set; }
+    public int DrawsThisTurn { get; set; }
+    public bool DrawStepDrawExempted { get; set; }
 
     public void AdjustLife(int delta)
     {

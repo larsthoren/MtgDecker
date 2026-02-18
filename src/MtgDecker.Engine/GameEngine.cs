@@ -34,6 +34,10 @@ public class GameEngine
         _state.ActivePlayer.LandsPlayedThisTurn = 0;
         _state.Player1.CreaturesDiedThisTurn = 0;
         _state.Player2.CreaturesDiedThisTurn = 0;
+        _state.Player1.DrawsThisTurn = 0;
+        _state.Player2.DrawsThisTurn = 0;
+        _state.Player1.DrawStepDrawExempted = false;
+        _state.Player2.DrawStepDrawExempted = false;
         _state.Log($"Turn {_state.TurnNumber}: {_state.ActivePlayer.Name}'s turn.");
 
         do
