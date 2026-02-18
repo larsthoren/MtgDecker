@@ -2538,6 +2538,11 @@ public class GameEngine
                     player.DrawStepDrawExempted = true;
                     // First draw of draw step is exempt from draw triggers
                 }
+                else
+                {
+                    // Fire draw triggers (e.g., Orcish Bowmasters)
+                    QueueDrawTriggers(player);
+                }
             }
             else
             {
@@ -2546,6 +2551,26 @@ public class GameEngine
                 _state.Winner = winner.Name;
                 _state.Log($"{player.Name} loses — cannot draw from an empty library.");
                 return;
+            }
+        }
+    }
+
+    private void QueueDrawTriggers(Player drawingPlayer)
+    {
+        foreach (var player in new[] { _state.Player1, _state.Player2 })
+        {
+            foreach (var card in player.Battlefield.Cards)
+            {
+                if (card.AbilitiesRemoved) continue;
+                foreach (var trigger in card.Triggers)
+                {
+                    if (trigger.Event != GameEvent.DrawCard) continue;
+                    if (trigger.Condition != TriggerCondition.OpponentDrawsExceptFirst) continue;
+                    if (drawingPlayer.Id == player.Id) continue; // Only opponent draws
+
+                    _state.Log($"{card.Name} triggers on {drawingPlayer.Name}'s draw.");
+                    _state.StackPush(new TriggeredAbilityStackObject(card, player.Id, trigger.Effect));
+                }
             }
         }
     }
