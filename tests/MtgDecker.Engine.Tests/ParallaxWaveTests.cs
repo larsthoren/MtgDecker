@@ -19,13 +19,12 @@ public class ParallaxWaveTests
     }
 
     [Fact]
-    public void HasETB_CounterTrigger()
+    public void HasEntersWithCounters_FadeCounters()
     {
         CardDefinitions.TryGet("Parallax Wave", out var def).Should().BeTrue();
-        def!.Triggers.Should().Contain(t =>
-            t.Event == GameEvent.EnterBattlefield
-            && t.Condition == Engine.Triggers.TriggerCondition.Self
-            && t.Effect is AddCountersEffect);
+        def!.EntersWithCounters.Should().NotBeNull();
+        def.EntersWithCounters.Should().ContainKey(CounterType.Fade);
+        def.EntersWithCounters![CounterType.Fade].Should().Be(5);
     }
 
     [Fact]

@@ -192,9 +192,9 @@ public static class CardDefinitions
             },
             ["Parallax Wave"] = new(ManaCost.Parse("{2}{W}{W}"), null, null, null, CardType.Enchantment)
             {
+                EntersWithCounters = new() { [CounterType.Fade] = 5 },
                 Triggers =
                 [
-                    new Trigger(GameEvent.EnterBattlefield, TriggerCondition.Self, new AddCountersEffect(CounterType.Fade, 5)),
                     new Trigger(GameEvent.LeavesBattlefield, TriggerCondition.SelfLeavesBattlefield, new ReturnExiledCardsEffect()),
                 ],
                 ActivatedAbility = new(
@@ -352,7 +352,7 @@ public static class CardDefinitions
             ["Adarkar Wastes"] = new(null, ManaAbility.PainChoice([ManaColor.Colorless, ManaColor.White, ManaColor.Blue], [ManaColor.White, ManaColor.Blue]), null, null, CardType.Land),
             ["Gemstone Mine"] = new(null, ManaAbility.DepletionChoice(CounterType.Mining, ManaColor.White, ManaColor.Blue, ManaColor.Black, ManaColor.Red, ManaColor.Green), null, null, CardType.Land)
             {
-                Triggers = [new Trigger(GameEvent.EnterBattlefield, TriggerCondition.Self, new AddCountersEffect(CounterType.Mining, 3))],
+                EntersWithCounters = new() { [CounterType.Mining] = 3 },
             },
             ["City of Brass"] = new(null, ManaAbility.PainChoice(
                 [ManaColor.White, ManaColor.Blue, ManaColor.Black, ManaColor.Red, ManaColor.Green],

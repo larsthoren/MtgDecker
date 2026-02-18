@@ -114,17 +114,13 @@ public class Phase5CounterMechanicsTests
     }
 
     [Fact]
-    public void GemstoneMine_CardDef_HasETBCounterTrigger()
+    public void GemstoneMine_CardDef_HasEntersWithCounters()
     {
         CardDefinitions.TryGet("Gemstone Mine", out var def);
 
-        def!.Triggers.Should().ContainSingle(t =>
-            t.Event == GameEvent.EnterBattlefield
-            && t.Effect is AddCountersEffect);
-
-        var etb = (AddCountersEffect)def.Triggers.First().Effect;
-        etb.CounterType.Should().Be(CounterType.Mining);
-        etb.Count.Should().Be(3);
+        def!.EntersWithCounters.Should().NotBeNull();
+        def.EntersWithCounters.Should().ContainKey(CounterType.Mining);
+        def.EntersWithCounters![CounterType.Mining].Should().Be(3);
     }
 
     // === Priest of Titania: DynamicAddManaEffect ===

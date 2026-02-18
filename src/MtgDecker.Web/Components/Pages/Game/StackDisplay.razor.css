@@ -34,6 +34,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
+    gap: 6px;
 }
 
 /* Each card entry */
@@ -43,15 +44,12 @@
     transition: z-index 0s, filter 0.15s ease;
 }
 
-/* Overlapping cards (not the first/top one) */
-.stack-card-overlap {
-    margin-top: -100px;
-}
-
 /* On hover, bring to front */
 .stack-card-entry:hover {
-    z-index: 20;
+    z-index: 50;
     filter: brightness(1.1);
+    transform: scale(2.0);
+    transform-origin: right center;
 }
 
 /* Targetable state (glow) */

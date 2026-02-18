@@ -13,11 +13,10 @@
             {
                 var item = Stack[i];
                 var isTop = i == Stack.Count - 1;
-                var isFirst = i == Stack.Count - 1; // first rendered (topmost in stack)
 
                 @if (item is StackObject spell)
                 {
-                    <div class="stack-card-entry @(isFirst ? "" : "stack-card-overlap") @(IsTargeting ? "stack-targetable" : "")"
+                    <div class="stack-card-entry @(IsTargeting ? "stack-targetable" : "")"
                          @onclick="() => HandleStackClick(spell.Card)">
                         <CardDisplay Name="@spell.Card.Name"
                                      ImageUrl="@spell.Card.ImageUrl"
@@ -37,7 +36,7 @@
                 }
                 else if (item is TriggeredAbilityStackObject triggered)
                 {
-                    <div class="stack-card-entry @(isFirst ? "" : "stack-card-overlap") @(IsTargeting ? "stack-targetable" : "")"
+                    <div class="stack-card-entry @(IsTargeting ? "stack-targetable" : "")"
                          @onclick="() => HandleStackClick(triggered.Source)">
                         <CardDisplay Name="@triggered.Source.Name"
                                      ImageUrl="@triggered.Source.ImageUrl"

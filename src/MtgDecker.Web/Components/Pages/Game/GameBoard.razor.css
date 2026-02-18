@@ -302,3 +302,13 @@
     max-width: 600px;
     width: 90%;
 }
+
+/* Hand cards: hover zoom grows upward */
+.player-hand .card-display.clickable:hover {
+    transform-origin: bottom center;
+}
+
+/* Opponent battlefield cards: hover zoom grows downward */
+.opponent-battlefield .card-display.clickable:hover {
+    transform-origin: top center;
+}
