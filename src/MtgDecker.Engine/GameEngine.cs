@@ -1766,6 +1766,20 @@ public class GameEngine
             ApplyPowerToughnessEffect(effect, _state.Player2);
         }
 
+        // === LAYER 7d: +1/+1 counter adjustments (MTG Layer 7d) ===
+        foreach (var player in new[] { _state.Player1, _state.Player2 })
+        {
+            foreach (var card in player.Battlefield.Cards)
+            {
+                var plusCounters = card.GetCounters(CounterType.PlusOnePlusOne);
+                if (plusCounters > 0 && card.IsCreature)
+                {
+                    card.EffectivePower = (card.EffectivePower ?? card.BasePower ?? 0) + plusCounters;
+                    card.EffectiveToughness = (card.EffectiveToughness ?? card.BaseToughness ?? 0) + plusCounters;
+                }
+            }
+        }
+
         // === Non-layered effects ===
         foreach (var effect in _state.ActiveEffects.Where(e => e.Type == ContinuousEffectType.ExtraLandDrop))
         {
