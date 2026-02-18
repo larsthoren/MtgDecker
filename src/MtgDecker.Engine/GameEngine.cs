@@ -308,6 +308,40 @@ public class GameEngine
                                 _state.Log($"{player.Name} taps {tapTarget.Name} (produces no mana).");
                             }
                         }
+                        else if (ability.Type == ManaAbilityType.Filter)
+                        {
+                            // Filter lands require paying an activation cost to produce multiple colors
+                            if (ability.ActivationCost != null && !player.ManaPool.CanPay(ability.ActivationCost))
+                            {
+                                // Can't pay — reject the tap
+                                tapTarget.IsTapped = false;
+                                player.ActionHistory.Pop();
+                                _state.Log($"{player.Name} cannot pay {ability.ActivationCost} to activate {tapTarget.Name}.");
+                                break;
+                            }
+
+                            if (ability.ActivationCost != null)
+                            {
+                                // Snapshot pool before paying to record what was actually spent (for undo)
+                                var poolBefore = player.ManaPool.Available.ToDictionary(kv => kv.Key, kv => kv.Value);
+                                player.ManaPool.Pay(ability.ActivationCost);
+                                var poolAfter = player.ManaPool.Available;
+                                action.ActualManaPaid = new Dictionary<ManaColor, int>();
+                                foreach (var (color, before) in poolBefore)
+                                {
+                                    var after = poolAfter.GetValueOrDefault(color, 0);
+                                    if (before > after)
+                                        action.ActualManaPaid[color] = before - after;
+                                }
+                            }
+
+                            // Produce all colors — use BonusManaProduced for undo tracking
+                            action.BonusManaProduced = ability.ProducedColors!.ToList();
+                            foreach (var color in ability.ProducedColors!)
+                                player.ManaPool.Add(color);
+
+                            _state.Log($"{player.Name} taps {tapTarget.Name} (pays {ability.ActivationCost}) for {string.Join(", ", ability.ProducedColors)}.");
+                        }
                     }
                     else
                     {
@@ -1311,11 +1345,17 @@ public class GameEngine
         player.PendingManaTaps.Remove(tapTarget.Id);
         if (action.ManaProduced.HasValue)
             player.ManaPool.Deduct(action.ManaProduced.Value, action.ManaProducedAmount);
-        // Also deduct bonus mana from aura triggers (e.g., Wild Growth)
+        // Also deduct bonus mana from aura triggers (e.g., Wild Growth) and filter lands
         if (action.BonusManaProduced != null)
         {
             foreach (var bonusColor in action.BonusManaProduced)
                 player.ManaPool.Deduct(bonusColor, 1);
+        }
+        // Restore mana spent on filter land activation cost
+        if (action.ActualManaPaid != null)
+        {
+            foreach (var (color, amount) in action.ActualManaPaid)
+                player.ManaPool.Add(color, amount);
         }
         // Restore pain damage from painlands
         if (action.PainDamageDealt)
