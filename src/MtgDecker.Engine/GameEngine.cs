@@ -188,6 +188,7 @@ public class GameEngine
                     action.DestinationZone = ZoneType.Battlefield;
                     player.ActionHistory.Push(action);
                     _state.Log($"{player.Name} plays {playCard.Name} (land drop).");
+                    ApplyEntersWithCounters(playCard);
                     await QueueSelfTriggersOnStackAsync(GameEvent.EnterBattlefield, playCard, player, ct);
                     await OnBoardChangedAsync(ct);
                 }
@@ -230,6 +231,7 @@ public class GameEngine
                         // Aura attachment: prompt for target after entering battlefield
                         await TryAttachAuraAsync(playCard, player, ct);
 
+                        ApplyEntersWithCounters(playCard);
                         await QueueSelfTriggersOnStackAsync(GameEvent.EnterBattlefield, playCard, player, ct);
                         await OnBoardChangedAsync(ct);
                     }
@@ -411,6 +413,7 @@ public class GameEngine
                             land.TurnEnteredBattlefield = _state.TurnNumber;
                             if (land.EntersTapped) land.IsTapped = true;
                             _state.Log($"{player.Name} fetches {land.Name}.");
+                            ApplyEntersWithCounters(land);
                             await QueueSelfTriggersOnStackAsync(GameEvent.EnterBattlefield, land, player, ct);
                             await OnBoardChangedAsync(ct);
                         }
@@ -2043,6 +2046,19 @@ public class GameEngine
         }
     }
 
+    /// <summary>Applies EntersWithCounters from CardDefinitions immediately when a permanent enters the battlefield.</summary>
+    private void ApplyEntersWithCounters(GameCard card)
+    {
+        if (CardDefinitions.TryGet(card.Name, out var def) && def.EntersWithCounters != null)
+        {
+            foreach (var (type, count) in def.EntersWithCounters)
+            {
+                card.AddCounters(type, count);
+                _state.Log($"{card.Name} enters with {count} {type} counter(s).");
+            }
+        }
+    }
+
     /// <summary>Queues Self triggers for a specific card onto the stack.</summary>
     internal Task QueueSelfTriggersOnStackAsync(GameEvent evt, GameCard source, Player controller, CancellationToken ct = default)
     {
@@ -2437,6 +2453,7 @@ public class GameEngine
                     // Aura attachment on stack resolution
                     await TryAttachAuraAsync(spell.Card, controller, ct);
 
+                    ApplyEntersWithCounters(spell.Card);
                     await QueueSelfTriggersOnStackAsync(GameEvent.EnterBattlefield, spell.Card, controller, ct);
                     await OnBoardChangedAsync(ct);
                 }
