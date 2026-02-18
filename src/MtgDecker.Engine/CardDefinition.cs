@@ -31,4 +31,5 @@ public record CardDefinition(
     public AlternateCost? AlternateCost { get; init; }
     public Func<GameState, int>? DynamicBasePower { get; init; }
     public Func<GameState, int>? DynamicBaseToughness { get; init; }
+    public Dictionary<CounterType, int>? EntersWithCounters { get; init; }
 }
