@@ -440,7 +440,8 @@ public class GameEngine
                 }
 
                 bool isInstant = def.CardTypes.HasFlag(CardType.Instant);
-                if (!isInstant && !CanCastSorcery(castPlayer.Id))
+                bool hasFlash = def.HasFlash;
+                if (!isInstant && !hasFlash && !CanCastSorcery(castPlayer.Id))
                 {
                     _state.Log($"Cannot cast {castCard.Name} at this time (sorcery-speed only).");
                     return;
@@ -876,7 +877,8 @@ public class GameEngine
                 }
 
                 bool fbIsInstant = fbDef.CardTypes.HasFlag(CardType.Instant);
-                if (!fbIsInstant && !CanCastSorcery(fbPlayer.Id))
+                bool fbHasFlash = fbDef.HasFlash;
+                if (!fbIsInstant && !fbHasFlash && !CanCastSorcery(fbPlayer.Id))
                 {
                     _state.Log($"Cannot cast {fbCard.Name} at this time (sorcery-speed only).");
                     return;
