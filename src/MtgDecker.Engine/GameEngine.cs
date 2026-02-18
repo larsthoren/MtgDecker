@@ -144,20 +144,10 @@ public class GameEngine
                     break;
                 }
 
-                var drawn = _state.ActivePlayer.Library.DrawFromTop();
-                if (drawn != null)
-                {
-                    _state.ActivePlayer.Hand.Add(drawn);
+                _state.ActivePlayer.DrawStepDrawExempted = false;
+                DrawCards(_state.ActivePlayer, 1, isDrawStepDraw: true);
+                if (!_state.IsGameOver)
                     _state.Log($"{_state.ActivePlayer.Name} draws a card.");
-                }
-                else
-                {
-                    var loser = _state.ActivePlayer;
-                    var winner = _state.GetOpponent(loser);
-                    _state.IsGameOver = true;
-                    _state.Winner = winner.Name;
-                    _state.Log($"{loser.Name} loses — cannot draw from an empty library.");
-                }
                 break;
         }
     }
@@ -2533,7 +2523,7 @@ public class GameEngine
         _state.Log($"{player.Name} mulliganed to 0 cards.");
     }
 
-    internal void DrawCards(Player player, int count)
+    internal void DrawCards(Player player, int count, bool isDrawStepDraw = false)
     {
         for (int i = 0; i < count; i++)
         {
@@ -2541,6 +2531,13 @@ public class GameEngine
             if (card != null)
             {
                 player.Hand.Add(card);
+                player.DrawsThisTurn++;
+
+                if (isDrawStepDraw && !player.DrawStepDrawExempted)
+                {
+                    player.DrawStepDrawExempted = true;
+                    // First draw of draw step is exempt from draw triggers
+                }
             }
             else
             {
