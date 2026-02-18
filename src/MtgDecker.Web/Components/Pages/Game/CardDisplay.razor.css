@@ -11,11 +11,18 @@
 
 .card-display.clickable:hover {
     filter: brightness(1.1);
+    transform: scale(1.8);
+    z-index: 50;
+    position: relative;
 }
 
 .card-display.tapped {
     transform: rotate(90deg);
     margin: 10px 12px;
+}
+
+.card-display.tapped.clickable:hover {
+    transform: rotate(90deg) scale(1.8);
 }
 
 .card-display.selected {

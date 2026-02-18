@@ -46,8 +46,10 @@
 
 /* On hover, bring to front */
 .stack-card-entry:hover {
-    z-index: 20;
+    z-index: 50;
     filter: brightness(1.1);
+    transform: scale(2.0);
+    transform-origin: right center;
 }
 
 /* Targetable state (glow) */
