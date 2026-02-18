@@ -452,6 +452,78 @@
         </div>
     }
 
+    @* Pile split prompt (Fact or Fiction — opponent splitting) *@
+    @if (Handler?.IsWaitingForSplit == true && Handler?.SplitOptions != null)
+    {
+        <div class="prompt-overlay">
+            <MudPaper Class="pa-3" Elevation="8" Style="min-width: 400px;">
+                <MudText Typo="Typo.body2" Class="mb-2">@(Handler.SplitPrompt)</MudText>
+
+                <MudText Typo="Typo.caption" Color="Color.Primary" Class="mb-1">
+                    Pile 1 (@_pile1Cards.Count card(s)) — click cards to move between piles
+                </MudText>
+                <div style="display: flex; flex-wrap: wrap; gap: 4px; min-height: 60px; padding: 8px; border: 1px dashed rgba(255,255,255,0.3); border-radius: 8px; margin-bottom: 8px;">
+                    @foreach (var card in Handler.SplitOptions.Where(c => _pile1Cards.Contains(c.Id)))
+                    {
+                        <div style="cursor: pointer; outline: 3px solid #2196F3; border-radius: 8px;"
+                             @onclick="() => TogglePileSplit(card.Id)">
+                            <CardDisplay ImageUrl="@card.ImageUrl" Name="@card.Name" Clickable="true" />
+                        </div>
+                    }
+                </div>
+
+                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-1">
+                    Pile 2 (@(Handler.SplitOptions.Count - _pile1Cards.Count) card(s))
+                </MudText>
+                <div style="display: flex; flex-wrap: wrap; gap: 4px; min-height: 60px; padding: 8px; border: 1px dashed rgba(255,255,255,0.3); border-radius: 8px; margin-bottom: 8px;">
+                    @foreach (var card in Handler.SplitOptions.Where(c => !_pile1Cards.Contains(c.Id)))
+                    {
+                        <div style="cursor: pointer;" @onclick="() => TogglePileSplit(card.Id)">
+                            <CardDisplay ImageUrl="@card.ImageUrl" Name="@card.Name" Clickable="true" />
+                        </div>
+                    }
+                </div>
+
+                <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary"
+                           OnClick="SubmitSplit">Done</MudButton>
+            </MudPaper>
+        </div>
+    }
+
+    @* Pile choice prompt (Fact or Fiction — caster choosing) *@
+    @if (Handler?.IsWaitingForPileChoice == true && Handler?.Pile1Options != null && Handler?.Pile2Options != null)
+    {
+        <div class="prompt-overlay">
+            <MudPaper Class="pa-3" Elevation="8" Style="min-width: 400px;">
+                <MudText Typo="Typo.body2" Class="mb-2">@(Handler.PileChoicePrompt)</MudText>
+
+                <MudText Typo="Typo.caption" Color="Color.Primary" Class="mb-1">
+                    Pile 1 (@Handler.Pile1Options.Count card(s))
+                </MudText>
+                <div style="display: flex; flex-wrap: wrap; gap: 4px; min-height: 60px; padding: 8px; border: 1px solid #2196F3; border-radius: 8px; margin-bottom: 4px;">
+                    @foreach (var card in Handler.Pile1Options)
+                    {
+                        <CardDisplay ImageUrl="@card.ImageUrl" Name="@card.Name" Clickable="false" />
+                    }
+                </div>
+                <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" Class="mb-3"
+                           OnClick="() => SubmitPileChoice(1)">Take Pile 1</MudButton>
+
+                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-1">
+                    Pile 2 (@Handler.Pile2Options.Count card(s))
+                </MudText>
+                <div style="display: flex; flex-wrap: wrap; gap: 4px; min-height: 60px; padding: 8px; border: 1px solid #FF9800; border-radius: 8px; margin-bottom: 4px;">
+                    @foreach (var card in Handler.Pile2Options)
+                    {
+                        <CardDisplay ImageUrl="@card.ImageUrl" Name="@card.Name" Clickable="false" />
+                    }
+                </div>
+                <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Secondary"
+                           OnClick="() => SubmitPileChoice(2)">Take Pile 2</MudButton>
+            </MudPaper>
+        </div>
+    }
+
     @* Reveal cards prompt *@
     @if (Handler?.IsWaitingForRevealAck == true && Handler?.RevealedCards != null)
     {
@@ -544,6 +616,9 @@
 
     // Discard selection state
     private HashSet<Guid> _selectedDiscards = new();
+
+    // Pile split state (Fact or Fiction)
+    private HashSet<Guid> _pile1Cards = new();
 
     // Pending cast state (waiting for player to tap lands)
     private GameCard? _pendingCastCard;
@@ -864,6 +939,29 @@
             .ToList();
         Handler.SubmitDiscard(chosen);
         _selectedDiscards.Clear();
+    }
+
+    // --- Pile split (Fact or Fiction) ---
+
+    private void TogglePileSplit(Guid cardId)
+    {
+        if (_pile1Cards.Contains(cardId))
+            _pile1Cards.Remove(cardId);
+        else
+            _pile1Cards.Add(cardId);
+    }
+
+    private void SubmitSplit()
+    {
+        if (Handler?.SplitOptions == null) return;
+        var pile1 = Handler.SplitOptions.Where(c => _pile1Cards.Contains(c.Id)).ToList();
+        Handler.SubmitSplit(pile1);
+        _pile1Cards.Clear();
+    }
+
+    private void SubmitPileChoice(int pile)
+    {
+        Handler?.SubmitPileChoice(pile);
     }
 
     // --- Pending cast (tap lands to pay) ---
