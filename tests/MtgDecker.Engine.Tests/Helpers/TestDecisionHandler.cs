@@ -17,6 +17,8 @@ public class TestDecisionHandler : IPlayerDecisionHandler
     private readonly Queue<TargetInfo?> _targetQueue = new();
     private readonly Queue<Guid?> _cardChoiceQueue = new();
     private readonly Queue<Func<IReadOnlyList<GameCard>, int, IReadOnlyList<GameCard>>> _discardChoices = new();
+    private readonly Queue<Func<IReadOnlyList<GameCard>, IReadOnlyList<GameCard>>> _splitChoices = new();
+    private readonly Queue<int> _pileChoices = new();
 
     public void EnqueueAction(GameAction action) => _actions.Enqueue(action);
 
@@ -37,6 +39,10 @@ public class TestDecisionHandler : IPlayerDecisionHandler
 
     public void EnqueueDiscardChoice(Func<IReadOnlyList<GameCard>, int, IReadOnlyList<GameCard>> chooser) =>
         _discardChoices.Enqueue(chooser);
+
+    public void EnqueueSplitChoice(Func<IReadOnlyList<GameCard>, IReadOnlyList<GameCard>> chooser) =>
+        _splitChoices.Enqueue(chooser);
+    public void EnqueuePileChoice(int pile) => _pileChoices.Enqueue(pile);
 
     public Action? OnBeforeAction { get; set; }
 
@@ -131,5 +137,19 @@ public class TestDecisionHandler : IPlayerDecisionHandler
         if (_discardChoices.Count == 0)
             return Task.FromResult<IReadOnlyList<GameCard>>(hand.Take(discardCount).ToList());
         return Task.FromResult(_discardChoices.Dequeue()(hand, discardCount));
+    }
+
+    public Task<IReadOnlyList<GameCard>> SplitCards(IReadOnlyList<GameCard> cards, string prompt, CancellationToken ct = default)
+    {
+        if (_splitChoices.Count == 0)
+            return Task.FromResult<IReadOnlyList<GameCard>>(cards.Take(cards.Count / 2).ToList());
+        return Task.FromResult(_splitChoices.Dequeue()(cards));
+    }
+
+    public Task<int> ChoosePile(IReadOnlyList<GameCard> pile1, IReadOnlyList<GameCard> pile2, string prompt, CancellationToken ct = default)
+    {
+        if (_pileChoices.Count == 0)
+            return Task.FromResult(1);
+        return Task.FromResult(_pileChoices.Dequeue());
     }
 }
