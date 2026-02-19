@@ -508,7 +508,9 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
             {
                 var damageAmount = dealDamage.Amount;
                 var killableTarget = opponent.Battlefield.Cards
-                    .Where(c => c.IsCreature && !c.ActiveKeywords.Contains(Enums.Keyword.Shroud))
+                    .Where(c => c.IsCreature
+                        && !c.ActiveKeywords.Contains(Enums.Keyword.Shroud)
+                        && !c.ActiveKeywords.Contains(Enums.Keyword.Hexproof))
                     .FirstOrDefault(c => (c.Toughness ?? 0) - c.DamageMarked <= damageAmount);
 
                 if (killableTarget != null)
@@ -527,7 +529,9 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
                     continue;
 
                 var biggestThreat = opponent.Battlefield.Cards
-                    .Where(c => c.IsCreature && !c.ActiveKeywords.Contains(Enums.Keyword.Shroud))
+                    .Where(c => c.IsCreature
+                        && !c.ActiveKeywords.Contains(Enums.Keyword.Shroud)
+                        && !c.ActiveKeywords.Contains(Enums.Keyword.Hexproof))
                     .OrderByDescending(c => c.Power ?? 0)
                     .FirstOrDefault();
 

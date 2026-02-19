@@ -484,10 +484,10 @@ public class GameEngine
                     var eligible = new List<GameCard>();
                     var opponent = _state.GetOpponent(castPlayer);
                     foreach (var c in castPlayer.Battlefield.Cards)
-                        if (def.TargetFilter.IsLegal(c, ZoneType.Battlefield) && !HasShroud(c))
+                        if (def.TargetFilter.IsLegal(c, ZoneType.Battlefield) && !CannotBeTargetedBy(c, castPlayer))
                             eligible.Add(c);
                     foreach (var c in opponent.Battlefield.Cards)
-                        if (def.TargetFilter.IsLegal(c, ZoneType.Battlefield) && !HasShroud(c))
+                        if (def.TargetFilter.IsLegal(c, ZoneType.Battlefield) && !CannotBeTargetedBy(c, castPlayer))
                             eligible.Add(c);
 
                     // Add player sentinels if the filter allows player targets
@@ -772,7 +772,7 @@ public class GameEngine
                     var opponent = _state.GetOpponent(player);
                     var eligible = player.Battlefield.Cards
                         .Concat(opponent.Battlefield.Cards)
-                        .Where(c => ability.TargetFilter(c) && !HasShroud(c))
+                        .Where(c => ability.TargetFilter(c) && !CannotBeTargetedBy(c, player))
                         .ToList();
 
                     if (eligible.Count == 0)
@@ -793,10 +793,11 @@ public class GameEngine
                     effectTarget = eligible.FirstOrDefault(c => c.Id == target.CardId);
                 }
 
-                // Shroud check: cannot target a permanent with shroud
-                if (effectTarget != null && HasShroud(effectTarget))
+                // Shroud/Hexproof check: cannot target a permanent with shroud or hexproof (opponent only)
+                if (effectTarget != null && CannotBeTargetedBy(effectTarget, player))
                 {
-                    _state.Log($"{effectTarget.Name} has shroud — cannot be targeted.");
+                    var reason = HasShroud(effectTarget) ? "shroud" : "hexproof";
+                    _state.Log($"{effectTarget.Name} has {reason} — cannot be targeted.");
                     break;
                 }
 
@@ -931,10 +932,10 @@ public class GameEngine
                     var fbEligible = new List<GameCard>();
 
                     foreach (var c in fbPlayer.Battlefield.Cards)
-                        if (fbDef.TargetFilter.IsLegal(c, ZoneType.Battlefield) && !HasShroud(c))
+                        if (fbDef.TargetFilter.IsLegal(c, ZoneType.Battlefield) && !CannotBeTargetedBy(c, fbPlayer))
                             fbEligible.Add(c);
                     foreach (var c in fbOpponent.Battlefield.Cards)
-                        if (fbDef.TargetFilter.IsLegal(c, ZoneType.Battlefield) && !HasShroud(c))
+                        if (fbDef.TargetFilter.IsLegal(c, ZoneType.Battlefield) && !CannotBeTargetedBy(c, fbPlayer))
                             fbEligible.Add(c);
 
                     // Player sentinels
@@ -1290,6 +1291,32 @@ public class GameEngine
 
     private bool HasShroud(GameCard card) => card.ActiveKeywords.Contains(Keyword.Shroud);
 
+    private bool HasHexproof(GameCard card) => card.ActiveKeywords.Contains(Keyword.Hexproof);
+
+    /// <summary>
+    /// Returns true if the card cannot be targeted by the given player.
+    /// Shroud prevents all targeting; Hexproof prevents only opponent targeting.
+    /// </summary>
+    private bool CannotBeTargetedBy(GameCard card, Player caster)
+    {
+        if (HasShroud(card)) return true;
+        if (HasHexproof(card))
+        {
+            // Hexproof only blocks opponents — controller can still target
+            var controller = GetCardController(card);
+            if (controller != null && controller.Id != caster.Id)
+                return true;
+        }
+        return false;
+    }
+
+    private Player? GetCardController(GameCard card)
+    {
+        if (_state.Player1.Battlefield.Contains(card.Id)) return _state.Player1;
+        if (_state.Player2.Battlefield.Contains(card.Id)) return _state.Player2;
+        return null;
+    }
+
     private bool HasPlayerShroud(Guid playerId)
     {
         return _state.ActiveEffects.Any(e =>
@@ -1326,7 +1353,7 @@ public class GameEngine
                 AuraTarget.Permanent => true,
                 _ => false,
             })
-            .Where(c => !HasShroud(c))
+            .Where(c => !CannotBeTargetedBy(c, player))
             .ToList();
 
         if (eligible.Count > 0)
