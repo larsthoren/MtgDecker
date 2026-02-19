@@ -20,76 +20,59 @@ public class FactOrFictionEffect : SpellEffect
             return;
         }
 
-        state.Log($"{caster.Name} reveals the top {revealed.Count} card(s) of their library (Fact or Fiction): {string.Join(", ", revealed.Select(c => c.Name))}.");
+        state.Log($"{caster.Name} reveals {revealed.Count} card(s): {string.Join(", ", revealed.Select(c => c.Name))}.");
 
-        // Remove all revealed cards from library upfront
+        // Remove revealed cards from library
         foreach (var card in revealed)
             caster.Library.RemoveById(card.Id);
 
         // Opponent splits into two piles
-        var pile1 = new List<GameCard>();
-        var remaining = new List<GameCard>(revealed);
+        var pile1 = await opponent.DecisionHandler.SplitCards(
+            revealed, "Fact or Fiction: Separate these cards into two piles.", ct);
 
-        while (remaining.Count > 0)
-        {
-            var chosenId = await opponent.DecisionHandler.ChooseCard(
-                remaining,
-                $"Fact or Fiction: Choose a card for pile 1 ({pile1.Count} selected so far). Skip when done.",
-                optional: true, ct);
+        var pile1Set = new HashSet<Guid>(pile1.Select(c => c.Id));
+        var pile2 = revealed.Where(c => !pile1Set.Contains(c.Id)).ToList();
 
-            if (chosenId == null)
-                break; // opponent is done splitting
+        state.Log($"{opponent.Name} splits: Pile 1 ({pile1.Count}), Pile 2 ({pile2.Count}).");
 
-            var chosen = remaining.FirstOrDefault(c => c.Id == chosenId);
-            if (chosen != null)
-            {
-                pile1.Add(chosen);
-                remaining.Remove(chosen);
-            }
-        }
-
-        var pile2 = remaining; // everything not in pile 1
-
-        state.Log($"{opponent.Name} splits into Pile 1 ({pile1.Count} card(s)) and Pile 2 ({pile2.Count} card(s)).");
-
-        // Caster chooses which pile to take
         List<GameCard> chosenPile;
         List<GameCard> rejectedPile;
 
         if (pile1.Count == 0)
         {
-            // Pile 1 is empty — caster automatically gets pile 2
             chosenPile = pile2;
-            rejectedPile = pile1;
-            state.Log($"{caster.Name} takes pile 2 ({pile2.Count} card(s)) (Fact or Fiction).");
+            rejectedPile = pile1.ToList();
+            state.Log($"{caster.Name} takes all {pile2.Count} card(s).");
+        }
+        else if (pile2.Count == 0)
+        {
+            chosenPile = pile1.ToList();
+            rejectedPile = pile2;
+            state.Log($"{caster.Name} takes all {pile1.Count} card(s).");
         }
         else
         {
-            // Ask caster: pick from pile 1 = take pile 1, skip (null) = take pile 2
-            var pick = await handler.ChooseCard(
-                pile1,
-                "Fact or Fiction: Choose a card from Pile 1 to take that pile, or skip to take Pile 2.",
-                optional: true, ct);
+            var choice = await handler.ChoosePile(
+                pile1.ToList(), pile2,
+                "Fact or Fiction: Choose which pile to put into your hand.", ct);
 
-            if (pick != null)
+            if (choice == 1)
             {
-                chosenPile = pile1;
+                chosenPile = pile1.ToList();
                 rejectedPile = pile2;
-                state.Log($"{caster.Name} takes pile 1 ({pile1.Count} card(s)) (Fact or Fiction).");
+                state.Log($"{caster.Name} takes pile 1 ({pile1.Count} card(s)).");
             }
             else
             {
                 chosenPile = pile2;
-                rejectedPile = pile1;
-                state.Log($"{caster.Name} takes pile 2 ({pile2.Count} card(s)) (Fact or Fiction).");
+                rejectedPile = pile1.ToList();
+                state.Log($"{caster.Name} takes pile 2 ({pile2.Count} card(s)).");
             }
         }
 
-        // Chosen pile → hand
         foreach (var card in chosenPile)
             caster.Hand.Add(card);
 
-        // Rejected pile → graveyard
         foreach (var card in rejectedPile)
             caster.Graveyard.Add(card);
     }

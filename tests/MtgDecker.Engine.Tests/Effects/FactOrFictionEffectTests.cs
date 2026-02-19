@@ -54,14 +54,12 @@ public class FactOrFictionEffectTests
         // cards[0]=Card 1, cards[1]=Card 2, ..., cards[6]=Card 7
         // PeekTop(5) returns [Card 1, Card 2, Card 3, Card 4, Card 5]
 
-        // Opponent puts Card 1, Card 2, Card 3 into pile 1, then skips
-        opponentHandler.EnqueueCardChoice(cards[0].Id); // Card 1
-        opponentHandler.EnqueueCardChoice(cards[1].Id); // Card 2
-        opponentHandler.EnqueueCardChoice(cards[2].Id); // Card 3
-        opponentHandler.EnqueueCardChoice(null);         // done splitting
+        // Opponent splits: pile 1 = Card 1, Card 2, Card 3
+        opponentHandler.EnqueueSplitChoice(revealed =>
+            revealed.Where(c => c.Name is "Card 1" or "Card 2" or "Card 3").ToList());
 
-        // Caster chooses pile 1 (picks Card 1 from pile 1 options)
-        casterHandler.EnqueueCardChoice(cards[0].Id);
+        // Caster chooses pile 1
+        casterHandler.EnqueuePileChoice(1);
 
         var spell = CreateSpell(state, state.Player1.Id);
         var effect = new FactOrFictionEffect();
@@ -90,14 +88,12 @@ public class FactOrFictionEffectTests
         var (state, casterHandler, opponentHandler) = CreateSetup();
         var cards = StockLibrary(state.Player1, 7);
 
-        // Opponent puts Card 1, 2, 3 into pile 1, then skips
-        opponentHandler.EnqueueCardChoice(cards[0].Id); // Card 1
-        opponentHandler.EnqueueCardChoice(cards[1].Id); // Card 2
-        opponentHandler.EnqueueCardChoice(cards[2].Id); // Card 3
-        opponentHandler.EnqueueCardChoice(null);         // done
+        // Opponent splits: pile 1 = Card 1, Card 2, Card 3
+        opponentHandler.EnqueueSplitChoice(revealed =>
+            revealed.Where(c => c.Name is "Card 1" or "Card 2" or "Card 3").ToList());
 
-        // Caster skips (null) → gets pile 2
-        casterHandler.EnqueueCardChoice(null);
+        // Caster chooses pile 2
+        casterHandler.EnqueuePileChoice(2);
 
         var spell = CreateSpell(state, state.Player1.Id);
         var effect = new FactOrFictionEffect();
@@ -127,15 +123,10 @@ public class FactOrFictionEffectTests
         var cards = StockLibrary(state.Player1, 7);
 
         // Opponent puts all 5 into pile 1
-        opponentHandler.EnqueueCardChoice(cards[0].Id); // Card 1
-        opponentHandler.EnqueueCardChoice(cards[1].Id); // Card 2
-        opponentHandler.EnqueueCardChoice(cards[2].Id); // Card 3
-        opponentHandler.EnqueueCardChoice(cards[3].Id); // Card 4
-        opponentHandler.EnqueueCardChoice(cards[4].Id); // Card 5
-        // No more remaining cards → loop ends automatically
+        opponentHandler.EnqueueSplitChoice(revealed => revealed.ToList());
 
-        // Caster chooses pile 1 (picks Card 1)
-        casterHandler.EnqueueCardChoice(cards[0].Id);
+        // pile 2 is empty, so caster auto-gets pile 1
+        // No caster pile choice needed
 
         var spell = CreateSpell(state, state.Player1.Id);
         var effect = new FactOrFictionEffect();
@@ -160,11 +151,11 @@ public class FactOrFictionEffectTests
         var (state, casterHandler, opponentHandler) = CreateSetup();
         var cards = StockLibrary(state.Player1, 7);
 
-        // Opponent immediately skips → pile 1 empty, pile 2 = all 5
-        opponentHandler.EnqueueCardChoice(null);
+        // Opponent puts nothing in pile 1
+        opponentHandler.EnqueueSplitChoice(revealed => new List<GameCard>());
 
-        // Caster doesn't need to choose (pile 1 is empty, auto-gets pile 2)
-        // No caster choice needed
+        // pile 1 is empty, so caster auto-gets pile 2
+        // No caster pile choice needed
 
         var spell = CreateSpell(state, state.Player1.Id);
         var effect = new FactOrFictionEffect();
@@ -194,12 +185,12 @@ public class FactOrFictionEffectTests
         state.Player1.Library.Add(cardA); // top
         // PeekTop(5) returns [Card A, Card B]
 
-        // Opponent puts Card A in pile 1, then skips
-        opponentHandler.EnqueueCardChoice(cardA.Id);
-        opponentHandler.EnqueueCardChoice(null); // done
+        // Opponent puts Card A in pile 1
+        opponentHandler.EnqueueSplitChoice(revealed =>
+            revealed.Where(c => c.Name == "Card A").ToList());
 
         // Caster picks pile 1 (Card A)
-        casterHandler.EnqueueCardChoice(cardA.Id);
+        casterHandler.EnqueuePileChoice(1);
 
         var spell = CreateSpell(state, state.Player1.Id);
         var effect = new FactOrFictionEffect();

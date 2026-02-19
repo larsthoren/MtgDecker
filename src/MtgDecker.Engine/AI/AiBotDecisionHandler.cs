@@ -405,6 +405,28 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
     }
 
     /// <summary>
+    /// Splits cards into two piles. Puts the single highest-CMC card alone in pile 1,
+    /// everything else in pile 2 (classic 1-4 split heuristic).
+    /// </summary>
+    public async Task<IReadOnlyList<GameCard>> SplitCards(IReadOnlyList<GameCard> cards, string prompt, CancellationToken ct = default)
+    {
+        await DelayAsync(ct);
+        if (cards.Count <= 1)
+            return cards.ToList();
+        var best = cards.OrderByDescending(c => c.ManaCost?.ConvertedManaCost ?? 0).First();
+        return new List<GameCard> { best };
+    }
+
+    /// <summary>
+    /// Picks the pile with more cards (greedy — more cards = more value).
+    /// </summary>
+    public async Task<int> ChoosePile(IReadOnlyList<GameCard> pile1, IReadOnlyList<GameCard> pile2, string prompt, CancellationToken ct = default)
+    {
+        await DelayAsync(ct);
+        return pile1.Count >= pile2.Count ? 1 : 2;
+    }
+
+    /// <summary>
     /// Chooses a target for a spell. Picks the opponent's creature with highest power,
     /// falling back to the first eligible target.
     /// </summary>

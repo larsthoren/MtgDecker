@@ -20,6 +20,8 @@ public class InteractiveDecisionHandler : IPlayerDecisionHandler
     private TaskCompletionSource<Guid?>? _cardChoiceTcs;
     private TaskCompletionSource<bool>? _revealAckTcs;
     private TaskCompletionSource<IReadOnlyList<GameCard>>? _discardTcs;
+    private TaskCompletionSource<IReadOnlyList<GameCard>>? _splitCardsTcs;
+    private TaskCompletionSource<int>? _choosePileTcs;
 
     public bool IsWaitingForAction => _actionTcs is { Task.IsCompleted: false };
     public bool IsWaitingForMulligan => _mulliganTcs is { Task.IsCompleted: false };
@@ -37,6 +39,13 @@ public class InteractiveDecisionHandler : IPlayerDecisionHandler
     public bool IsWaitingForDiscard => _discardTcs is { Task.IsCompleted: false };
     public IReadOnlyList<GameCard>? DiscardOptions { get; private set; }
     public int DiscardCount { get; private set; }
+    public bool IsWaitingForSplit => _splitCardsTcs is { Task.IsCompleted: false };
+    public IReadOnlyList<GameCard>? SplitOptions { get; private set; }
+    public string? SplitPrompt { get; private set; }
+    public bool IsWaitingForPileChoice => _choosePileTcs is { Task.IsCompleted: false };
+    public IReadOnlyList<GameCard>? Pile1Options { get; private set; }
+    public IReadOnlyList<GameCard>? Pile2Options { get; private set; }
+    public string? PileChoicePrompt { get; private set; }
 
     /// <summary>
     /// True when this handler is waiting for any player input, meaning the
@@ -47,7 +56,7 @@ public class InteractiveDecisionHandler : IPlayerDecisionHandler
         || IsWaitingForManaColor || IsWaitingForGenericPayment
         || IsWaitingForAttackers || IsWaitingForBlockers || IsWaitingForBlockerOrder
         || IsWaitingForTarget || IsWaitingForCardChoice || IsWaitingForRevealAck
-        || IsWaitingForDiscard;
+        || IsWaitingForDiscard || IsWaitingForSplit || IsWaitingForPileChoice;
 
     public IReadOnlyList<ManaColor>? ManaColorOptions { get; private set; }
     public IReadOnlyList<GameCard>? EligibleAttackers { get; private set; }
@@ -292,5 +301,43 @@ public class InteractiveDecisionHandler : IPlayerDecisionHandler
         DiscardOptions = null;
         DiscardCount = 0;
         _discardTcs?.TrySetResult(cards);
+    }
+
+    public Task<IReadOnlyList<GameCard>> SplitCards(IReadOnlyList<GameCard> cards, string prompt, CancellationToken ct = default)
+    {
+        SplitOptions = cards;
+        SplitPrompt = prompt;
+        _splitCardsTcs = new TaskCompletionSource<IReadOnlyList<GameCard>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var registration = ct.Register(() => { SplitOptions = null; SplitPrompt = null; _splitCardsTcs.TrySetCanceled(); });
+        _splitCardsTcs.Task.ContinueWith(_ => registration.Dispose(), TaskContinuationOptions.ExecuteSynchronously);
+        OnWaitingForInput?.Invoke();
+        return _splitCardsTcs.Task;
+    }
+
+    public void SubmitSplit(IReadOnlyList<GameCard> pile1Cards)
+    {
+        SplitOptions = null;
+        SplitPrompt = null;
+        _splitCardsTcs?.TrySetResult(pile1Cards);
+    }
+
+    public Task<int> ChoosePile(IReadOnlyList<GameCard> pile1, IReadOnlyList<GameCard> pile2, string prompt, CancellationToken ct = default)
+    {
+        Pile1Options = pile1;
+        Pile2Options = pile2;
+        PileChoicePrompt = prompt;
+        _choosePileTcs = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var registration = ct.Register(() => { Pile1Options = null; Pile2Options = null; PileChoicePrompt = null; _choosePileTcs.TrySetCanceled(); });
+        _choosePileTcs.Task.ContinueWith(_ => registration.Dispose(), TaskContinuationOptions.ExecuteSynchronously);
+        OnWaitingForInput?.Invoke();
+        return _choosePileTcs.Task;
+    }
+
+    public void SubmitPileChoice(int pile)
+    {
+        Pile1Options = null;
+        Pile2Options = null;
+        PileChoicePrompt = null;
+        _choosePileTcs?.TrySetResult(pile);
     }
 }
