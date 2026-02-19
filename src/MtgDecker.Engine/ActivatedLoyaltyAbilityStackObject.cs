@@ -9,6 +9,8 @@ public class ActivatedLoyaltyAbilityStackObject : IStackObject
     public Guid ControllerId { get; }
     public IEffect Effect { get; }
     public string Description { get; }
+    public GameCard? Target { get; init; }
+    public Guid? TargetPlayerId { get; init; }
 
     public ActivatedLoyaltyAbilityStackObject(GameCard source, Guid controllerId, IEffect effect, string description)
     {

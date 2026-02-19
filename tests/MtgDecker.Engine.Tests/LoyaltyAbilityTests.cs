@@ -139,4 +139,28 @@ public class LoyaltyAbilityTests : IDisposable
         state.StackCount.Should().Be(0);
         pw.Loyalty.Should().Be(1);
     }
+
+    [Fact]
+    public async Task LoyaltyAbility_Resolves_ExecutesEffect()
+    {
+        var (engine, state, p1, p2, h1, h2) = SetupWithPW();
+        await engine.StartGameAsync();
+        state.CurrentPhase = Phase.MainPhase1;
+
+        var pw = GameCard.Create(TestPwName);
+        pw.AddCounters(CounterType.Loyalty, 4);
+        pw.TurnEnteredBattlefield = state.TurnNumber - 1;
+        p1.Battlefield.Add(pw);
+
+        // Activate +1 ability (DealDamageEffect(1))
+        await engine.ExecuteAction(GameAction.ActivateLoyaltyAbility(p1.Id, pw.Id, 0));
+        state.StackCount.Should().Be(1);
+
+        // Resolve the stack
+        await engine.ResolveAllTriggersAsync();
+
+        state.StackCount.Should().Be(0);
+        // DealDamageEffect(1) should have dealt 1 damage to opponent (p2)
+        p2.Life.Should().Be(19);
+    }
 }

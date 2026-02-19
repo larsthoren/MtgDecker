@@ -1073,9 +1073,13 @@ public class GameEngine
                 // Mark as used this turn
                 player.PlaneswalkerAbilitiesUsedThisTurn.Add(pwCard.Id);
 
-                // Push to stack
+                // Push to stack — default target is opponent (for damage/effect abilities)
+                var opponent = _state.GetOpponent(player);
                 var loyaltyStackObj = new ActivatedLoyaltyAbilityStackObject(
-                    pwCard, player.Id, loyaltyAbility.Effect, loyaltyAbility.Description);
+                    pwCard, player.Id, loyaltyAbility.Effect, loyaltyAbility.Description)
+                {
+                    TargetPlayerId = opponent.Id,
+                };
                 _state.StackPush(loyaltyStackObj);
 
                 _state.Log($"{player.Name} activates {pwCard.Name}: {loyaltyAbility.Description}");
@@ -2478,6 +2482,25 @@ public class GameEngine
                 },
             };
             await triggered.Effect.Execute(context, ct);
+            await OnBoardChangedAsync(ct);
+            return;
+        }
+
+        if (top is ActivatedLoyaltyAbilityStackObject loyaltyAbility)
+        {
+            var loyaltyContext = new EffectContext(_state, controller, loyaltyAbility.Source, controller.DecisionHandler)
+            {
+                Target = loyaltyAbility.Target,
+                TargetPlayerId = loyaltyAbility.TargetPlayerId,
+                FireLeaveBattlefieldTriggers = async card =>
+                {
+                    var ctrl = _state.Player1.Battlefield.Contains(card.Id) ? _state.Player1
+                        : _state.Player2.Battlefield.Contains(card.Id) ? _state.Player2 : null;
+                    if (ctrl != null) await FireLeaveBattlefieldTriggersAsync(card, ctrl, ct);
+                },
+            };
+            await loyaltyAbility.Effect.Execute(loyaltyContext, ct);
+            _state.Log($"Resolved {loyaltyAbility.Source.Name} loyalty ability: {loyaltyAbility.Description}");
             await OnBoardChangedAsync(ct);
             return;
         }
