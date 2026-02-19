@@ -49,6 +49,7 @@ public class GameState
         }
     }
 
+    public Queue<Guid> ExtraTurns { get; } = new();
     public List<ContinuousEffect> ActiveEffects { get; } = new();
     public List<DelayedTrigger> DelayedTriggers { get; } = new();
     public long NextEffectTimestamp { get; set; } = 1;
