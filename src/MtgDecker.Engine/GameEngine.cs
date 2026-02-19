@@ -1815,6 +1815,10 @@ public class GameEngine
         RebuildGraveyardAbilities(_state.Player1);
         RebuildGraveyardAbilities(_state.Player2);
 
+        // Emblem effects (command zone — permanent, cannot be removed)
+        RebuildEmblemEffects(_state.Player1);
+        RebuildEmblemEffects(_state.Player2);
+
         // Re-add temporary effects with fresh timestamps
         foreach (var temp in tempEffects)
         {
@@ -2035,6 +2039,24 @@ public class GameEngine
                     Applies = (c, p) => p.Id == ownerId && originalApplies(c, p)
                 });
             }
+        }
+    }
+
+    private void RebuildEmblemEffects(Player player)
+    {
+        var ownerId = player.Id;
+        foreach (var emblem in player.Emblems)
+        {
+            var originalApplies = emblem.Effect.Applies;
+            var effect = emblem.Effect with
+            {
+                Timestamp = _state.NextEffectTimestamp++,
+                // Scope ControllerOnly emblems to the owning player (same pattern as graveyard abilities)
+                Applies = emblem.Effect.ControllerOnly
+                    ? (c, p) => p.Id == ownerId && originalApplies(c, p)
+                    : originalApplies
+            };
+            _state.ActiveEffects.Add(effect);
         }
     }
 

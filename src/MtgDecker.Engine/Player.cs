@@ -25,6 +25,7 @@ public class Player
     public bool DrawStepDrawExempted { get; set; }
     public HashSet<Guid> PlaneswalkerAbilitiesUsedThisTurn { get; } = [];
     public int LifeLostThisTurn { get; set; }
+    public List<Emblem> Emblems { get; } = [];
 
     public void AdjustLife(int delta)
     {
