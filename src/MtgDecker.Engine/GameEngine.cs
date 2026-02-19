@@ -38,6 +38,8 @@ public class GameEngine
         _state.Player2.DrawsThisTurn = 0;
         _state.Player1.DrawStepDrawExempted = false;
         _state.Player2.DrawStepDrawExempted = false;
+        _state.Player1.PlaneswalkerAbilitiesUsedThisTurn.Clear();
+        _state.Player2.PlaneswalkerAbilitiesUsedThisTurn.Clear();
         _state.Log($"Turn {_state.TurnNumber}: {_state.ActivePlayer.Name}'s turn.");
 
         do
@@ -1012,6 +1014,71 @@ public class GameEngine
 
                 _state.Log($"{fbPlayer.Name} casts {fbCard.Name} (flashback).");
                 await QueueBoardTriggersOnStackAsync(GameEvent.SpellCast, fbCard, ct);
+                break;
+            }
+
+            case ActionType.ActivateLoyaltyAbility:
+            {
+                var pwCard = player.Battlefield.Cards.FirstOrDefault(c => c.Id == action.CardId);
+                if (pwCard == null || !pwCard.IsPlaneswalker) break;
+
+                // Must be sorcery speed
+                if (!CanCastSorcery(player.Id))
+                {
+                    _state.Log($"Cannot activate {pwCard.Name} — not at sorcery speed.");
+                    break;
+                }
+
+                // One loyalty ability per planeswalker per turn
+                if (player.PlaneswalkerAbilitiesUsedThisTurn.Contains(pwCard.Id))
+                {
+                    _state.Log($"{pwCard.Name} has already activated a loyalty ability this turn.");
+                    break;
+                }
+
+                // Get card definition and validate ability index
+                if (!CardDefinitions.TryGet(pwCard.Name, out var pwDef) || pwDef.LoyaltyAbilities == null)
+                {
+                    _state.Log($"{pwCard.Name} has no loyalty abilities.");
+                    break;
+                }
+
+                var abilityIdx = action.AbilityIndex ?? -1;
+                if (abilityIdx < 0 || abilityIdx >= pwDef.LoyaltyAbilities.Count)
+                {
+                    _state.Log($"Invalid loyalty ability index for {pwCard.Name}.");
+                    break;
+                }
+
+                var loyaltyAbility = pwDef.LoyaltyAbilities[abilityIdx];
+
+                // Check loyalty cost is payable (negative costs: loyalty + cost >= 0)
+                if (loyaltyAbility.LoyaltyCost < 0 && pwCard.Loyalty + loyaltyAbility.LoyaltyCost < 0)
+                {
+                    _state.Log($"Not enough loyalty to activate {pwCard.Name} ({loyaltyAbility.Description}).");
+                    break;
+                }
+
+                // Pay loyalty cost
+                if (loyaltyAbility.LoyaltyCost > 0)
+                {
+                    pwCard.AddCounters(CounterType.Loyalty, loyaltyAbility.LoyaltyCost);
+                }
+                else if (loyaltyAbility.LoyaltyCost < 0)
+                {
+                    for (int i = 0; i < -loyaltyAbility.LoyaltyCost; i++)
+                        pwCard.RemoveCounter(CounterType.Loyalty);
+                }
+
+                // Mark as used this turn
+                player.PlaneswalkerAbilitiesUsedThisTurn.Add(pwCard.Id);
+
+                // Push to stack
+                var loyaltyStackObj = new ActivatedLoyaltyAbilityStackObject(
+                    pwCard, player.Id, loyaltyAbility.Effect, loyaltyAbility.Description);
+                _state.StackPush(loyaltyStackObj);
+
+                _state.Log($"{player.Name} activates {pwCard.Name}: {loyaltyAbility.Description}");
                 break;
             }
         }

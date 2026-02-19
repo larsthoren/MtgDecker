@@ -23,6 +23,7 @@ public class Player
     public int CreaturesDiedThisTurn { get; set; }
     public int DrawsThisTurn { get; set; }
     public bool DrawStepDrawExempted { get; set; }
+    public HashSet<Guid> PlaneswalkerAbilitiesUsedThisTurn { get; } = [];
 
     public void AdjustLife(int delta)
     {
