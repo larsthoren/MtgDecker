@@ -34,6 +34,10 @@ public class GameEngine
         _state.ActivePlayer.LandsPlayedThisTurn = 0;
         _state.Player1.CreaturesDiedThisTurn = 0;
         _state.Player2.CreaturesDiedThisTurn = 0;
+        _state.Player1.DrawsThisTurn = 0;
+        _state.Player2.DrawsThisTurn = 0;
+        _state.Player1.DrawStepDrawExempted = false;
+        _state.Player2.DrawStepDrawExempted = false;
         _state.Log($"Turn {_state.TurnNumber}: {_state.ActivePlayer.Name}'s turn.");
 
         do
@@ -140,20 +144,10 @@ public class GameEngine
                     break;
                 }
 
-                var drawn = _state.ActivePlayer.Library.DrawFromTop();
-                if (drawn != null)
-                {
-                    _state.ActivePlayer.Hand.Add(drawn);
+                _state.ActivePlayer.DrawStepDrawExempted = false;
+                DrawCards(_state.ActivePlayer, 1, isDrawStepDraw: true);
+                if (!_state.IsGameOver)
                     _state.Log($"{_state.ActivePlayer.Name} draws a card.");
-                }
-                else
-                {
-                    var loser = _state.ActivePlayer;
-                    var winner = _state.GetOpponent(loser);
-                    _state.IsGameOver = true;
-                    _state.Winner = winner.Name;
-                    _state.Log($"{loser.Name} loses — cannot draw from an empty library.");
-                }
                 break;
         }
     }
@@ -446,7 +440,8 @@ public class GameEngine
                 }
 
                 bool isInstant = def.CardTypes.HasFlag(CardType.Instant);
-                if (!isInstant && !CanCastSorcery(castPlayer.Id))
+                bool hasFlash = def.HasFlash;
+                if (!isInstant && !hasFlash && !CanCastSorcery(castPlayer.Id))
                 {
                     _state.Log($"Cannot cast {castCard.Name} at this time (sorcery-speed only).");
                     return;
@@ -882,7 +877,8 @@ public class GameEngine
                 }
 
                 bool fbIsInstant = fbDef.CardTypes.HasFlag(CardType.Instant);
-                if (!fbIsInstant && !CanCastSorcery(fbPlayer.Id))
+                bool fbHasFlash = fbDef.HasFlash;
+                if (!fbIsInstant && !fbHasFlash && !CanCastSorcery(fbPlayer.Id))
                 {
                     _state.Log($"Cannot cast {fbCard.Name} at this time (sorcery-speed only).");
                     return;
@@ -1766,6 +1762,20 @@ public class GameEngine
             ApplyPowerToughnessEffect(effect, _state.Player2);
         }
 
+        // === LAYER 7d: +1/+1 counter adjustments (MTG Layer 7d) ===
+        foreach (var player in new[] { _state.Player1, _state.Player2 })
+        {
+            foreach (var card in player.Battlefield.Cards)
+            {
+                var plusCounters = card.GetCounters(CounterType.PlusOnePlusOne);
+                if (plusCounters > 0 && card.IsCreature)
+                {
+                    card.EffectivePower = (card.EffectivePower ?? card.BasePower ?? 0) + plusCounters;
+                    card.EffectiveToughness = (card.EffectiveToughness ?? card.BaseToughness ?? 0) + plusCounters;
+                }
+            }
+        }
+
         // === Non-layered effects ===
         foreach (var effect in _state.ActiveEffects.Where(e => e.Type == ContinuousEffectType.ExtraLandDrop))
         {
@@ -2515,7 +2525,7 @@ public class GameEngine
         _state.Log($"{player.Name} mulliganed to 0 cards.");
     }
 
-    internal void DrawCards(Player player, int count)
+    internal void DrawCards(Player player, int count, bool isDrawStepDraw = false)
     {
         for (int i = 0; i < count; i++)
         {
@@ -2523,6 +2533,18 @@ public class GameEngine
             if (card != null)
             {
                 player.Hand.Add(card);
+                player.DrawsThisTurn++;
+
+                if (isDrawStepDraw && !player.DrawStepDrawExempted)
+                {
+                    player.DrawStepDrawExempted = true;
+                    // First draw of draw step is exempt from draw triggers
+                }
+                else
+                {
+                    // Fire draw triggers (e.g., Orcish Bowmasters)
+                    QueueDrawTriggers(player);
+                }
             }
             else
             {
@@ -2531,6 +2553,26 @@ public class GameEngine
                 _state.Winner = winner.Name;
                 _state.Log($"{player.Name} loses — cannot draw from an empty library.");
                 return;
+            }
+        }
+    }
+
+    private void QueueDrawTriggers(Player drawingPlayer)
+    {
+        foreach (var player in new[] { _state.Player1, _state.Player2 })
+        {
+            foreach (var card in player.Battlefield.Cards)
+            {
+                if (card.AbilitiesRemoved) continue;
+                foreach (var trigger in card.Triggers)
+                {
+                    if (trigger.Event != GameEvent.DrawCard) continue;
+                    if (trigger.Condition != TriggerCondition.OpponentDrawsExceptFirst) continue;
+                    if (drawingPlayer.Id == player.Id) continue; // Only opponent draws
+
+                    _state.Log($"{card.Name} triggers on {drawingPlayer.Name}'s draw.");
+                    _state.StackPush(new TriggeredAbilityStackObject(card, player.Id, trigger.Effect));
+                }
             }
         }
     }

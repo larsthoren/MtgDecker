@@ -15,4 +15,5 @@ public enum TriggerCondition
     ControllerCastsNoncreature,
     AnyPlayerCastsSpell,
     AnyUpkeep,
+    OpponentDrawsExceptFirst,
 }
