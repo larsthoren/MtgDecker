@@ -195,6 +195,9 @@ public class GameEngine
                     ApplyEntersWithCounters(playCard);
                     await QueueSelfTriggersOnStackAsync(GameEvent.EnterBattlefield, playCard, player, ct);
                     await OnBoardChangedAsync(ct);
+
+                    // Fire LandPlayed triggers (e.g., City of Traitors)
+                    await QueueBoardTriggersOnStackAsync(GameEvent.LandPlayed, playCard, ct);
                 }
                 else if (playCard.ManaCost != null)
                 {
@@ -2187,6 +2190,11 @@ public class GameEngine
                         evt == GameEvent.SpellCast
                         && relevantCard != null
                         && (relevantCard.ManaCost?.ConvertedManaCost ?? 0) <= 3,
+                    TriggerCondition.ControllerPlaysAnotherLand =>
+                        evt == GameEvent.LandPlayed
+                        && relevantCard != null
+                        && relevantCard.Id != permanent.Id
+                        && _state.ActivePlayer == player,
                     TriggerCondition.SelfAttacks => false,
                     _ => false,
                 };
