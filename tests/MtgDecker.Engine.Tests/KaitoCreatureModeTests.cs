@@ -7,7 +7,7 @@ namespace MtgDecker.Engine.Tests;
 
 public class KaitoCreatureModeTests : IDisposable
 {
-    private const string KaitoName = "Kaito, Bane of Nightmares";
+    private const string KaitoName = "Test Kaito Creature Mode";
 
     // StateCondition: only applies during the controller's turn
     // (active player has this card on their battlefield)
