@@ -10,5 +10,6 @@ public enum ActionType
     ActivateFetch,
     ActivateAbility,
     Cycle,
-    Flashback
+    Flashback,
+    ActivateLoyaltyAbility
 }

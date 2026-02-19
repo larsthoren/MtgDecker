@@ -3,6 +3,7 @@ using MtgDecker.Engine;
 using MtgDecker.Engine.Enums;
 using MtgDecker.Engine.Mana;
 using MtgDecker.Engine.Tests.Helpers;
+using MtgDecker.Engine.Triggers.Effects;
 
 namespace MtgDecker.Engine.Tests;
 
@@ -150,5 +151,37 @@ public class PlaneswalkerCoreTests
         {
             CardDefinitions.Unregister(testPwName);
         }
+    }
+
+    [Fact]
+    public void LoyaltyAbility_Record_StoresCorrectValues()
+    {
+        var effect = new DealDamageEffect(1);
+        var ability = new LoyaltyAbility(-2, effect, "Deal 1 damage");
+        ability.LoyaltyCost.Should().Be(-2);
+        ability.Effect.Should().Be(effect);
+        ability.Description.Should().Be("Deal 1 damage");
+    }
+
+    [Fact]
+    public void CardDefinition_LoyaltyAbilities_CanBeSet()
+    {
+        var def = new CardDefinition(null, null, null, null, CardType.Planeswalker)
+        {
+            LoyaltyAbilities =
+            [
+                new LoyaltyAbility(1, new DealDamageEffect(1), "+1: Deal 1"),
+                new LoyaltyAbility(-2, new DealDamageEffect(2), "-2: Deal 2"),
+            ],
+        };
+        def.LoyaltyAbilities.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public void GameAction_ActivateLoyaltyAbility_HasCorrectProperties()
+    {
+        var action = GameAction.ActivateLoyaltyAbility(Guid.NewGuid(), Guid.NewGuid(), 1);
+        action.Type.Should().Be(ActionType.ActivateLoyaltyAbility);
+        action.AbilityIndex.Should().Be(1);
     }
 }

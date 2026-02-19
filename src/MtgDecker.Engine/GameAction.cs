@@ -14,6 +14,7 @@ public class GameAction
     public ZoneType? DestinationZone { get; internal set; }
     public Guid? TargetCardId { get; init; }
     public Guid? TargetPlayerId { get; init; }
+    public int? AbilityIndex { get; init; }
 
     // Undo metadata — set by GameEngine during ExecuteAction
     public bool IsManaAbility { get; internal set; }
@@ -93,5 +94,13 @@ public class GameAction
         PlayerId = playerId,
         CardId = cardId,
         SourceZone = ZoneType.Graveyard,
+    };
+
+    public static GameAction ActivateLoyaltyAbility(Guid playerId, Guid cardId, int abilityIndex) => new()
+    {
+        Type = ActionType.ActivateLoyaltyAbility,
+        PlayerId = playerId,
+        CardId = cardId,
+        AbilityIndex = abilityIndex,
     };
 }
