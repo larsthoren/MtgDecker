@@ -37,4 +37,11 @@ public class TargetFilter
         && (card.ManaCost?.ConvertedManaCost ?? 0) <= maxCmc);
 
     public static TargetFilter AnyPermanent() => new((card, zone) => zone == ZoneType.Battlefield);
+
+    public static TargetFilter NoncreatureSpell() => new((card, zone) =>
+        zone == ZoneType.Stack && !card.CardTypes.HasFlag(CardType.Creature));
+
+    public static TargetFilter InstantOrSorcerySpell() => new((card, zone) =>
+        zone == ZoneType.Stack &&
+        (card.CardTypes.HasFlag(CardType.Instant) || card.CardTypes.HasFlag(CardType.Sorcery)));
 }
