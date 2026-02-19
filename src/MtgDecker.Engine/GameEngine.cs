@@ -270,9 +270,17 @@ public class GameEngine
                         var ability = tapTarget.ManaAbility;
                         if (ability.Type == ManaAbilityType.Fixed)
                         {
-                            player.ManaPool.Add(ability.FixedColor!.Value);
+                            var count = ability.ProduceCount;
+                            player.ManaPool.Add(ability.FixedColor!.Value, count);
                             action.ManaProduced = ability.FixedColor!.Value;
-                            _state.Log($"{player.Name} taps {tapTarget.Name} for {ability.FixedColor}.");
+                            action.ManaProducedAmount = count;
+                            if (ability.SelfDamage > 0)
+                            {
+                                player.AdjustLife(-ability.SelfDamage);
+                                _state.Log($"{tapTarget.Name} deals {ability.SelfDamage} damage to {player.Name}.");
+                            }
+                            var manaDesc = count > 1 ? $"{count} {ability.FixedColor}" : $"{ability.FixedColor}";
+                            _state.Log($"{player.Name} taps {tapTarget.Name} for {manaDesc}.");
                         }
                         else if (ability.Type == ManaAbilityType.Choice)
                         {
