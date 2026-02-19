@@ -98,7 +98,17 @@ public class GameEngine
 
         _state.IsFirstTurn = false;
         _state.TurnNumber++;
-        _state.ActivePlayer = _state.GetOpponent(_state.ActivePlayer);
+
+        if (_state.ExtraTurns.Count > 0)
+        {
+            var extraPlayerId = _state.ExtraTurns.Dequeue();
+            _state.ActivePlayer = _state.GetPlayer(extraPlayerId);
+            _state.Log($"Extra turn for {_state.ActivePlayer.Name}!");
+        }
+        else
+        {
+            _state.ActivePlayer = _state.GetOpponent(_state.ActivePlayer);
+        }
     }
 
     private async Task DiscardToHandSizeAsync(Player player, CancellationToken ct)
