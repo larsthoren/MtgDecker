@@ -128,7 +128,17 @@ public class GameEngine
         {
             case Phase.Untap:
                 foreach (var card in _state.ActivePlayer.Battlefield.Cards)
-                    card.IsTapped = false;
+                {
+                    if (card.GetCounters(CounterType.Stun) > 0)
+                    {
+                        card.RemoveCounter(CounterType.Stun);
+                        _state.Log($"Removed a stun counter from {card.Name} (instead of untapping).");
+                    }
+                    else if (card.IsTapped)
+                    {
+                        card.IsTapped = false;
+                    }
+                }
                 _state.ActivePlayer.PendingManaTaps.Clear();
                 _state.Log($"{_state.ActivePlayer.Name} untaps all permanents.");
                 break;

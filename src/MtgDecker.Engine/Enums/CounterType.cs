@@ -6,4 +6,5 @@ public enum CounterType
     Mining,
     PlusOnePlusOne,
     Loyalty,
+    Stun,
 }
