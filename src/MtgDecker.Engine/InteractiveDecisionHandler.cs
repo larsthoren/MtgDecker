@@ -14,6 +14,7 @@ public class InteractiveDecisionHandler : IPlayerDecisionHandler
     private TaskCompletionSource<Dictionary<ManaColor, int>>? _genericPaymentTcs;
 #pragma warning restore CS0649
     private TaskCompletionSource<IReadOnlyList<Guid>>? _attackersTcs;
+    private TaskCompletionSource<Dictionary<Guid, Guid?>>? _attackerTargetsTcs;
     private TaskCompletionSource<Dictionary<Guid, Guid>>? _blockersTcs;
     private TaskCompletionSource<IReadOnlyList<Guid>>? _blockerOrderTcs;
     private TaskCompletionSource<TargetInfo?>? _targetTcs;
@@ -27,6 +28,7 @@ public class InteractiveDecisionHandler : IPlayerDecisionHandler
     public bool IsWaitingForManaColor => _manaColorTcs is { Task.IsCompleted: false };
     public bool IsWaitingForGenericPayment => _genericPaymentTcs is { Task.IsCompleted: false };
     public bool IsWaitingForAttackers => _attackersTcs is { Task.IsCompleted: false };
+    public bool IsWaitingForAttackerTargets => _attackerTargetsTcs is { Task.IsCompleted: false };
     public bool IsWaitingForBlockers => _blockersTcs is { Task.IsCompleted: false };
     public bool IsWaitingForBlockerOrder => _blockerOrderTcs is { Task.IsCompleted: false };
     public bool IsWaitingForTarget => _targetTcs is { Task.IsCompleted: false };
@@ -45,12 +47,15 @@ public class InteractiveDecisionHandler : IPlayerDecisionHandler
     public bool IsWaitingForInput =>
         IsWaitingForAction || IsWaitingForMulligan || IsWaitingForBottomCards
         || IsWaitingForManaColor || IsWaitingForGenericPayment
-        || IsWaitingForAttackers || IsWaitingForBlockers || IsWaitingForBlockerOrder
+        || IsWaitingForAttackers || IsWaitingForAttackerTargets
+        || IsWaitingForBlockers || IsWaitingForBlockerOrder
         || IsWaitingForTarget || IsWaitingForCardChoice || IsWaitingForRevealAck
         || IsWaitingForDiscard;
 
     public IReadOnlyList<ManaColor>? ManaColorOptions { get; private set; }
     public IReadOnlyList<GameCard>? EligibleAttackers { get; private set; }
+    public IReadOnlyList<GameCard>? AttackerTargetAttackers { get; private set; }
+    public IReadOnlyList<GameCard>? AttackerTargetPlaneswalkers { get; private set; }
     public IReadOnlyList<GameCard>? EligibleBlockers { get; private set; }
     public IReadOnlyList<GameCard>? CurrentAttackers { get; private set; }
     public Guid? OrderingAttackerId { get; private set; }
@@ -219,6 +224,24 @@ public class InteractiveDecisionHandler : IPlayerDecisionHandler
     {
         EligibleAttackers = null;
         _attackersTcs?.TrySetResult(attackerIds);
+    }
+
+    public Task<Dictionary<Guid, Guid?>> ChooseAttackerTargets(IReadOnlyList<GameCard> attackers, IReadOnlyList<GameCard> planeswalkers, CancellationToken ct = default)
+    {
+        AttackerTargetAttackers = attackers;
+        AttackerTargetPlaneswalkers = planeswalkers;
+        _attackerTargetsTcs = new TaskCompletionSource<Dictionary<Guid, Guid?>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var registration = ct.Register(() => { AttackerTargetAttackers = null; AttackerTargetPlaneswalkers = null; _attackerTargetsTcs.TrySetCanceled(); });
+        _attackerTargetsTcs.Task.ContinueWith(_ => registration.Dispose(), TaskContinuationOptions.ExecuteSynchronously);
+        OnWaitingForInput?.Invoke();
+        return _attackerTargetsTcs.Task;
+    }
+
+    public void SubmitAttackerTargets(Dictionary<Guid, Guid?> targets)
+    {
+        AttackerTargetAttackers = null;
+        AttackerTargetPlaneswalkers = null;
+        _attackerTargetsTcs?.TrySetResult(targets);
     }
 
     public void SubmitBlockers(Dictionary<Guid, Guid> assignments)

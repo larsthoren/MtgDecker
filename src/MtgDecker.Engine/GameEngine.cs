@@ -1447,6 +1447,35 @@ public class GameEngine
             _state.Log($"{attacker.Name} attacks with {card.Name} ({card.Power}/{card.Toughness}).");
         }
 
+        // Choose attacker targets when defending player controls planeswalkers
+        var defenderPlaneswalkers = defender.Battlefield.Cards
+            .Where(c => c.IsPlaneswalker)
+            .ToList();
+
+        if (defenderPlaneswalkers.Count > 0)
+        {
+            var declaredAttackerCards = validAttackerIds
+                .Select(id => attacker.Battlefield.Cards.First(c => c.Id == id))
+                .ToList();
+
+            var targets = await attacker.DecisionHandler.ChooseAttackerTargets(declaredAttackerCards, defenderPlaneswalkers, ct);
+
+            foreach (var (attackerId, targetId) in targets)
+            {
+                if (validAttackerIds.Contains(attackerId))
+                {
+                    _state.Combat.SetAttackerTarget(attackerId, targetId);
+                    if (targetId.HasValue)
+                    {
+                        var targetPw = defenderPlaneswalkers.FirstOrDefault(pw => pw.Id == targetId.Value);
+                        var attackerCard = attacker.Battlefield.Cards.First(c => c.Id == attackerId);
+                        if (targetPw != null)
+                            _state.Log($"{attackerCard.Name} targets {targetPw.Name}.");
+                    }
+                }
+            }
+        }
+
         // Fire SelfAttacks triggers (e.g., Piledriver pump) after attackers declared
         foreach (var attackerId in validAttackerIds)
         {
@@ -1581,11 +1610,40 @@ public class GameEngine
 
             if (!_state.Combat.IsBlocked(attackerId))
             {
-                // Unblocked: deal damage to defending player
+                // Unblocked: deal damage to target (planeswalker or player)
                 var damage = attackerCard.Power ?? 0;
                 if (damage > 0)
                 {
-                    if (HasPlayerDamageProtection(defender.Id))
+                    var pwTargetId = _state.Combat.GetAttackerTarget(attackerId);
+                    GameCard? targetPw = null;
+                    if (pwTargetId.HasValue)
+                        targetPw = defender.Battlefield.Cards.FirstOrDefault(c => c.Id == pwTargetId.Value && c.IsPlaneswalker);
+
+                    if (targetPw != null)
+                    {
+                        // Deal damage to planeswalker by removing loyalty counters
+                        var loyaltyToRemove = Math.Min(damage, targetPw.Loyalty);
+                        for (int i = 0; i < loyaltyToRemove; i++)
+                            targetPw.RemoveCounter(CounterType.Loyalty);
+
+                        // If damage exceeds current loyalty, mark additional as removed
+                        // (SBA will handle moving the PW to graveyard)
+                        if (damage > loyaltyToRemove)
+                        {
+                            // Counters can't go below 0, but the PW is dead either way
+                        }
+
+                        _state.Log($"{attackerCard.Name} deals {damage} damage to {targetPw.Name}. ({targetPw.Loyalty} loyalty)");
+                        unblockedAttackers.Add(attackerCard);
+
+                        // Lifelink: controller gains life equal to damage dealt
+                        if (attackerCard.ActiveKeywords.Contains(Keyword.Lifelink))
+                        {
+                            attacker.AdjustLife(damage);
+                            _state.Log($"{attackerCard.Name} has lifelink — {attacker.Name} gains {damage} life. ({attacker.Life} life)");
+                        }
+                    }
+                    else if (HasPlayerDamageProtection(defender.Id))
                     {
                         _state.Log($"{attackerCard.Name}'s {damage} damage to {defender.Name} is prevented (protection).");
                     }
