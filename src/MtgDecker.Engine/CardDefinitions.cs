@@ -816,6 +816,26 @@ public static class CardDefinitions
             ["Gaea's Cradle"] = new(null, ManaAbility.Dynamic(ManaColor.Green,
                 p => p.Battlefield.Cards.Count(c => c.IsCreature)),
                 null, null, CardType.Land) { IsLegendary = true },
+
+            // ─── Legacy Dimir Tempo ────────────────────────────────────────────
+
+            ["Orcish Bowmasters"] = new(ManaCost.Parse("{1}{B}"), null, 1, 1, CardType.Creature)
+            {
+                HasFlash = true,
+                Subtypes = ["Orc", "Archer"],
+                Triggers =
+                [
+                    new Trigger(GameEvent.EnterBattlefield, TriggerCondition.Self, new BowmastersEffect()),
+                    new Trigger(GameEvent.DrawCard, TriggerCondition.OpponentDrawsExceptFirst, new BowmastersEffect()),
+                ],
+                ContinuousEffects =
+                [
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
+                        (card, _) => card.Name == "Orcish Bowmasters",
+                        GrantedKeyword: Keyword.Flash,
+                        Layer: EffectLayer.Layer6_AbilityAddRemove),
+                ],
+            },
         };
 
         Registry = cards.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
