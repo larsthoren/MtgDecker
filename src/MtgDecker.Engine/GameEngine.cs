@@ -615,6 +615,13 @@ public class GameEngine
                     break;
                 }
 
+                // Validate: pay life cost
+                if (cost.PayLife > 0 && player.Life < cost.PayLife)
+                {
+                    _state.Log($"Cannot activate {abilitySource.Name} — not enough life (need {cost.PayLife}, have {player.Life}).");
+                    break;
+                }
+
                 // Validate: mana cost
                 if (cost.ManaCost != null && !player.ManaPool.CanPay(cost.ManaCost))
                 {
@@ -763,6 +770,13 @@ public class GameEngine
                     player.Hand.RemoveById(discardTarget.Id);
                     player.Graveyard.Add(discardTarget);
                     _state.Log($"{player.Name} discards {discardTarget.Name}.");
+                }
+
+                // Pay costs: life
+                if (cost.PayLife > 0)
+                {
+                    player.AdjustLife(-cost.PayLife);
+                    _state.Log($"{player.Name} pays {cost.PayLife} life.");
                 }
 
                 // Find or prompt for effect target
