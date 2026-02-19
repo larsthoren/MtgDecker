@@ -125,7 +125,7 @@ public class GameEngine
         foreach (var card in chosen.Take(excess))
         {
             player.Hand.Remove(card);
-            player.Graveyard.Add(card);
+            MoveToGraveyardWithReplacement(card, player);
             _state.Log($"{player.Name} discards {card.Name}.");
         }
     }
@@ -1653,6 +1653,42 @@ public class GameEngine
     {
         if (card.IsCreature && !card.IsToken)
             owner.CreaturesDiedThisTurn++;
+    }
+
+    /// <summary>
+    /// Moves a card to graveyard, checking for replacement effects (e.g., Emrakul shuffle).
+    /// </summary>
+    public void MoveToGraveyardWithReplacement(GameCard card, Player owner)
+    {
+        if (CardDefinitions.TryGet(card.Name, out var def) && def.ShuffleGraveyardOnDeath)
+        {
+            // Shuffle this card + entire graveyard into library
+            owner.Library.AddToTop(card);
+            foreach (var graveyardCard in owner.Graveyard.Cards.ToList())
+            {
+                owner.Graveyard.Remove(graveyardCard);
+                owner.Library.AddToTop(graveyardCard);
+            }
+            owner.Library.Shuffle();
+            _state.Log($"{card.Name}'s graveyard replacement — {owner.Name} shuffles their graveyard into their library.");
+        }
+        else
+        {
+            owner.Graveyard.Add(card);
+        }
+    }
+
+    /// <summary>
+    /// Checks if a card can be targeted by a spell, considering protection abilities.
+    /// </summary>
+    public bool CanTargetWithSpell(GameCard target, GameCard spell)
+    {
+        if (target.ActiveKeywords.Contains(Keyword.ProtectionFromColoredSpells))
+        {
+            if (spell.ManaCost != null && spell.ManaCost.IsColored)
+                return false;
+        }
+        return true;
     }
 
     public void ClearDamage()
