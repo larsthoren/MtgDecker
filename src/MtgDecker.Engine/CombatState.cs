@@ -23,6 +23,8 @@ public class CombatState
             _attackers.Add(cardId);
     }
 
+    public bool RemoveAttacker(Guid cardId) => _attackers.Remove(cardId);
+
     public void SetAttackerTarget(Guid attackerId, Guid? planeswalkerTargetId)
     {
         _attackerTargets[attackerId] = planeswalkerTargetId;

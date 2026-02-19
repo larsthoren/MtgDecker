@@ -15,6 +15,7 @@ public class GameAction
     public Guid? TargetCardId { get; init; }
     public Guid? TargetPlayerId { get; init; }
     public int? AbilityIndex { get; init; }
+    public Guid? ReturnCardId { get; init; }
 
     // Undo metadata — set by GameEngine during ExecuteAction
     public bool IsManaAbility { get; internal set; }
@@ -102,5 +103,15 @@ public class GameAction
         PlayerId = playerId,
         CardId = cardId,
         AbilityIndex = abilityIndex,
+    };
+
+    public static GameAction Ninjutsu(Guid playerId, Guid ninjutsuCardId, Guid returnCreatureId) => new()
+    {
+        Type = ActionType.Ninjutsu,
+        PlayerId = playerId,
+        CardId = ninjutsuCardId,
+        ReturnCardId = returnCreatureId,
+        SourceZone = ZoneType.Hand,
+        DestinationZone = ZoneType.Battlefield,
     };
 }

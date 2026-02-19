@@ -35,4 +35,5 @@ public record CardDefinition(
     public int? StartingLoyalty { get; init; }
     public IReadOnlyList<LoyaltyAbility>? LoyaltyAbilities { get; init; }
     public bool HasFlash { get; init; }
+    public ManaCost? NinjutsuCost { get; init; }
 }

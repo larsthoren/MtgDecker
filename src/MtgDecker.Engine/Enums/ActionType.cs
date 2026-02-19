@@ -11,5 +11,6 @@ public enum ActionType
     ActivateAbility,
     Cycle,
     Flashback,
-    ActivateLoyaltyAbility
+    ActivateLoyaltyAbility,
+    Ninjutsu
 }
