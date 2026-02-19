@@ -40,6 +40,8 @@ public class GameEngine
         _state.Player2.DrawStepDrawExempted = false;
         _state.Player1.PlaneswalkerAbilitiesUsedThisTurn.Clear();
         _state.Player2.PlaneswalkerAbilitiesUsedThisTurn.Clear();
+        _state.Player1.LifeLostThisTurn = 0;
+        _state.Player2.LifeLostThisTurn = 0;
         _state.Log($"Turn {_state.TurnNumber}: {_state.ActivePlayer.Name}'s turn.");
 
         do

@@ -24,10 +24,13 @@ public class Player
     public int DrawsThisTurn { get; set; }
     public bool DrawStepDrawExempted { get; set; }
     public HashSet<Guid> PlaneswalkerAbilitiesUsedThisTurn { get; } = [];
+    public int LifeLostThisTurn { get; set; }
 
     public void AdjustLife(int delta)
     {
         Life += delta;
+        if (delta < 0)
+            LifeLostThisTurn += -delta;
     }
 
     public Player(Guid id, string name, IPlayerDecisionHandler decisionHandler)
