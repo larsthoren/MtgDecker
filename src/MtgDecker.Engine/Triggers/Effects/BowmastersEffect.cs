@@ -15,10 +15,13 @@ public class BowmastersEffect : IEffect
         await amass.Execute(context, ct);
 
         // Step 2: Deal 1 damage to any target (creature or player)
-        // Get all eligible creature targets (all creatures on the battlefield except those with shroud)
+        // Get all eligible creature targets (exclude shroud and opponent hexproof)
         var eligibleCreatures = context.State.Player1.Battlefield.Cards
             .Concat(context.State.Player2.Battlefield.Cards)
-            .Where(c => c.IsCreature && !c.ActiveKeywords.Contains(Keyword.Shroud))
+            .Where(c => c.IsCreature
+                && !c.ActiveKeywords.Contains(Keyword.Shroud)
+                && !(c.ActiveKeywords.Contains(Keyword.Hexproof)
+                    && !context.Controller.Battlefield.Contains(c.Id)))
             .ToList();
 
         GameCard? targetCreature = null;

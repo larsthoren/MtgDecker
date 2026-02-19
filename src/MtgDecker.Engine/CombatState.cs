@@ -7,6 +7,7 @@ public class CombatState
     private readonly List<Guid> _attackers = new();
     public IReadOnlyList<Guid> Attackers => _attackers;
 
+    private readonly Dictionary<Guid, Guid?> _attackerTargets = new(); // attackerId -> planeswalker target (null = player)
     private readonly Dictionary<Guid, List<Guid>> _blockerAssignments = new(); // attackerId -> blockerIds
     private readonly Dictionary<Guid, List<Guid>> _blockerOrder = new(); // attackerId -> ordered blockerIds
 
@@ -20,6 +21,18 @@ public class CombatState
     {
         if (!_attackers.Contains(cardId))
             _attackers.Add(cardId);
+    }
+
+    public bool RemoveAttacker(Guid cardId) => _attackers.Remove(cardId);
+
+    public void SetAttackerTarget(Guid attackerId, Guid? planeswalkerTargetId)
+    {
+        _attackerTargets[attackerId] = planeswalkerTargetId;
+    }
+
+    public Guid? GetAttackerTarget(Guid attackerId)
+    {
+        return _attackerTargets.TryGetValue(attackerId, out var target) ? target : null;
     }
 
     public void DeclareBlocker(Guid blockerId, Guid attackerId)

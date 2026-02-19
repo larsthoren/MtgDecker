@@ -12,6 +12,7 @@ public class TestDecisionHandler : IPlayerDecisionHandler
     private readonly Queue<ManaColor> _manaColorChoices = new();
     private readonly Queue<Dictionary<ManaColor, int>> _genericPaymentChoices = new();
     private readonly Queue<IReadOnlyList<Guid>> _attackerQueue = new();
+    private readonly Queue<Dictionary<Guid, Guid?>> _attackerTargetQueue = new();
     private readonly Queue<Dictionary<Guid, Guid>> _blockerQueue = new();
     private readonly Queue<IReadOnlyList<Guid>> _blockerOrderQueue = new();
     private readonly Queue<TargetInfo?> _targetQueue = new();
@@ -32,6 +33,7 @@ public class TestDecisionHandler : IPlayerDecisionHandler
     public void EnqueueGenericPayment(Dictionary<ManaColor, int> payment) => _genericPaymentChoices.Enqueue(payment);
 
     public void EnqueueAttackers(IReadOnlyList<Guid> attackerIds) => _attackerQueue.Enqueue(attackerIds);
+    public void EnqueueAttackerTargets(Dictionary<Guid, Guid?> targets) => _attackerTargetQueue.Enqueue(targets);
     public void EnqueueBlockers(Dictionary<Guid, Guid> assignments) => _blockerQueue.Enqueue(assignments);
     public void EnqueueBlockerOrder(IReadOnlyList<Guid> order) => _blockerOrderQueue.Enqueue(order);
     public void EnqueueTarget(TargetInfo? target) => _targetQueue.Enqueue(target);
@@ -101,6 +103,15 @@ public class TestDecisionHandler : IPlayerDecisionHandler
 
     public Task<IReadOnlyList<Guid>> ChooseAttackers(IReadOnlyList<GameCard> eligibleAttackers, CancellationToken ct = default)
         => Task.FromResult(_attackerQueue.Count > 0 ? _attackerQueue.Dequeue() : (IReadOnlyList<Guid>)Array.Empty<Guid>());
+
+    public Task<Dictionary<Guid, Guid?>> ChooseAttackerTargets(IReadOnlyList<GameCard> attackers, IReadOnlyList<GameCard> planeswalkers, CancellationToken ct = default)
+    {
+        if (_attackerTargetQueue.Count > 0)
+            return Task.FromResult(_attackerTargetQueue.Dequeue());
+        // Default: all attack the player (null targets)
+        var result = attackers.ToDictionary(a => a.Id, _ => (Guid?)null);
+        return Task.FromResult(result);
+    }
 
     public Task<Dictionary<Guid, Guid>> ChooseBlockers(IReadOnlyList<GameCard> eligibleBlockers, IReadOnlyList<GameCard> attackers, CancellationToken ct = default)
         => Task.FromResult(_blockerQueue.Count > 0 ? _blockerQueue.Dequeue() : new Dictionary<Guid, Guid>());

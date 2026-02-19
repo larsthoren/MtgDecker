@@ -304,6 +304,45 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
     }
 
     /// <summary>
+    /// Chooses attacker targets when the defending player controls planeswalkers.
+    /// Heuristic: Attack planeswalkers with low loyalty that can be killed this turn,
+    /// otherwise attack the player.
+    /// </summary>
+    public async Task<Dictionary<Guid, Guid?>> ChooseAttackerTargets(IReadOnlyList<GameCard> attackers,
+        IReadOnlyList<GameCard> planeswalkers, CancellationToken ct = default)
+    {
+        await DelayAsync(ct);
+        var targets = new Dictionary<Guid, Guid?>();
+
+        // Sort attackers by power descending to allocate biggest hitters first
+        var sortedAttackers = attackers.OrderByDescending(a => a.Power ?? 0).ToList();
+        var pwLoyaltyRemaining = planeswalkers.ToDictionary(pw => pw.Id, pw => pw.Loyalty);
+
+        foreach (var attacker in sortedAttackers)
+        {
+            var power = attacker.Power ?? 0;
+            // Find a PW that this attacker can finish off
+            var killablePw = planeswalkers
+                .Where(pw => pwLoyaltyRemaining[pw.Id] > 0 && pwLoyaltyRemaining[pw.Id] <= power)
+                .OrderBy(pw => pwLoyaltyRemaining[pw.Id])
+                .FirstOrDefault();
+
+            if (killablePw != null)
+            {
+                targets[attacker.Id] = killablePw.Id;
+                pwLoyaltyRemaining[killablePw.Id] -= power;
+            }
+            else
+            {
+                // Default: attack the player
+                targets[attacker.Id] = null;
+            }
+        }
+
+        return targets;
+    }
+
+    /// <summary>
     /// Blocks when a creature can kill the attacker (power >= attacker toughness).
     /// Uses the smallest sufficient blocker. Prioritizes blocking the biggest
     /// attacker first to maximize value. Each blocker is only assigned once.
@@ -491,7 +530,9 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
             {
                 var damageAmount = dealDamage.Amount;
                 var killableTarget = opponent.Battlefield.Cards
-                    .Where(c => c.IsCreature && !c.ActiveKeywords.Contains(Enums.Keyword.Shroud))
+                    .Where(c => c.IsCreature
+                        && !c.ActiveKeywords.Contains(Enums.Keyword.Shroud)
+                        && !c.ActiveKeywords.Contains(Enums.Keyword.Hexproof))
                     .FirstOrDefault(c => (c.Toughness ?? 0) - c.DamageMarked <= damageAmount);
 
                 if (killableTarget != null)
@@ -510,7 +551,9 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
                     continue;
 
                 var biggestThreat = opponent.Battlefield.Cards
-                    .Where(c => c.IsCreature && !c.ActiveKeywords.Contains(Enums.Keyword.Shroud))
+                    .Where(c => c.IsCreature
+                        && !c.ActiveKeywords.Contains(Enums.Keyword.Shroud)
+                        && !c.ActiveKeywords.Contains(Enums.Keyword.Hexproof))
                     .OrderByDescending(c => c.Power ?? 0)
                     .FirstOrDefault();
 

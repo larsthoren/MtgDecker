@@ -18,4 +18,5 @@ public enum Keyword
     ProtectionFromBlue,
     ProtectionFromWhite,
     Flash,
+    Hexproof,
 }
