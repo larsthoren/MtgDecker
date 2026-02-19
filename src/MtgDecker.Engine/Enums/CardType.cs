@@ -9,5 +9,6 @@ public enum CardType
     Enchantment = 4,
     Instant = 8,
     Sorcery = 16,
-    Artifact = 32
+    Artifact = 32,
+    Planeswalker = 64
 }

@@ -104,6 +104,9 @@ public class GameCard
         (EffectiveCardTypes ?? CardTypes).HasFlag(CardType.Creature) ||
         TypeLine.Contains("Creature", StringComparison.OrdinalIgnoreCase);
 
+    public bool IsPlaneswalker =>
+        (EffectiveCardTypes ?? CardTypes).HasFlag(CardType.Planeswalker);
+
     /// <summary>Original factory: uses CardDefinitions registry only.</summary>
     public static GameCard Create(string name, string typeLine = "", string? imageUrl = null)
     {
