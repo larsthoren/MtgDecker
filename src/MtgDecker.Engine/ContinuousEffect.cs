@@ -36,4 +36,6 @@ public record ContinuousEffect(
     EffectLayer? Layer = null,
     long Timestamp = 0,
     int? SetPower = null,
-    int? SetToughness = null);
+    int? SetToughness = null,
+    bool ApplyToSelf = false,
+    Func<GameState, bool>? StateCondition = null);

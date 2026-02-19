@@ -1847,6 +1847,9 @@ public class GameEngine
             .Where(e => e.Layer == EffectLayer.Layer4_TypeChanging)
             .OrderBy(e => e.Timestamp))
         {
+            if (effect.StateCondition != null && !effect.StateCondition(_state))
+                continue;
+
             ApplyBecomeCreatureEffect(effect, _state.Player1);
             ApplyBecomeCreatureEffect(effect, _state.Player2);
         }
@@ -1858,6 +1861,9 @@ public class GameEngine
                      && e.Layer == EffectLayer.Layer6_AbilityAddRemove)
             .OrderBy(e => e.Timestamp))
         {
+            if (effect.StateCondition != null && !effect.StateCondition(_state))
+                continue;
+
             foreach (var player in new[] { _state.Player1, _state.Player2 })
             {
                 foreach (var card in player.Battlefield.Cards)
@@ -1875,6 +1881,9 @@ public class GameEngine
                      && (e.Layer == EffectLayer.Layer6_AbilityAddRemove || e.Layer == null))
             .OrderBy(e => e.Timestamp))
         {
+            if (effect.StateCondition != null && !effect.StateCondition(_state))
+                continue;
+
             // Skip if the SOURCE of this effect is a creature that lost its abilities
             if (abilitiesRemovedFrom.Contains(effect.SourceId))
                 continue;
@@ -1907,6 +1916,9 @@ public class GameEngine
                      && e.Layer == EffectLayer.Layer7b_SetPT)
             .OrderBy(e => e.Timestamp))
         {
+            if (effect.StateCondition != null && !effect.StateCondition(_state))
+                continue;
+
             foreach (var player in new[] { _state.Player1, _state.Player2 })
             {
                 foreach (var card in player.Battlefield.Cards)
@@ -1926,6 +1938,9 @@ public class GameEngine
                      && (e.Layer == EffectLayer.Layer7c_ModifyPT || e.Layer == null))
             .OrderBy(e => e.Timestamp))
         {
+            if (effect.StateCondition != null && !effect.StateCondition(_state))
+                continue;
+
             // Skip if the SOURCE of this effect is a creature that lost its abilities
             if (abilitiesRemovedFrom.Contains(effect.SourceId))
                 continue;
@@ -1961,19 +1976,26 @@ public class GameEngine
     {
         foreach (var card in player.Battlefield.Cards)
         {
-            if (card.Id == effect.SourceId) continue; // "each other" exclusion
+            // "each other" exclusion (e.g. Opalescence) — skip unless ApplyToSelf is set
+            if (!effect.ApplyToSelf && card.Id == effect.SourceId) continue;
             if (!effect.Applies(card, player)) continue;
 
             // Add Creature type
             card.EffectiveCardTypes = (card.EffectiveCardTypes ?? card.CardTypes) | CardType.Creature;
 
-            // Set P/T to CMC
+            // Set P/T to CMC (e.g. Opalescence)
             if (effect.SetPowerToughnessToCMC && card.ManaCost != null)
             {
                 var cmc = card.ManaCost.ConvertedManaCost;
                 card.EffectivePower = cmc;
                 card.EffectiveToughness = cmc;
             }
+
+            // Set P/T to explicit values (e.g. Kaito creature mode)
+            if (effect.SetPower.HasValue)
+                card.EffectivePower = effect.SetPower.Value;
+            if (effect.SetToughness.HasValue)
+                card.EffectiveToughness = effect.SetToughness.Value;
         }
     }
 
