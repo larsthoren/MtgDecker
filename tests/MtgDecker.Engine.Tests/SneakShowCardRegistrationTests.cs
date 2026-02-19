@@ -14,6 +14,7 @@ public class SneakShowCardRegistrationTests
     [InlineData("Spell Pierce")]
     [InlineData("Ancient Tomb")]
     [InlineData("City of Traitors")]
+    [InlineData("Intuition")]
     public void Card_IsRegistered(string cardName)
     {
         CardDefinitions.TryGet(cardName, out var def).Should().BeTrue($"'{cardName}' should be registered");

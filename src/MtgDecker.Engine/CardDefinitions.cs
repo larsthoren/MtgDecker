@@ -914,6 +914,9 @@ public static class CardDefinitions
                         new SacrificeSelfOnLandEffect()),
                 ],
             },
+
+            ["Intuition"] = new(ManaCost.Parse("{2}{U}"), null, null, null, CardType.Instant,
+                Effect: new IntuitionEffect()),
         };
 
         Registry = cards.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
