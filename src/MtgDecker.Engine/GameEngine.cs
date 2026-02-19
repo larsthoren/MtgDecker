@@ -1980,6 +1980,23 @@ public class GameEngine
                 }
             }
 
+            // SBA: Planeswalker with 0 or less loyalty → graveyard (MTG 704.5i)
+            foreach (var player in new[] { _state.Player1, _state.Player2 })
+            {
+                var dyingPws = player.Battlefield.Cards
+                    .Where(c => c.IsPlaneswalker && c.Loyalty <= 0)
+                    .ToList();
+
+                foreach (var pw in dyingPws)
+                {
+                    await FireLeaveBattlefieldTriggersAsync(pw, player, ct);
+                    player.Battlefield.Remove(pw);
+                    player.Graveyard.Add(pw);
+                    _state.Log($"{pw.Name} is put into {player.Name}'s graveyard (0 loyalty).");
+                    anyActionTaken = true;
+                }
+            }
+
             // If anything changed, recalculate effects before looping
             if (anyActionTaken)
                 RecalculateState();

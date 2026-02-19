@@ -62,6 +62,53 @@ public class PlaneswalkerCoreTests
     }
 
     [Fact]
+    public async Task SBA_Planeswalker_ZeroLoyalty_MovesToGraveyard()
+    {
+        var h1 = new TestDecisionHandler();
+        var h2 = new TestDecisionHandler();
+        var p1 = new Player(Guid.NewGuid(), "P1", h1);
+        var p2 = new Player(Guid.NewGuid(), "P2", h2);
+        var state = new GameState(p1, p2);
+        var engine = new GameEngine(state);
+
+        var pw = new GameCard
+        {
+            Name = "Dying Planeswalker",
+            CardTypes = CardType.Planeswalker,
+        };
+        // No loyalty counters = 0 loyalty
+        p1.Battlefield.Add(pw);
+
+        await engine.CheckStateBasedActionsAsync();
+
+        p1.Battlefield.Cards.Should().NotContain(c => c.Name == "Dying Planeswalker");
+        p1.Graveyard.Cards.Should().Contain(c => c.Name == "Dying Planeswalker");
+    }
+
+    [Fact]
+    public async Task SBA_Planeswalker_PositiveLoyalty_StaysOnBattlefield()
+    {
+        var h1 = new TestDecisionHandler();
+        var h2 = new TestDecisionHandler();
+        var p1 = new Player(Guid.NewGuid(), "P1", h1);
+        var p2 = new Player(Guid.NewGuid(), "P2", h2);
+        var state = new GameState(p1, p2);
+        var engine = new GameEngine(state);
+
+        var pw = new GameCard
+        {
+            Name = "Healthy Planeswalker",
+            CardTypes = CardType.Planeswalker,
+        };
+        pw.AddCounters(CounterType.Loyalty, 3);
+        p1.Battlefield.Add(pw);
+
+        await engine.CheckStateBasedActionsAsync();
+
+        p1.Battlefield.Cards.Should().Contain(c => c.Name == "Healthy Planeswalker");
+    }
+
+    [Fact]
     public async Task Planeswalker_EntersWithLoyaltyCounters_WhenCast()
     {
         // Register a test planeswalker in CardDefinitions for this test
