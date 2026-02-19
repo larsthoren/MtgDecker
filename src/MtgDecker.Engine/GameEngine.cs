@@ -583,6 +583,9 @@ public class GameEngine
 
                 // Fire SpellCast board triggers (e.g., enchantress draw on enchantment cast)
                 await QueueBoardTriggersOnStackAsync(GameEvent.SpellCast, castCard, ct);
+
+                // Fire SelfIsCast triggers (e.g., Emrakul extra turn on cast)
+                await QueueSelfCastTriggersAsync(castCard, castPlayer, ct);
                 break;
             }
 
@@ -2234,6 +2237,26 @@ public class GameEngine
 
             _state.Log($"{attacker.Name} triggers: {trigger.Effect.GetType().Name.Replace("Effect", "")}");
             _state.StackPush(new TriggeredAbilityStackObject(attacker, player.Id, trigger.Effect));
+        }
+
+        return Task.CompletedTask;
+    }
+
+    /// <summary>Queues cast triggers from the spell itself (e.g., Emrakul extra turn on cast).</summary>
+    private Task QueueSelfCastTriggersAsync(GameCard card, Player controller, CancellationToken ct)
+    {
+        // Check triggers on the card instance first, then fall back to CardDefinitions
+        var triggers = card.Triggers.Count > 0
+            ? card.Triggers
+            : (CardDefinitions.TryGet(card.Name, out var def) ? def.Triggers : []);
+
+        foreach (var trigger in triggers)
+        {
+            if (trigger.Event == GameEvent.SpellCast && trigger.Condition == TriggerCondition.SelfIsCast)
+            {
+                _state.StackPush(new TriggeredAbilityStackObject(card, controller.Id, trigger.Effect));
+                _state.Log($"{card.Name}'s cast trigger goes on the stack.");
+            }
         }
 
         return Task.CompletedTask;
