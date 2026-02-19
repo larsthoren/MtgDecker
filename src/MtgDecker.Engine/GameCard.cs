@@ -75,6 +75,9 @@ public class GameCard
     public int GetCounters(CounterType type) =>
         Counters.TryGetValue(type, out var count) ? count : 0;
 
+    /// <summary>Current loyalty (reads from loyalty counters).</summary>
+    public int Loyalty => GetCounters(CounterType.Loyalty);
+
     // Per-source exile tracking (e.g., Parallax Wave)
     public List<Guid> ExiledCardIds { get; } = new();
 

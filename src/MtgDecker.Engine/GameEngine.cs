@@ -2059,12 +2059,22 @@ public class GameEngine
     /// <summary>Applies EntersWithCounters from CardDefinitions immediately when a permanent enters the battlefield.</summary>
     private void ApplyEntersWithCounters(GameCard card)
     {
-        if (CardDefinitions.TryGet(card.Name, out var def) && def.EntersWithCounters != null)
+        if (CardDefinitions.TryGet(card.Name, out var def))
         {
-            foreach (var (type, count) in def.EntersWithCounters)
+            if (def.EntersWithCounters != null)
             {
-                card.AddCounters(type, count);
-                _state.Log($"{card.Name} enters with {count} {type} counter(s).");
+                foreach (var (type, count) in def.EntersWithCounters)
+                {
+                    card.AddCounters(type, count);
+                    _state.Log($"{card.Name} enters with {count} {type} counter(s).");
+                }
+            }
+
+            // Planeswalker loyalty setup
+            if (def.StartingLoyalty.HasValue && card.IsPlaneswalker)
+            {
+                card.AddCounters(CounterType.Loyalty, def.StartingLoyalty.Value);
+                _state.Log($"{card.Name} enters with {def.StartingLoyalty.Value} loyalty.");
             }
         }
     }
@@ -2454,7 +2464,8 @@ public class GameEngine
             else
             {
                 if (spell.Card.IsCreature || spell.Card.CardTypes.HasFlag(CardType.Enchantment)
-                    || spell.Card.CardTypes.HasFlag(CardType.Artifact))
+                    || spell.Card.CardTypes.HasFlag(CardType.Artifact)
+                    || spell.Card.IsPlaneswalker)
                 {
                     spell.Card.TurnEnteredBattlefield = _state.TurnNumber;
                     if (spell.Card.EntersTapped) spell.Card.IsTapped = true;

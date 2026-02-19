@@ -5,4 +5,5 @@ public enum CounterType
     Fade,
     Mining,
     PlusOnePlusOne,
+    Loyalty,
 }
