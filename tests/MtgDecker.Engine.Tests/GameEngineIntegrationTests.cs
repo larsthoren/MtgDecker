@@ -18,13 +18,14 @@ public class GameEngineIntegrationTests
         var p1 = new Player(Guid.NewGuid(), "Alice", p1Handler);
         var p2 = new Player(Guid.NewGuid(), "Bob", p2Handler);
 
+        var landCount = deckSize * 3 / 5; // 36/60 — ensures land in opening hand
         var deck1 = new DeckBuilder()
-            .AddLand("Forest", deckSize / 3)
-            .AddCard("Grizzly Bears", deckSize - deckSize / 3, "Creature — Bear")
+            .AddLand("Forest", landCount)
+            .AddCard("Grizzly Bears", deckSize - landCount, "Creature — Bear")
             .Build();
         var deck2 = new DeckBuilder()
-            .AddLand("Mountain", deckSize / 3)
-            .AddCard("Goblin Guide", deckSize - deckSize / 3, "Creature — Goblin")
+            .AddLand("Mountain", landCount)
+            .AddCard("Goblin Guide", deckSize - landCount, "Creature — Goblin")
             .Build();
 
         foreach (var card in deck1) p1.Library.Add(card);
