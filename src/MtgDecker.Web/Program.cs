@@ -443,6 +443,40 @@ if (app.Environment.IsDevelopment())
         else
             Console.WriteLine("[Seed] PM Mono Black Control deck created.");
     }
+
+    if (!existingDecks.Any(d => d.Name == "Legacy Dimir Tempo"))
+    {
+        var dimirTempoDeck = """
+            4 Tamiyo, Inquisitive Student
+            4 Orcish Bowmasters
+            3 Murktide Regent
+            2 Kaito, Bane of Nightmares
+            4 Brainstorm
+            4 Ponder
+            4 Thoughtseize
+            4 Force of Will
+            4 Fatal Push
+            3 Daze
+            2 Brazen Borrower
+            1 Snuff Out
+            4 Polluted Delta
+            4 Underground Sea
+            4 Wasteland
+            2 Flooded Strand
+            1 Scalding Tarn
+            1 Misty Rainforest
+            1 Bloodstained Mire
+            1 Undercity Sewers
+            1 Island
+            1 Swamp
+            """;
+        var result = await mediator.Send(new ImportDeckCommand(
+            dimirTempoDeck, "MTGO", "Legacy Dimir Tempo", Format.Legacy, seedUserId));
+        if (result.UnresolvedCards.Count > 0)
+            Console.WriteLine($"[Seed] Legacy Dimir Tempo — unresolved: {string.Join(", ", result.UnresolvedCards)}");
+        else
+            Console.WriteLine("[Seed] Legacy Dimir Tempo deck created.");
+    }
 }
 
 // Configure the HTTP request pipeline.

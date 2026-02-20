@@ -43,6 +43,8 @@ public class GameEngine
         _state.Player2.PlaneswalkerAbilitiesUsedThisTurn.Clear();
         _state.Player1.LifeLostThisTurn = 0;
         _state.Player2.LifeLostThisTurn = 0;
+        _state.Player1.PermanentLeftBattlefieldThisTurn = false;
+        _state.Player2.PermanentLeftBattlefieldThisTurn = false;
         _state.Log($"Turn {_state.TurnNumber}: {_state.ActivePlayer.Name}'s turn.");
 
         do
@@ -2763,6 +2765,9 @@ public class GameEngine
 
     internal Task FireLeaveBattlefieldTriggersAsync(GameCard card, Player controller, CancellationToken ct)
     {
+        // Track revolt — a permanent controlled by this player left the battlefield
+        controller.PermanentLeftBattlefieldThisTurn = true;
+
         if (!CardDefinitions.TryGet(card.Name, out var def)) return Task.CompletedTask;
 
         foreach (var trigger in def.Triggers)
