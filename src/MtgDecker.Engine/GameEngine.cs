@@ -2904,6 +2904,26 @@ public class GameEngine
         return Task.CompletedTask;
     }
 
+    /// <summary>Snapshots both players' battlefield card IDs for ETB diffing.</summary>
+    private (HashSet<Guid> p1, HashSet<Guid> p2) SnapshotBattlefields() =>
+        (new HashSet<Guid>(_state.Player1.Battlefield.Cards.Select(c => c.Id)),
+         new HashSet<Guid>(_state.Player2.Battlefield.Cards.Select(c => c.Id)));
+
+    /// <summary>Fires ETB triggers for any permanents that appeared on either battlefield since the snapshot.</summary>
+    private async Task FireEtbForNewPermanentsAsync(HashSet<Guid> p1Before, HashSet<Guid> p2Before, CancellationToken ct)
+    {
+        foreach (var card in _state.Player1.Battlefield.Cards.Where(c => !p1Before.Contains(c.Id)))
+        {
+            ApplyEntersWithCounters(card);
+            await QueueSelfTriggersOnStackAsync(GameEvent.EnterBattlefield, card, _state.Player1, ct);
+        }
+        foreach (var card in _state.Player2.Battlefield.Cards.Where(c => !p2Before.Contains(c.Id)))
+        {
+            ApplyEntersWithCounters(card);
+            await QueueSelfTriggersOnStackAsync(GameEvent.EnterBattlefield, card, _state.Player2, ct);
+        }
+    }
+
     /// <summary>Resolves all items on the stack (for testing).</summary>
     internal async Task ResolveAllTriggersAsync(CancellationToken ct = default)
     {
@@ -3014,7 +3034,9 @@ public class GameEngine
                     if (ctrl != null) await FireLeaveBattlefieldTriggersAsync(card, ctrl, ct);
                 },
             };
+            var (p1Before, p2Before) = SnapshotBattlefields();
             await triggered.Effect.Execute(context, ct);
+            await FireEtbForNewPermanentsAsync(p1Before, p2Before, ct);
             await OnBoardChangedAsync(ct);
             return;
         }
@@ -3032,7 +3054,9 @@ public class GameEngine
                     if (ctrl != null) await FireLeaveBattlefieldTriggersAsync(card, ctrl, ct);
                 },
             };
+            var (p1BeforeLoyalty, p2BeforeLoyalty) = SnapshotBattlefields();
             await loyaltyAbility.Effect.Execute(loyaltyContext, ct);
+            await FireEtbForNewPermanentsAsync(p1BeforeLoyalty, p2BeforeLoyalty, ct);
             _state.Log($"Resolved {loyaltyAbility.Source.Name} loyalty ability: {loyaltyAbility.Description}");
             await OnBoardChangedAsync(ct);
             return;
@@ -3138,7 +3162,9 @@ public class GameEngine
                     }
                 }
 
+                var (p1BeforeSpell, p2BeforeSpell) = SnapshotBattlefields();
                 await def.Effect.ResolveAsync(_state, spell, controller.DecisionHandler, ct);
+                await FireEtbForNewPermanentsAsync(p1BeforeSpell, p2BeforeSpell, ct);
                 if (spell.IsFlashback)
                 {
                     controller.Exile.Add(spell.Card);
