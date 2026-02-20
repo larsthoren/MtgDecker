@@ -14,6 +14,10 @@ public class GameCard
 
     // Resolved from CardDefinitions registry or auto-parsed
     public ManaCost? ManaCost { get; set; }
+
+    // BaseManaAbility stores the original mana ability (before continuous effects).
+    // ManaAbility is the "effective" value used by the engine.
+    public ManaAbility? BaseManaAbility { get; set; }
     public ManaAbility? ManaAbility { get; set; }
     public CardType CardTypes { get; set; } = CardType.None;
     public IReadOnlyList<string> Subtypes { get; init; } = [];
@@ -121,6 +125,7 @@ public class GameCard
                 TypeLine = typeLine,
                 ImageUrl = imageUrl,
                 ManaCost = def.ManaCost,
+                BaseManaAbility = def.ManaAbility,
                 ManaAbility = def.ManaAbility,
                 BasePower = def.Power,
                 BaseToughness = def.Toughness,
@@ -158,6 +163,7 @@ public class GameCard
                 TypeLine = typeLine,
                 ImageUrl = imageUrl,
                 ManaCost = def.ManaCost,
+                BaseManaAbility = def.ManaAbility,
                 ManaAbility = def.ManaAbility,
                 BasePower = def.Power,
                 BaseToughness = def.Toughness,
@@ -192,7 +198,9 @@ public class GameCard
             autoCard.BaseToughness = t;
 
         // Auto-detect mana ability for basic lands
-        autoCard.ManaAbility = DetectBasicLandManaAbility(typeLine);
+        var detectedAbility = DetectBasicLandManaAbility(typeLine);
+        autoCard.BaseManaAbility = detectedAbility;
+        autoCard.ManaAbility = detectedAbility;
 
         return autoCard;
     }

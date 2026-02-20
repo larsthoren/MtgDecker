@@ -2042,6 +2042,10 @@ public class GameEngine
                 card.EffectiveCardTypes = null;
                 card.ActiveKeywords.Clear();
                 card.AbilitiesRemoved = false;
+
+                // Restore ManaAbility from BaseManaAbility (continuous effects may override)
+                if (card.BaseManaAbility != null)
+                    card.ManaAbility = card.BaseManaAbility;
             }
             player.MaxLandDrops = 1;
         }
@@ -2049,7 +2053,7 @@ public class GameEngine
         // Build suppression tracking set
         var abilitiesRemovedFrom = new HashSet<Guid>();
 
-        // === LAYER 4: Type-changing effects (BecomeCreature) ===
+        // === LAYER 4: Type-changing effects (BecomeCreature, OverrideLandType) ===
         foreach (var effect in _state.ActiveEffects
             .Where(e => e.Layer == EffectLayer.Layer4_TypeChanging)
             .OrderBy(e => e.Timestamp))
@@ -2057,8 +2061,16 @@ public class GameEngine
             if (effect.StateCondition != null && !effect.StateCondition(_state))
                 continue;
 
-            ApplyBecomeCreatureEffect(effect, _state.Player1);
-            ApplyBecomeCreatureEffect(effect, _state.Player2);
+            if (effect.Type == ContinuousEffectType.OverrideLandType)
+            {
+                ApplyOverrideLandTypeEffect(effect, _state.Player1);
+                ApplyOverrideLandTypeEffect(effect, _state.Player2);
+            }
+            else
+            {
+                ApplyBecomeCreatureEffect(effect, _state.Player1);
+                ApplyBecomeCreatureEffect(effect, _state.Player2);
+            }
         }
 
         // === LAYER 6: Ability add/remove ===
@@ -2203,6 +2215,17 @@ public class GameEngine
                 card.EffectivePower = effect.SetPower.Value;
             if (effect.SetToughness.HasValue)
                 card.EffectiveToughness = effect.SetToughness.Value;
+        }
+    }
+
+    private void ApplyOverrideLandTypeEffect(ContinuousEffect effect, Player player)
+    {
+        foreach (var card in player.Battlefield.Cards)
+        {
+            if (!effect.Applies(card, player)) continue;
+
+            // Blood Moon: nonbasic lands become Mountains (produce Red mana only)
+            card.ManaAbility = ManaAbility.Fixed(ManaColor.Red);
         }
     }
 
