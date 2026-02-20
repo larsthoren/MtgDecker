@@ -895,7 +895,7 @@ public static class CardDefinitions
             ["Lotus Petal"] = new(ManaCost.Parse("{0}"), null, null, null, CardType.Artifact)
             {
                 ActivatedAbility = new(
-                    new ActivatedAbilityCost(SacrificeSelf: true),
+                    new ActivatedAbilityCost(TapSelf: true, SacrificeSelf: true),
                     new AddAnyManaEffect()),
             },
 

@@ -3,6 +3,8 @@ using MtgDecker.Engine.Effects;
 using MtgDecker.Engine.Enums;
 using MtgDecker.Engine.Mana;
 using MtgDecker.Engine.Tests.Helpers;
+using MtgDecker.Engine.Triggers;
+using MtgDecker.Engine.Triggers.Effects;
 
 namespace MtgDecker.Engine.Tests;
 
@@ -127,6 +129,115 @@ public class ShowAndTellTests
 
         state.Player1.Battlefield.Cards.Should().BeEmpty();
         state.Player2.Battlefield.Cards.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task ShowAndTell_FiresEtbTriggers_WhenCreatureEntersBattlefield()
+    {
+        // Test through the engine to verify ETB triggers fire
+        var h1 = new TestDecisionHandler();
+        var h2 = new TestDecisionHandler();
+        var p1 = new Player(Guid.NewGuid(), "P1", h1);
+        var p2 = new Player(Guid.NewGuid(), "P2", h2);
+        var state = new GameState(p1, p2);
+        var engine = new GameEngine(state);
+        state.ActivePlayer = p1;
+        state.TurnNumber = 2;
+        state.CurrentPhase = Phase.MainPhase1;
+
+        // Give mana for Show and Tell ({1}{U}{U})
+        p1.ManaPool.Add(ManaColor.Blue, 2);
+        p1.ManaPool.Add(ManaColor.Colorless, 1);
+
+        var showAndTell = GameCard.Create("Show and Tell");
+        p1.Hand.Add(showAndTell);
+
+        // Siege-Gang Commander has ETB: create 3 Goblin tokens
+        var commander = new GameCard
+        {
+            Name = "Siege-Gang Commander",
+            CardTypes = CardType.Creature,
+            ManaCost = ManaCost.Parse("{3}{R}{R}"),
+            Power = 2,
+            Toughness = 2,
+            Subtypes = ["Goblin"],
+            Triggers = [
+                new Trigger(GameEvent.EnterBattlefield, TriggerCondition.Self,
+                    new CreateTokensEffect("Goblin", 1, 1, CardType.Creature, ["Goblin"], count: 3))
+            ]
+        };
+        p1.Hand.Add(commander);
+
+        h1.EnqueueCardChoice(commander.Id); // P1 chooses Siege-Gang
+        h2.EnqueueCardChoice((Guid?)null);  // P2 declines
+
+        await engine.ExecuteAction(GameAction.CastSpell(p1.Id, showAndTell.Id));
+        await engine.ResolveAllTriggersAsync();
+
+        // Commander should be on battlefield
+        p1.Battlefield.Cards.Should().Contain(c => c.Name == "Siege-Gang Commander");
+
+        // ETB should have fired: 3 Goblin tokens
+        p1.Battlefield.Cards.Where(c => c.Name == "Goblin" && c.IsToken).Should().HaveCount(3);
+    }
+
+    [Fact]
+    public async Task ShowAndTell_FiresEtbTriggers_ForBothPlayers()
+    {
+        var h1 = new TestDecisionHandler();
+        var h2 = new TestDecisionHandler();
+        var p1 = new Player(Guid.NewGuid(), "P1", h1);
+        var p2 = new Player(Guid.NewGuid(), "P2", h2);
+        var state = new GameState(p1, p2);
+        var engine = new GameEngine(state);
+        state.ActivePlayer = p1;
+        state.TurnNumber = 2;
+        state.CurrentPhase = Phase.MainPhase1;
+
+        p1.ManaPool.Add(ManaColor.Blue, 2);
+        p1.ManaPool.Add(ManaColor.Colorless, 1);
+
+        var showAndTell = GameCard.Create("Show and Tell");
+        p1.Hand.Add(showAndTell);
+
+        // P1's creature with ETB
+        var p1Creature = new GameCard
+        {
+            Name = "Siege-Gang Commander",
+            CardTypes = CardType.Creature,
+            Power = 2, Toughness = 2,
+            Subtypes = ["Goblin"],
+            Triggers = [
+                new Trigger(GameEvent.EnterBattlefield, TriggerCondition.Self,
+                    new CreateTokensEffect("Goblin", 1, 1, CardType.Creature, ["Goblin"], count: 3))
+            ]
+        };
+        p1.Hand.Add(p1Creature);
+
+        // P2's creature with ETB
+        var p2Creature = new GameCard
+        {
+            Name = "Goblin Matron",
+            CardTypes = CardType.Creature,
+            Power = 1, Toughness = 1,
+            Subtypes = ["Goblin"],
+            Triggers = [
+                new Trigger(GameEvent.EnterBattlefield, TriggerCondition.Self,
+                    new CreateTokensEffect("Token", 1, 1, CardType.Creature, ["Goblin"], count: 1))
+            ]
+        };
+        p2.Hand.Add(p2Creature);
+
+        h1.EnqueueCardChoice(p1Creature.Id);
+        h2.EnqueueCardChoice(p2Creature.Id);
+
+        await engine.ExecuteAction(GameAction.CastSpell(p1.Id, showAndTell.Id));
+        await engine.ResolveAllTriggersAsync();
+
+        // P1 gets 3 tokens from Siege-Gang
+        p1.Battlefield.Cards.Where(c => c.IsToken).Should().HaveCount(3);
+        // P2 gets 1 token from their creature's ETB
+        p2.Battlefield.Cards.Where(c => c.IsToken).Should().HaveCount(1);
     }
 
     [Fact]
