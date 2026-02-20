@@ -55,6 +55,7 @@ public class GameCard
     public bool IsLegendary { get; init; }
     public bool EntersTapped { get; init; }
     public FetchAbility? FetchAbility { get; init; }
+    public ActivatedAbility? TokenActivatedAbility { get; set; }
     public bool EchoPaid { get; set; } = true;
 
     // Base power/toughness from the card definition

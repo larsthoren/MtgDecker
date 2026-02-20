@@ -625,13 +625,19 @@ public class GameEngine
                     break;
                 }
 
-                if (!CardDefinitions.TryGet(abilitySource.Name, out var abilityDef) || abilityDef.ActivatedAbility == null)
+                // Look up activated ability: token ability on the card, then CardDefinitions registry
+                ActivatedAbility? ability = abilitySource.TokenActivatedAbility;
+                if (ability == null)
+                {
+                    if (CardDefinitions.TryGet(abilitySource.Name, out var abilityDef))
+                        ability = abilityDef.ActivatedAbility;
+                }
+
+                if (ability == null)
                 {
                     _state.Log($"{abilitySource.Name} has no activated ability.");
                     break;
                 }
-
-                var ability = abilityDef.ActivatedAbility;
                 var cost = ability.Cost;
 
                 // Validate: activation condition (e.g., threshold)
