@@ -37,4 +37,7 @@ public class TargetFilter
         && (card.ManaCost?.ConvertedManaCost ?? 0) <= maxCmc);
 
     public static TargetFilter AnyPermanent() => new((card, zone) => zone == ZoneType.Battlefield);
+
+    public static TargetFilter NonlandPermanent() => new((card, zone) =>
+        zone == ZoneType.Battlefield && !card.IsLand);
 }
