@@ -39,4 +39,5 @@ public record ContinuousEffect(
     int? SetPower = null,
     int? SetToughness = null,
     bool ApplyToSelf = false,
-    Func<GameState, bool>? StateCondition = null);
+    Func<GameState, bool>? StateCondition = null,
+    int? ExpiresOnTurnNumber = null);

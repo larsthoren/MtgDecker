@@ -36,12 +36,15 @@ public class GameEngine
         _state.Player2.CreaturesDiedThisTurn = 0;
         _state.Player1.DrawsThisTurn = 0;
         _state.Player2.DrawsThisTurn = 0;
+        RemoveExpiredEffects();
         _state.Player1.DrawStepDrawExempted = false;
         _state.Player2.DrawStepDrawExempted = false;
         _state.Player1.PlaneswalkerAbilitiesUsedThisTurn.Clear();
         _state.Player2.PlaneswalkerAbilitiesUsedThisTurn.Clear();
         _state.Player1.LifeLostThisTurn = 0;
         _state.Player2.LifeLostThisTurn = 0;
+        _state.Player1.PermanentLeftBattlefieldThisTurn = false;
+        _state.Player2.PermanentLeftBattlefieldThisTurn = false;
         _state.Log($"Turn {_state.TurnNumber}: {_state.ActivePlayer.Name}'s turn.");
 
         do
@@ -496,6 +499,16 @@ public class GameEngine
             {
                 var castPlayer = _state.GetPlayer(action.PlayerId);
                 var castCard = castPlayer.Hand.Cards.FirstOrDefault(c => c.Id == action.CardId);
+                bool castingFromExileAdventure = false;
+
+                // If not in hand, check exile for adventure cards
+                if (castCard == null)
+                {
+                    castCard = castPlayer.Exile.Cards.FirstOrDefault(c => c.Id == action.CardId && c.IsOnAdventure);
+                    if (castCard != null)
+                        castingFromExileAdventure = true;
+                }
+
                 if (castCard == null)
                 {
                     _state.Log("Card not found in hand.");
@@ -620,7 +633,15 @@ public class GameEngine
                     castPlayer.PendingManaTaps.Clear();
                 }
 
-                castPlayer.Hand.RemoveById(castCard.Id);
+                if (castingFromExileAdventure)
+                {
+                    castPlayer.Exile.RemoveById(castCard.Id);
+                    castCard.IsOnAdventure = false;
+                }
+                else
+                {
+                    castPlayer.Hand.RemoveById(castCard.Id);
+                }
                 var stackObj = new StackObject(castCard, castPlayer.Id, manaPaid, targets, _state.StackCount);
                 _state.StackPush(stackObj);
 
@@ -649,13 +670,19 @@ public class GameEngine
                     break;
                 }
 
-                if (!CardDefinitions.TryGet(abilitySource.Name, out var abilityDef) || abilityDef.ActivatedAbility == null)
+                // Look up activated ability: token ability on the card, then CardDefinitions registry
+                ActivatedAbility? ability = abilitySource.TokenActivatedAbility;
+                if (ability == null)
+                {
+                    if (CardDefinitions.TryGet(abilitySource.Name, out var abilityDef))
+                        ability = abilityDef.ActivatedAbility;
+                }
+
+                if (ability == null)
                 {
                     _state.Log($"{abilitySource.Name} has no activated ability.");
                     break;
                 }
-
-                var ability = abilityDef.ActivatedAbility;
                 var cost = ability.Cost;
 
                 // Validate: activation condition (e.g., threshold)
@@ -1122,7 +1149,14 @@ public class GameEngine
                 }
 
                 // Get card definition and validate ability index
-                if (!CardDefinitions.TryGet(pwCard.Name, out var pwDef) || pwDef.LoyaltyAbilities == null)
+                // For transformed cards, check BackFaceDefinition first (back face name isn't in CardDefinitions)
+                CardDefinition? pwDef = null;
+                if (pwCard.IsTransformed && pwCard.BackFaceDefinition?.LoyaltyAbilities != null)
+                    pwDef = pwCard.BackFaceDefinition;
+                else if (CardDefinitions.TryGet(pwCard.Name, out var registeredDef))
+                    pwDef = registeredDef;
+
+                if (pwDef?.LoyaltyAbilities == null)
                 {
                     _state.Log($"{pwCard.Name} has no loyalty abilities.");
                     break;
@@ -1261,6 +1295,98 @@ public class GameEngine
                 await OnBoardChangedAsync(ct);
 
                 _state.Log($"{ninjutsuPlayer.Name} activates ninjutsu: {returnCreature.Name} returns to hand, {ninjaCard.Name} enters attacking.");
+                break;
+            }
+
+            case ActionType.CastAdventure:
+            {
+                var advPlayer = _state.GetPlayer(action.PlayerId);
+                var advCard = advPlayer.Hand.Cards.FirstOrDefault(c => c.Id == action.CardId);
+                if (advCard == null)
+                {
+                    _state.Log("Card not found in hand.");
+                    return;
+                }
+
+                if (!CardDefinitions.TryGet(advCard.Name, out var advDef) || advDef.Adventure == null)
+                {
+                    _state.Log($"{advCard.Name} has no adventure.");
+                    return;
+                }
+
+                var adventure = advDef.Adventure;
+
+                // Check timing: adventure instants at instant speed, adventure sorceries at sorcery speed
+                // Brazen Borrower's Petty Theft is an instant, so check if the adventure's effect type
+                // For simplicity: if the main card has flash or the card is an instant, allow at instant speed
+                bool advIsInstant = advDef.CardTypes.HasFlag(CardType.Instant) || advDef.HasFlash;
+                if (!advIsInstant && !CanCastSorcery(advPlayer.Id))
+                {
+                    _state.Log($"Cannot cast {adventure.Name} at this time (sorcery-speed only).");
+                    return;
+                }
+
+                // Apply cost modification from continuous effects
+                var advEffectiveCost = adventure.Cost;
+                var advCostReduction = ComputeCostModification(advCard, advPlayer);
+                if (advCostReduction != 0)
+                    advEffectiveCost = advEffectiveCost.WithGenericReduction(-advCostReduction);
+
+                if (!advPlayer.ManaPool.CanPay(advEffectiveCost))
+                {
+                    _state.Log($"Not enough mana to cast {adventure.Name}.");
+                    return;
+                }
+
+                // Find targets if the adventure has a target filter
+                var advTargets = new List<TargetInfo>();
+                if (adventure.Filter != null)
+                {
+                    var advOpponent = _state.GetOpponent(advPlayer);
+                    var advEligible = new List<GameCard>();
+
+                    foreach (var c in advPlayer.Battlefield.Cards)
+                        if (adventure.Filter.IsLegal(c, ZoneType.Battlefield) && !CannotBeTargetedBy(c, advPlayer))
+                            advEligible.Add(c);
+                    foreach (var c in advOpponent.Battlefield.Cards)
+                        if (adventure.Filter.IsLegal(c, ZoneType.Battlefield) && !CannotBeTargetedBy(c, advPlayer))
+                            advEligible.Add(c);
+
+                    if (advEligible.Count == 0)
+                    {
+                        _state.Log($"No legal targets for {adventure.Name}.");
+                        return;
+                    }
+
+                    var advTarget = await advPlayer.DecisionHandler.ChooseTarget(
+                        adventure.Name, advEligible, advOpponent.Id, ct);
+
+                    if (advTarget == null)
+                    {
+                        _state.Log($"{advPlayer.Name} cancels casting {adventure.Name}.");
+                        return;
+                    }
+
+                    advTargets.Add(advTarget);
+                }
+
+                // Pay mana cost
+                var advManaPaid = await PayManaCostAsync(advEffectiveCost, advPlayer, ct);
+                advPlayer.PendingManaTaps.Clear();
+
+                // Move card from hand to stack
+                advPlayer.Hand.RemoveById(advCard.Id);
+                var advStackObj = new StackObject(advCard, advPlayer.Id, advManaPaid, advTargets, _state.StackCount)
+                {
+                    IsAdventure = true,
+                };
+                _state.StackPush(advStackObj);
+
+                action.ManaCostPaid = advEffectiveCost;
+                advPlayer.ActionHistory.Push(action);
+
+                _state.Log($"{advPlayer.Name} casts {adventure.Name} (adventure of {advCard.Name}).");
+                await QueueBoardTriggersOnStackAsync(GameEvent.SpellCast, advCard, ct);
                 break;
             }
         }
@@ -2005,10 +2131,18 @@ public class GameEngine
         _state.ActiveEffects.RemoveAll(e => e.UntilEndOfTurn);
     }
 
+    public void RemoveExpiredEffects()
+    {
+        _state.ActiveEffects.RemoveAll(e =>
+            e.ExpiresOnTurnNumber != null && e.ExpiresOnTurnNumber <= _state.TurnNumber);
+    }
+
     public void RecalculateState()
     {
-        // Preserve temporary (UntilEndOfTurn) effects before rebuild
-        var tempEffects = _state.ActiveEffects.Where(e => e.UntilEndOfTurn).ToList();
+        // Preserve temporary (UntilEndOfTurn) and expiring effects before rebuild
+        var tempEffects = _state.ActiveEffects
+            .Where(e => e.UntilEndOfTurn || e.ExpiresOnTurnNumber != null)
+            .ToList();
 
         // Reset timestamp counter
         _state.NextEffectTimestamp = 1;
@@ -2753,6 +2887,9 @@ public class GameEngine
 
     internal Task FireLeaveBattlefieldTriggersAsync(GameCard card, Player controller, CancellationToken ct)
     {
+        // Track revolt — a permanent controlled by this player left the battlefield
+        controller.PermanentLeftBattlefieldThisTurn = true;
+
         if (!CardDefinitions.TryGet(card.Name, out var def)) return Task.CompletedTask;
 
         foreach (var trigger in def.Triggers)
@@ -2903,6 +3040,55 @@ public class GameEngine
 
         if (top is StackObject spell)
         {
+            // Adventure spell resolution: run adventure effect, then exile with IsOnAdventure
+            if (spell.IsAdventure)
+            {
+                if (CardDefinitions.TryGet(spell.Card.Name, out var advDef) && advDef.Adventure?.Effect != null)
+                {
+                    _state.Log($"Resolving {advDef.Adventure.Name} (adventure of {spell.Card.Name}).");
+
+                    // Target legality check
+                    if (spell.Targets.Count > 0)
+                    {
+                        var allAdvTargetsLegal = true;
+                        foreach (var target in spell.Targets)
+                        {
+                            if (target.Zone == ZoneType.None) continue;
+                            var targetOwner = _state.GetPlayer(target.PlayerId);
+                            var targetZone = targetOwner.GetZone(target.Zone);
+                            if (!targetZone.Contains(target.CardId))
+                            {
+                                allAdvTargetsLegal = false;
+                                break;
+                            }
+                        }
+
+                        if (!allAdvTargetsLegal)
+                        {
+                            _state.Log($"{advDef.Adventure.Name} fizzles (illegal target).");
+                            // Adventure fizzle: card goes to exile on adventure regardless
+                            spell.Card.IsOnAdventure = true;
+                            controller.Exile.Add(spell.Card);
+                            _state.Log($"{spell.Card.Name} is exiled (adventure).");
+                            return;
+                        }
+                    }
+
+                    await advDef.Adventure.Effect.ResolveAsync(_state, spell, controller.DecisionHandler, ct);
+                }
+                else
+                {
+                    _state.Log($"Resolving adventure of {spell.Card.Name}.");
+                }
+
+                // Adventure resolution: card goes to exile with IsOnAdventure
+                spell.Card.IsOnAdventure = true;
+                controller.Exile.Add(spell.Card);
+                _state.Log($"{spell.Card.Name} is exiled (adventure).");
+                await OnBoardChangedAsync(ct);
+                return;
+            }
+
             _state.Log($"Resolving {spell.Card.Name}.");
 
             if (CardDefinitions.TryGet(spell.Card.Name, out var def) && def.Effect != null)
@@ -3081,11 +3267,21 @@ public class GameEngine
                 foreach (var trigger in card.Triggers)
                 {
                     if (trigger.Event != GameEvent.DrawCard) continue;
-                    if (trigger.Condition != TriggerCondition.OpponentDrawsExceptFirst) continue;
-                    if (drawingPlayer.Id == player.Id) continue; // Only opponent draws
 
-                    _state.Log($"{card.Name} triggers on {drawingPlayer.Name}'s draw.");
-                    _state.StackPush(new TriggeredAbilityStackObject(card, player.Id, trigger.Effect));
+                    if (trigger.Condition == TriggerCondition.OpponentDrawsExceptFirst)
+                    {
+                        if (drawingPlayer.Id == player.Id) continue; // Only opponent draws
+                        _state.Log($"{card.Name} triggers on {drawingPlayer.Name}'s draw.");
+                        _state.StackPush(new TriggeredAbilityStackObject(card, player.Id, trigger.Effect));
+                    }
+                    else if (trigger.Condition == TriggerCondition.ThirdDrawInTurn)
+                    {
+                        // Only fires for the controller of the trigger card
+                        if (drawingPlayer.Id != player.Id) continue;
+                        if (drawingPlayer.DrawsThisTurn != 3) continue;
+                        _state.Log($"{card.Name} triggers on {drawingPlayer.Name}'s third draw this turn.");
+                        _state.StackPush(new TriggeredAbilityStackObject(card, player.Id, trigger.Effect));
+                    }
                 }
             }
         }

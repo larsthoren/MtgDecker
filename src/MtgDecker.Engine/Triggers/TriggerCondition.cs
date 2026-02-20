@@ -18,4 +18,5 @@ public enum TriggerCondition
     OpponentDrawsExceptFirst,
     SelfIsCast,
     ControllerPlaysAnotherLand,
+    ThirdDrawInTurn,
 }

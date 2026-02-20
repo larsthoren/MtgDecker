@@ -20,4 +20,5 @@ public enum Keyword
     Flash,
     ProtectionFromColoredSpells,
     Hexproof,
+    CantBlockNonFlying,
 }

@@ -990,6 +990,89 @@ public static class CardDefinitions
                                 c => c.Name == "Kaito, Bane of Nightmares")),
                 ],
             },
+
+            ["Tamiyo, Inquisitive Student"] = new(ManaCost.Parse("{U}"), null, 0, 3, CardType.Creature)
+            {
+                Name = "Tamiyo, Inquisitive Student",
+                IsLegendary = true,
+                Subtypes = ["Moonfolk", "Wizard"],
+                ContinuousEffects =
+                [
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
+                        (card, _) => card.Name == "Tamiyo, Inquisitive Student",
+                        GrantedKeyword: Keyword.Flying,
+                        Layer: EffectLayer.Layer6_AbilityAddRemove,
+                        ApplyToSelf: true),
+                ],
+                Triggers =
+                [
+                    new Trigger(GameEvent.BeginCombat, TriggerCondition.SelfAttacks, new InvestigateEffect()),
+                    new Trigger(GameEvent.DrawCard, TriggerCondition.ThirdDrawInTurn, new TransformExileReturnEffect()),
+                ],
+                TransformInto = new CardDefinition(null, null, null, null, CardType.Planeswalker)
+                {
+                    Name = "Tamiyo, Seasoned Scholar",
+                    IsLegendary = true,
+                    Subtypes = ["Tamiyo"],
+                    StartingLoyalty = 2,
+                    LoyaltyAbilities =
+                    [
+                        new LoyaltyAbility(2, new TamiyoDefenseEffect(),
+                            "+2: Creatures attacking you get -1/-0 until next turn"),
+                        new LoyaltyAbility(-3, new TamiyoRecoverEffect(),
+                            "-3: Return instant or sorcery from graveyard to hand"),
+                        new LoyaltyAbility(-7, new TamiyoUltimateEffect(),
+                            "-7: Draw half library, emblem no max hand size"),
+                    ],
+                },
+            },
+
+            ["Polluted Delta"] = new(null, null, null, null, CardType.Land)
+            { Name = "Polluted Delta", FetchAbility = new FetchAbility(["Island", "Swamp"]) },
+
+            ["Underground Sea"] = new(null, ManaAbility.Choice(ManaColor.Blue, ManaColor.Black),
+                null, null, CardType.Land)
+            { Name = "Underground Sea", Subtypes = ["Island", "Swamp"] },
+
+            ["Misty Rainforest"] = new(null, null, null, null, CardType.Land)
+            { Name = "Misty Rainforest", FetchAbility = new FetchAbility(["Forest", "Island"]) },
+
+            ["Undercity Sewers"] = new(null, ManaAbility.Choice(ManaColor.Blue, ManaColor.Black),
+                null, null, CardType.Land)
+            {
+                Name = "Undercity Sewers",
+                EntersTapped = true,
+                Triggers = [new Trigger(GameEvent.EnterBattlefield, TriggerCondition.Self, new SurveilEffect(1))],
+            },
+
+            ["Thoughtseize"] = new(ManaCost.Parse("{B}"), null, null, null, CardType.Sorcery,
+                TargetFilter.Player(), new ThoughtseizeEffect())
+            { Name = "Thoughtseize" },
+
+            ["Fatal Push"] = new(ManaCost.Parse("{B}"), null, null, null, CardType.Instant,
+                TargetFilter.Creature(), new FatalPushEffect())
+            { Name = "Fatal Push" },
+
+            ["Brazen Borrower"] = new(ManaCost.Parse("{1}{U}{U}"), null, 3, 1, CardType.Creature)
+            {
+                Name = "Brazen Borrower",
+                Subtypes = ["Faerie", "Rogue"],
+                HasFlash = true,
+                ContinuousEffects =
+                [
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
+                        (card, _) => card.Name == "Brazen Borrower",
+                        GrantedKeyword: Keyword.Flying,
+                        Layer: EffectLayer.Layer6_AbilityAddRemove, ApplyToSelf: true),
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
+                        (card, _) => card.Name == "Brazen Borrower",
+                        GrantedKeyword: Keyword.CantBlockNonFlying,
+                        Layer: EffectLayer.Layer6_AbilityAddRemove, ApplyToSelf: true),
+                ],
+                Adventure = new AdventurePart("Petty Theft", ManaCost.Parse("{1}{U}"),
+                    Filter: TargetFilter.NonlandPermanent(),
+                    Effect: new PettyTheftEffect()),
+            },
         };
 
         Registry = cards.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
