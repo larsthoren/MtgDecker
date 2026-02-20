@@ -284,4 +284,205 @@ public class TransformTests
         card.Loyalty.Should().Be(0);
         card.IsCreature.Should().BeTrue();
     }
+
+    // --- Task 6: TriggerCondition.ThirdDrawInTurn ---
+
+    [Fact]
+    public void ThirdDrawTrigger_FiresOnThirdDraw()
+    {
+        // Setup: card with trigger GameEvent.DrawCard + TriggerCondition.ThirdDrawInTurn
+        var handler = new TestDecisionHandler();
+        var p1 = new Player(Guid.NewGuid(), "P1", handler);
+        var p2 = new Player(Guid.NewGuid(), "P2", new TestDecisionHandler());
+        var state = new GameState(p1, p2);
+        var engine = new GameEngine(state);
+
+        var backFace = new CardDefinition(null, null, 3, 3, CardType.Creature)
+        { Name = "Transformed Side" };
+        var card = new GameCard
+        {
+            Name = "Front Side",
+            CardTypes = CardType.Creature,
+            BasePower = 0,
+            BaseToughness = 3,
+            BackFaceDefinition = backFace,
+            Triggers = [new Trigger(GameEvent.DrawCard, TriggerCondition.ThirdDrawInTurn, new TransformExileReturnEffect())]
+        };
+        p1.Battlefield.Add(card);
+
+        // Put 3 cards in library for p1 to draw
+        for (int i = 0; i < 3; i++)
+            p1.Library.Add(new GameCard { Name = $"Card {i}" });
+
+        // Draw 3 cards — should fire the trigger and push to stack
+        engine.DrawCards(p1, 3);
+
+        // The trigger should have been pushed to the stack
+        state.StackCount.Should().BeGreaterThan(0);
+    }
+
+    [Fact]
+    public void ThirdDrawTrigger_DoesNotFireBeforeThirdDraw()
+    {
+        var handler = new TestDecisionHandler();
+        var p1 = new Player(Guid.NewGuid(), "P1", handler);
+        var p2 = new Player(Guid.NewGuid(), "P2", new TestDecisionHandler());
+        var state = new GameState(p1, p2);
+        var engine = new GameEngine(state);
+
+        var backFace = new CardDefinition(null, null, 3, 3, CardType.Creature)
+        { Name = "Transformed Side" };
+        var card = new GameCard
+        {
+            Name = "Front Side",
+            CardTypes = CardType.Creature,
+            BasePower = 0,
+            BaseToughness = 3,
+            BackFaceDefinition = backFace,
+            Triggers = [new Trigger(GameEvent.DrawCard, TriggerCondition.ThirdDrawInTurn, new TransformExileReturnEffect())]
+        };
+        p1.Battlefield.Add(card);
+
+        // Put 2 cards in library for p1 to draw
+        for (int i = 0; i < 2; i++)
+            p1.Library.Add(new GameCard { Name = $"Card {i}" });
+
+        // Draw only 2 cards — should NOT fire the trigger
+        engine.DrawCards(p1, 2);
+
+        // No trigger on the stack
+        state.StackCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void ThirdDrawTrigger_OnlyFiresForController()
+    {
+        // The trigger should only fire when the CONTROLLER of the card draws the third card,
+        // not when the opponent does
+        var handler = new TestDecisionHandler();
+        var p1 = new Player(Guid.NewGuid(), "P1", handler);
+        var p2 = new Player(Guid.NewGuid(), "P2", new TestDecisionHandler());
+        var state = new GameState(p1, p2);
+        var engine = new GameEngine(state);
+
+        var backFace = new CardDefinition(null, null, 3, 3, CardType.Creature)
+        { Name = "Transformed Side" };
+        var card = new GameCard
+        {
+            Name = "Front Side",
+            CardTypes = CardType.Creature,
+            BasePower = 0,
+            BaseToughness = 3,
+            BackFaceDefinition = backFace,
+            Triggers = [new Trigger(GameEvent.DrawCard, TriggerCondition.ThirdDrawInTurn, new TransformExileReturnEffect())]
+        };
+        // Card is on P1's battlefield
+        p1.Battlefield.Add(card);
+
+        // Put 3 cards in P2's library and have P2 draw 3
+        for (int i = 0; i < 3; i++)
+            p2.Library.Add(new GameCard { Name = $"Card {i}" });
+
+        engine.DrawCards(p2, 3);
+
+        // Trigger should NOT fire — P2 drew, but the card is controlled by P1
+        state.StackCount.Should().Be(0);
+    }
+
+    // --- Task 7: ExpiresOnTurnNumber for ContinuousEffect ---
+
+    [Fact]
+    public void ContinuousEffect_ExpiresOnTurnNumber_RemovedAtTurnStart()
+    {
+        var p1 = new Player(Guid.NewGuid(), "P1", new TestDecisionHandler());
+        var p2 = new Player(Guid.NewGuid(), "P2", new TestDecisionHandler());
+        var state = new GameState(p1, p2);
+        var engine = new GameEngine(state);
+        state.TurnNumber = 1;
+
+        var effect = new ContinuousEffect(
+            Guid.NewGuid(), ContinuousEffectType.ModifyPowerToughness,
+            (card, _) => card.IsCreature,
+            PowerMod: -1,
+            ExpiresOnTurnNumber: 3,
+            Layer: EffectLayer.Layer7c_ModifyPT);
+        state.ActiveEffects.Add(effect);
+
+        // Turn 2 — effect should still be there
+        state.TurnNumber = 2;
+        engine.RemoveExpiredEffects();
+        state.ActiveEffects.Should().Contain(effect);
+
+        // Turn 3 — effect should be removed
+        state.TurnNumber = 3;
+        engine.RemoveExpiredEffects();
+        state.ActiveEffects.Should().NotContain(effect);
+    }
+
+    [Fact]
+    public void ContinuousEffect_ExpiresOnTurnNumber_NotRemovedBeforeExpiry()
+    {
+        var p1 = new Player(Guid.NewGuid(), "P1", new TestDecisionHandler());
+        var p2 = new Player(Guid.NewGuid(), "P2", new TestDecisionHandler());
+        var state = new GameState(p1, p2);
+        var engine = new GameEngine(state);
+        state.TurnNumber = 1;
+
+        var effect = new ContinuousEffect(
+            Guid.NewGuid(), ContinuousEffectType.ModifyPowerToughness,
+            (card, _) => card.IsCreature,
+            PowerMod: +2,
+            ExpiresOnTurnNumber: 5,
+            Layer: EffectLayer.Layer7c_ModifyPT);
+        state.ActiveEffects.Add(effect);
+
+        // Turn 4 — effect should still be there
+        state.TurnNumber = 4;
+        engine.RemoveExpiredEffects();
+        state.ActiveEffects.Should().Contain(effect);
+    }
+
+    [Fact]
+    public void ContinuousEffect_WithoutExpiresOnTurnNumber_NeverExpires()
+    {
+        var p1 = new Player(Guid.NewGuid(), "P1", new TestDecisionHandler());
+        var p2 = new Player(Guid.NewGuid(), "P2", new TestDecisionHandler());
+        var state = new GameState(p1, p2);
+        var engine = new GameEngine(state);
+
+        var effect = new ContinuousEffect(
+            Guid.NewGuid(), ContinuousEffectType.ModifyPowerToughness,
+            (card, _) => card.IsCreature,
+            PowerMod: -1,
+            Layer: EffectLayer.Layer7c_ModifyPT);
+        state.ActiveEffects.Add(effect);
+
+        // Even at turn 100, effect without ExpiresOnTurnNumber should persist
+        state.TurnNumber = 100;
+        engine.RemoveExpiredEffects();
+        state.ActiveEffects.Should().Contain(effect);
+    }
+
+    [Fact]
+    public void ContinuousEffect_ExpiresOnTurnNumber_SurvivedByRecalculateState()
+    {
+        var p1 = new Player(Guid.NewGuid(), "P1", new TestDecisionHandler());
+        var p2 = new Player(Guid.NewGuid(), "P2", new TestDecisionHandler());
+        var state = new GameState(p1, p2);
+        var engine = new GameEngine(state);
+        state.TurnNumber = 1;
+
+        var effect = new ContinuousEffect(
+            Guid.NewGuid(), ContinuousEffectType.ModifyPowerToughness,
+            (card, _) => card.IsCreature,
+            PowerMod: -1,
+            ExpiresOnTurnNumber: 5,
+            Layer: EffectLayer.Layer7c_ModifyPT);
+        state.ActiveEffects.Add(effect);
+
+        // RecalculateState should preserve ExpiresOnTurnNumber effects (like UntilEndOfTurn)
+        engine.RecalculateState();
+
+        state.ActiveEffects.Should().ContainSingle(e => e.ExpiresOnTurnNumber == 5);
+    }
 }
