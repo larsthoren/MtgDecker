@@ -36,6 +36,7 @@ public class GameEngine
         _state.Player2.CreaturesDiedThisTurn = 0;
         _state.Player1.DrawsThisTurn = 0;
         _state.Player2.DrawsThisTurn = 0;
+        RemoveExpiredEffects();
         _state.Player1.DrawStepDrawExempted = false;
         _state.Player2.DrawStepDrawExempted = false;
         _state.Player1.PlaneswalkerAbilitiesUsedThisTurn.Clear();
@@ -625,13 +626,19 @@ public class GameEngine
                     break;
                 }
 
-                if (!CardDefinitions.TryGet(abilitySource.Name, out var abilityDef) || abilityDef.ActivatedAbility == null)
+                // Look up activated ability: token ability on the card, then CardDefinitions registry
+                ActivatedAbility? ability = abilitySource.TokenActivatedAbility;
+                if (ability == null)
+                {
+                    if (CardDefinitions.TryGet(abilitySource.Name, out var abilityDef))
+                        ability = abilityDef.ActivatedAbility;
+                }
+
+                if (ability == null)
                 {
                     _state.Log($"{abilitySource.Name} has no activated ability.");
                     break;
                 }
-
-                var ability = abilityDef.ActivatedAbility;
                 var cost = ability.Cost;
 
                 // Validate: activation condition (e.g., threshold)
@@ -1084,7 +1091,14 @@ public class GameEngine
                 }
 
                 // Get card definition and validate ability index
-                if (!CardDefinitions.TryGet(pwCard.Name, out var pwDef) || pwDef.LoyaltyAbilities == null)
+                // For transformed cards, check BackFaceDefinition first (back face name isn't in CardDefinitions)
+                CardDefinition? pwDef = null;
+                if (pwCard.IsTransformed && pwCard.BackFaceDefinition?.LoyaltyAbilities != null)
+                    pwDef = pwCard.BackFaceDefinition;
+                else if (CardDefinitions.TryGet(pwCard.Name, out var registeredDef))
+                    pwDef = registeredDef;
+
+                if (pwDef?.LoyaltyAbilities == null)
                 {
                     _state.Log($"{pwCard.Name} has no loyalty abilities.");
                     break;
@@ -1931,10 +1945,18 @@ public class GameEngine
         _state.ActiveEffects.RemoveAll(e => e.UntilEndOfTurn);
     }
 
+    public void RemoveExpiredEffects()
+    {
+        _state.ActiveEffects.RemoveAll(e =>
+            e.ExpiresOnTurnNumber != null && e.ExpiresOnTurnNumber <= _state.TurnNumber);
+    }
+
     public void RecalculateState()
     {
-        // Preserve temporary (UntilEndOfTurn) effects before rebuild
-        var tempEffects = _state.ActiveEffects.Where(e => e.UntilEndOfTurn).ToList();
+        // Preserve temporary (UntilEndOfTurn) and expiring effects before rebuild
+        var tempEffects = _state.ActiveEffects
+            .Where(e => e.UntilEndOfTurn || e.ExpiresOnTurnNumber != null)
+            .ToList();
 
         // Reset timestamp counter
         _state.NextEffectTimestamp = 1;
@@ -2959,11 +2981,21 @@ public class GameEngine
                 foreach (var trigger in card.Triggers)
                 {
                     if (trigger.Event != GameEvent.DrawCard) continue;
-                    if (trigger.Condition != TriggerCondition.OpponentDrawsExceptFirst) continue;
-                    if (drawingPlayer.Id == player.Id) continue; // Only opponent draws
 
-                    _state.Log($"{card.Name} triggers on {drawingPlayer.Name}'s draw.");
-                    _state.StackPush(new TriggeredAbilityStackObject(card, player.Id, trigger.Effect));
+                    if (trigger.Condition == TriggerCondition.OpponentDrawsExceptFirst)
+                    {
+                        if (drawingPlayer.Id == player.Id) continue; // Only opponent draws
+                        _state.Log($"{card.Name} triggers on {drawingPlayer.Name}'s draw.");
+                        _state.StackPush(new TriggeredAbilityStackObject(card, player.Id, trigger.Effect));
+                    }
+                    else if (trigger.Condition == TriggerCondition.ThirdDrawInTurn)
+                    {
+                        // Only fires for the controller of the trigger card
+                        if (drawingPlayer.Id != player.Id) continue;
+                        if (drawingPlayer.DrawsThisTurn != 3) continue;
+                        _state.Log($"{card.Name} triggers on {drawingPlayer.Name}'s third draw this turn.");
+                        _state.StackPush(new TriggeredAbilityStackObject(card, player.Id, trigger.Effect));
+                    }
                 }
             }
         }

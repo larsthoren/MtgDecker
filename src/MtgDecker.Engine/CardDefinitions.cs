@@ -876,6 +876,42 @@ public static class CardDefinitions
                                 c => c.Name == "Kaito, Bane of Nightmares")),
                 ],
             },
+
+            ["Tamiyo, Inquisitive Student"] = new(ManaCost.Parse("{U}"), null, 0, 3, CardType.Creature)
+            {
+                Name = "Tamiyo, Inquisitive Student",
+                IsLegendary = true,
+                Subtypes = ["Moonfolk", "Wizard"],
+                ContinuousEffects =
+                [
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
+                        (card, _) => card.Name == "Tamiyo, Inquisitive Student",
+                        GrantedKeyword: Keyword.Flying,
+                        Layer: EffectLayer.Layer6_AbilityAddRemove,
+                        ApplyToSelf: true),
+                ],
+                Triggers =
+                [
+                    new Trigger(GameEvent.BeginCombat, TriggerCondition.SelfAttacks, new InvestigateEffect()),
+                    new Trigger(GameEvent.DrawCard, TriggerCondition.ThirdDrawInTurn, new TransformExileReturnEffect()),
+                ],
+                TransformInto = new CardDefinition(null, null, null, null, CardType.Planeswalker)
+                {
+                    Name = "Tamiyo, Seasoned Scholar",
+                    IsLegendary = true,
+                    Subtypes = ["Tamiyo"],
+                    StartingLoyalty = 2,
+                    LoyaltyAbilities =
+                    [
+                        new LoyaltyAbility(2, new TamiyoDefenseEffect(),
+                            "+2: Creatures attacking you get -1/-0 until next turn"),
+                        new LoyaltyAbility(-3, new TamiyoRecoverEffect(),
+                            "-3: Return instant or sorcery from graveyard to hand"),
+                        new LoyaltyAbility(-7, new TamiyoUltimateEffect(),
+                            "-7: Draw half library, emblem no max hand size"),
+                    ],
+                },
+            },
         };
 
         Registry = cards.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
