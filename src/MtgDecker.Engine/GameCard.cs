@@ -7,7 +7,30 @@ namespace MtgDecker.Engine;
 public class GameCard
 {
     public Guid Id { get; init; } = Guid.NewGuid();
-    public string Name { get; init; } = string.Empty;
+
+    // Backing fields for transform-aware properties
+    private string _frontName = string.Empty;
+    private CardType _frontCardTypes = CardType.None;
+    private int? _frontBasePower;
+    private int? _frontBaseToughness;
+
+    // Transform state
+    public bool IsTransformed { get; set; }
+    public CardDefinition? BackFaceDefinition { get; set; }
+
+    /// <summary>Always returns the front face name, regardless of transform state.</summary>
+    public string FrontName => _frontName;
+
+    /// <summary>
+    /// Returns back face name when transformed (with a BackFaceDefinition), otherwise front face name.
+    /// Setter always writes to the front face.
+    /// </summary>
+    public string Name
+    {
+        get => IsTransformed && BackFaceDefinition != null ? BackFaceDefinition.Name : _frontName;
+        set => _frontName = value;
+    }
+
     public string TypeLine { get; init; } = string.Empty;
     public string? ImageUrl { get; init; }
     public bool IsTapped { get; set; }
@@ -15,7 +38,17 @@ public class GameCard
     // Resolved from CardDefinitions registry or auto-parsed
     public ManaCost? ManaCost { get; set; }
     public ManaAbility? ManaAbility { get; set; }
-    public CardType CardTypes { get; set; } = CardType.None;
+
+    /// <summary>
+    /// Returns back face card types when transformed, otherwise front face card types.
+    /// Setter always writes to the front face.
+    /// </summary>
+    public CardType CardTypes
+    {
+        get => IsTransformed && BackFaceDefinition != null ? BackFaceDefinition.CardTypes : _frontCardTypes;
+        set => _frontCardTypes = value;
+    }
+
     public IReadOnlyList<string> Subtypes { get; init; } = [];
     public IReadOnlyList<Trigger> Triggers { get; init; } = [];
     public bool IsToken { get; init; }
@@ -25,8 +58,25 @@ public class GameCard
     public bool EchoPaid { get; set; } = true;
 
     // Base power/toughness from the card definition
-    public int? BasePower { get; set; }
-    public int? BaseToughness { get; set; }
+    /// <summary>
+    /// Returns back face power when transformed, otherwise front face power.
+    /// Setter always writes to the front face.
+    /// </summary>
+    public int? BasePower
+    {
+        get => IsTransformed && BackFaceDefinition != null ? BackFaceDefinition.Power : _frontBasePower;
+        set => _frontBasePower = value;
+    }
+
+    /// <summary>
+    /// Returns back face toughness when transformed, otherwise front face toughness.
+    /// Setter always writes to the front face.
+    /// </summary>
+    public int? BaseToughness
+    {
+        get => IsTransformed && BackFaceDefinition != null ? BackFaceDefinition.Toughness : _frontBaseToughness;
+        set => _frontBaseToughness = value;
+    }
 
     // Effective overrides set by continuous effects (RecalculateState)
     public int? EffectivePower { get; set; }
