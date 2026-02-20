@@ -211,8 +211,11 @@ public class DelverIntegrationTests
         var ponder = GameCard.Create("Ponder");
         state.Player1.Hand.Add(ponder);
 
-        // Choose to keep order: non-null = keep
-        h1.EnqueueCardChoice(Guid.NewGuid());
+        // Reorder: put back in original order (ThirdCard deepest, SecondCard middle, TopCard on top)
+        h1.EnqueueCardChoice(lib3.Id); // ThirdCard goes deepest
+        h1.EnqueueCardChoice(lib2.Id); // SecondCard middle
+        // TopCard auto-placed on top
+        h1.EnqueueCardChoice(Guid.NewGuid()); // keep order (non-null)
 
         h1.EnqueueAction(GameAction.TapCard(state.Player1.Id, island.Id));
         h1.EnqueueAction(GameAction.CastSpell(state.Player1.Id, ponder.Id));
