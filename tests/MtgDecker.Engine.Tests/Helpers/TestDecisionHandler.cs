@@ -12,11 +12,14 @@ public class TestDecisionHandler : IPlayerDecisionHandler
     private readonly Queue<ManaColor> _manaColorChoices = new();
     private readonly Queue<Dictionary<ManaColor, int>> _genericPaymentChoices = new();
     private readonly Queue<IReadOnlyList<Guid>> _attackerQueue = new();
+    private readonly Queue<Dictionary<Guid, Guid?>> _attackerTargetQueue = new();
     private readonly Queue<Dictionary<Guid, Guid>> _blockerQueue = new();
     private readonly Queue<IReadOnlyList<Guid>> _blockerOrderQueue = new();
     private readonly Queue<TargetInfo?> _targetQueue = new();
     private readonly Queue<Guid?> _cardChoiceQueue = new();
     private readonly Queue<Func<IReadOnlyList<GameCard>, int, IReadOnlyList<GameCard>>> _discardChoices = new();
+    private readonly Queue<Func<IReadOnlyList<GameCard>, IReadOnlyList<GameCard>>> _splitChoices = new();
+    private readonly Queue<int> _pileChoices = new();
 
     public void EnqueueAction(GameAction action) => _actions.Enqueue(action);
 
@@ -30,6 +33,7 @@ public class TestDecisionHandler : IPlayerDecisionHandler
     public void EnqueueGenericPayment(Dictionary<ManaColor, int> payment) => _genericPaymentChoices.Enqueue(payment);
 
     public void EnqueueAttackers(IReadOnlyList<Guid> attackerIds) => _attackerQueue.Enqueue(attackerIds);
+    public void EnqueueAttackerTargets(Dictionary<Guid, Guid?> targets) => _attackerTargetQueue.Enqueue(targets);
     public void EnqueueBlockers(Dictionary<Guid, Guid> assignments) => _blockerQueue.Enqueue(assignments);
     public void EnqueueBlockerOrder(IReadOnlyList<Guid> order) => _blockerOrderQueue.Enqueue(order);
     public void EnqueueTarget(TargetInfo? target) => _targetQueue.Enqueue(target);
@@ -37,6 +41,10 @@ public class TestDecisionHandler : IPlayerDecisionHandler
 
     public void EnqueueDiscardChoice(Func<IReadOnlyList<GameCard>, int, IReadOnlyList<GameCard>> chooser) =>
         _discardChoices.Enqueue(chooser);
+
+    public void EnqueueSplitChoice(Func<IReadOnlyList<GameCard>, IReadOnlyList<GameCard>> chooser) =>
+        _splitChoices.Enqueue(chooser);
+    public void EnqueuePileChoice(int pile) => _pileChoices.Enqueue(pile);
 
     public Action? OnBeforeAction { get; set; }
 
@@ -96,6 +104,15 @@ public class TestDecisionHandler : IPlayerDecisionHandler
     public Task<IReadOnlyList<Guid>> ChooseAttackers(IReadOnlyList<GameCard> eligibleAttackers, CancellationToken ct = default)
         => Task.FromResult(_attackerQueue.Count > 0 ? _attackerQueue.Dequeue() : (IReadOnlyList<Guid>)Array.Empty<Guid>());
 
+    public Task<Dictionary<Guid, Guid?>> ChooseAttackerTargets(IReadOnlyList<GameCard> attackers, IReadOnlyList<GameCard> planeswalkers, CancellationToken ct = default)
+    {
+        if (_attackerTargetQueue.Count > 0)
+            return Task.FromResult(_attackerTargetQueue.Dequeue());
+        // Default: all attack the player (null targets)
+        var result = attackers.ToDictionary(a => a.Id, _ => (Guid?)null);
+        return Task.FromResult(result);
+    }
+
     public Task<Dictionary<Guid, Guid>> ChooseBlockers(IReadOnlyList<GameCard> eligibleBlockers, IReadOnlyList<GameCard> attackers, CancellationToken ct = default)
         => Task.FromResult(_blockerQueue.Count > 0 ? _blockerQueue.Dequeue() : new Dictionary<Guid, Guid>());
 
@@ -131,5 +148,19 @@ public class TestDecisionHandler : IPlayerDecisionHandler
         if (_discardChoices.Count == 0)
             return Task.FromResult<IReadOnlyList<GameCard>>(hand.Take(discardCount).ToList());
         return Task.FromResult(_discardChoices.Dequeue()(hand, discardCount));
+    }
+
+    public Task<IReadOnlyList<GameCard>> SplitCards(IReadOnlyList<GameCard> cards, string prompt, CancellationToken ct = default)
+    {
+        if (_splitChoices.Count == 0)
+            return Task.FromResult<IReadOnlyList<GameCard>>(cards.Take(cards.Count / 2).ToList());
+        return Task.FromResult(_splitChoices.Dequeue()(cards));
+    }
+
+    public Task<int> ChoosePile(IReadOnlyList<GameCard> pile1, IReadOnlyList<GameCard> pile2, string prompt, CancellationToken ct = default)
+    {
+        if (_pileChoices.Count == 0)
+            return Task.FromResult(1);
+        return Task.FromResult(_pileChoices.Dequeue());
     }
 }

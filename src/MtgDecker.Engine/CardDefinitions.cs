@@ -348,7 +348,7 @@ public static class CardDefinitions
             ["Battlefield Forge"] = new(null, ManaAbility.PainChoice([ManaColor.Colorless, ManaColor.Red, ManaColor.White], [ManaColor.Red, ManaColor.White]), null, null, CardType.Land),
             ["Tainted Field"] = new(null, ManaAbility.Choice(ManaColor.White, ManaColor.Black), null, null, CardType.Land),
             ["Coastal Tower"] = new(null, ManaAbility.Choice(ManaColor.White, ManaColor.Blue), null, null, CardType.Land) { EntersTapped = true },
-            ["Skycloud Expanse"] = new(null, ManaAbility.Choice(ManaColor.White, ManaColor.Blue), null, null, CardType.Land),
+            ["Skycloud Expanse"] = new(null, ManaAbility.Filter(ManaCost.Parse("{1}"), ManaColor.White, ManaColor.Blue), null, null, CardType.Land),
             ["Adarkar Wastes"] = new(null, ManaAbility.PainChoice([ManaColor.Colorless, ManaColor.White, ManaColor.Blue], [ManaColor.White, ManaColor.Blue]), null, null, CardType.Land),
             ["Gemstone Mine"] = new(null, ManaAbility.DepletionChoice(CounterType.Mining, ManaColor.White, ManaColor.Blue, ManaColor.Black, ManaColor.Red, ManaColor.Green), null, null, CardType.Land)
             {
@@ -917,6 +917,48 @@ public static class CardDefinitions
 
             ["Intuition"] = new(ManaCost.Parse("{2}{U}"), null, null, null, CardType.Instant,
                 Effect: new IntuitionEffect()),
+
+            // ─── Planeswalkers ──────────────────────────────────────────────────
+
+            ["Kaito, Bane of Nightmares"] = new(ManaCost.Parse("{2}{U}{B}"), null, null, null, CardType.Planeswalker)
+            {
+                IsLegendary = true,
+                Subtypes = ["Kaito", "Ninja"],
+                StartingLoyalty = 4,
+                NinjutsuCost = ManaCost.Parse("{1}{U}{B}"),
+                LoyaltyAbilities =
+                [
+                    new LoyaltyAbility(1, new CreateNinjaEmblemEffect(),
+                        "+1: You get an emblem with \"Ninjas you control get +1/+1.\""),
+                    new LoyaltyAbility(0, new SurveilAndDrawEffect(),
+                        "0: Surveil 2. Then draw a card for each opponent who lost life this turn."),
+                    new LoyaltyAbility(-2, new TapAndStunEffect(),
+                        "-2: Tap target creature. Put two stun counters on it."),
+                ],
+                ContinuousEffects =
+                [
+                    // During your turn, as long as Kaito has 1+ loyalty counters,
+                    // he's a 3/4 Ninja creature with hexproof.
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.BecomeCreature,
+                        (card, _) => card.Name == "Kaito, Bane of Nightmares"
+                            && card.GetCounters(CounterType.Loyalty) > 0,
+                        SetPower: 3, SetToughness: 4,
+                        ApplyToSelf: true,
+                        Layer: EffectLayer.Layer4_TypeChanging,
+                        StateCondition: state =>
+                            state.ActivePlayer.Battlefield.Cards.Any(
+                                c => c.Name == "Kaito, Bane of Nightmares")),
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
+                        (card, _) => card.Name == "Kaito, Bane of Nightmares"
+                            && card.GetCounters(CounterType.Loyalty) > 0,
+                        GrantedKeyword: Keyword.Hexproof,
+                        ApplyToSelf: true,
+                        Layer: EffectLayer.Layer6_AbilityAddRemove,
+                        StateCondition: state =>
+                            state.ActivePlayer.Battlefield.Cards.Any(
+                                c => c.Name == "Kaito, Bane of Nightmares")),
+                ],
+            },
         };
 
         Registry = cards.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);

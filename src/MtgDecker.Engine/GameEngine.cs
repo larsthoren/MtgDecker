@@ -38,6 +38,10 @@ public class GameEngine
         _state.Player2.DrawsThisTurn = 0;
         _state.Player1.DrawStepDrawExempted = false;
         _state.Player2.DrawStepDrawExempted = false;
+        _state.Player1.PlaneswalkerAbilitiesUsedThisTurn.Clear();
+        _state.Player2.PlaneswalkerAbilitiesUsedThisTurn.Clear();
+        _state.Player1.LifeLostThisTurn = 0;
+        _state.Player2.LifeLostThisTurn = 0;
         _state.Log($"Turn {_state.TurnNumber}: {_state.ActivePlayer.Name}'s turn.");
 
         do
@@ -136,7 +140,17 @@ public class GameEngine
         {
             case Phase.Untap:
                 foreach (var card in _state.ActivePlayer.Battlefield.Cards)
-                    card.IsTapped = false;
+                {
+                    if (card.GetCounters(CounterType.Stun) > 0)
+                    {
+                        card.RemoveCounter(CounterType.Stun);
+                        _state.Log($"Removed a stun counter from {card.Name} (instead of untapping).");
+                    }
+                    else if (card.IsTapped)
+                    {
+                        card.IsTapped = false;
+                    }
+                }
                 _state.ActivePlayer.PendingManaTaps.Clear();
                 _state.Log($"{_state.ActivePlayer.Name} untaps all permanents.");
                 break;
@@ -325,6 +339,40 @@ public class GameEngine
                                 _state.Log($"{player.Name} taps {tapTarget.Name} (produces no mana).");
                             }
                         }
+                        else if (ability.Type == ManaAbilityType.Filter)
+                        {
+                            // Filter lands require paying an activation cost to produce multiple colors
+                            if (ability.ActivationCost != null && !player.ManaPool.CanPay(ability.ActivationCost))
+                            {
+                                // Can't pay — reject the tap
+                                tapTarget.IsTapped = false;
+                                player.ActionHistory.Pop();
+                                _state.Log($"{player.Name} cannot pay {ability.ActivationCost} to activate {tapTarget.Name}.");
+                                break;
+                            }
+
+                            if (ability.ActivationCost != null)
+                            {
+                                // Snapshot pool before paying to record what was actually spent (for undo)
+                                var poolBefore = player.ManaPool.Available.ToDictionary(kv => kv.Key, kv => kv.Value);
+                                player.ManaPool.Pay(ability.ActivationCost);
+                                var poolAfter = player.ManaPool.Available;
+                                action.ActualManaPaid = new Dictionary<ManaColor, int>();
+                                foreach (var (color, before) in poolBefore)
+                                {
+                                    var after = poolAfter.GetValueOrDefault(color, 0);
+                                    if (before > after)
+                                        action.ActualManaPaid[color] = before - after;
+                                }
+                            }
+
+                            // Produce all colors — use BonusManaProduced for undo tracking
+                            action.BonusManaProduced = ability.ProducedColors!.ToList();
+                            foreach (var color in ability.ProducedColors!)
+                                player.ManaPool.Add(color);
+
+                            _state.Log($"{player.Name} taps {tapTarget.Name} (pays {ability.ActivationCost}) for {string.Join(", ", ability.ProducedColors)}.");
+                        }
                     }
                     else
                     {
@@ -503,10 +551,10 @@ public class GameEngine
                     var eligible = new List<GameCard>();
                     var opponent = _state.GetOpponent(castPlayer);
                     foreach (var c in castPlayer.Battlefield.Cards)
-                        if (def.TargetFilter.IsLegal(c, ZoneType.Battlefield) && !HasShroud(c))
+                        if (def.TargetFilter.IsLegal(c, ZoneType.Battlefield) && !CannotBeTargetedBy(c, castPlayer))
                             eligible.Add(c);
                     foreach (var c in opponent.Battlefield.Cards)
-                        if (def.TargetFilter.IsLegal(c, ZoneType.Battlefield) && !HasShroud(c))
+                        if (def.TargetFilter.IsLegal(c, ZoneType.Battlefield) && !CannotBeTargetedBy(c, castPlayer))
                             eligible.Add(c);
 
                     // Add player sentinels if the filter allows player targets
@@ -808,7 +856,7 @@ public class GameEngine
                     var opponent = _state.GetOpponent(player);
                     var eligible = player.Battlefield.Cards
                         .Concat(opponent.Battlefield.Cards)
-                        .Where(c => ability.TargetFilter(c) && !HasShroud(c))
+                        .Where(c => ability.TargetFilter(c) && !CannotBeTargetedBy(c, player))
                         .ToList();
 
                     if (eligible.Count == 0)
@@ -829,10 +877,11 @@ public class GameEngine
                     effectTarget = eligible.FirstOrDefault(c => c.Id == target.CardId);
                 }
 
-                // Shroud check: cannot target a permanent with shroud
-                if (effectTarget != null && HasShroud(effectTarget))
+                // Shroud/Hexproof check: cannot target a permanent with shroud or hexproof (opponent only)
+                if (effectTarget != null && CannotBeTargetedBy(effectTarget, player))
                 {
-                    _state.Log($"{effectTarget.Name} has shroud — cannot be targeted.");
+                    var reason = HasShroud(effectTarget) ? "shroud" : "hexproof";
+                    _state.Log($"{effectTarget.Name} has {reason} — cannot be targeted.");
                     break;
                 }
 
@@ -967,10 +1016,10 @@ public class GameEngine
                     var fbEligible = new List<GameCard>();
 
                     foreach (var c in fbPlayer.Battlefield.Cards)
-                        if (fbDef.TargetFilter.IsLegal(c, ZoneType.Battlefield) && !HasShroud(c))
+                        if (fbDef.TargetFilter.IsLegal(c, ZoneType.Battlefield) && !CannotBeTargetedBy(c, fbPlayer))
                             fbEligible.Add(c);
                     foreach (var c in fbOpponent.Battlefield.Cards)
-                        if (fbDef.TargetFilter.IsLegal(c, ZoneType.Battlefield) && !HasShroud(c))
+                        if (fbDef.TargetFilter.IsLegal(c, ZoneType.Battlefield) && !CannotBeTargetedBy(c, fbPlayer))
                             fbEligible.Add(c);
 
                     // Player sentinels
@@ -1050,6 +1099,168 @@ public class GameEngine
 
                 _state.Log($"{fbPlayer.Name} casts {fbCard.Name} (flashback).");
                 await QueueBoardTriggersOnStackAsync(GameEvent.SpellCast, fbCard, ct);
+                break;
+            }
+
+            case ActionType.ActivateLoyaltyAbility:
+            {
+                var pwCard = player.Battlefield.Cards.FirstOrDefault(c => c.Id == action.CardId);
+                if (pwCard == null || !pwCard.IsPlaneswalker) break;
+
+                // Must be sorcery speed
+                if (!CanCastSorcery(player.Id))
+                {
+                    _state.Log($"Cannot activate {pwCard.Name} — not at sorcery speed.");
+                    break;
+                }
+
+                // One loyalty ability per planeswalker per turn
+                if (player.PlaneswalkerAbilitiesUsedThisTurn.Contains(pwCard.Id))
+                {
+                    _state.Log($"{pwCard.Name} has already activated a loyalty ability this turn.");
+                    break;
+                }
+
+                // Get card definition and validate ability index
+                if (!CardDefinitions.TryGet(pwCard.Name, out var pwDef) || pwDef.LoyaltyAbilities == null)
+                {
+                    _state.Log($"{pwCard.Name} has no loyalty abilities.");
+                    break;
+                }
+
+                var abilityIdx = action.AbilityIndex ?? -1;
+                if (abilityIdx < 0 || abilityIdx >= pwDef.LoyaltyAbilities.Count)
+                {
+                    _state.Log($"Invalid loyalty ability index for {pwCard.Name}.");
+                    break;
+                }
+
+                var loyaltyAbility = pwDef.LoyaltyAbilities[abilityIdx];
+
+                // Check loyalty cost is payable (negative costs: loyalty + cost >= 0)
+                if (loyaltyAbility.LoyaltyCost < 0 && pwCard.Loyalty + loyaltyAbility.LoyaltyCost < 0)
+                {
+                    _state.Log($"Not enough loyalty to activate {pwCard.Name} ({loyaltyAbility.Description}).");
+                    break;
+                }
+
+                // Pay loyalty cost
+                if (loyaltyAbility.LoyaltyCost > 0)
+                {
+                    pwCard.AddCounters(CounterType.Loyalty, loyaltyAbility.LoyaltyCost);
+                }
+                else if (loyaltyAbility.LoyaltyCost < 0)
+                {
+                    for (int i = 0; i < -loyaltyAbility.LoyaltyCost; i++)
+                        pwCard.RemoveCounter(CounterType.Loyalty);
+                }
+
+                // Mark as used this turn
+                player.PlaneswalkerAbilitiesUsedThisTurn.Add(pwCard.Id);
+
+                // Push to stack — default target is opponent (for damage/effect abilities)
+                var opponent = _state.GetOpponent(player);
+                var loyaltyStackObj = new ActivatedLoyaltyAbilityStackObject(
+                    pwCard, player.Id, loyaltyAbility.Effect, loyaltyAbility.Description)
+                {
+                    TargetPlayerId = opponent.Id,
+                };
+                _state.StackPush(loyaltyStackObj);
+
+                _state.Log($"{player.Name} activates {pwCard.Name}: {loyaltyAbility.Description}");
+                break;
+            }
+
+            case ActionType.Ninjutsu:
+            {
+                // Ninjutsu: pay cost, return unblocked attacker to hand, put ninja on battlefield tapped and attacking
+                var ninjutsuPlayer = _state.GetPlayer(action.PlayerId);
+                var ninjaCard = ninjutsuPlayer.Hand.Cards.FirstOrDefault(c => c.Id == action.CardId);
+                if (ninjaCard == null)
+                {
+                    _state.Log("Ninjutsu card not found in hand.");
+                    break;
+                }
+
+                // Must have NinjutsuCost registered
+                if (!CardDefinitions.TryGet(ninjaCard.Name, out var ninjutsuDef) || ninjutsuDef.NinjutsuCost == null)
+                {
+                    _state.Log($"{ninjaCard.Name} does not have ninjutsu.");
+                    break;
+                }
+
+                // Must be during combat, after blockers declared
+                if (_state.CurrentPhase != Phase.Combat || _state.Combat == null
+                    || _state.CombatStep < CombatStep.DeclareBlockers)
+                {
+                    _state.Log("Ninjutsu can only be activated during combat after blockers are declared.");
+                    break;
+                }
+
+                // Return creature must be an unblocked attacker you control
+                var returnCreatureId = action.ReturnCardId;
+                if (!returnCreatureId.HasValue)
+                {
+                    _state.Log("No creature specified to return.");
+                    break;
+                }
+
+                var returnCreature = ninjutsuPlayer.Battlefield.Cards.FirstOrDefault(c => c.Id == returnCreatureId.Value);
+                if (returnCreature == null)
+                {
+                    _state.Log("Return creature not found on battlefield.");
+                    break;
+                }
+
+                // Must be attacking and unblocked
+                if (!_state.Combat.Attackers.Contains(returnCreature.Id))
+                {
+                    _state.Log($"{returnCreature.Name} is not attacking.");
+                    break;
+                }
+
+                if (_state.Combat.IsBlocked(returnCreature.Id))
+                {
+                    _state.Log($"{returnCreature.Name} is blocked — cannot use ninjutsu.");
+                    break;
+                }
+
+                // Must be able to pay ninjutsu cost
+                var ninjutsuCost = ninjutsuDef.NinjutsuCost;
+                if (!ninjutsuPlayer.ManaPool.CanPay(ninjutsuCost))
+                {
+                    _state.Log($"Not enough mana to activate ninjutsu for {ninjaCard.Name}.");
+                    break;
+                }
+
+                // Pay ninjutsu cost
+                await PayManaCostAsync(ninjutsuCost, ninjutsuPlayer, ct);
+                ninjutsuPlayer.PendingManaTaps.Clear();
+
+                // Return attacker to hand
+                ninjutsuPlayer.Battlefield.RemoveById(returnCreature.Id);
+                returnCreature.IsTapped = false;
+                returnCreature.DamageMarked = 0;
+                ninjutsuPlayer.Hand.Add(returnCreature);
+                _state.Combat.RemoveAttacker(returnCreature.Id);
+
+                // Put ninja on battlefield tapped and attacking
+                ninjutsuPlayer.Hand.RemoveById(ninjaCard.Id);
+                ninjaCard.IsTapped = true;
+                ninjaCard.TurnEnteredBattlefield = _state.TurnNumber;
+                ninjutsuPlayer.Battlefield.Add(ninjaCard);
+
+                // Apply enters-with-counters (loyalty, +1/+1, etc.)
+                ApplyEntersWithCounters(ninjaCard);
+
+                // Add to combat as attacker
+                _state.Combat.DeclareAttacker(ninjaCard.Id);
+
+                // Fire ETB triggers
+                await QueueSelfTriggersOnStackAsync(GameEvent.EnterBattlefield, ninjaCard, ninjutsuPlayer, ct);
+                await OnBoardChangedAsync(ct);
+
+                _state.Log($"{ninjutsuPlayer.Name} activates ninjutsu: {returnCreature.Name} returns to hand, {ninjaCard.Name} enters attacking.");
                 break;
             }
         }
@@ -1257,6 +1468,32 @@ public class GameEngine
 
     private bool HasShroud(GameCard card) => card.ActiveKeywords.Contains(Keyword.Shroud);
 
+    private bool HasHexproof(GameCard card) => card.ActiveKeywords.Contains(Keyword.Hexproof);
+
+    /// <summary>
+    /// Returns true if the card cannot be targeted by the given player.
+    /// Shroud prevents all targeting; Hexproof prevents only opponent targeting.
+    /// </summary>
+    private bool CannotBeTargetedBy(GameCard card, Player caster)
+    {
+        if (HasShroud(card)) return true;
+        if (HasHexproof(card))
+        {
+            // Hexproof only blocks opponents — controller can still target
+            var controller = GetCardController(card);
+            if (controller != null && controller.Id != caster.Id)
+                return true;
+        }
+        return false;
+    }
+
+    private Player? GetCardController(GameCard card)
+    {
+        if (_state.Player1.Battlefield.Contains(card.Id)) return _state.Player1;
+        if (_state.Player2.Battlefield.Contains(card.Id)) return _state.Player2;
+        return null;
+    }
+
     private bool HasPlayerShroud(Guid playerId)
     {
         return _state.ActiveEffects.Any(e =>
@@ -1293,7 +1530,7 @@ public class GameEngine
                 AuraTarget.Permanent => true,
                 _ => false,
             })
-            .Where(c => !HasShroud(c))
+            .Where(c => !CannotBeTargetedBy(c, player))
             .ToList();
 
         if (eligible.Count > 0)
@@ -1348,11 +1585,17 @@ public class GameEngine
         player.PendingManaTaps.Remove(tapTarget.Id);
         if (action.ManaProduced.HasValue)
             player.ManaPool.Deduct(action.ManaProduced.Value, action.ManaProducedAmount);
-        // Also deduct bonus mana from aura triggers (e.g., Wild Growth)
+        // Also deduct bonus mana from aura triggers (e.g., Wild Growth) and filter lands
         if (action.BonusManaProduced != null)
         {
             foreach (var bonusColor in action.BonusManaProduced)
                 player.ManaPool.Deduct(bonusColor, 1);
+        }
+        // Restore mana spent on filter land activation cost
+        if (action.ActualManaPaid != null)
+        {
+            foreach (var (color, amount) in action.ActualManaPaid)
+                player.ManaPool.Add(color, amount);
         }
         // Restore pain damage from painlands
         if (action.PainDamageDealt)
@@ -1412,6 +1655,35 @@ public class GameEngine
             card.IsTapped = true;
             _state.Combat.DeclareAttacker(attackerId);
             _state.Log($"{attacker.Name} attacks with {card.Name} ({card.Power}/{card.Toughness}).");
+        }
+
+        // Choose attacker targets when defending player controls planeswalkers
+        var defenderPlaneswalkers = defender.Battlefield.Cards
+            .Where(c => c.IsPlaneswalker)
+            .ToList();
+
+        if (defenderPlaneswalkers.Count > 0)
+        {
+            var declaredAttackerCards = validAttackerIds
+                .Select(id => attacker.Battlefield.Cards.First(c => c.Id == id))
+                .ToList();
+
+            var targets = await attacker.DecisionHandler.ChooseAttackerTargets(declaredAttackerCards, defenderPlaneswalkers, ct);
+
+            foreach (var (attackerId, targetId) in targets)
+            {
+                if (validAttackerIds.Contains(attackerId))
+                {
+                    _state.Combat.SetAttackerTarget(attackerId, targetId);
+                    if (targetId.HasValue)
+                    {
+                        var targetPw = defenderPlaneswalkers.FirstOrDefault(pw => pw.Id == targetId.Value);
+                        var attackerCard = attacker.Battlefield.Cards.First(c => c.Id == attackerId);
+                        if (targetPw != null)
+                            _state.Log($"{attackerCard.Name} targets {targetPw.Name}.");
+                    }
+                }
+            }
         }
 
         // Fire SelfAttacks triggers (e.g., Piledriver pump) after attackers declared
@@ -1548,11 +1820,40 @@ public class GameEngine
 
             if (!_state.Combat.IsBlocked(attackerId))
             {
-                // Unblocked: deal damage to defending player
+                // Unblocked: deal damage to target (planeswalker or player)
                 var damage = attackerCard.Power ?? 0;
                 if (damage > 0)
                 {
-                    if (HasPlayerDamageProtection(defender.Id))
+                    var pwTargetId = _state.Combat.GetAttackerTarget(attackerId);
+                    GameCard? targetPw = null;
+                    if (pwTargetId.HasValue)
+                        targetPw = defender.Battlefield.Cards.FirstOrDefault(c => c.Id == pwTargetId.Value && c.IsPlaneswalker);
+
+                    if (targetPw != null)
+                    {
+                        // Deal damage to planeswalker by removing loyalty counters
+                        var loyaltyToRemove = Math.Min(damage, targetPw.Loyalty);
+                        for (int i = 0; i < loyaltyToRemove; i++)
+                            targetPw.RemoveCounter(CounterType.Loyalty);
+
+                        // If damage exceeds current loyalty, mark additional as removed
+                        // (SBA will handle moving the PW to graveyard)
+                        if (damage > loyaltyToRemove)
+                        {
+                            // Counters can't go below 0, but the PW is dead either way
+                        }
+
+                        _state.Log($"{attackerCard.Name} deals {damage} damage to {targetPw.Name}. ({targetPw.Loyalty} loyalty)");
+                        unblockedAttackers.Add(attackerCard);
+
+                        // Lifelink: controller gains life equal to damage dealt
+                        if (attackerCard.ActiveKeywords.Contains(Keyword.Lifelink))
+                        {
+                            attacker.AdjustLife(damage);
+                            _state.Log($"{attackerCard.Name} has lifelink — {attacker.Name} gains {damage} life. ({attacker.Life} life)");
+                        }
+                    }
+                    else if (HasPlayerDamageProtection(defender.Id))
                     {
                         _state.Log($"{attackerCard.Name}'s {damage} damage to {defender.Name} is prevented (protection).");
                     }
@@ -1721,6 +2022,10 @@ public class GameEngine
         RebuildGraveyardAbilities(_state.Player1);
         RebuildGraveyardAbilities(_state.Player2);
 
+        // Emblem effects (command zone — permanent, cannot be removed)
+        RebuildEmblemEffects(_state.Player1);
+        RebuildEmblemEffects(_state.Player2);
+
         // Re-add temporary effects with fresh timestamps
         foreach (var temp in tempEffects)
         {
@@ -1749,6 +2054,9 @@ public class GameEngine
             .Where(e => e.Layer == EffectLayer.Layer4_TypeChanging)
             .OrderBy(e => e.Timestamp))
         {
+            if (effect.StateCondition != null && !effect.StateCondition(_state))
+                continue;
+
             ApplyBecomeCreatureEffect(effect, _state.Player1);
             ApplyBecomeCreatureEffect(effect, _state.Player2);
         }
@@ -1760,6 +2068,9 @@ public class GameEngine
                      && e.Layer == EffectLayer.Layer6_AbilityAddRemove)
             .OrderBy(e => e.Timestamp))
         {
+            if (effect.StateCondition != null && !effect.StateCondition(_state))
+                continue;
+
             foreach (var player in new[] { _state.Player1, _state.Player2 })
             {
                 foreach (var card in player.Battlefield.Cards)
@@ -1777,6 +2088,9 @@ public class GameEngine
                      && (e.Layer == EffectLayer.Layer6_AbilityAddRemove || e.Layer == null))
             .OrderBy(e => e.Timestamp))
         {
+            if (effect.StateCondition != null && !effect.StateCondition(_state))
+                continue;
+
             // Skip if the SOURCE of this effect is a creature that lost its abilities
             if (abilitiesRemovedFrom.Contains(effect.SourceId))
                 continue;
@@ -1809,6 +2123,9 @@ public class GameEngine
                      && e.Layer == EffectLayer.Layer7b_SetPT)
             .OrderBy(e => e.Timestamp))
         {
+            if (effect.StateCondition != null && !effect.StateCondition(_state))
+                continue;
+
             foreach (var player in new[] { _state.Player1, _state.Player2 })
             {
                 foreach (var card in player.Battlefield.Cards)
@@ -1828,6 +2145,9 @@ public class GameEngine
                      && (e.Layer == EffectLayer.Layer7c_ModifyPT || e.Layer == null))
             .OrderBy(e => e.Timestamp))
         {
+            if (effect.StateCondition != null && !effect.StateCondition(_state))
+                continue;
+
             // Skip if the SOURCE of this effect is a creature that lost its abilities
             if (abilitiesRemovedFrom.Contains(effect.SourceId))
                 continue;
@@ -1863,19 +2183,26 @@ public class GameEngine
     {
         foreach (var card in player.Battlefield.Cards)
         {
-            if (card.Id == effect.SourceId) continue; // "each other" exclusion
+            // "each other" exclusion (e.g. Opalescence) — skip unless ApplyToSelf is set
+            if (!effect.ApplyToSelf && card.Id == effect.SourceId) continue;
             if (!effect.Applies(card, player)) continue;
 
             // Add Creature type
             card.EffectiveCardTypes = (card.EffectiveCardTypes ?? card.CardTypes) | CardType.Creature;
 
-            // Set P/T to CMC
+            // Set P/T to CMC (e.g. Opalescence)
             if (effect.SetPowerToughnessToCMC && card.ManaCost != null)
             {
                 var cmc = card.ManaCost.ConvertedManaCost;
                 card.EffectivePower = cmc;
                 card.EffectiveToughness = cmc;
             }
+
+            // Set P/T to explicit values (e.g. Kaito creature mode)
+            if (effect.SetPower.HasValue)
+                card.EffectivePower = effect.SetPower.Value;
+            if (effect.SetToughness.HasValue)
+                card.EffectiveToughness = effect.SetToughness.Value;
         }
     }
 
@@ -1941,6 +2268,24 @@ public class GameEngine
                     Applies = (c, p) => p.Id == ownerId && originalApplies(c, p)
                 });
             }
+        }
+    }
+
+    private void RebuildEmblemEffects(Player player)
+    {
+        var ownerId = player.Id;
+        foreach (var emblem in player.Emblems)
+        {
+            var originalApplies = emblem.Effect.Applies;
+            var effect = emblem.Effect with
+            {
+                Timestamp = _state.NextEffectTimestamp++,
+                // Scope ControllerOnly emblems to the owning player (same pattern as graveyard abilities)
+                Applies = emblem.Effect.ControllerOnly
+                    ? (c, p) => p.Id == ownerId && originalApplies(c, p)
+                    : originalApplies
+            };
+            _state.ActiveEffects.Add(effect);
         }
     }
 
@@ -2054,6 +2399,23 @@ public class GameEngine
                 }
             }
 
+            // SBA: Planeswalker with 0 or less loyalty → graveyard (MTG 704.5i)
+            foreach (var player in new[] { _state.Player1, _state.Player2 })
+            {
+                var dyingPws = player.Battlefield.Cards
+                    .Where(c => c.IsPlaneswalker && c.Loyalty <= 0)
+                    .ToList();
+
+                foreach (var pw in dyingPws)
+                {
+                    await FireLeaveBattlefieldTriggersAsync(pw, player, ct);
+                    player.Battlefield.Remove(pw);
+                    player.Graveyard.Add(pw);
+                    _state.Log($"{pw.Name} is put into {player.Name}'s graveyard (0 loyalty).");
+                    anyActionTaken = true;
+                }
+            }
+
             // If anything changed, recalculate effects before looping
             if (anyActionTaken)
                 RecalculateState();
@@ -2133,12 +2495,22 @@ public class GameEngine
     /// <summary>Applies EntersWithCounters from CardDefinitions immediately when a permanent enters the battlefield.</summary>
     private void ApplyEntersWithCounters(GameCard card)
     {
-        if (CardDefinitions.TryGet(card.Name, out var def) && def.EntersWithCounters != null)
+        if (CardDefinitions.TryGet(card.Name, out var def))
         {
-            foreach (var (type, count) in def.EntersWithCounters)
+            if (def.EntersWithCounters != null)
             {
-                card.AddCounters(type, count);
-                _state.Log($"{card.Name} enters with {count} {type} counter(s).");
+                foreach (var (type, count) in def.EntersWithCounters)
+                {
+                    card.AddCounters(type, count);
+                    _state.Log($"{card.Name} enters with {count} {type} counter(s).");
+                }
+            }
+
+            // Planeswalker loyalty setup
+            if (def.StartingLoyalty.HasValue && card.IsPlaneswalker)
+            {
+                card.AddCounters(CounterType.Loyalty, def.StartingLoyalty.Value);
+                _state.Log($"{card.Name} enters with {def.StartingLoyalty.Value} loyalty.");
             }
         }
     }
@@ -2487,6 +2859,25 @@ public class GameEngine
             return;
         }
 
+        if (top is ActivatedLoyaltyAbilityStackObject loyaltyAbility)
+        {
+            var loyaltyContext = new EffectContext(_state, controller, loyaltyAbility.Source, controller.DecisionHandler)
+            {
+                Target = loyaltyAbility.Target,
+                TargetPlayerId = loyaltyAbility.TargetPlayerId,
+                FireLeaveBattlefieldTriggers = async card =>
+                {
+                    var ctrl = _state.Player1.Battlefield.Contains(card.Id) ? _state.Player1
+                        : _state.Player2.Battlefield.Contains(card.Id) ? _state.Player2 : null;
+                    if (ctrl != null) await FireLeaveBattlefieldTriggersAsync(card, ctrl, ct);
+                },
+            };
+            await loyaltyAbility.Effect.Execute(loyaltyContext, ct);
+            _state.Log($"Resolved {loyaltyAbility.Source.Name} loyalty ability: {loyaltyAbility.Description}");
+            await OnBoardChangedAsync(ct);
+            return;
+        }
+
         if (top is StackObject spell)
         {
             _state.Log($"Resolving {spell.Card.Name}.");
@@ -2553,7 +2944,8 @@ public class GameEngine
             else
             {
                 if (spell.Card.IsCreature || spell.Card.CardTypes.HasFlag(CardType.Enchantment)
-                    || spell.Card.CardTypes.HasFlag(CardType.Artifact))
+                    || spell.Card.CardTypes.HasFlag(CardType.Artifact)
+                    || spell.Card.IsPlaneswalker)
                 {
                     spell.Card.TurnEnteredBattlefield = _state.TurnNumber;
                     if (spell.Card.EntersTapped) spell.Card.IsTapped = true;

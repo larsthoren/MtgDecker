@@ -32,6 +32,9 @@ public record CardDefinition(
     public Func<GameState, int>? DynamicBasePower { get; init; }
     public Func<GameState, int>? DynamicBaseToughness { get; init; }
     public Dictionary<CounterType, int>? EntersWithCounters { get; init; }
+    public int? StartingLoyalty { get; init; }
+    public IReadOnlyList<LoyaltyAbility>? LoyaltyAbilities { get; init; }
     public bool HasFlash { get; init; }
     public bool ShuffleGraveyardOnDeath { get; init; }
+    public ManaCost? NinjutsuCost { get; init; }
 }

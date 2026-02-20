@@ -304,6 +304,45 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
     }
 
     /// <summary>
+    /// Chooses attacker targets when the defending player controls planeswalkers.
+    /// Heuristic: Attack planeswalkers with low loyalty that can be killed this turn,
+    /// otherwise attack the player.
+    /// </summary>
+    public async Task<Dictionary<Guid, Guid?>> ChooseAttackerTargets(IReadOnlyList<GameCard> attackers,
+        IReadOnlyList<GameCard> planeswalkers, CancellationToken ct = default)
+    {
+        await DelayAsync(ct);
+        var targets = new Dictionary<Guid, Guid?>();
+
+        // Sort attackers by power descending to allocate biggest hitters first
+        var sortedAttackers = attackers.OrderByDescending(a => a.Power ?? 0).ToList();
+        var pwLoyaltyRemaining = planeswalkers.ToDictionary(pw => pw.Id, pw => pw.Loyalty);
+
+        foreach (var attacker in sortedAttackers)
+        {
+            var power = attacker.Power ?? 0;
+            // Find a PW that this attacker can finish off
+            var killablePw = planeswalkers
+                .Where(pw => pwLoyaltyRemaining[pw.Id] > 0 && pwLoyaltyRemaining[pw.Id] <= power)
+                .OrderBy(pw => pwLoyaltyRemaining[pw.Id])
+                .FirstOrDefault();
+
+            if (killablePw != null)
+            {
+                targets[attacker.Id] = killablePw.Id;
+                pwLoyaltyRemaining[killablePw.Id] -= power;
+            }
+            else
+            {
+                // Default: attack the player
+                targets[attacker.Id] = null;
+            }
+        }
+
+        return targets;
+    }
+
+    /// <summary>
     /// Blocks when a creature can kill the attacker (power >= attacker toughness).
     /// Uses the smallest sufficient blocker. Prioritizes blocking the biggest
     /// attacker first to maximize value. Each blocker is only assigned once.
@@ -405,6 +444,28 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
     }
 
     /// <summary>
+    /// Splits cards into two piles. Puts the single highest-CMC card alone in pile 1,
+    /// everything else in pile 2 (classic 1-4 split heuristic).
+    /// </summary>
+    public async Task<IReadOnlyList<GameCard>> SplitCards(IReadOnlyList<GameCard> cards, string prompt, CancellationToken ct = default)
+    {
+        await DelayAsync(ct);
+        if (cards.Count <= 1)
+            return cards.ToList();
+        var best = cards.OrderByDescending(c => c.ManaCost?.ConvertedManaCost ?? 0).First();
+        return new List<GameCard> { best };
+    }
+
+    /// <summary>
+    /// Picks the pile with more cards (greedy — more cards = more value).
+    /// </summary>
+    public async Task<int> ChoosePile(IReadOnlyList<GameCard> pile1, IReadOnlyList<GameCard> pile2, string prompt, CancellationToken ct = default)
+    {
+        await DelayAsync(ct);
+        return pile1.Count >= pile2.Count ? 1 : 2;
+    }
+
+    /// <summary>
     /// Chooses a target for a spell. Picks the opponent's creature with highest power,
     /// falling back to the first eligible target.
     /// </summary>
@@ -469,7 +530,9 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
             {
                 var damageAmount = dealDamage.Amount;
                 var killableTarget = opponent.Battlefield.Cards
-                    .Where(c => c.IsCreature && !c.ActiveKeywords.Contains(Enums.Keyword.Shroud))
+                    .Where(c => c.IsCreature
+                        && !c.ActiveKeywords.Contains(Enums.Keyword.Shroud)
+                        && !c.ActiveKeywords.Contains(Enums.Keyword.Hexproof))
                     .FirstOrDefault(c => (c.Toughness ?? 0) - c.DamageMarked <= damageAmount);
 
                 if (killableTarget != null)
@@ -488,7 +551,9 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
                     continue;
 
                 var biggestThreat = opponent.Battlefield.Cards
-                    .Where(c => c.IsCreature && !c.ActiveKeywords.Contains(Enums.Keyword.Shroud))
+                    .Where(c => c.IsCreature
+                        && !c.ActiveKeywords.Contains(Enums.Keyword.Shroud)
+                        && !c.ActiveKeywords.Contains(Enums.Keyword.Hexproof))
                     .OrderByDescending(c => c.Power ?? 0)
                     .FirstOrDefault();
 

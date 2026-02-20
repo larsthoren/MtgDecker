@@ -75,6 +75,9 @@ public class GameCard
     public int GetCounters(CounterType type) =>
         Counters.TryGetValue(type, out var count) ? count : 0;
 
+    /// <summary>Current loyalty (reads from loyalty counters).</summary>
+    public int Loyalty => GetCounters(CounterType.Loyalty);
+
     // Per-source exile tracking (e.g., Parallax Wave)
     public List<Guid> ExiledCardIds { get; } = new();
 
@@ -103,6 +106,9 @@ public class GameCard
     public bool IsCreature =>
         (EffectiveCardTypes ?? CardTypes).HasFlag(CardType.Creature) ||
         TypeLine.Contains("Creature", StringComparison.OrdinalIgnoreCase);
+
+    public bool IsPlaneswalker =>
+        (EffectiveCardTypes ?? CardTypes).HasFlag(CardType.Planeswalker);
 
     /// <summary>Original factory: uses CardDefinitions registry only.</summary>
     public static GameCard Create(string name, string typeLine = "", string? imageUrl = null)
