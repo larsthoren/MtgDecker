@@ -181,6 +181,7 @@ public class GameCard
                 EntersTapped = def.EntersTapped,
                 FetchAbility = def.FetchAbility,
                 EchoPaid = def.EchoCost == null,
+                BackFaceDefinition = def.TransformInto,
             };
         }
         return new GameCard
@@ -218,6 +219,7 @@ public class GameCard
                 EntersTapped = def.EntersTapped,
                 FetchAbility = def.FetchAbility,
                 EchoPaid = def.EchoCost == null,
+                BackFaceDefinition = def.TransformInto,
             };
         }
 

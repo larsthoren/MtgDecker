@@ -179,4 +179,23 @@ public class TransformTests
         card.BaseToughness.Should().Be(3);
         card.CardTypes.Should().Be(CardType.Creature);
     }
+
+    [Fact]
+    public void GameCardCreate_WithTransformDefinition_SetsBackFaceDefinition()
+    {
+        var backFace = new CardDefinition(null, null, 5, 5, CardType.Planeswalker)
+        { Name = "Test Back Face", StartingLoyalty = 3 };
+        CardDefinitions.Register(new CardDefinition(null, null, 0, 3, CardType.Creature)
+        { Name = "Test Transform Card", TransformInto = backFace });
+        try
+        {
+            var card = GameCard.Create("Test Transform Card");
+            card.BackFaceDefinition.Should().NotBeNull();
+            card.BackFaceDefinition!.Name.Should().Be("Test Back Face");
+        }
+        finally
+        {
+            CardDefinitions.Unregister("Test Transform Card");
+        }
+    }
 }

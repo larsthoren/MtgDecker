@@ -36,4 +36,5 @@ public record CardDefinition(
     public IReadOnlyList<LoyaltyAbility>? LoyaltyAbilities { get; init; }
     public bool HasFlash { get; init; }
     public ManaCost? NinjutsuCost { get; init; }
+    public CardDefinition? TransformInto { get; init; }
 }
