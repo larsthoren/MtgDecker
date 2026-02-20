@@ -913,6 +913,32 @@ public static class CardDefinitions
                 },
             },
 
+            ["Polluted Delta"] = new(null, null, null, null, CardType.Land)
+            { Name = "Polluted Delta", FetchAbility = new FetchAbility(["Island", "Swamp"]) },
+
+            ["Underground Sea"] = new(null, ManaAbility.Choice(ManaColor.Blue, ManaColor.Black),
+                null, null, CardType.Land)
+            { Name = "Underground Sea", Subtypes = ["Island", "Swamp"] },
+
+            ["Misty Rainforest"] = new(null, null, null, null, CardType.Land)
+            { Name = "Misty Rainforest", FetchAbility = new FetchAbility(["Forest", "Island"]) },
+
+            ["Undercity Sewers"] = new(null, ManaAbility.Choice(ManaColor.Blue, ManaColor.Black),
+                null, null, CardType.Land)
+            {
+                Name = "Undercity Sewers",
+                EntersTapped = true,
+                Triggers = [new Trigger(GameEvent.EnterBattlefield, TriggerCondition.Self, new SurveilEffect(1))],
+            },
+
+            ["Thoughtseize"] = new(ManaCost.Parse("{B}"), null, null, null, CardType.Sorcery,
+                TargetFilter.Player(), new ThoughtseizeEffect())
+            { Name = "Thoughtseize" },
+
+            ["Fatal Push"] = new(ManaCost.Parse("{B}"), null, null, null, CardType.Instant,
+                TargetFilter.Creature(), new FatalPushEffect())
+            { Name = "Fatal Push" },
+
             ["Brazen Borrower"] = new(ManaCost.Parse("{1}{U}{U}"), null, 3, 1, CardType.Creature)
             {
                 Name = "Brazen Borrower",
