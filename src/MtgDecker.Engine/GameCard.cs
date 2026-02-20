@@ -103,6 +103,9 @@ public class GameCard
     // Keywords granted by continuous effects or intrinsic abilities
     public HashSet<Keyword> ActiveKeywords { get; } = new();
 
+    // Adventure state — true when in exile after adventure half resolved
+    public bool IsOnAdventure { get; set; }
+
     // Aura attachment
     public Guid? AttachedTo { get; set; }
 

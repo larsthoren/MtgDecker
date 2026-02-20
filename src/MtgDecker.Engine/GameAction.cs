@@ -114,4 +114,12 @@ public class GameAction
         SourceZone = ZoneType.Hand,
         DestinationZone = ZoneType.Battlefield,
     };
+
+    public static GameAction CastAdventure(Guid playerId, Guid cardId) => new()
+    {
+        Type = ActionType.CastAdventure,
+        PlayerId = playerId,
+        CardId = cardId,
+        SourceZone = ZoneType.Hand,
+    };
 }

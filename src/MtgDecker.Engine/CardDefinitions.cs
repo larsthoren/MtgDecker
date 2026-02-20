@@ -912,6 +912,27 @@ public static class CardDefinitions
                     ],
                 },
             },
+
+            ["Brazen Borrower"] = new(ManaCost.Parse("{1}{U}{U}"), null, 3, 1, CardType.Creature)
+            {
+                Name = "Brazen Borrower",
+                Subtypes = ["Faerie", "Rogue"],
+                HasFlash = true,
+                ContinuousEffects =
+                [
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
+                        (card, _) => card.Name == "Brazen Borrower",
+                        GrantedKeyword: Keyword.Flying,
+                        Layer: EffectLayer.Layer6_AbilityAddRemove, ApplyToSelf: true),
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
+                        (card, _) => card.Name == "Brazen Borrower",
+                        GrantedKeyword: Keyword.CantBlockNonFlying,
+                        Layer: EffectLayer.Layer6_AbilityAddRemove, ApplyToSelf: true),
+                ],
+                Adventure = new AdventurePart("Petty Theft", ManaCost.Parse("{1}{U}"),
+                    Filter: TargetFilter.NonlandPermanent(),
+                    Effect: new PettyTheftEffect()),
+            },
         };
 
         Registry = cards.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);

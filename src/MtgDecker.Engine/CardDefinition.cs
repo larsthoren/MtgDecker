@@ -37,4 +37,5 @@ public record CardDefinition(
     public bool HasFlash { get; init; }
     public ManaCost? NinjutsuCost { get; init; }
     public CardDefinition? TransformInto { get; init; }
+    public AdventurePart? Adventure { get; init; }
 }

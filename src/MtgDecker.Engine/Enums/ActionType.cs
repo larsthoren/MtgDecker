@@ -12,5 +12,6 @@ public enum ActionType
     Cycle,
     Flashback,
     ActivateLoyaltyAbility,
-    Ninjutsu
+    Ninjutsu,
+    CastAdventure
 }
