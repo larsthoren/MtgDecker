@@ -1091,7 +1091,14 @@ public class GameEngine
                 }
 
                 // Get card definition and validate ability index
-                if (!CardDefinitions.TryGet(pwCard.Name, out var pwDef) || pwDef.LoyaltyAbilities == null)
+                // For transformed cards, check BackFaceDefinition first (back face name isn't in CardDefinitions)
+                CardDefinition? pwDef = null;
+                if (pwCard.IsTransformed && pwCard.BackFaceDefinition?.LoyaltyAbilities != null)
+                    pwDef = pwCard.BackFaceDefinition;
+                else if (CardDefinitions.TryGet(pwCard.Name, out var registeredDef))
+                    pwDef = registeredDef;
+
+                if (pwDef?.LoyaltyAbilities == null)
                 {
                     _state.Log($"{pwCard.Name} has no loyalty abilities.");
                     break;
