@@ -2,6 +2,9 @@ using FluentAssertions;
 using MtgDecker.Engine;
 using MtgDecker.Engine.Enums;
 using MtgDecker.Engine.Mana;
+using MtgDecker.Engine.Tests.Helpers;
+using MtgDecker.Engine.Triggers;
+using MtgDecker.Engine.Triggers.Effects;
 
 namespace MtgDecker.Engine.Tests;
 
@@ -197,5 +200,88 @@ public class TransformTests
         {
             CardDefinitions.Unregister("Test Transform Card");
         }
+    }
+
+    [Fact]
+    public async Task TransformExileReturnEffect_TransformsCard()
+    {
+        var handler = new TestDecisionHandler();
+        var p1 = new Player(Guid.NewGuid(), "P1", handler);
+        var p2 = new Player(Guid.NewGuid(), "P2", new TestDecisionHandler());
+        var state = new GameState(p1, p2);
+
+        var backFace = new CardDefinition(null, null, null, null, CardType.Planeswalker)
+        { Name = "PW Back", StartingLoyalty = 3 };
+        var card = new GameCard
+        {
+            Name = "Creature Front",
+            CardTypes = CardType.Creature,
+            BasePower = 0,
+            BaseToughness = 3,
+            BackFaceDefinition = backFace,
+        };
+        p1.Battlefield.Add(card);
+
+        var effect = new TransformExileReturnEffect();
+        var context = new EffectContext(state, p1, card, handler);
+        await effect.Execute(context);
+
+        p1.Battlefield.Cards.Should().Contain(c => c.Id == card.Id);
+        card.IsTransformed.Should().BeTrue();
+        card.IsPlaneswalker.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task TransformExileReturnEffect_AddsLoyaltyCounters()
+    {
+        var handler = new TestDecisionHandler();
+        var p1 = new Player(Guid.NewGuid(), "P1", handler);
+        var p2 = new Player(Guid.NewGuid(), "P2", new TestDecisionHandler());
+        var state = new GameState(p1, p2);
+
+        var backFace = new CardDefinition(null, null, null, null, CardType.Planeswalker)
+        { Name = "PW Back", StartingLoyalty = 2 };
+        var card = new GameCard
+        {
+            Name = "Creature Front",
+            CardTypes = CardType.Creature,
+            BackFaceDefinition = backFace,
+        };
+        p1.Battlefield.Add(card);
+
+        var effect = new TransformExileReturnEffect();
+        var context = new EffectContext(state, p1, card, handler);
+        await effect.Execute(context);
+
+        card.Loyalty.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task TransformExileReturnEffect_NoLoyaltyCounters_WhenNotPlaneswalker()
+    {
+        var handler = new TestDecisionHandler();
+        var p1 = new Player(Guid.NewGuid(), "P1", handler);
+        var p2 = new Player(Guid.NewGuid(), "P2", new TestDecisionHandler());
+        var state = new GameState(p1, p2);
+
+        var backFace = new CardDefinition(null, null, 3, 2, CardType.Creature)
+        { Name = "Creature Back" };
+        var card = new GameCard
+        {
+            Name = "Creature Front",
+            CardTypes = CardType.Creature,
+            BasePower = 1,
+            BaseToughness = 1,
+            BackFaceDefinition = backFace,
+        };
+        p1.Battlefield.Add(card);
+
+        var effect = new TransformExileReturnEffect();
+        var context = new EffectContext(state, p1, card, handler);
+        await effect.Execute(context);
+
+        card.IsTransformed.Should().BeTrue();
+        card.Loyalty.Should().Be(0);
+        card.IsCreature.Should().BeTrue();
     }
 }
