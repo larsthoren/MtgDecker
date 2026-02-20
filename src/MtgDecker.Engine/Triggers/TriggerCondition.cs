@@ -16,5 +16,7 @@ public enum TriggerCondition
     AnyPlayerCastsSpell,
     AnyUpkeep,
     OpponentDrawsExceptFirst,
+    SelfIsCast,
+    ControllerPlaysAnotherLand,
     ThirdDrawInTurn,
 }

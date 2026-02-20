@@ -18,6 +18,7 @@ public enum Keyword
     ProtectionFromBlue,
     ProtectionFromWhite,
     Flash,
+    ProtectionFromColoredSpells,
     Hexproof,
     CantBlockNonFlying,
 }

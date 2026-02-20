@@ -105,7 +105,17 @@ public class GameEngine
 
         _state.IsFirstTurn = false;
         _state.TurnNumber++;
-        _state.ActivePlayer = _state.GetOpponent(_state.ActivePlayer);
+
+        if (_state.ExtraTurns.Count > 0)
+        {
+            var extraPlayerId = _state.ExtraTurns.Dequeue();
+            _state.ActivePlayer = _state.GetPlayer(extraPlayerId);
+            _state.Log($"Extra turn for {_state.ActivePlayer.Name}!");
+        }
+        else
+        {
+            _state.ActivePlayer = _state.GetOpponent(_state.ActivePlayer);
+        }
     }
 
     private async Task DiscardToHandSizeAsync(Player player, CancellationToken ct)
@@ -122,7 +132,7 @@ public class GameEngine
         foreach (var card in chosen.Take(excess))
         {
             player.Hand.Remove(card);
-            player.Graveyard.Add(card);
+            MoveToGraveyardWithReplacement(card, player);
             _state.Log($"{player.Name} discards {card.Name}.");
         }
     }
@@ -202,6 +212,9 @@ public class GameEngine
                     ApplyEntersWithCounters(playCard);
                     await QueueSelfTriggersOnStackAsync(GameEvent.EnterBattlefield, playCard, player, ct);
                     await OnBoardChangedAsync(ct);
+
+                    // Fire LandPlayed triggers (e.g., City of Traitors)
+                    await QueueBoardTriggersOnStackAsync(GameEvent.LandPlayed, playCard, ct);
                 }
                 else if (playCard.ManaCost != null)
                 {
@@ -287,9 +300,17 @@ public class GameEngine
                         var ability = tapTarget.ManaAbility;
                         if (ability.Type == ManaAbilityType.Fixed)
                         {
-                            player.ManaPool.Add(ability.FixedColor!.Value);
+                            var count = ability.ProduceCount;
+                            player.ManaPool.Add(ability.FixedColor!.Value, count);
                             action.ManaProduced = ability.FixedColor!.Value;
-                            _state.Log($"{player.Name} taps {tapTarget.Name} for {ability.FixedColor}.");
+                            action.ManaProducedAmount = count;
+                            if (ability.SelfDamage > 0)
+                            {
+                                player.AdjustLife(-ability.SelfDamage);
+                                _state.Log($"{tapTarget.Name} deals {ability.SelfDamage} damage to {player.Name}.");
+                            }
+                            var manaDesc = count > 1 ? $"{count} {ability.FixedColor}" : $"{ability.FixedColor}";
+                            _state.Log($"{player.Name} taps {tapTarget.Name} for {manaDesc}.");
                         }
                         else if (ability.Type == ManaAbilityType.Choice)
                         {
@@ -631,6 +652,9 @@ public class GameEngine
 
                 // Fire SpellCast board triggers (e.g., enchantress draw on enchantment cast)
                 await QueueBoardTriggersOnStackAsync(GameEvent.SpellCast, castCard, ct);
+
+                // Fire SelfIsCast triggers (e.g., Emrakul extra turn on cast)
+                await QueueSelfCastTriggersAsync(castCard, castPlayer, ct);
                 break;
             }
 
@@ -679,6 +703,13 @@ public class GameEngine
                 if (cost.TapSelf && abilitySource.IsCreature && abilitySource.HasSummoningSickness(_state.TurnNumber))
                 {
                     _state.Log($"{abilitySource.Name} has summoning sickness.");
+                    break;
+                }
+
+                // Validate: pay life cost
+                if (cost.PayLife > 0 && player.Life < cost.PayLife)
+                {
+                    _state.Log($"Cannot activate {abilitySource.Name} — not enough life (need {cost.PayLife}, have {player.Life}).");
                     break;
                 }
 
@@ -830,6 +861,13 @@ public class GameEngine
                     player.Hand.RemoveById(discardTarget.Id);
                     player.Graveyard.Add(discardTarget);
                     _state.Log($"{player.Name} discards {discardTarget.Name}.");
+                }
+
+                // Pay costs: life
+                if (cost.PayLife > 0)
+                {
+                    player.AdjustLife(-cost.PayLife);
+                    _state.Log($"{player.Name} pays {cost.PayLife} life.");
                 }
 
                 // Find or prompt for effect target
@@ -2044,6 +2082,42 @@ public class GameEngine
             owner.CreaturesDiedThisTurn++;
     }
 
+    /// <summary>
+    /// Moves a card to graveyard, checking for replacement effects (e.g., Emrakul shuffle).
+    /// </summary>
+    public void MoveToGraveyardWithReplacement(GameCard card, Player owner)
+    {
+        if (CardDefinitions.TryGet(card.Name, out var def) && def.ShuffleGraveyardOnDeath)
+        {
+            // Shuffle this card + entire graveyard into library
+            owner.Library.AddToTop(card);
+            foreach (var graveyardCard in owner.Graveyard.Cards.ToList())
+            {
+                owner.Graveyard.Remove(graveyardCard);
+                owner.Library.AddToTop(graveyardCard);
+            }
+            owner.Library.Shuffle();
+            _state.Log($"{card.Name}'s graveyard replacement — {owner.Name} shuffles their graveyard into their library.");
+        }
+        else
+        {
+            owner.Graveyard.Add(card);
+        }
+    }
+
+    /// <summary>
+    /// Checks if a card can be targeted by a spell, considering protection abilities.
+    /// </summary>
+    public bool CanTargetWithSpell(GameCard target, GameCard spell)
+    {
+        if (target.ActiveKeywords.Contains(Keyword.ProtectionFromColoredSpells))
+        {
+            if (spell.ManaCost != null && spell.ManaCost.IsColored)
+                return false;
+        }
+        return true;
+    }
+
     public void ClearDamage()
     {
         foreach (var card in _state.Player1.Battlefield.Cards)
@@ -2102,6 +2176,10 @@ public class GameEngine
                 card.EffectiveCardTypes = null;
                 card.ActiveKeywords.Clear();
                 card.AbilitiesRemoved = false;
+
+                // Restore ManaAbility from BaseManaAbility (continuous effects may override)
+                if (card.BaseManaAbility != null)
+                    card.ManaAbility = card.BaseManaAbility;
             }
             player.MaxLandDrops = 1;
         }
@@ -2109,7 +2187,7 @@ public class GameEngine
         // Build suppression tracking set
         var abilitiesRemovedFrom = new HashSet<Guid>();
 
-        // === LAYER 4: Type-changing effects (BecomeCreature) ===
+        // === LAYER 4: Type-changing effects (BecomeCreature, OverrideLandType) ===
         foreach (var effect in _state.ActiveEffects
             .Where(e => e.Layer == EffectLayer.Layer4_TypeChanging)
             .OrderBy(e => e.Timestamp))
@@ -2117,8 +2195,16 @@ public class GameEngine
             if (effect.StateCondition != null && !effect.StateCondition(_state))
                 continue;
 
-            ApplyBecomeCreatureEffect(effect, _state.Player1);
-            ApplyBecomeCreatureEffect(effect, _state.Player2);
+            if (effect.Type == ContinuousEffectType.OverrideLandType)
+            {
+                ApplyOverrideLandTypeEffect(effect, _state.Player1);
+                ApplyOverrideLandTypeEffect(effect, _state.Player2);
+            }
+            else
+            {
+                ApplyBecomeCreatureEffect(effect, _state.Player1);
+                ApplyBecomeCreatureEffect(effect, _state.Player2);
+            }
         }
 
         // === LAYER 6: Ability add/remove ===
@@ -2263,6 +2349,17 @@ public class GameEngine
                 card.EffectivePower = effect.SetPower.Value;
             if (effect.SetToughness.HasValue)
                 card.EffectiveToughness = effect.SetToughness.Value;
+        }
+    }
+
+    private void ApplyOverrideLandTypeEffect(ContinuousEffect effect, Player player)
+    {
+        foreach (var card in player.Battlefield.Cards)
+        {
+            if (!effect.Applies(card, player)) continue;
+
+            // Blood Moon: nonbasic lands become Mountains (produce Red mana only)
+            card.ManaAbility = ManaAbility.Fixed(ManaColor.Red);
         }
     }
 
@@ -2661,6 +2758,11 @@ public class GameEngine
                         evt == GameEvent.SpellCast
                         && relevantCard != null
                         && (relevantCard.ManaCost?.ConvertedManaCost ?? 0) <= 3,
+                    TriggerCondition.ControllerPlaysAnotherLand =>
+                        evt == GameEvent.LandPlayed
+                        && relevantCard != null
+                        && relevantCard.Id != permanent.Id
+                        && _state.ActivePlayer == player,
                     TriggerCondition.SelfAttacks => false,
                     _ => false,
                 };
@@ -2700,6 +2802,26 @@ public class GameEngine
 
             _state.Log($"{attacker.Name} triggers: {trigger.Effect.GetType().Name.Replace("Effect", "")}");
             _state.StackPush(new TriggeredAbilityStackObject(attacker, player.Id, trigger.Effect));
+        }
+
+        return Task.CompletedTask;
+    }
+
+    /// <summary>Queues cast triggers from the spell itself (e.g., Emrakul extra turn on cast).</summary>
+    private Task QueueSelfCastTriggersAsync(GameCard card, Player controller, CancellationToken ct)
+    {
+        // Check triggers on the card instance first, then fall back to CardDefinitions
+        var triggers = card.Triggers.Count > 0
+            ? card.Triggers
+            : (CardDefinitions.TryGet(card.Name, out var def) ? def.Triggers : []);
+
+        foreach (var trigger in triggers)
+        {
+            if (trigger.Event == GameEvent.SpellCast && trigger.Condition == TriggerCondition.SelfIsCast)
+            {
+                _state.StackPush(new TriggeredAbilityStackObject(card, controller.Id, trigger.Effect));
+                _state.Log($"{card.Name}'s cast trigger goes on the stack.");
+            }
         }
 
         return Task.CompletedTask;

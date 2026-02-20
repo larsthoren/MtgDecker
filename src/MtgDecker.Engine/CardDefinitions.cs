@@ -837,6 +837,120 @@ public static class CardDefinitions
                 ],
             },
 
+            // ─── Legacy Sneak and Show ──────────────────────────────────────────
+
+            ["Show and Tell"] = new(ManaCost.Parse("{1}{U}{U}"), null, null, null, CardType.Sorcery,
+                Effect: new ShowAndTellEffect()),
+
+            ["Sneak Attack"] = new(ManaCost.Parse("{3}{R}"), null, null, null, CardType.Enchantment)
+            {
+                ActivatedAbility = new(
+                    new ActivatedAbilityCost(ManaCost: ManaCost.Parse("{R}")),
+                    new SneakAttackPutEffect()),
+            },
+
+            ["Emrakul, the Aeons Torn"] = new(ManaCost.Parse("{15}"), null, 15, 15, CardType.Creature)
+            {
+                IsLegendary = true,
+                Subtypes = ["Eldrazi"],
+                ShuffleGraveyardOnDeath = true,
+                ContinuousEffects =
+                [
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
+                        (card, _) => card.Name == "Emrakul, the Aeons Torn",
+                        GrantedKeyword: Keyword.Flying,
+                        Layer: EffectLayer.Layer6_AbilityAddRemove),
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
+                        (card, _) => card.Name == "Emrakul, the Aeons Torn",
+                        GrantedKeyword: Keyword.ProtectionFromColoredSpells,
+                        Layer: EffectLayer.Layer6_AbilityAddRemove),
+                ],
+                Triggers =
+                [
+                    new Trigger(GameEvent.SpellCast, TriggerCondition.SelfIsCast, new ExtraTurnEffect()),
+                    new Trigger(GameEvent.BeginCombat, TriggerCondition.SelfAttacks, new AnnihilatorEffect(6)),
+                ],
+            },
+
+            ["Griselbrand"] = new(ManaCost.Parse("{4}{B}{B}{B}{B}"), null, 7, 7, CardType.Creature)
+            {
+                IsLegendary = true,
+                Subtypes = ["Demon"],
+                ContinuousEffects =
+                [
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
+                        (card, _) => card.Name == "Griselbrand",
+                        GrantedKeyword: Keyword.Flying,
+                        Layer: EffectLayer.Layer6_AbilityAddRemove),
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
+                        (card, _) => card.Name == "Griselbrand",
+                        GrantedKeyword: Keyword.Lifelink,
+                        Layer: EffectLayer.Layer6_AbilityAddRemove),
+                ],
+                ActivatedAbility = new(
+                    new ActivatedAbilityCost(PayLife: 7),
+                    new DrawCardsActivatedEffect(7)),
+            },
+
+            ["Lotus Petal"] = new(ManaCost.Parse("{0}"), null, null, null, CardType.Artifact)
+            {
+                ActivatedAbility = new(
+                    new ActivatedAbilityCost(SacrificeSelf: true),
+                    new AddAnyManaEffect()),
+            },
+
+            ["Spell Pierce"] = new(ManaCost.Parse("{U}"), null, null, null, CardType.Instant,
+                TargetFilter.NoncreatureSpell(), new ConditionalCounterEffect(2)),
+
+            ["Ancient Tomb"] = new(null, ManaAbility.FixedMultiple(ManaColor.Colorless, 2, selfDamage: 2),
+                null, null, CardType.Land),
+
+            ["City of Traitors"] = new(null, ManaAbility.FixedMultiple(ManaColor.Colorless, 2),
+                null, null, CardType.Land)
+            {
+                Triggers =
+                [
+                    new Trigger(GameEvent.LandPlayed, TriggerCondition.ControllerPlaysAnotherLand,
+                        new SacrificeSelfOnLandEffect()),
+                ],
+            },
+
+            ["Intuition"] = new(ManaCost.Parse("{2}{U}"), null, null, null, CardType.Instant,
+                Effect: new IntuitionEffect()),
+
+            // ─── Sneak and Show Sideboard ─────────────────────────────────────────
+
+            ["Blood Moon"] = new(ManaCost.Parse("{2}{R}"), null, null, null, CardType.Enchantment)
+            {
+                ContinuousEffects =
+                [
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.OverrideLandType,
+                        (card, _) => card.IsLand && !card.IsBasicLand,
+                        Layer: EffectLayer.Layer4_TypeChanging),
+                ],
+            },
+
+            ["Pyroclasm"] = new(ManaCost.Parse("{1}{R}"), null, null, null, CardType.Sorcery,
+                Effect: new DamageAllCreaturesEffect(2)),
+
+            ["Flusterstorm"] = new(ManaCost.Parse("{U}"), null, null, null, CardType.Instant,
+                TargetFilter.InstantOrSorcerySpell(), new ConditionalCounterEffect(1)),
+
+            ["Pyroblast"] = new(ManaCost.Parse("{R}"), null, null, null, CardType.Instant,
+                TargetFilter.Spell(), new PyroblastEffect()),
+
+            ["Surgical Extraction"] = new(ManaCost.Parse("{B}"), null, null, null, CardType.Instant)
+            {
+                AlternateCost = new AlternateCost(LifeCost: 2),
+            },
+
+            ["Grafdigger's Cage"] = new(ManaCost.Parse("{1}"), null, null, null, CardType.Artifact),
+
+            ["Wipe Away"] = new(ManaCost.Parse("{1}{U}{U}"), null, null, null, CardType.Instant,
+                TargetFilter.AnyPermanent(), new BounceTargetEffect()),
+
+            // ─── Planeswalkers ──────────────────────────────────────────────────
+
             ["Kaito, Bane of Nightmares"] = new(ManaCost.Parse("{2}{U}{B}"), null, null, null, CardType.Planeswalker)
             {
                 IsLegendary = true,

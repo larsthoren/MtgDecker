@@ -23,6 +23,7 @@ public sealed partial class ManaCost
     public IReadOnlyDictionary<ManaColor, int> ColorRequirements { get; }
     public int GenericCost { get; }
     public int ConvertedManaCost { get; }
+    public bool IsColored => ColorRequirements.Keys.Any(c => c != ManaColor.Colorless);
 
     private ManaCost(Dictionary<ManaColor, int> colorRequirements, int genericCost)
     {

@@ -13,4 +13,5 @@ public enum GameEvent
     EndStep,
     TapForMana,
     Cycle,
+    LandPlayed,
 }

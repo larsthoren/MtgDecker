@@ -11,7 +11,8 @@ public record ActivatedAbilityCost(
     ManaCost? ManaCost = null,
     CounterType? RemoveCounterType = null,
     CardType? SacrificeCardType = null,
-    CardType? DiscardCardType = null);
+    CardType? DiscardCardType = null,
+    int PayLife = 0);
 
 public record ActivatedAbility(
     ActivatedAbilityCost Cost,

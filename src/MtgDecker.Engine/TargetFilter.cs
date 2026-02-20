@@ -38,6 +38,13 @@ public class TargetFilter
 
     public static TargetFilter AnyPermanent() => new((card, zone) => zone == ZoneType.Battlefield);
 
+    public static TargetFilter NoncreatureSpell() => new((card, zone) =>
+        zone == ZoneType.Stack && !card.CardTypes.HasFlag(CardType.Creature));
+
+    public static TargetFilter InstantOrSorcerySpell() => new((card, zone) =>
+        zone == ZoneType.Stack &&
+        (card.CardTypes.HasFlag(CardType.Instant) || card.CardTypes.HasFlag(CardType.Sorcery)));
+
     public static TargetFilter NonlandPermanent() => new((card, zone) =>
         zone == ZoneType.Battlefield && !card.IsLand);
 }

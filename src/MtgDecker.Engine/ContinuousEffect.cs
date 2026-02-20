@@ -15,6 +15,7 @@ public enum ContinuousEffectType
     BecomeCreature,
     SetBasePowerToughness,
     RemoveAbilities,
+    OverrideLandType,
 }
 
 public record ContinuousEffect(
