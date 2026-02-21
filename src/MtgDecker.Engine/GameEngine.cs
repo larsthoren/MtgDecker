@@ -1606,6 +1606,65 @@ public class GameEngine
     private bool HasHexproof(GameCard card) => card.ActiveKeywords.Contains(Keyword.Hexproof);
 
     /// <summary>
+    /// Shared targeting helper — builds eligible targets, prompts player, validates choice.
+    /// Returns null if the player cancels targeting. Returns empty list if no legal targets exist.
+    /// </summary>
+    internal async Task<List<TargetInfo>?> FindAndChooseTargetsAsync(
+        TargetFilter filter, Player caster, IPlayerDecisionHandler handler,
+        string? spellName = null, CancellationToken ct = default)
+    {
+        var opponent = _state.GetOpponent(caster);
+        var eligible = new List<GameCard>();
+
+        foreach (var c in caster.Battlefield.Cards)
+            if (filter.IsLegal(c, ZoneType.Battlefield) && !CannotBeTargetedBy(c, caster))
+                eligible.Add(c);
+        foreach (var c in opponent.Battlefield.Cards)
+            if (filter.IsLegal(c, ZoneType.Battlefield) && !CannotBeTargetedBy(c, caster))
+                eligible.Add(c);
+
+        var dummyCard = new GameCard { Name = "Player" };
+        if (filter.IsLegal(dummyCard, ZoneType.None))
+        {
+            eligible.Add(new GameCard { Id = Guid.Empty, Name = caster.Name });
+            eligible.Add(new GameCard { Id = Guid.Empty, Name = opponent.Name });
+        }
+
+        if (filter.IsLegal(dummyCard, ZoneType.Stack))
+        {
+            foreach (var so in _state.Stack.OfType<StackObject>())
+                if (filter.IsLegal(so.Card, ZoneType.Stack))
+                    eligible.Add(so.Card);
+        }
+
+        if (eligible.Count == 0)
+            return new List<TargetInfo>();
+
+        var target = await handler.ChooseTarget(
+            spellName ?? "spell", eligible, opponent.Id, ct);
+
+        if (target == null)
+            return null;
+
+        var targets = new List<TargetInfo>();
+        if (target.Zone == ZoneType.None)
+        {
+            targets.Add(new TargetInfo(Guid.Empty, target.PlayerId, ZoneType.None));
+        }
+        else
+        {
+            var stackTarget = _state.Stack.OfType<StackObject>()
+                .FirstOrDefault(s => s.Card.Id == target.CardId);
+            if (stackTarget != null)
+                targets.Add(new TargetInfo(stackTarget.Card.Id, stackTarget.ControllerId, ZoneType.Stack));
+            else
+                targets.Add(target);
+        }
+
+        return targets;
+    }
+
+    /// <summary>
     /// Returns true if the card cannot be targeted by the given player.
     /// Shroud prevents all targeting; Hexproof prevents only opponent targeting.
     /// </summary>
