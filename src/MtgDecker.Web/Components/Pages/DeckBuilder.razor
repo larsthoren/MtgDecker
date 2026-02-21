@@ -1,4 +1,5 @@
 @page "/decks/{DeckId:guid}/edit"
+@page "/decks/{DeckId:guid}/view"
 @inject IMediator Mediator
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
@@ -16,19 +17,30 @@ else
     <MudStack Row="true" Class="mb-3" AlignItems="AlignItems.Center">
         <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" OnClick="@(() => Navigation.NavigateTo("/decks"))" />
         <MudText Typo="Typo.h5">@_deck.Name</MudText>
-        <MudSelect T="MtgDecker.Domain.Enums.Format" Value="_deck.Format" ValueChanged="OnFormatChanged"
-                   Variant="Variant.Outlined" Dense="true" Margin="Margin.Dense"
-                   Style="max-width: 160px;">
-            @foreach (var fmt in Enum.GetValues<MtgDecker.Domain.Enums.Format>())
-            {
-                <MudSelectItem Value="fmt">@fmt</MudSelectItem>
-            }
-        </MudSelect>
-        <MudButton Variant="Variant.Outlined" Color="Color.Tertiary"
-                   StartIcon="@Icons.Material.Filled.Casino"
-                   OnClick="OpenPlaytest" Size="Size.Small">
-            Playtest
-        </MudButton>
+        @if (IsReadOnly)
+        {
+            <MudChip T="string" Size="Size.Small" Color="Color.Info">@_deck.Format</MudChip>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       OnClick="@CloneToMyDecks" StartIcon="@Icons.Material.Filled.ContentCopy">
+                Clone to My Decks
+            </MudButton>
+        }
+        else
+        {
+            <MudSelect T="MtgDecker.Domain.Enums.Format" Value="_deck.Format" ValueChanged="OnFormatChanged"
+                       Variant="Variant.Outlined" Dense="true" Margin="Margin.Dense"
+                       Style="max-width: 160px;">
+                @foreach (var fmt in Enum.GetValues<MtgDecker.Domain.Enums.Format>())
+                {
+                    <MudSelectItem Value="fmt">@fmt</MudSelectItem>
+                }
+            </MudSelect>
+            <MudButton Variant="Variant.Outlined" Color="Color.Tertiary"
+                       StartIcon="@Icons.Material.Filled.Casino"
+                       OnClick="OpenPlaytest" Size="Size.Small">
+                Playtest
+            </MudButton>
+        }
         <MudSpacer />
         <MudText Typo="Typo.body2">
             Main: @_deck.TotalMainDeckCount
@@ -86,58 +98,61 @@ else
 
     @* Two-Panel Layout *@
     <MudGrid>
-        @* Left Panel: Card Search *@
-        <MudItem xs="12" md="6">
-            <MudPaper Class="pa-3" Elevation="1">
-                <MudText Typo="Typo.subtitle1" Class="mb-2">Search Cards</MudText>
-                <MudStack Row="true" Class="mb-3">
-                    <MudTextField @bind-Value="_searchText" Label="Card Name" Variant="Variant.Outlined"
-                                  Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.Search"
-                                  OnKeyUp="OnSearchKeyUp" />
-                    <MudIconButton Icon="@Icons.Material.Filled.Search" Color="Color.Primary"
-                                   Variant="Variant.Filled" OnClick="SearchCards" />
-                </MudStack>
+        @if (!IsReadOnly)
+        {
+            @* Left Panel: Card Search *@
+            <MudItem xs="12" md="6">
+                <MudPaper Class="pa-3" Elevation="1">
+                    <MudText Typo="Typo.subtitle1" Class="mb-2">Search Cards</MudText>
+                    <MudStack Row="true" Class="mb-3">
+                        <MudTextField @bind-Value="_searchText" Label="Card Name" Variant="Variant.Outlined"
+                                      Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.Search"
+                                      OnKeyUp="OnSearchKeyUp" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Search" Color="Color.Primary"
+                                       Variant="Variant.Filled" OnClick="SearchCards" />
+                    </MudStack>
 
-                @if (_searchLoading)
-                {
-                    <MudProgressLinear Indeterminate="true" />
-                }
-
-                <MudList T="MtgDecker.Domain.Entities.Card" Dense="true">
-                    @foreach (var card in _searchResults)
+                    @if (_searchLoading)
                     {
-                        <MudListItem>
-                            <MudStack Row="true" AlignItems="AlignItems.Center">
-                                @if (!string.IsNullOrEmpty(card.ImageUriSmall))
-                                {
-                                    <MudImage Src="@card.ImageUriSmall" Width="40" Height="56"
-                                              ObjectFit="ObjectFit.Cover" Class="rounded" />
-                                }
-                                <MudStack Spacing="0" Class="flex-grow-1">
-                                    <MudText Typo="Typo.body2"><b>@card.Name</b></MudText>
-                                    <MudText Typo="Typo.caption">@card.ManaCost @card.TypeLine · @card.SetCode.ToUpperInvariant()</MudText>
-                                </MudStack>
-                                <MudIconButton Icon="@Icons.Material.Filled.Add" Size="Size.Small"
-                                               Color="Color.Primary"
-                                               OnClick="() => AddCardToDeck(card, MtgDecker.Domain.Enums.DeckCategory.MainDeck)" />
-                                @if (MtgDecker.Domain.Rules.FormatRules.HasSideboard(_deck.Format))
-                                {
-                                    <MudIconButton Icon="@Icons.Material.Filled.PlaylistAdd" Size="Size.Small"
-                                                   Color="Color.Secondary" Title="Sideboard"
-                                                   OnClick="() => AddCardToDeck(card, MtgDecker.Domain.Enums.DeckCategory.Sideboard)" />
-                                }
-                                <MudIconButton Icon="@Icons.Material.Filled.Bookmark" Size="Size.Small"
-                                               Color="Color.Info" Title="Maybeboard"
-                                               OnClick="() => AddCardToDeck(card, MtgDecker.Domain.Enums.DeckCategory.Maybeboard)" />
-                            </MudStack>
-                        </MudListItem>
+                        <MudProgressLinear Indeterminate="true" />
                     }
-                </MudList>
-            </MudPaper>
-        </MudItem>
+
+                    <MudList T="MtgDecker.Domain.Entities.Card" Dense="true">
+                        @foreach (var card in _searchResults)
+                        {
+                            <MudListItem>
+                                <MudStack Row="true" AlignItems="AlignItems.Center">
+                                    @if (!string.IsNullOrEmpty(card.ImageUriSmall))
+                                    {
+                                        <MudImage Src="@card.ImageUriSmall" Width="40" Height="56"
+                                                  ObjectFit="ObjectFit.Cover" Class="rounded" />
+                                    }
+                                    <MudStack Spacing="0" Class="flex-grow-1">
+                                        <MudText Typo="Typo.body2"><b>@card.Name</b></MudText>
+                                        <MudText Typo="Typo.caption">@card.ManaCost @card.TypeLine · @card.SetCode.ToUpperInvariant()</MudText>
+                                    </MudStack>
+                                    <MudIconButton Icon="@Icons.Material.Filled.Add" Size="Size.Small"
+                                                   Color="Color.Primary"
+                                                   OnClick="() => AddCardToDeck(card, MtgDecker.Domain.Enums.DeckCategory.MainDeck)" />
+                                    @if (MtgDecker.Domain.Rules.FormatRules.HasSideboard(_deck.Format))
+                                    {
+                                        <MudIconButton Icon="@Icons.Material.Filled.PlaylistAdd" Size="Size.Small"
+                                                       Color="Color.Secondary" Title="Sideboard"
+                                                       OnClick="() => AddCardToDeck(card, MtgDecker.Domain.Enums.DeckCategory.Sideboard)" />
+                                    }
+                                    <MudIconButton Icon="@Icons.Material.Filled.Bookmark" Size="Size.Small"
+                                                   Color="Color.Info" Title="Maybeboard"
+                                                   OnClick="() => AddCardToDeck(card, MtgDecker.Domain.Enums.DeckCategory.Maybeboard)" />
+                                </MudStack>
+                            </MudListItem>
+                        }
+                    </MudList>
+                </MudPaper>
+            </MudItem>
+        }
 
         @* Right Panel: Deck List *@
-        <MudItem xs="12" md="6">
+        <MudItem xs="12" md="@(IsReadOnly ? 12 : 6)">
             <MudPaper Class="pa-3" Elevation="1">
                 <MudText Typo="Typo.subtitle1" Class="mb-2">
                     Main Deck (@_deck.TotalMainDeckCount)
@@ -163,13 +178,16 @@ else
                                         Need @GetShortage(entry.CardId)
                                     </MudChip>
                                 }
-                                <MudIconButton Icon="@Icons.Material.Filled.Add" Size="Size.Small"
-                                               OnClick="() => ChangeQuantity(entry.CardId, entry.Category, entry.Quantity + 1)" />
-                                <MudIconButton Icon="@Icons.Material.Filled.Remove" Size="Size.Small"
-                                               OnClick="() => ChangeQuantity(entry.CardId, entry.Category, entry.Quantity - 1)" />
-                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
-                                               Color="Color.Error"
-                                               OnClick="() => RemoveCard(entry.CardId, entry.Category)" />
+                                @if (!IsReadOnly)
+                                {
+                                    <MudIconButton Icon="@Icons.Material.Filled.Add" Size="Size.Small"
+                                                   OnClick="() => ChangeQuantity(entry.CardId, entry.Category, entry.Quantity + 1)" />
+                                    <MudIconButton Icon="@Icons.Material.Filled.Remove" Size="Size.Small"
+                                                   OnClick="() => ChangeQuantity(entry.CardId, entry.Category, entry.Quantity - 1)" />
+                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
+                                                   Color="Color.Error"
+                                                   OnClick="() => RemoveCard(entry.CardId, entry.Category)" />
+                                }
                             </MudStack>
                         </MudListItem>
                     }
@@ -189,11 +207,14 @@ else
                                     <MudText Typo="Typo.body2" Class="flex-grow-1">
                                         @entry.Quantity x @GetCardName(entry.CardId)
                                     </MudText>
-                                    <MudIconButton Icon="@Icons.Material.Filled.Remove" Size="Size.Small"
-                                                   OnClick="() => ChangeQuantity(entry.CardId, entry.Category, entry.Quantity - 1)" />
-                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
-                                                   Color="Color.Error"
-                                                   OnClick="() => RemoveCard(entry.CardId, entry.Category)" />
+                                    @if (!IsReadOnly)
+                                    {
+                                        <MudIconButton Icon="@Icons.Material.Filled.Remove" Size="Size.Small"
+                                                       OnClick="() => ChangeQuantity(entry.CardId, entry.Category, entry.Quantity - 1)" />
+                                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
+                                                       Color="Color.Error"
+                                                       OnClick="() => RemoveCard(entry.CardId, entry.Category)" />
+                                    }
                                 </MudStack>
                             </MudListItem>
                         }
@@ -214,14 +235,17 @@ else
                                     <MudText Typo="Typo.body2" Class="flex-grow-1">
                                         @entry.Quantity x @GetCardName(entry.CardId)
                                     </MudText>
-                                    <MudIconButton Icon="@Icons.Material.Filled.ArrowUpward" Size="Size.Small"
-                                                   Color="Color.Primary" Title="Move to Main Deck"
-                                                   OnClick="() => MoveToMainDeck(entry)" />
-                                    <MudIconButton Icon="@Icons.Material.Filled.Remove" Size="Size.Small"
-                                                   OnClick="() => ChangeQuantity(entry.CardId, entry.Category, entry.Quantity - 1)" />
-                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
-                                                   Color="Color.Error"
-                                                   OnClick="() => RemoveCard(entry.CardId, entry.Category)" />
+                                    @if (!IsReadOnly)
+                                    {
+                                        <MudIconButton Icon="@Icons.Material.Filled.ArrowUpward" Size="Size.Small"
+                                                       Color="Color.Primary" Title="Move to Main Deck"
+                                                       OnClick="() => MoveToMainDeck(entry)" />
+                                        <MudIconButton Icon="@Icons.Material.Filled.Remove" Size="Size.Small"
+                                                       OnClick="() => ChangeQuantity(entry.CardId, entry.Category, entry.Quantity - 1)" />
+                                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
+                                                       Color="Color.Error"
+                                                       OnClick="() => RemoveCard(entry.CardId, entry.Category)" />
+                                    }
                                 </MudStack>
                             </MudListItem>
                         }
@@ -245,6 +269,8 @@ else
     private bool _searchLoading;
 
     private static readonly Guid UserId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+
+    private bool IsReadOnly => _deck?.IsSystemDeck == true;
 
     private IEnumerable<MtgDecker.Domain.Entities.DeckEntry> _mainDeckEntries =>
         _deck?.Entries.Where(e => e.Category == MtgDecker.Domain.Enums.DeckCategory.MainDeck) ?? Enumerable.Empty<MtgDecker.Domain.Entities.DeckEntry>();
@@ -476,6 +502,20 @@ else
         catch (Exception ex)
         {
             Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+
+    private async Task CloneToMyDecks()
+    {
+        try
+        {
+            var clone = await Mediator.Send(new MtgDecker.Application.Decks.CloneDeckCommand(DeckId, UserId));
+            Snackbar.Add($"Cloned '{_deck!.Name}' to your decks", Severity.Success);
+            Navigation.NavigateTo($"/decks/{clone.Id}/edit");
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to clone deck: {ex.Message}", Severity.Error);
         }
     }
 
