@@ -85,4 +85,93 @@ public class PhyrexianManaTests
         reduced.GenericCost.Should().Be(1);
         reduced.PhyrexianRequirements[ManaColor.Black].Should().Be(1);
     }
+
+    // --- ManaPool.CanPayWithPhyrexian tests ---
+
+    [Fact]
+    public void CanPayWithPhyrexian_EnoughMana_ReturnsTrue()
+    {
+        var pool = new ManaPool();
+        pool.Add(ManaColor.Black, 2);
+        pool.Add(ManaColor.Colorless, 1);
+        var cost = ManaCost.Parse("{1}{B/P}{B/P}");
+        pool.CanPayWithPhyrexian(cost, 20).Should().BeTrue();
+    }
+
+    [Fact]
+    public void CanPayWithPhyrexian_NoManaButEnoughLife_ReturnsTrue()
+    {
+        var pool = new ManaPool();
+        pool.Add(ManaColor.Colorless, 1);
+        var cost = ManaCost.Parse("{1}{B/P}{B/P}");
+        // Need 1 generic (have it) + 2 Phyrexian black at 2 life each = 4 life
+        pool.CanPayWithPhyrexian(cost, 5).Should().BeTrue();
+    }
+
+    [Fact]
+    public void CanPayWithPhyrexian_NotEnoughGenericMana_ReturnsFalse()
+    {
+        var pool = new ManaPool();
+        // No mana at all, need {1}{B/P}{B/P} = 1 generic + 2 Phyrexian
+        var cost = ManaCost.Parse("{1}{B/P}{B/P}");
+        pool.CanPayWithPhyrexian(cost, 20).Should().BeFalse(); // Can't pay generic
+    }
+
+    [Fact]
+    public void CanPayWithPhyrexian_LifeTooLow_ReturnsFalse()
+    {
+        var pool = new ManaPool();
+        pool.Add(ManaColor.Colorless, 1);
+        var cost = ManaCost.Parse("{1}{B/P}{B/P}");
+        // Need 4 life for 2 Phyrexian, but only have 3
+        pool.CanPayWithPhyrexian(cost, 3).Should().BeFalse();
+    }
+
+    [Fact]
+    public void CanPayWithPhyrexian_MixedPayment_ReturnsTrue()
+    {
+        var pool = new ManaPool();
+        pool.Add(ManaColor.Black, 1);
+        pool.Add(ManaColor.Colorless, 1);
+        var cost = ManaCost.Parse("{1}{B/P}{B/P}");
+        // 1 generic (have it) + 1 black mana for 1st Phyrexian + 2 life for 2nd
+        pool.CanPayWithPhyrexian(cost, 3).Should().BeTrue();
+    }
+
+    [Fact]
+    public void CanPayWithPhyrexian_NonPhyrexianCost_DelegatesToCanPay()
+    {
+        var pool = new ManaPool();
+        pool.Add(ManaColor.Red, 2);
+        pool.Add(ManaColor.Colorless, 2);
+        var cost = ManaCost.Parse("{2}{R}{R}");
+        pool.CanPayWithPhyrexian(cost, 20).Should().BeTrue();
+    }
+
+    [Fact]
+    public void CanPayWithPhyrexian_NonPhyrexianCost_NotEnough_ReturnsFalse()
+    {
+        var pool = new ManaPool();
+        pool.Add(ManaColor.Red, 1);
+        var cost = ManaCost.Parse("{2}{R}{R}");
+        pool.CanPayWithPhyrexian(cost, 20).Should().BeFalse();
+    }
+
+    [Fact]
+    public void CanPayWithPhyrexian_SinglePhyrexian_LifeOnly()
+    {
+        var pool = new ManaPool();
+        var cost = ManaCost.Parse("{B/P}");
+        // No mana, but enough life
+        pool.CanPayWithPhyrexian(cost, 3).Should().BeTrue();
+    }
+
+    [Fact]
+    public void CanPayWithPhyrexian_SinglePhyrexian_LifeExactlyEqual_ReturnsFalse()
+    {
+        var pool = new ManaPool();
+        var cost = ManaCost.Parse("{B/P}");
+        // Life exactly equal to cost (2) — strict inequality means can't pay
+        pool.CanPayWithPhyrexian(cost, 2).Should().BeFalse();
+    }
 }
