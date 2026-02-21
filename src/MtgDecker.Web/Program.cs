@@ -45,8 +45,7 @@ if (app.Environment.IsDevelopment())
 {
     using var seedScope = app.Services.CreateScope();
     var mediator = seedScope.ServiceProvider.GetRequiredService<IMediator>();
-    var seedUserId = Guid.Parse("00000000-0000-0000-0000-000000000001");
-    var seedResult = await mediator.Send(new SeedPresetDecksCommand(seedUserId));
+    var seedResult = await mediator.Send(new SeedPresetDecksCommand());
 
     foreach (var name in seedResult.Created)
         Console.WriteLine($"[Seed] {name} deck created.");

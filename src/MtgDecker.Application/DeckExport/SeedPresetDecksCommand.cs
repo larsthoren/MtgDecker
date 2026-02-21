@@ -1,9 +1,9 @@
 using MediatR;
-using MtgDecker.Application.Decks;
+using MtgDecker.Application.Interfaces;
 
 namespace MtgDecker.Application.DeckExport;
 
-public record SeedPresetDecksCommand(Guid UserId) : IRequest<SeedPresetDecksResult>;
+public record SeedPresetDecksCommand() : IRequest<SeedPresetDecksResult>;
 
 public record SeedPresetDecksResult(
     List<string> Created,
@@ -13,14 +13,19 @@ public record SeedPresetDecksResult(
 public class SeedPresetDecksHandler : IRequestHandler<SeedPresetDecksCommand, SeedPresetDecksResult>
 {
     private readonly IMediator _mediator;
+    private readonly IDeckRepository _deckRepository;
 
-    public SeedPresetDecksHandler(IMediator mediator) => _mediator = mediator;
+    public SeedPresetDecksHandler(IMediator mediator, IDeckRepository deckRepository)
+    {
+        _mediator = mediator;
+        _deckRepository = deckRepository;
+    }
 
     public async Task<SeedPresetDecksResult> Handle(
         SeedPresetDecksCommand request, CancellationToken cancellationToken)
     {
-        var existing = await _mediator.Send(new ListDecksQuery(request.UserId), cancellationToken);
-        var existingNames = existing.Select(d => d.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var existingDecks = await _deckRepository.ListSystemDecksAsync(cancellationToken);
+        var existingNames = existingDecks.Select(d => d.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         var created = new List<string>();
         var skipped = new List<string>();
@@ -35,7 +40,7 @@ public class SeedPresetDecksHandler : IRequestHandler<SeedPresetDecksCommand, Se
             }
 
             var result = await _mediator.Send(
-                new ImportDeckCommand(preset.DeckTextMtgo, "MTGO", preset.Name, preset.Format, request.UserId),
+                new ImportDeckCommand(preset.DeckTextMtgo, "MTGO", preset.Name, preset.Format, null),
                 cancellationToken);
 
             created.Add(preset.Name);
