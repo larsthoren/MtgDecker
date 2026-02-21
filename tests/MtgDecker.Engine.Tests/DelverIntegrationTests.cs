@@ -170,10 +170,8 @@ public class DelverIntegrationTests
         var ponder = GameCard.Create("Ponder");
         state.Player1.Hand.Add(ponder);
 
-        // Ponder flow:
-        // 1. RevealCards (auto-acknowledged by TestDecisionHandler)
-        // 2. ChooseCard with empty list + optional=true → null means "shuffle"
-        h1.EnqueueCardChoice(null); // choose to shuffle
+        // Ponder reorder: order doesn't matter since we shuffle anyway
+        h1.EnqueueReorder(cards => cards.ToList(), shuffle: true);
 
         h1.EnqueueAction(GameAction.TapCard(state.Player1.Id, island.Id));
         h1.EnqueueAction(GameAction.CastSpell(state.Player1.Id, ponder.Id));
@@ -211,18 +209,22 @@ public class DelverIntegrationTests
         var ponder = GameCard.Create("Ponder");
         state.Player1.Hand.Add(ponder);
 
-        // Reorder: put back in original order (ThirdCard deepest, SecondCard middle, TopCard on top)
-        h1.EnqueueCardChoice(lib3.Id); // ThirdCard goes deepest
-        h1.EnqueueCardChoice(lib2.Id); // SecondCard middle
-        // TopCard auto-placed on top
-        h1.EnqueueCardChoice(Guid.NewGuid()); // keep order (non-null)
+        // Reorder: place ThirdCard first (deepest), SecondCard second, TopCard last (top)
+        // This keeps the original order. shuffle: false = keep order.
+        h1.EnqueueReorder(cards =>
+        {
+            var third = cards.First(c => c.Name == "ThirdCard");
+            var second = cards.First(c => c.Name == "SecondCard");
+            var top = cards.First(c => c.Name == "TopCard");
+            return new List<GameCard> { third, second, top };
+        }, shuffle: false);
 
         h1.EnqueueAction(GameAction.TapCard(state.Player1.Id, island.Id));
         h1.EnqueueAction(GameAction.CastSpell(state.Player1.Id, ponder.Id));
 
         await engine.RunPriorityAsync();
 
-        // Drew TopCard (kept order)
+        // Drew TopCard (kept on top via reorder)
         state.Player1.Hand.Count.Should().Be(1);
         state.Player1.Hand.Cards[0].Name.Should().Be("TopCard");
         state.Player1.Library.Count.Should().Be(3);

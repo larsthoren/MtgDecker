@@ -466,6 +466,16 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
     }
 
     /// <summary>
+    /// Keeps original order and doesn't shuffle (keeps the known top card).
+    /// </summary>
+    public async Task<(IReadOnlyList<GameCard> ordered, bool shuffle)> ReorderCards(
+        IReadOnlyList<GameCard> cards, string prompt, CancellationToken ct = default)
+    {
+        await DelayAsync(ct);
+        return (cards.ToList(), false);
+    }
+
+    /// <summary>
     /// Chooses a target for a spell. Picks the opponent's creature with highest power,
     /// falling back to the first eligible target.
     /// </summary>

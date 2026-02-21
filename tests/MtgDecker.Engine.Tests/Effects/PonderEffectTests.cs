@@ -35,36 +35,27 @@ public class PonderEffectTests
     }
 
     [Fact]
-    public async Task Ponder_ReorderAndKeep_DrawsTopCard()
+    public async Task Ponder_ReorderAndKeep_DrawsLastPlaced()
     {
         // Library top-to-bottom: E, D, C, B, A
         var (state, player, handler) = CreateSetup("A", "B", "C", "D", "E");
 
-        // Reorder: click D first (goes deepest), then E (middle), C auto-placed (top)
-        // Top 3 peeked: E, D, C
-        var top3 = player.Library.PeekTop(3).ToList(); // [C, D, E] — wait, PeekTop returns top first
-        // Actually PeekTop(3) returns [E, D, C] (top to bottom within the 3)
-        // Let me just use card IDs from the library
-        var cardE = player.Library.Cards[4]; // top
-        var cardD = player.Library.Cards[3];
-        var cardC = player.Library.Cards[2];
-
-        // Click D first (goes to library), then E (goes on top of D), C auto-placed on top
-        handler.EnqueueCardChoice(cardD.Id); // pick 1 of 3: D goes deepest
-        handler.EnqueueCardChoice(cardE.Id); // pick 2 of 3: E goes on top of D
-        // C is auto-placed on top
-        // Shuffle prompt: choose card = keep order
-        handler.EnqueueCardChoice(Guid.NewGuid()); // any non-null = keep order
+        // Place order: D first (deepest), E second, C last (top) → draws C
+        handler.EnqueueReorder(cards =>
+        {
+            var d = cards.First(c => c.Name == "D");
+            var e = cards.First(c => c.Name == "E");
+            var c = cards.First(c => c.Name == "C");
+            return new List<GameCard> { d, e, c };
+        }, shuffle: false);
 
         var effect = new PonderEffect();
         var spell = CreateSpell(state);
         await effect.ResolveAsync(state, spell, handler);
 
-        // Player draws C (the last card placed = top of library)
+        // Player draws C (last placed = top)
         player.Hand.Cards.Should().HaveCount(1);
         player.Hand.Cards[0].Name.Should().Be("C");
-
-        // Library top-to-bottom: E, D, B, A (C was drawn)
         player.Library.Count.Should().Be(4);
     }
 
@@ -74,15 +65,14 @@ public class PonderEffectTests
         // Library top-to-bottom: E, D, C, B, A
         var (state, player, handler) = CreateSetup("A", "B", "C", "D", "E");
 
-        var cardE = player.Library.Cards[4]; // top
-        var cardD = player.Library.Cards[3];
-        var cardC = player.Library.Cards[2];
-
-        // Click in reverse order to restore original: C first, D second, E auto-placed on top
-        handler.EnqueueCardChoice(cardC.Id); // C goes deepest
-        handler.EnqueueCardChoice(cardD.Id); // D goes on top of C
-        // E auto-placed on top (original order restored)
-        handler.EnqueueCardChoice(Guid.NewGuid()); // keep order
+        // Place in original order: C first (deepest), D second, E last (top)
+        handler.EnqueueReorder(cards =>
+        {
+            var c = cards.First(x => x.Name == "C");
+            var d = cards.First(x => x.Name == "D");
+            var e = cards.First(x => x.Name == "E");
+            return new List<GameCard> { c, d, e };
+        }, shuffle: false);
 
         var effect = new PonderEffect();
         var spell = CreateSpell(state);
@@ -92,7 +82,7 @@ public class PonderEffectTests
         player.Hand.Cards.Should().HaveCount(1);
         player.Hand.Cards[0].Name.Should().Be("E");
 
-        // Library: D, C, B, A
+        // Library: D, C, B, A (top-to-bottom)
         player.Library.Count.Should().Be(4);
         player.Library.Cards[3].Name.Should().Be("D"); // new top
         player.Library.Cards[2].Name.Should().Be("C");
@@ -107,13 +97,8 @@ public class PonderEffectTests
         var cardNames = Enumerable.Range(1, 20).Select(i => $"Card{i}").ToArray();
         var (state, player, handler) = CreateSetup(cardNames);
 
-        var top3 = player.Library.PeekTop(3).ToList();
-
-        // Click cards in any order (doesn't matter since we shuffle)
-        handler.EnqueueCardChoice(top3[0].Id); // first pick
-        handler.EnqueueCardChoice(top3[1].Id); // second pick
-        // third auto-placed
-        handler.EnqueueCardChoice(null); // skip = shuffle
+        // Keep original order but shuffle
+        handler.EnqueueReorder(cards => cards.ToList(), shuffle: true);
 
         var effect = new PonderEffect();
         var spell = CreateSpell(state);
@@ -136,19 +121,19 @@ public class PonderEffectTests
         // Only 2 cards in library
         var (state, player, handler) = CreateSetup("X", "Y");
 
-        var cardY = player.Library.Cards[1]; // top
-        var cardX = player.Library.Cards[0]; // bottom
-
-        // Click X first (deepest), Y auto-placed on top
-        handler.EnqueueCardChoice(cardX.Id);
-        // Y auto-placed
-        handler.EnqueueCardChoice(Guid.NewGuid()); // keep order
+        // Place X first (deepest), Y last (top)
+        handler.EnqueueReorder(cards =>
+        {
+            var x = cards.First(c => c.Name == "X");
+            var y = cards.First(c => c.Name == "Y");
+            return new List<GameCard> { x, y };
+        }, shuffle: false);
 
         var effect = new PonderEffect();
         var spell = CreateSpell(state);
         await effect.ResolveAsync(state, spell, handler);
 
-        // Player draws Y (top)
+        // Player draws Y (last placed = top)
         player.Hand.Cards.Should().HaveCount(1);
         player.Hand.Cards[0].Name.Should().Be("Y");
         player.Library.Count.Should().Be(1);
@@ -156,12 +141,12 @@ public class PonderEffectTests
     }
 
     [Fact]
-    public async Task Ponder_OneCard_AutoPlacedAndDrawn()
+    public async Task Ponder_OneCard_DrawsIt()
     {
-        // Only 1 card — auto-placed, no clicking needed
+        // Only 1 card — only option is to place it back and draw
         var (state, player, handler) = CreateSetup("OnlyCard");
 
-        handler.EnqueueCardChoice(Guid.NewGuid()); // keep order (shuffle prompt)
+        handler.EnqueueReorder(cards => cards.ToList(), shuffle: false);
 
         var effect = new PonderEffect();
         var spell = CreateSpell(state);
@@ -189,11 +174,8 @@ public class PonderEffectTests
     public async Task Ponder_LogsKeepOrder()
     {
         var (state, player, handler) = CreateSetup("A", "B", "C", "D", "E");
-        var top3 = player.Library.PeekTop(3).ToList();
 
-        handler.EnqueueCardChoice(top3[0].Id);
-        handler.EnqueueCardChoice(top3[1].Id);
-        handler.EnqueueCardChoice(Guid.NewGuid()); // keep order
+        handler.EnqueueReorder(cards => cards.ToList(), shuffle: false);
 
         var effect = new PonderEffect();
         var spell = CreateSpell(state);
@@ -208,11 +190,8 @@ public class PonderEffectTests
     public async Task Ponder_LogsShuffle()
     {
         var (state, player, handler) = CreateSetup("A", "B", "C", "D", "E");
-        var top3 = player.Library.PeekTop(3).ToList();
 
-        handler.EnqueueCardChoice(top3[0].Id);
-        handler.EnqueueCardChoice(top3[1].Id);
-        handler.EnqueueCardChoice(null); // shuffle
+        handler.EnqueueReorder(cards => cards.ToList(), shuffle: true);
 
         var effect = new PonderEffect();
         var spell = CreateSpell(state);
@@ -226,25 +205,23 @@ public class PonderEffectTests
     [Fact]
     public async Task Ponder_ReorderChangesLibraryOrder()
     {
-        // Verify that reordering actually changes the library order
         // Library top-to-bottom: E, D, C, B, A
         var (state, player, handler) = CreateSetup("A", "B", "C", "D", "E");
 
-        var cardE = player.Library.Cards[4]; // top
-        var cardD = player.Library.Cards[3];
-        var cardC = player.Library.Cards[2];
-
-        // Put E deepest, C middle, D on top → draw D
-        handler.EnqueueCardChoice(cardE.Id); // E goes deepest
-        handler.EnqueueCardChoice(cardC.Id); // C on top of E
-        // D auto-placed on top of C
-        handler.EnqueueCardChoice(Guid.NewGuid()); // keep order
+        // Place E first (deepest), C second, D last (top) → draw D
+        handler.EnqueueReorder(cards =>
+        {
+            var e = cards.First(c => c.Name == "E");
+            var c = cards.First(x => x.Name == "C");
+            var d = cards.First(x => x.Name == "D");
+            return new List<GameCard> { e, c, d };
+        }, shuffle: false);
 
         var effect = new PonderEffect();
         var spell = CreateSpell(state);
         await effect.ResolveAsync(state, spell, handler);
 
-        // Player draws D (the auto-placed top card)
+        // Player draws D (last placed = top)
         player.Hand.Cards[0].Name.Should().Be("D");
 
         // Library top-to-bottom: C, E, B, A

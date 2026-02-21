@@ -20,6 +20,7 @@ public class TestDecisionHandler : IPlayerDecisionHandler
     private readonly Queue<Func<IReadOnlyList<GameCard>, int, IReadOnlyList<GameCard>>> _discardChoices = new();
     private readonly Queue<Func<IReadOnlyList<GameCard>, IReadOnlyList<GameCard>>> _splitChoices = new();
     private readonly Queue<int> _pileChoices = new();
+    private readonly Queue<(Func<IReadOnlyList<GameCard>, IReadOnlyList<GameCard>> orderer, bool shuffle)> _reorderQueue = new();
 
     public void EnqueueAction(GameAction action) => _actions.Enqueue(action);
 
@@ -45,6 +46,9 @@ public class TestDecisionHandler : IPlayerDecisionHandler
     public void EnqueueSplitChoice(Func<IReadOnlyList<GameCard>, IReadOnlyList<GameCard>> chooser) =>
         _splitChoices.Enqueue(chooser);
     public void EnqueuePileChoice(int pile) => _pileChoices.Enqueue(pile);
+
+    public void EnqueueReorder(Func<IReadOnlyList<GameCard>, IReadOnlyList<GameCard>> orderer, bool shuffle)
+        => _reorderQueue.Enqueue((orderer, shuffle));
 
     public Action? OnBeforeAction { get; set; }
 
@@ -162,5 +166,17 @@ public class TestDecisionHandler : IPlayerDecisionHandler
         if (_pileChoices.Count == 0)
             return Task.FromResult(1);
         return Task.FromResult(_pileChoices.Dequeue());
+    }
+
+    public Task<(IReadOnlyList<GameCard> ordered, bool shuffle)> ReorderCards(
+        IReadOnlyList<GameCard> cards, string prompt, CancellationToken ct = default)
+    {
+        if (_reorderQueue.Count > 0)
+        {
+            var (orderer, shuffle) = _reorderQueue.Dequeue();
+            return Task.FromResult((orderer(cards), shuffle));
+        }
+        // Default: keep original order, no shuffle
+        return Task.FromResult(((IReadOnlyList<GameCard>)cards.ToList(), false));
     }
 }

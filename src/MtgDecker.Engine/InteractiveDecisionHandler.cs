@@ -23,6 +23,7 @@ public class InteractiveDecisionHandler : IPlayerDecisionHandler
     private TaskCompletionSource<IReadOnlyList<GameCard>>? _discardTcs;
     private TaskCompletionSource<IReadOnlyList<GameCard>>? _splitCardsTcs;
     private TaskCompletionSource<int>? _choosePileTcs;
+    private TaskCompletionSource<(IReadOnlyList<GameCard> ordered, bool shuffle)>? _reorderTcs;
 
     public bool IsWaitingForAction => _actionTcs is { Task.IsCompleted: false };
     public bool IsWaitingForMulligan => _mulliganTcs is { Task.IsCompleted: false };
@@ -48,6 +49,9 @@ public class InteractiveDecisionHandler : IPlayerDecisionHandler
     public IReadOnlyList<GameCard>? Pile1Options { get; private set; }
     public IReadOnlyList<GameCard>? Pile2Options { get; private set; }
     public string? PileChoicePrompt { get; private set; }
+    public bool IsWaitingForReorder => _reorderTcs is { Task.IsCompleted: false };
+    public IReadOnlyList<GameCard>? ReorderOptions { get; private set; }
+    public string? ReorderPrompt { get; private set; }
 
     /// <summary>
     /// True when this handler is waiting for any player input, meaning the
@@ -59,7 +63,8 @@ public class InteractiveDecisionHandler : IPlayerDecisionHandler
         || IsWaitingForAttackers || IsWaitingForAttackerTargets
         || IsWaitingForBlockers || IsWaitingForBlockerOrder
         || IsWaitingForTarget || IsWaitingForCardChoice || IsWaitingForRevealAck
-        || IsWaitingForDiscard || IsWaitingForSplit || IsWaitingForPileChoice;
+        || IsWaitingForDiscard || IsWaitingForSplit || IsWaitingForPileChoice
+        || IsWaitingForReorder;
 
     public IReadOnlyList<ManaColor>? ManaColorOptions { get; private set; }
     public IReadOnlyList<GameCard>? EligibleAttackers { get; private set; }
@@ -362,5 +367,24 @@ public class InteractiveDecisionHandler : IPlayerDecisionHandler
         Pile2Options = null;
         PileChoicePrompt = null;
         _choosePileTcs?.TrySetResult(pile);
+    }
+
+    public Task<(IReadOnlyList<GameCard> ordered, bool shuffle)> ReorderCards(
+        IReadOnlyList<GameCard> cards, string prompt, CancellationToken ct = default)
+    {
+        ReorderOptions = cards;
+        ReorderPrompt = prompt;
+        _reorderTcs = new TaskCompletionSource<(IReadOnlyList<GameCard>, bool)>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var registration = ct.Register(() => { ReorderOptions = null; ReorderPrompt = null; _reorderTcs.TrySetCanceled(); });
+        _reorderTcs.Task.ContinueWith(_ => registration.Dispose(), TaskContinuationOptions.ExecuteSynchronously);
+        OnWaitingForInput?.Invoke();
+        return _reorderTcs.Task;
+    }
+
+    public void SubmitReorder(IReadOnlyList<GameCard> ordered, bool shuffle)
+    {
+        ReorderOptions = null;
+        ReorderPrompt = null;
+        _reorderTcs?.TrySetResult((ordered, shuffle));
     }
 }
