@@ -24,6 +24,7 @@ public class InteractiveDecisionHandler : IPlayerDecisionHandler
     private TaskCompletionSource<IReadOnlyList<GameCard>>? _splitCardsTcs;
     private TaskCompletionSource<int>? _choosePileTcs;
     private TaskCompletionSource<(IReadOnlyList<GameCard> ordered, bool shuffle)>? _reorderTcs;
+    private TaskCompletionSource<bool>? _phyrexianPaymentTcs;
 
     public bool IsWaitingForAction => _actionTcs is { Task.IsCompleted: false };
     public bool IsWaitingForMulligan => _mulliganTcs is { Task.IsCompleted: false };
@@ -52,6 +53,8 @@ public class InteractiveDecisionHandler : IPlayerDecisionHandler
     public bool IsWaitingForReorder => _reorderTcs is { Task.IsCompleted: false };
     public IReadOnlyList<GameCard>? ReorderOptions { get; private set; }
     public string? ReorderPrompt { get; private set; }
+    public bool IsWaitingForPhyrexianPayment => _phyrexianPaymentTcs is { Task.IsCompleted: false };
+    public ManaColor? PhyrexianPaymentColor { get; private set; }
 
     /// <summary>
     /// True when this handler is waiting for any player input, meaning the
@@ -64,7 +67,7 @@ public class InteractiveDecisionHandler : IPlayerDecisionHandler
         || IsWaitingForBlockers || IsWaitingForBlockerOrder
         || IsWaitingForTarget || IsWaitingForCardChoice || IsWaitingForRevealAck
         || IsWaitingForDiscard || IsWaitingForSplit || IsWaitingForPileChoice
-        || IsWaitingForReorder;
+        || IsWaitingForReorder || IsWaitingForPhyrexianPayment;
 
     public IReadOnlyList<ManaColor>? ManaColorOptions { get; private set; }
     public IReadOnlyList<GameCard>? EligibleAttackers { get; private set; }
@@ -386,5 +389,21 @@ public class InteractiveDecisionHandler : IPlayerDecisionHandler
         ReorderOptions = null;
         ReorderPrompt = null;
         _reorderTcs?.TrySetResult((ordered, shuffle));
+    }
+
+    public Task<bool> ChoosePhyrexianPayment(ManaColor color, CancellationToken ct = default)
+    {
+        PhyrexianPaymentColor = color;
+        _phyrexianPaymentTcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var registration = ct.Register(() => { PhyrexianPaymentColor = null; _phyrexianPaymentTcs.TrySetCanceled(); });
+        _phyrexianPaymentTcs.Task.ContinueWith(_ => registration.Dispose(), TaskContinuationOptions.ExecuteSynchronously);
+        OnWaitingForInput?.Invoke();
+        return _phyrexianPaymentTcs.Task;
+    }
+
+    public void SubmitPhyrexianPayment(bool payWithMana)
+    {
+        PhyrexianPaymentColor = null;
+        _phyrexianPaymentTcs?.TrySetResult(payWithMana);
     }
 }

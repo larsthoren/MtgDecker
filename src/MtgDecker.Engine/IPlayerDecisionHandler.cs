@@ -34,4 +34,9 @@ public interface IPlayerDecisionHandler
     /// </summary>
     Task<(IReadOnlyList<GameCard> ordered, bool shuffle)> ReorderCards(
         IReadOnlyList<GameCard> cards, string prompt, CancellationToken ct = default);
+
+    /// <summary>
+    /// Choose whether to pay a Phyrexian mana symbol with colored mana (true) or 2 life (false).
+    /// </summary>
+    Task<bool> ChoosePhyrexianPayment(ManaColor color, CancellationToken ct = default);
 }
