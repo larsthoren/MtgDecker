@@ -19,62 +19,97 @@
 {
     <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
 }
-else if (_decks.Count == 0)
-{
-    <MudPaper Class="pa-8 d-flex flex-column align-center" Elevation="1">
-        <MudIcon Icon="@Icons.Material.Filled.LibraryBooks" Size="Size.Large" Color="Color.Secondary" Class="mb-4" />
-        <MudText Typo="Typo.h6" Class="mb-2">No decks yet</MudText>
-        <MudText Typo="Typo.body1" Class="mb-4">Create your first deck to get started.</MudText>
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CreateNewDeck">
-            Create Deck
-        </MudButton>
-    </MudPaper>
-}
 else
 {
-    <MudGrid>
-        @foreach (var deck in _decks)
-        {
-            <MudItem xs="12" sm="6" md="4" lg="3">
-                <MudCard Class="cursor-pointer" @onclick="() => EditDeck(deck.Id)">
-                    <MudCardHeader>
-                        <CardHeaderContent>
+    @if (_systemDecks.Any())
+    {
+        <MudText Typo="Typo.h5" Class="mb-2">Preset Decks</MudText>
+        <MudGrid>
+            @foreach (var deck in _systemDecks)
+            {
+                <MudItem xs="12" sm="6" md="4" lg="3">
+                    <MudCard Elevation="2" Class="pa-3">
+                        <MudCardContent>
                             <MudText Typo="Typo.h6">@deck.Name</MudText>
-                            <MudChip T="string" Size="Size.Small" Color="Color.Primary">@deck.Format</MudChip>
-                        </CardHeaderContent>
-                        <CardHeaderActions>
-                            <MudMenu Icon="@Icons.Material.Filled.MoreVert">
-                                <MudMenuItem OnClick="() => EditDeck(deck.Id)"
-                                             Icon="@Icons.Material.Filled.Edit">Edit</MudMenuItem>
-                                <MudMenuItem OnClick="() => ExportDeck(deck)"
-                                             Icon="@Icons.Material.Filled.FileDownload">Export</MudMenuItem>
-                                <MudMenuItem OnClick="() => DeleteDeck(deck)"
-                                             Icon="@Icons.Material.Filled.Delete" IconColor="Color.Error">Delete</MudMenuItem>
-                            </MudMenu>
-                        </CardHeaderActions>
-                    </MudCardHeader>
-                    <MudCardContent>
-                        @if (!string.IsNullOrEmpty(deck.Description))
-                        {
-                            <MudText Typo="Typo.body2" Class="mb-2">@deck.Description</MudText>
-                        }
-                        <MudText Typo="Typo.body2">Main: @deck.TotalMainDeckCount cards</MudText>
-                        @if (deck.TotalSideboardCount > 0)
-                        {
-                            <MudText Typo="Typo.body2">Sideboard: @deck.TotalSideboardCount cards</MudText>
-                        }
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">
-                            Updated: @deck.UpdatedAt.ToString("MMM dd, yyyy")
-                        </MudText>
-                    </MudCardContent>
-                </MudCard>
-            </MudItem>
-        }
-    </MudGrid>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">@deck.Format</MudText>
+                            @if (!string.IsNullOrWhiteSpace(deck.Description))
+                            {
+                                <MudText Typo="Typo.caption">@deck.Description</MudText>
+                            }
+                        </MudCardContent>
+                        <MudCardActions>
+                            <MudButton Variant="Variant.Text" Color="Color.Primary"
+                                       OnClick="@(() => ViewDeck(deck.Id))">View</MudButton>
+                            <MudButton Variant="Variant.Text" Color="Color.Secondary"
+                                       OnClick="@(() => CloneDeck(deck))">Clone</MudButton>
+                        </MudCardActions>
+                    </MudCard>
+                </MudItem>
+            }
+        </MudGrid>
+        <MudDivider Class="my-4" />
+    }
+
+    <MudText Typo="Typo.h5" Class="mb-2">My Decks</MudText>
+
+    @if (_decks.Count == 0)
+    {
+        <MudPaper Class="pa-8 d-flex flex-column align-center" Elevation="1">
+            <MudIcon Icon="@Icons.Material.Filled.LibraryBooks" Size="Size.Large" Color="Color.Secondary" Class="mb-4" />
+            <MudText Typo="Typo.h6" Class="mb-2">No decks yet</MudText>
+            <MudText Typo="Typo.body1" Class="mb-4">Create your first deck to get started.</MudText>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CreateNewDeck">
+                Create Deck
+            </MudButton>
+        </MudPaper>
+    }
+    else
+    {
+        <MudGrid>
+            @foreach (var deck in _decks)
+            {
+                <MudItem xs="12" sm="6" md="4" lg="3">
+                    <MudCard Class="cursor-pointer" @onclick="() => EditDeck(deck.Id)">
+                        <MudCardHeader>
+                            <CardHeaderContent>
+                                <MudText Typo="Typo.h6">@deck.Name</MudText>
+                                <MudChip T="string" Size="Size.Small" Color="Color.Primary">@deck.Format</MudChip>
+                            </CardHeaderContent>
+                            <CardHeaderActions>
+                                <MudMenu Icon="@Icons.Material.Filled.MoreVert">
+                                    <MudMenuItem OnClick="() => EditDeck(deck.Id)"
+                                                 Icon="@Icons.Material.Filled.Edit">Edit</MudMenuItem>
+                                    <MudMenuItem OnClick="() => ExportDeck(deck)"
+                                                 Icon="@Icons.Material.Filled.FileDownload">Export</MudMenuItem>
+                                    <MudMenuItem OnClick="() => DeleteDeck(deck)"
+                                                 Icon="@Icons.Material.Filled.Delete" IconColor="Color.Error">Delete</MudMenuItem>
+                                </MudMenu>
+                            </CardHeaderActions>
+                        </MudCardHeader>
+                        <MudCardContent>
+                            @if (!string.IsNullOrEmpty(deck.Description))
+                            {
+                                <MudText Typo="Typo.body2" Class="mb-2">@deck.Description</MudText>
+                            }
+                            <MudText Typo="Typo.body2">Main: @deck.TotalMainDeckCount cards</MudText>
+                            @if (deck.TotalSideboardCount > 0)
+                            {
+                                <MudText Typo="Typo.body2">Sideboard: @deck.TotalSideboardCount cards</MudText>
+                            }
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                Updated: @deck.UpdatedAt.ToString("MMM dd, yyyy")
+                            </MudText>
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+            }
+        </MudGrid>
+    }
 }
 
 @code {
     private List<MtgDecker.Domain.Entities.Deck> _decks = new();
+    private List<MtgDecker.Domain.Entities.Deck> _systemDecks = new();
     private bool _loading = true;
 
     // Hardcoded user ID for single-user mode
@@ -91,6 +126,7 @@ else
         {
             _loading = true;
             _decks = await Mediator.Send(new MtgDecker.Application.Decks.ListDecksQuery(UserId));
+            _systemDecks = await Mediator.Send(new MtgDecker.Application.Decks.ListSystemDecksQuery());
         }
         catch (Exception ex)
         {
@@ -119,6 +155,25 @@ else
     private void EditDeck(Guid deckId)
     {
         Navigation.NavigateTo($"/decks/{deckId}/edit");
+    }
+
+    private void ViewDeck(Guid deckId)
+    {
+        Navigation.NavigateTo($"/decks/{deckId}/view");
+    }
+
+    private async Task CloneDeck(MtgDecker.Domain.Entities.Deck deck)
+    {
+        try
+        {
+            var clone = await Mediator.Send(new MtgDecker.Application.Decks.CloneDeckCommand(deck.Id, UserId));
+            Snackbar.Add($"Cloned '{deck.Name}' to your decks", Severity.Success);
+            await LoadDecks();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to clone deck: {ex.Message}", Severity.Error);
+        }
     }
 
     private async Task ExportDeck(MtgDecker.Domain.Entities.Deck deck)
