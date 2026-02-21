@@ -14,6 +14,7 @@ public class GameEngine
     public GameEngine(GameState state)
     {
         _state = state;
+        _handlers[ActionType.UntapCard] = new UntapCardHandler();
     }
 
     public async Task StartGameAsync(CancellationToken ct = default)
@@ -440,15 +441,6 @@ public class GameEngine
                 }
                 break;
 
-            case ActionType.UntapCard:
-                var untapTarget = player.Battlefield.Cards.FirstOrDefault(c => c.Id == action.CardId);
-                if (untapTarget != null && untapTarget.IsTapped)
-                {
-                    untapTarget.IsTapped = false;
-                    player.ActionHistory.Push(action);
-                    _state.Log($"{player.Name} untaps {untapTarget.Name}.");
-                }
-                break;
 
             case ActionType.ActivateFetch:
             {
