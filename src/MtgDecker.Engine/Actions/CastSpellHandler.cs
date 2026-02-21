@@ -46,7 +46,9 @@ internal class CastSpellHandler : IActionHandler
         if (castCostReduction != 0)
             castEffectiveCost = castEffectiveCost.WithGenericReduction(-castCostReduction);
 
-        bool canPayMana = castPlayer.ManaPool.CanPay(castEffectiveCost);
+        bool canPayMana = castEffectiveCost.HasPhyrexianCost
+            ? castPlayer.ManaPool.CanPayWithPhyrexian(castEffectiveCost, castPlayer.Life)
+            : castPlayer.ManaPool.CanPay(castEffectiveCost);
         bool canPayAlternate = def?.AlternateCost != null && engine.CanPayAlternateCost(def.AlternateCost, castPlayer, castCard);
         bool useAlternateCost = false;
 

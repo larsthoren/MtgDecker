@@ -1,11 +1,28 @@
 using FluentAssertions;
 using MtgDecker.Engine.Enums;
 using MtgDecker.Engine.Mana;
+using MtgDecker.Engine.Tests.Helpers;
 
 namespace MtgDecker.Engine.Tests;
 
 public class PhyrexianManaTests
 {
+    private (GameEngine engine, GameState state, TestDecisionHandler h1, TestDecisionHandler h2) CreateSetup()
+    {
+        var h1 = new TestDecisionHandler();
+        var h2 = new TestDecisionHandler();
+        var p1 = new Player(Guid.NewGuid(), "P1", h1);
+        var p2 = new Player(Guid.NewGuid(), "P2", h2);
+        for (int i = 0; i < 40; i++)
+        {
+            p1.Library.Add(new GameCard { Name = $"Card{i}" });
+            p2.Library.Add(new GameCard { Name = $"Card{i}" });
+        }
+        var state = new GameState(p1, p2);
+        var engine = new GameEngine(state);
+        return (engine, state, h1, h2);
+    }
+
     [Fact]
     public void Parse_SinglePhyrexianBlack_HasPhyrexianRequirement()
     {
@@ -173,5 +190,113 @@ public class PhyrexianManaTests
         var cost = ManaCost.Parse("{B/P}");
         // Life exactly equal to cost (2) — strict inequality means can't pay
         pool.CanPayWithPhyrexian(cost, 2).Should().BeFalse();
+    }
+
+    // --- Integration tests: CastSpell with Phyrexian mana ---
+
+    [Fact]
+    public async Task PhyrexianCost_PayAllMana_NoLifeLost()
+    {
+        var (engine, state, h1, _) = CreateSetup();
+        await engine.StartGameAsync();
+        state.CurrentPhase = Phase.MainPhase1;
+        state.ActivePlayer = state.Player1;
+
+        // Create a card with Phyrexian cost (not in CardDefinitions)
+        var card = new GameCard { Name = "TestPhyrexianCard", ManaCost = ManaCost.Parse("{1}{B/P}{B/P}"), CardTypes = CardType.Instant };
+        state.Player1.Hand.Add(card);
+        state.Player1.ManaPool.Add(ManaColor.Black, 2);
+        state.Player1.ManaPool.Add(ManaColor.Colorless, 1);
+
+        // Pay both Phyrexian with mana
+        h1.EnqueuePhyrexianPayment(true);  // 1st {B/P} = pay mana
+        h1.EnqueuePhyrexianPayment(true);  // 2nd {B/P} = pay mana
+
+        var startLife = state.Player1.Life;
+        await engine.ExecuteAction(GameAction.CastSpell(state.Player1.Id, card.Id));
+
+        state.Player1.Life.Should().Be(startLife);
+        state.StackCount.Should().BeGreaterThanOrEqualTo(1);
+        state.Player1.ManaPool.Total.Should().Be(0); // All mana used
+    }
+
+    [Fact]
+    public async Task PhyrexianCost_PayAllLife_Pays4Life()
+    {
+        var (engine, state, h1, _) = CreateSetup();
+        await engine.StartGameAsync();
+        state.CurrentPhase = Phase.MainPhase1;
+        state.ActivePlayer = state.Player1;
+
+        var card = new GameCard { Name = "TestPhyrexianCard", ManaCost = ManaCost.Parse("{1}{B/P}{B/P}"), CardTypes = CardType.Instant };
+        state.Player1.Hand.Add(card);
+        state.Player1.ManaPool.Add(ManaColor.Colorless, 1); // Only generic mana, no black
+
+        // No black mana — should auto-pay life without prompting
+        var startLife = state.Player1.Life;
+        await engine.ExecuteAction(GameAction.CastSpell(state.Player1.Id, card.Id));
+
+        state.Player1.Life.Should().Be(startLife - 4);
+        state.StackCount.Should().BeGreaterThanOrEqualTo(1);
+    }
+
+    [Fact]
+    public async Task PhyrexianCost_MixedPayment_1Mana1Life()
+    {
+        var (engine, state, h1, _) = CreateSetup();
+        await engine.StartGameAsync();
+        state.CurrentPhase = Phase.MainPhase1;
+        state.ActivePlayer = state.Player1;
+
+        var card = new GameCard { Name = "TestPhyrexianCard", ManaCost = ManaCost.Parse("{1}{B/P}{B/P}"), CardTypes = CardType.Instant };
+        state.Player1.Hand.Add(card);
+        state.Player1.ManaPool.Add(ManaColor.Black, 1);
+        state.Player1.ManaPool.Add(ManaColor.Colorless, 1);
+
+        h1.EnqueuePhyrexianPayment(true);   // 1st {B/P} = pay mana
+        h1.EnqueuePhyrexianPayment(false);  // 2nd {B/P} = pay life
+
+        var startLife = state.Player1.Life;
+        await engine.ExecuteAction(GameAction.CastSpell(state.Player1.Id, card.Id));
+
+        state.Player1.Life.Should().Be(startLife - 2);
+        state.StackCount.Should().BeGreaterThanOrEqualTo(1);
+    }
+
+    [Fact]
+    public async Task PhyrexianCost_SingleSymbol_PayLife()
+    {
+        var (engine, state, h1, _) = CreateSetup();
+        await engine.StartGameAsync();
+        state.CurrentPhase = Phase.MainPhase1;
+        state.ActivePlayer = state.Player1;
+
+        var card = new GameCard { Name = "TestPhyrexianSingle", ManaCost = ManaCost.Parse("{B/P}"), CardTypes = CardType.Instant };
+        state.Player1.Hand.Add(card);
+        // No mana at all
+
+        var startLife = state.Player1.Life;
+        await engine.ExecuteAction(GameAction.CastSpell(state.Player1.Id, card.Id));
+
+        state.Player1.Life.Should().Be(startLife - 2);
+        state.StackCount.Should().BeGreaterThanOrEqualTo(1);
+    }
+
+    [Fact]
+    public async Task PhyrexianCost_NotEnoughManaOrLife_Rejected()
+    {
+        var (engine, state, h1, _) = CreateSetup();
+        await engine.StartGameAsync();
+        state.CurrentPhase = Phase.MainPhase1;
+        state.ActivePlayer = state.Player1;
+
+        var card = new GameCard { Name = "TestPhyrexianCard", ManaCost = ManaCost.Parse("{1}{B/P}{B/P}"), CardTypes = CardType.Instant };
+        state.Player1.Hand.Add(card);
+        // No mana, no generic — can pay Phyrexian with life but no generic mana
+        // Life is 20, so Phyrexian is fine, but {1} generic can't be paid
+
+        await engine.ExecuteAction(GameAction.CastSpell(state.Player1.Id, card.Id));
+
+        state.Player1.Hand.Cards.Should().Contain(c => c.Id == card.Id); // Still in hand
     }
 }
