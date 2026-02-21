@@ -10,7 +10,6 @@ public class PonderEffect : SpellEffect
 
         if (top3.Count == 0)
         {
-            state.Log($"{player.Name} has no cards to look at (Ponder).");
             var drawn = player.Library.DrawFromTop();
             if (drawn != null)
             {
@@ -24,40 +23,19 @@ public class PonderEffect : SpellEffect
         foreach (var card in top3)
             player.Library.RemoveById(card.Id);
 
-        // Player puts cards back one by one — each placed card goes on top,
-        // so the last card placed ends up on top of the library.
-        var remaining = new List<GameCard>(top3);
-        int total = remaining.Count;
-        int placed = 0;
+        // Player clicks cards one by one to place back.
+        // Returned ordered: first = placed first = deepest, last = placed last = top.
+        var (ordered, shuffle) = await handler.ReorderCards(
+            top3, "Click a card to put on top", ct);
 
-        while (remaining.Count > 1)
-        {
-            placed++;
-            var chosenId = await handler.ChooseCard(
-                remaining,
-                $"Ponder: Put a card on top of your library ({placed} of {total})",
-                optional: false, ct);
+        // Place cards back: each AddToTop pushes previous down,
+        // so first in ordered ends up deepest, last ends up on top.
+        foreach (var card in ordered)
+            player.Library.AddToTop(card);
 
-            if (chosenId.HasValue)
-            {
-                var chosen = remaining.First(c => c.Id == chosenId.Value);
-                remaining.Remove(chosen);
-                player.Library.AddToTop(chosen);
-            }
-        }
-
-        // Auto-place last card on top
-        player.Library.AddToTop(remaining[0]);
         state.Log($"{player.Name} puts cards back in chosen order (Ponder).");
 
-        // Shuffle prompt: show the top card, Skip = shuffle, Choose = keep order
-        var topCard = player.Library.PeekTop(1).ToList();
-        var shuffleDecision = await handler.ChooseCard(
-            topCard,
-            "You may shuffle your library. Choose to keep order, or Skip to shuffle.",
-            optional: true, ct);
-
-        if (!shuffleDecision.HasValue)
+        if (shuffle)
         {
             player.Library.Shuffle();
             state.Log($"{player.Name} shuffles their library (Ponder).");

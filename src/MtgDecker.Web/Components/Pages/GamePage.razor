@@ -36,7 +36,8 @@ else if (_session.State != null)
                OnBlockersChosen="HandleBlockersChosen"
                OnBlockerOrderChosen="HandleBlockerOrderChosen"
                OnCardChosen="HandleCardChosen"
-               OnRevealAcknowledged="HandleRevealAcknowledged" />
+               OnRevealAcknowledged="HandleRevealAcknowledged"
+               OnReorderSubmitted="HandleReorderSubmitted" />
 }
 
 @code {
@@ -150,6 +151,10 @@ else if (_session.State != null)
         {
             InvokeAsync(StateHasChanged);
         }
+        else if (handler.IsWaitingForReorder)
+        {
+            InvokeAsync(StateHasChanged);
+        }
     }
 
     private async Task ShowMulliganDialog(int mulliganCount)
@@ -209,6 +214,12 @@ else if (_session.State != null)
     {
         var handler = _session?.GetHandler(_playerSeat);
         handler?.SubmitCardChoice(cardId);
+    }
+
+    private void HandleReorderSubmitted((IReadOnlyList<GameCard> ordered, bool shuffle) result)
+    {
+        var handler = _session?.GetHandler(_playerSeat);
+        handler?.SubmitReorder(result.ordered, result.shuffle);
     }
 
     private void HandleRevealAcknowledged()

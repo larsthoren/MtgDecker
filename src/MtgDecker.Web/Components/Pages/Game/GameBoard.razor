@@ -422,6 +422,43 @@
         </div>
     }
 
+    @* Reorder prompt (Ponder) *@
+    @if (Handler?.IsWaitingForReorder == true && Handler?.ReorderOptions != null)
+    {
+        @(EnsureReorderInitialized())
+        <div class="prompt-overlay">
+            <MudPaper Class="pa-3" Elevation="8">
+                <MudText Typo="Typo.body2" Class="mb-2">@(Handler.ReorderPrompt)</MudText>
+                @if (_reorderRemaining.Count > 0)
+                {
+                    <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+                        @foreach (var card in _reorderRemaining)
+                        {
+                            <div style="cursor: pointer;" @onclick="() => PlaceReorderCard(card)">
+                                <CardDisplay ImageUrl="@card.ImageUrl" Name="@card.Name" Clickable="true" />
+                            </div>
+                        }
+                    </div>
+                    <div style="display: flex; gap: 8px; margin-top: 8px;">
+                        @if (_reorderPlaced.Count > 0)
+                        {
+                            <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="UndoReorderCard">Undo</MudButton>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <MudText Typo="Typo.body2" Class="mb-2">All cards placed. Shuffle your library?</MudText>
+                    <div style="display: flex; gap: 8px; margin-top: 8px;">
+                        <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" OnClick="() => SubmitReorder(true)">Shuffle</MudButton>
+                        <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="() => SubmitReorder(false)">No shuffle</MudButton>
+                        <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="UndoReorderCard">Undo</MudButton>
+                    </div>
+                }
+            </MudPaper>
+        </div>
+    }
+
     @* Discard to hand size prompt *@
     @if (Handler?.IsWaitingForDiscard == true && Handler?.DiscardOptions != null)
     {
@@ -596,6 +633,7 @@
     [Parameter] public EventCallback<IReadOnlyList<Guid>> OnBlockerOrderChosen { get; set; }
     [Parameter] public EventCallback<Guid?> OnCardChosen { get; set; }
     [Parameter] public EventCallback OnRevealAcknowledged { get; set; }
+    [Parameter] public EventCallback<(IReadOnlyList<GameCard> ordered, bool shuffle)> OnReorderSubmitted { get; set; }
 
     private ElementReference _boardRef;
     private PhaseStopSettings _phaseStops = new();
@@ -613,6 +651,11 @@
 
     // Card choice state
     private Guid? _selectedChoiceId;
+
+    // Reorder state (Ponder)
+    private List<GameCard> _reorderRemaining = new();
+    private List<GameCard> _reorderPlaced = new();
+    private bool _reorderInitialized;
 
     // Discard selection state
     private HashSet<Guid> _selectedDiscards = new();
@@ -919,6 +962,49 @@
     {
         _selectedChoiceId = null;
         await OnCardChosen.InvokeAsync(cardId);
+    }
+
+    // --- Reorder (Ponder) ---
+
+    private string EnsureReorderInitialized()
+    {
+        InitReorder();
+        return string.Empty;
+    }
+
+    private void InitReorder()
+    {
+        if (!_reorderInitialized && Handler?.ReorderOptions != null)
+        {
+            _reorderRemaining = new List<GameCard>(Handler.ReorderOptions);
+            _reorderPlaced.Clear();
+            _reorderInitialized = true;
+        }
+    }
+
+    private void PlaceReorderCard(GameCard card)
+    {
+        _reorderRemaining.Remove(card);
+        _reorderPlaced.Add(card);
+    }
+
+    private void UndoReorderCard()
+    {
+        if (_reorderPlaced.Count > 0)
+        {
+            var last = _reorderPlaced[^1];
+            _reorderPlaced.RemoveAt(_reorderPlaced.Count - 1);
+            _reorderRemaining.Add(last);
+        }
+    }
+
+    private async Task SubmitReorder(bool shuffle)
+    {
+        var ordered = _reorderPlaced.ToList();
+        _reorderPlaced.Clear();
+        _reorderRemaining.Clear();
+        _reorderInitialized = false;
+        await OnReorderSubmitted.InvokeAsync((ordered, shuffle));
     }
 
     // --- Discard selection ---

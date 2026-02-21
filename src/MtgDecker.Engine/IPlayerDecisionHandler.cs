@@ -26,4 +26,12 @@ public interface IPlayerDecisionHandler
 
     Task<IReadOnlyList<GameCard>> SplitCards(IReadOnlyList<GameCard> cards, string prompt, CancellationToken ct = default);
     Task<int> ChoosePile(IReadOnlyList<GameCard> pile1, IReadOnlyList<GameCard> pile2, string prompt, CancellationToken ct = default);
+
+    /// <summary>
+    /// Reorder cards (e.g. Ponder). Player clicks cards one by one to place back on library
+    /// (last placed = top), then chooses shuffle or no shuffle.
+    /// Returns (ordered list where first = placed first = deepest, last = placed last = top, shuffle decision).
+    /// </summary>
+    Task<(IReadOnlyList<GameCard> ordered, bool shuffle)> ReorderCards(
+        IReadOnlyList<GameCard> cards, string prompt, CancellationToken ct = default);
 }
