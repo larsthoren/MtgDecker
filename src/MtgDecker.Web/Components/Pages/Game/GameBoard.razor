@@ -901,6 +901,14 @@
         // Non-land: check if we can pay the mana cost
         if (_selectedCard.ManaCost != null && !LocalPlayer.ManaPool.CanPay(_selectedCard.ManaCost))
         {
+            // Check for alternate cost — let engine handle the choice
+            if (CardDefinitions.TryGet(_selectedCard.Name, out var def) && def.AlternateCost != null)
+            {
+                await OnAction.InvokeAsync(GameAction.CastSpell(LocalPlayer.Id, _selectedCard.Id));
+                ClearSelection();
+                return;
+            }
+
             // Enter pending cast mode — player taps lands to pay
             _pendingCastCard = _selectedCard;
             ClearSelection();
