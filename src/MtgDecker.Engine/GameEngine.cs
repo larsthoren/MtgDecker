@@ -18,7 +18,7 @@ public class GameEngine
         _handlers[ActionType.Cycle] = new CycleHandler();
         _handlers[ActionType.ActivateFetch] = new ActivateFetchHandler();
         _handlers[ActionType.ActivateLoyaltyAbility] = new ActivateLoyaltyAbilityHandler();
-        _handlers[ActionType.PlayCard] = new PlayCardHandler();
+        _handlers[ActionType.PlayLand] = new PlayLandHandler();
         _handlers[ActionType.CastAdventure] = new CastAdventureHandler();
         _handlers[ActionType.Ninjutsu] = new NinjutsuHandler();
         _handlers[ActionType.Flashback] = new FlashbackHandler();
