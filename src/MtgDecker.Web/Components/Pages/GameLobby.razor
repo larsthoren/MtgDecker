@@ -139,7 +139,9 @@
 
     protected override async Task OnInitializedAsync()
     {
-        _decks = await Mediator.Send(new MtgDecker.Application.Decks.ListDecksQuery(UserId));
+        var userDecks = await Mediator.Send(new MtgDecker.Application.Decks.ListDecksQuery(UserId));
+        var systemDecks = await Mediator.Send(new MtgDecker.Application.Decks.ListSystemDecksQuery());
+        _decks = systemDecks.Concat(userDecks).ToList();
 
         if (GameId != null)
         {
