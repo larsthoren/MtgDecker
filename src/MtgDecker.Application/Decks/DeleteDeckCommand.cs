@@ -28,6 +28,9 @@ public class DeleteDeckHandler : IRequestHandler<DeleteDeckCommand>
         var deck = await _deckRepository.GetByIdAsync(request.Id, cancellationToken)
             ?? throw new KeyNotFoundException($"Deck {request.Id} not found.");
 
+        if (deck.IsSystemDeck)
+            throw new InvalidOperationException("System decks cannot be modified.");
+
         await _deckRepository.DeleteAsync(request.Id, cancellationToken);
     }
 }
