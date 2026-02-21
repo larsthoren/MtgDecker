@@ -299,4 +299,27 @@ public class PhyrexianManaTests
 
         state.Player1.Hand.Cards.Should().Contain(c => c.Id == card.Id); // Still in hand
     }
+
+    // --- CardDefinitions registration tests ---
+
+    [Fact]
+    public void Dismember_HasCorrectDefinition()
+    {
+        CardDefinitions.TryGet("Dismember", out var def).Should().BeTrue();
+        def!.ManaCost.Should().NotBeNull();
+        def.ManaCost!.GenericCost.Should().Be(1);
+        def.ManaCost.PhyrexianRequirements.Should().ContainKey(ManaColor.Black);
+        def.ManaCost.PhyrexianRequirements[ManaColor.Black].Should().Be(2);
+        def.AlternateCost.Should().BeNull();
+    }
+
+    [Fact]
+    public void SurgicalExtraction_UsesPhyrexianMana()
+    {
+        CardDefinitions.TryGet("Surgical Extraction", out var def).Should().BeTrue();
+        def!.ManaCost.Should().NotBeNull();
+        def.ManaCost!.PhyrexianRequirements.Should().ContainKey(ManaColor.Black);
+        def.ManaCost.PhyrexianRequirements[ManaColor.Black].Should().Be(1);
+        def.AlternateCost.Should().BeNull();
+    }
 }
