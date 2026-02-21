@@ -13,7 +13,7 @@ public class DeckConfiguration : IEntityTypeConfiguration<Deck>
         builder.Property(d => d.Name).HasMaxLength(200).IsRequired();
         builder.Property(d => d.Format).IsRequired();
         builder.Property(d => d.Description).HasMaxLength(2000);
-        builder.Property(d => d.UserId).IsRequired();
+        builder.Property(d => d.UserId).IsRequired(false);
 
         builder.HasIndex(d => d.UserId);
 
@@ -24,5 +24,7 @@ public class DeckConfiguration : IEntityTypeConfiguration<Deck>
 
         builder.Ignore(d => d.TotalMainDeckCount);
         builder.Ignore(d => d.TotalSideboardCount);
+        builder.Ignore(d => d.TotalMaybeboardCount);
+        builder.Ignore(d => d.IsSystemDeck);
     }
 }

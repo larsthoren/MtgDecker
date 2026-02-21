@@ -37,7 +37,7 @@ public class CityOfTraitorsTests
         };
         state.Player1.Hand.Add(island);
 
-        await engine.ExecuteAction(GameAction.PlayCard(state.Player1.Id, island.Id));
+        await engine.ExecuteAction(GameAction.PlayLand(state.Player1.Id, island.Id));
         await engine.ResolveAllTriggersAsync();
 
         state.Player1.Battlefield.Cards.Should().NotContain(c => c.Name == "City of Traitors");
@@ -94,7 +94,7 @@ public class CityOfTraitorsTests
         };
         state.Player2.Hand.Add(island);
 
-        await engine.ExecuteAction(GameAction.PlayCard(state.Player2.Id, island.Id));
+        await engine.ExecuteAction(GameAction.PlayLand(state.Player2.Id, island.Id));
         await engine.ResolveAllTriggersAsync();
 
         // City should still be on P1's battlefield

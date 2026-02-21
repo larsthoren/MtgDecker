@@ -35,7 +35,7 @@ public class GameEnginePriorityTests
         var card = GameCard.Create("Forest", "Basic Land — Forest");
         state.Player1.Hand.Add(card);
 
-        p1Handler.EnqueueAction(GameAction.PlayCard(state.Player1.Id, card.Id));
+        p1Handler.EnqueueAction(GameAction.PlayLand(state.Player1.Id, card.Id));
 
         await engine.RunPriorityAsync();
 
@@ -51,7 +51,7 @@ public class GameEnginePriorityTests
         var card = GameCard.Create("Mountain", "Basic Land — Mountain");
         state.Player2.Hand.Add(card);
 
-        p2Handler.EnqueueAction(GameAction.PlayCard(state.Player2.Id, card.Id));
+        p2Handler.EnqueueAction(GameAction.PlayLand(state.Player2.Id, card.Id));
 
         await engine.RunPriorityAsync();
 
@@ -67,8 +67,8 @@ public class GameEnginePriorityTests
         state.Player2.Hand.Add(card1);
         state.Player1.Hand.Add(card2);
 
-        p2Handler.EnqueueAction(GameAction.PlayCard(state.Player2.Id, card1.Id));
-        p1Handler.EnqueueAction(GameAction.PlayCard(state.Player1.Id, card2.Id));
+        p2Handler.EnqueueAction(GameAction.PlayLand(state.Player2.Id, card1.Id));
+        p1Handler.EnqueueAction(GameAction.PlayLand(state.Player1.Id, card2.Id));
 
         await engine.RunPriorityAsync();
 
@@ -92,7 +92,7 @@ public class GameEnginePriorityTests
         // Action 1: Try to cast Wild Growth with no mana (rejected)
         // Action 2: Play Forest (should succeed because player retains priority)
         p1Handler.EnqueueAction(GameAction.CastSpell(state.Player1.Id, wildGrowth.Id));
-        p1Handler.EnqueueAction(GameAction.PlayCard(state.Player1.Id, forest.Id));
+        p1Handler.EnqueueAction(GameAction.PlayLand(state.Player1.Id, forest.Id));
 
         await engine.RunPriorityAsync();
 
@@ -132,7 +132,7 @@ public class GameEnginePriorityTests
         // Then P1 would need to act again. The test verifies the action sequence works
         // with P1 tapping, then immediately playing a land without P2 intervening.
         p1Handler.EnqueueAction(GameAction.TapCard(state.Player1.Id, forest.Id));
-        p1Handler.EnqueueAction(GameAction.PlayCard(state.Player1.Id, mountain.Id));
+        p1Handler.EnqueueAction(GameAction.PlayLand(state.Player1.Id, mountain.Id));
 
         // Track whether P2 ever gets prompted between P1's tap and play
         int p2ActionCallCount = 0;

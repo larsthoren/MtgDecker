@@ -64,8 +64,8 @@ public class ParallaxWaveTests
         var wave = GameCard.Create("Parallax Wave", "Enchantment");
         state.Player1.Hand.Add(wave);
 
-        // Cast via PlayCard (mana payment path)
-        await engine.ExecuteAction(GameAction.PlayCard(state.Player1.Id, wave.Id));
+        // Cast via CastSpell (mana payment path)
+        await engine.ExecuteAction(GameAction.CastSpell(state.Player1.Id, wave.Id));
 
         // Resolve the ETB trigger on the stack
         await engine.ResolveAllTriggersAsync();

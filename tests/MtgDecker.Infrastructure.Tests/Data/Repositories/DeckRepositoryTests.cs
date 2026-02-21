@@ -109,6 +109,42 @@ public class DeckRepositoryTests
         context.SaveChanges();
     }
 
+    [Fact]
+    public async Task ListSystemDecksAsync_ReturnsOnlyDecksWithNullUserId()
+    {
+        // Arrange
+        using var context = TestDbContextFactory.Create();
+        var repository = new DeckRepository(context);
+
+        var systemDeck = new Deck
+        {
+            Name = "System Deck",
+            Format = Format.Legacy,
+            UserId = null,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+        var userDeck = new Deck
+        {
+            Name = "User Deck",
+            Format = Format.Modern,
+            UserId = Guid.NewGuid(),
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        context.Decks.AddRange(systemDeck, userDeck);
+        await context.SaveChangesAsync();
+
+        // Act
+        var result = await repository.ListSystemDecksAsync();
+
+        // Assert
+        result.Should().HaveCount(1);
+        result[0].Name.Should().Be("System Deck");
+        result[0].UserId.Should().BeNull();
+    }
+
     private static Deck CreateDeck(string name, Guid? userId = null)
     {
         return new Deck

@@ -1,6 +1,7 @@
 using MtgDecker.Engine.Enums;
 using MtgDecker.Engine.Mana;
 using MtgDecker.Engine.Triggers;
+using MtgDecker.Engine.Actions;
 
 namespace MtgDecker.Engine;
 
@@ -8,10 +9,22 @@ public class GameEngine
 {
     private readonly GameState _state;
     private readonly TurnStateMachine _turnStateMachine = new();
+    private readonly Dictionary<ActionType, IActionHandler> _handlers = new();
 
     public GameEngine(GameState state)
     {
         _state = state;
+        _handlers[ActionType.UntapCard] = new UntapCardHandler();
+        _handlers[ActionType.Cycle] = new CycleHandler();
+        _handlers[ActionType.ActivateFetch] = new ActivateFetchHandler();
+        _handlers[ActionType.ActivateLoyaltyAbility] = new ActivateLoyaltyAbilityHandler();
+        _handlers[ActionType.PlayLand] = new PlayLandHandler();
+        _handlers[ActionType.CastAdventure] = new CastAdventureHandler();
+        _handlers[ActionType.Ninjutsu] = new NinjutsuHandler();
+        _handlers[ActionType.Flashback] = new FlashbackHandler();
+        _handlers[ActionType.TapCard] = new TapCardHandler();
+        _handlers[ActionType.CastSpell] = new CastSpellHandler();
+        _handlers[ActionType.ActivateAbility] = new ActivateAbilityHandler();
     }
 
     public async Task StartGameAsync(CancellationToken ct = default)
@@ -184,1212 +197,14 @@ public class GameEngine
         if (action.PlayerId != _state.Player1.Id && action.PlayerId != _state.Player2.Id)
             throw new InvalidOperationException($"Unknown player ID: {action.PlayerId}");
 
-        var player = _state.GetPlayer(action.PlayerId);
-
-        switch (action.Type)
+        // Dispatch to extracted handler
+        if (_handlers.TryGetValue(action.Type, out var handler))
         {
-            case ActionType.PlayCard:
-                var playCard = player.Hand.Cards.FirstOrDefault(c => c.Id == action.CardId);
-                if (playCard == null) break;
-
-                if (playCard.IsLand)
-                {
-                    // Part A: Land drop enforcement
-                    if (player.LandsPlayedThisTurn >= player.MaxLandDrops)
-                    {
-                        _state.Log($"{player.Name} cannot play another land this turn.");
-                        break;
-                    }
-                    player.Hand.RemoveById(playCard.Id);
-                    player.Battlefield.Add(playCard);
-                    playCard.TurnEnteredBattlefield = _state.TurnNumber;
-                    if (playCard.EntersTapped) playCard.IsTapped = true;
-                    player.LandsPlayedThisTurn++;
-                    action.IsLandDrop = true;
-                    action.DestinationZone = ZoneType.Battlefield;
-                    player.ActionHistory.Push(action);
-                    _state.Log($"{player.Name} plays {playCard.Name} (land drop).");
-                    ApplyEntersWithCounters(playCard);
-                    await QueueSelfTriggersOnStackAsync(GameEvent.EnterBattlefield, playCard, player, ct);
-                    await OnBoardChangedAsync(ct);
-
-                    // Fire LandPlayed triggers (e.g., City of Traitors)
-                    await QueueBoardTriggersOnStackAsync(GameEvent.LandPlayed, playCard, ct);
-                }
-                else if (playCard.ManaCost != null)
-                {
-                    // Part B: Cast spell with mana payment
-                    // Apply cost modification from continuous effects
-                    var effectiveCost = playCard.ManaCost;
-                    var costReduction = ComputeCostModification(playCard, player);
-                    if (costReduction != 0)
-                        effectiveCost = effectiveCost.WithGenericReduction(-costReduction);
-
-                    if (!player.ManaPool.CanPay(effectiveCost))
-                    {
-                        _state.Log($"{player.Name} cannot cast {playCard.Name} — not enough mana.");
-                        break;
-                    }
-
-                    var playManaPaid = await PayManaCostAsync(effectiveCost, player, ct);
-                    player.PendingManaTaps.Clear();
-
-                    // Move card to destination
-                    player.Hand.RemoveById(playCard.Id);
-                    bool isInstantOrSorcery = playCard.CardTypes.HasFlag(CardType.Instant)
-                                            || playCard.CardTypes.HasFlag(CardType.Sorcery);
-                    if (isInstantOrSorcery)
-                    {
-                        player.Graveyard.Add(playCard);
-                        action.DestinationZone = ZoneType.Graveyard;
-                        _state.Log($"{player.Name} casts {playCard.Name} (→ graveyard).");
-                    }
-                    else
-                    {
-                        player.Battlefield.Add(playCard);
-                        playCard.TurnEnteredBattlefield = _state.TurnNumber;
-                        if (playCard.EntersTapped) playCard.IsTapped = true;
-                        action.DestinationZone = ZoneType.Battlefield;
-                        _state.Log($"{player.Name} casts {playCard.Name}.");
-
-                        // Aura attachment: prompt for target after entering battlefield
-                        await TryAttachAuraAsync(playCard, player, ct);
-
-                        ApplyEntersWithCounters(playCard);
-                        await QueueSelfTriggersOnStackAsync(GameEvent.EnterBattlefield, playCard, player, ct);
-                        await OnBoardChangedAsync(ct);
-                    }
-                    // Fire SpellCast board triggers (e.g., enchantress draw on enchantment cast)
-                    await QueueBoardTriggersOnStackAsync(GameEvent.SpellCast, playCard, ct);
-                    action.ManaCostPaid = effectiveCost;
-                    action.ActualManaPaid = playManaPaid;
-                    player.ActionHistory.Push(action);
-                }
-                else
-                {
-                    // No ManaCost, not a land — card not supported in engine
-                    _state.Log($"{playCard.Name} is not supported in the engine (no card definition).");
-                    break;
-                }
-                break;
-
-            case ActionType.TapCard:
-                var tapTarget = player.Battlefield.Cards.FirstOrDefault(c => c.Id == action.CardId);
-                if (tapTarget != null && !tapTarget.IsTapped)
-                {
-                    // Summoning sickness: creatures that entered this turn can't be tapped (lands/artifacts exempt)
-                    if (tapTarget.IsCreature && tapTarget.HasSummoningSickness(_state.TurnNumber))
-                    {
-                        _state.Log($"{tapTarget.Name} has summoning sickness.");
-                        break;
-                    }
-
-                    tapTarget.IsTapped = true;
-                    player.ActionHistory.Push(action);
-
-                    // Suppression: creatures that lost abilities can't produce mana
-                    if (tapTarget.IsCreature && tapTarget.AbilitiesRemoved)
-                    {
-                        _state.Log($"{tapTarget.Name} has lost its abilities — no mana produced.");
-                        break;
-                    }
-
-                    if (tapTarget.ManaAbility != null)
-                    {
-                        action.IsManaAbility = true;
-                        var ability = tapTarget.ManaAbility;
-                        if (ability.Type == ManaAbilityType.Fixed)
-                        {
-                            var count = ability.ProduceCount;
-                            player.ManaPool.Add(ability.FixedColor!.Value, count);
-                            action.ManaProduced = ability.FixedColor!.Value;
-                            action.ManaProducedAmount = count;
-                            if (ability.SelfDamage > 0)
-                            {
-                                player.AdjustLife(-ability.SelfDamage);
-                                _state.Log($"{tapTarget.Name} deals {ability.SelfDamage} damage to {player.Name}.");
-                            }
-                            var manaDesc = count > 1 ? $"{count} {ability.FixedColor}" : $"{ability.FixedColor}";
-                            _state.Log($"{player.Name} taps {tapTarget.Name} for {manaDesc}.");
-                        }
-                        else if (ability.Type == ManaAbilityType.Choice)
-                        {
-                            var chosen = await player.DecisionHandler.ChooseManaColor(
-                                ability.ChoiceColors!, ct);
-                            player.ManaPool.Add(chosen);
-                            action.ManaProduced = chosen;
-                            // Painland: deal 1 damage for colored mana choices
-                            if (ability.PainColors != null && ability.PainColors.Contains(chosen))
-                            {
-                                player.AdjustLife(-1);
-                                action.PainDamageDealt = true;
-                                _state.Log($"{tapTarget.Name} deals 1 damage to {player.Name}.");
-                            }
-                            _state.Log($"{player.Name} taps {tapTarget.Name} for {chosen}.");
-                        }
-                        else if (ability.Type == ManaAbilityType.Dynamic)
-                        {
-                            var amount = ability.CountFunc!(player);
-                            if (amount > 0)
-                            {
-                                player.ManaPool.Add(ability.DynamicColor!.Value, amount);
-                                action.ManaProduced = ability.DynamicColor!.Value;
-                                action.ManaProducedAmount = amount;
-                                _state.Log($"{player.Name} taps {tapTarget.Name} for {amount} {ability.DynamicColor}.");
-                            }
-                            else
-                            {
-                                _state.Log($"{player.Name} taps {tapTarget.Name} (produces no mana).");
-                            }
-                        }
-                        else if (ability.Type == ManaAbilityType.Filter)
-                        {
-                            // Filter lands require paying an activation cost to produce multiple colors
-                            if (ability.ActivationCost != null && !player.ManaPool.CanPay(ability.ActivationCost))
-                            {
-                                // Can't pay — reject the tap
-                                tapTarget.IsTapped = false;
-                                player.ActionHistory.Pop();
-                                _state.Log($"{player.Name} cannot pay {ability.ActivationCost} to activate {tapTarget.Name}.");
-                                break;
-                            }
-
-                            if (ability.ActivationCost != null)
-                            {
-                                // Snapshot pool before paying to record what was actually spent (for undo)
-                                var poolBefore = player.ManaPool.Available.ToDictionary(kv => kv.Key, kv => kv.Value);
-                                player.ManaPool.Pay(ability.ActivationCost);
-                                var poolAfter = player.ManaPool.Available;
-                                action.ActualManaPaid = new Dictionary<ManaColor, int>();
-                                foreach (var (color, before) in poolBefore)
-                                {
-                                    var after = poolAfter.GetValueOrDefault(color, 0);
-                                    if (before > after)
-                                        action.ActualManaPaid[color] = before - after;
-                                }
-                            }
-
-                            // Produce all colors — use BonusManaProduced for undo tracking
-                            action.BonusManaProduced = ability.ProducedColors!.ToList();
-                            foreach (var color in ability.ProducedColors!)
-                                player.ManaPool.Add(color);
-
-                            _state.Log($"{player.Name} taps {tapTarget.Name} (pays {ability.ActivationCost}) for {string.Join(", ", ability.ProducedColors)}.");
-                        }
-                    }
-                    else
-                    {
-                        _state.Log($"{player.Name} taps {tapTarget.Name}.");
-                    }
-
-                    // Depletion counter: remove a counter when tapped for mana, sacrifice if empty
-                    if (tapTarget.ManaAbility?.RemovesCounterOnTap is { } depletionType)
-                    {
-                        tapTarget.RemoveCounter(depletionType);
-                        if (tapTarget.GetCounters(depletionType) <= 0)
-                        {
-                            player.Battlefield.RemoveById(tapTarget.Id);
-                            player.Graveyard.Add(tapTarget);
-                            _state.Log($"{tapTarget.Name} is sacrificed (no {depletionType} counters remaining).");
-                        }
-                    }
-
-                    // Fire mana triggers from auras attached to this permanent (immediate — mana abilities don't use stack)
-                    foreach (var aura in player.Battlefield.Cards.Where(c => c.AttachedTo == tapTarget.Id).ToList())
-                    {
-                        var auraTriggers = aura.Triggers.Count > 0
-                            ? aura.Triggers
-                            : (CardDefinitions.TryGet(aura.Name, out var auraDef2) ? auraDef2.Triggers : []);
-
-                        foreach (var trigger in auraTriggers)
-                        {
-                            if (trigger.Condition == TriggerCondition.AttachedPermanentTapped)
-                            {
-                                // Track bonus mana for undo
-                                if (trigger.Effect is Triggers.Effects.AddBonusManaEffect bonusMana)
-                                {
-                                    action.BonusManaProduced ??= [];
-                                    action.BonusManaProduced.Add(bonusMana.Color);
-                                }
-
-                                var ctx = new EffectContext(_state, player, aura, player.DecisionHandler)
-                                {
-                                    FireLeaveBattlefieldTriggers = async card =>
-                                    {
-                                        var ctrl = _state.Player1.Battlefield.Contains(card.Id) ? _state.Player1
-                                            : _state.Player2.Battlefield.Contains(card.Id) ? _state.Player2 : null;
-                                        if (ctrl != null) await FireLeaveBattlefieldTriggersAsync(card, ctrl, ct);
-                                    },
-                                };
-                                await trigger.Effect.Execute(ctx);
-                            }
-                        }
-                    }
-
-                    // Track pending tap for scoped undo
-                    player.PendingManaTaps.Add(tapTarget.Id);
-                }
-                break;
-
-            case ActionType.UntapCard:
-                var untapTarget = player.Battlefield.Cards.FirstOrDefault(c => c.Id == action.CardId);
-                if (untapTarget != null && untapTarget.IsTapped)
-                {
-                    untapTarget.IsTapped = false;
-                    player.ActionHistory.Push(action);
-                    _state.Log($"{player.Name} untaps {untapTarget.Name}.");
-                }
-                break;
-
-            case ActionType.ActivateFetch:
-            {
-                var fetchLand = player.Battlefield.Cards.FirstOrDefault(c => c.Id == action.CardId);
-                if (fetchLand == null || fetchLand.IsTapped) break;
-
-                var fetchDef = CardDefinitions.TryGet(fetchLand.Name, out var fd) ? fd : null;
-                var fetchAbility = fetchDef?.FetchAbility ?? fetchLand.FetchAbility;
-                if (fetchAbility == null) break;
-
-                // Pay costs: 1 life + sacrifice
-                player.AdjustLife(-1);
-                await FireLeaveBattlefieldTriggersAsync(fetchLand, player, ct);
-                player.Battlefield.RemoveById(fetchLand.Id);
-                player.Graveyard.Add(fetchLand);
-                _state.Log($"{player.Name} sacrifices {fetchLand.Name}, pays 1 life ({player.Life}).");
-
-                // Search library for matching land
-                var searchTypes = fetchAbility.SearchTypes;
-                var eligible = player.Library.Cards
-                    .Where(c => c.IsLand && searchTypes.Any(t =>
-                        c.Subtypes.Contains(t) || c.Name.Equals(t, StringComparison.OrdinalIgnoreCase)))
-                    .ToList();
-
-                if (eligible.Count > 0)
-                {
-                    var chosenId = await player.DecisionHandler.ChooseCard(
-                        eligible, $"Search for a land ({string.Join(" or ", searchTypes)})",
-                        optional: true, ct);
-
-                    if (chosenId != null)
-                    {
-                        var land = player.Library.RemoveById(chosenId.Value);
-                        if (land != null)
-                        {
-                            player.Battlefield.Add(land);
-                            land.TurnEnteredBattlefield = _state.TurnNumber;
-                            if (land.EntersTapped) land.IsTapped = true;
-                            _state.Log($"{player.Name} fetches {land.Name}.");
-                            ApplyEntersWithCounters(land);
-                            await QueueSelfTriggersOnStackAsync(GameEvent.EnterBattlefield, land, player, ct);
-                            await OnBoardChangedAsync(ct);
-                        }
-                    }
-                }
-                else
-                {
-                    _state.Log($"{player.Name} finds no matching land.");
-                }
-
-                player.Library.Shuffle();
-                player.ActionHistory.Push(action);
-                break;
-            }
-
-            case ActionType.CastSpell:
-            {
-                var castPlayer = _state.GetPlayer(action.PlayerId);
-                var castCard = castPlayer.Hand.Cards.FirstOrDefault(c => c.Id == action.CardId);
-                bool castingFromExileAdventure = false;
-
-                // If not in hand, check exile for adventure cards
-                if (castCard == null)
-                {
-                    castCard = castPlayer.Exile.Cards.FirstOrDefault(c => c.Id == action.CardId && c.IsOnAdventure);
-                    if (castCard != null)
-                        castingFromExileAdventure = true;
-                }
-
-                if (castCard == null)
-                {
-                    _state.Log("Card not found in hand.");
-                    return;
-                }
-
-                if (!CardDefinitions.TryGet(castCard.Name, out var def) || def.ManaCost == null)
-                {
-                    _state.Log($"Cannot cast {castCard.Name} — no registered mana cost.");
-                    return;
-                }
-
-                bool isInstant = def.CardTypes.HasFlag(CardType.Instant);
-                bool hasFlash = def.HasFlash;
-                if (!isInstant && !hasFlash && !CanCastSorcery(castPlayer.Id))
-                {
-                    _state.Log($"Cannot cast {castCard.Name} at this time (sorcery-speed only).");
-                    return;
-                }
-
-                // Apply cost modification from continuous effects
-                var castEffectiveCost = def.ManaCost;
-                var castCostReduction = ComputeCostModification(castCard, castPlayer);
-                if (castCostReduction != 0)
-                    castEffectiveCost = castEffectiveCost.WithGenericReduction(-castCostReduction);
-
-                // Determine payment method: mana vs alternate cost
-                bool canPayMana = castPlayer.ManaPool.CanPay(castEffectiveCost);
-                bool canPayAlternate = def.AlternateCost != null && CanPayAlternateCost(def.AlternateCost, castPlayer, castCard);
-                bool useAlternateCost = false;
-
-                if (!canPayMana && !canPayAlternate)
-                {
-                    _state.Log($"Not enough mana to cast {castCard.Name}.");
-                    return;
-                }
-
-                if (canPayAlternate && !canPayMana)
-                {
-                    useAlternateCost = true;
-                }
-                else if (canPayAlternate && canPayMana)
-                {
-                    // Ask player: choose card = pay mana, skip (null) = use alternate cost
-                    var choice = await castPlayer.DecisionHandler.ChooseCard(
-                        [castCard], $"Pay mana for {castCard.Name}? (skip to use alternate cost)", optional: true, ct);
-                    useAlternateCost = !choice.HasValue;
-                }
-
-                var targets = new List<TargetInfo>();
-                if (def.TargetFilter != null)
-                {
-                    var eligible = new List<GameCard>();
-                    var opponent = _state.GetOpponent(castPlayer);
-                    foreach (var c in castPlayer.Battlefield.Cards)
-                        if (def.TargetFilter.IsLegal(c, ZoneType.Battlefield) && !CannotBeTargetedBy(c, castPlayer))
-                            eligible.Add(c);
-                    foreach (var c in opponent.Battlefield.Cards)
-                        if (def.TargetFilter.IsLegal(c, ZoneType.Battlefield) && !CannotBeTargetedBy(c, castPlayer))
-                            eligible.Add(c);
-
-                    // Add player sentinels if the filter allows player targets
-                    var dummyCard = new GameCard { Name = "Player" };
-                    if (def.TargetFilter.IsLegal(dummyCard, ZoneType.None))
-                    {
-                        eligible.Add(new GameCard { Id = Guid.Empty, Name = castPlayer.Name });
-                        eligible.Add(new GameCard { Id = Guid.Empty, Name = opponent.Name });
-                    }
-
-                    // Add stack objects as targets if the filter allows spell targets
-                    if (def.TargetFilter.IsLegal(dummyCard, ZoneType.Stack))
-                    {
-                        foreach (var so in _state.Stack.OfType<StackObject>())
-                        {
-                            if (def.TargetFilter.IsLegal(so.Card, ZoneType.Stack))
-                                eligible.Add(so.Card);
-                        }
-                    }
-
-                    if (eligible.Count == 0)
-                    {
-                        _state.Log($"No legal targets for {castCard.Name}.");
-                        return;
-                    }
-
-                    var target = await castPlayer.DecisionHandler.ChooseTarget(
-                        castCard.Name, eligible, opponent.Id, ct);
-
-                    // Null target means the player cancelled the spell
-                    if (target == null)
-                    {
-                        _state.Log($"{castPlayer.Name} cancels casting {castCard.Name}.");
-                        return;
-                    }
-
-                    // Convert player sentinel targets to proper TargetInfo
-                    if (target.Zone == ZoneType.None)
-                    {
-                        // Player target — ensure correct convention
-                        targets.Add(new TargetInfo(Guid.Empty, target.PlayerId, ZoneType.None));
-                    }
-                    else
-                    {
-                        // Auto-detect stack targets: if the chosen card is on the stack, use ZoneType.Stack
-                        var stackTarget = _state.Stack.OfType<StackObject>().FirstOrDefault(s => s.Card.Id == target.CardId);
-                        if (stackTarget != null)
-                            targets.Add(new TargetInfo(stackTarget.Card.Id, stackTarget.ControllerId, ZoneType.Stack));
-                        else
-                            targets.Add(target);
-                    }
-                }
-
-                Dictionary<ManaColor, int> manaPaid;
-                if (useAlternateCost)
-                {
-                    await PayAlternateCostAsync(def.AlternateCost!, castPlayer, castCard, ct);
-                    manaPaid = new Dictionary<ManaColor, int>(); // No mana spent
-                }
-                else
-                {
-                    manaPaid = await PayManaCostAsync(castEffectiveCost, castPlayer, ct);
-                    castPlayer.PendingManaTaps.Clear();
-                }
-
-                if (castingFromExileAdventure)
-                {
-                    castPlayer.Exile.RemoveById(castCard.Id);
-                    castCard.IsOnAdventure = false;
-                }
-                else
-                {
-                    castPlayer.Hand.RemoveById(castCard.Id);
-                }
-                var stackObj = new StackObject(castCard, castPlayer.Id, manaPaid, targets, _state.StackCount);
-                _state.StackPush(stackObj);
-
-                action.ManaCostPaid = castEffectiveCost;
-                castPlayer.ActionHistory.Push(action);
-
-                _state.Log($"{castPlayer.Name} casts {castCard.Name}.");
-
-                // Fire SpellCast board triggers (e.g., enchantress draw on enchantment cast)
-                await QueueBoardTriggersOnStackAsync(GameEvent.SpellCast, castCard, ct);
-
-                // Fire SelfIsCast triggers (e.g., Emrakul extra turn on cast)
-                await QueueSelfCastTriggersAsync(castCard, castPlayer, ct);
-                break;
-            }
-
-            case ActionType.ActivateAbility:
-            {
-                var abilitySource = player.Battlefield.Cards.FirstOrDefault(c => c.Id == action.CardId);
-                if (abilitySource == null) break;
-
-                // Suppression: creatures that lost abilities can't activate abilities
-                if (abilitySource.IsCreature && abilitySource.AbilitiesRemoved)
-                {
-                    _state.Log($"{abilitySource.Name} has lost its abilities — cannot activate.");
-                    break;
-                }
-
-                // Look up activated ability: token ability on the card, then CardDefinitions registry
-                ActivatedAbility? ability = abilitySource.TokenActivatedAbility;
-                if (ability == null)
-                {
-                    if (CardDefinitions.TryGet(abilitySource.Name, out var abilityDef))
-                        ability = abilityDef.ActivatedAbility;
-                }
-
-                if (ability == null)
-                {
-                    _state.Log($"{abilitySource.Name} has no activated ability.");
-                    break;
-                }
-                var cost = ability.Cost;
-
-                // Validate: activation condition (e.g., threshold)
-                if (ability.Condition != null && !ability.Condition(player))
-                {
-                    _state.Log($"Cannot activate {abilitySource.Name} — condition not met.");
-                    break;
-                }
-
-                // Validate: tap cost when already tapped
-                if (cost.TapSelf && abilitySource.IsTapped)
-                {
-                    _state.Log($"Cannot activate {abilitySource.Name} — already tapped.");
-                    break;
-                }
-
-                // Validate: summoning sickness prevents creatures from using tap abilities
-                if (cost.TapSelf && abilitySource.IsCreature && abilitySource.HasSummoningSickness(_state.TurnNumber))
-                {
-                    _state.Log($"{abilitySource.Name} has summoning sickness.");
-                    break;
-                }
-
-                // Validate: pay life cost
-                if (cost.PayLife > 0 && player.Life < cost.PayLife)
-                {
-                    _state.Log($"Cannot activate {abilitySource.Name} — not enough life (need {cost.PayLife}, have {player.Life}).");
-                    break;
-                }
-
-                // Validate: mana cost
-                if (cost.ManaCost != null && !player.ManaPool.CanPay(cost.ManaCost))
-                {
-                    _state.Log($"Cannot activate {abilitySource.Name} — not enough mana.");
-                    break;
-                }
-
-                // Validate: counter removal cost
-                if (cost.RemoveCounterType.HasValue)
-                {
-                    if (abilitySource.GetCounters(cost.RemoveCounterType.Value) <= 0)
-                    {
-                        _state.Log($"Cannot activate {abilitySource.Name} — no {cost.RemoveCounterType.Value} counters.");
-                        break;
-                    }
-                }
-
-                // Validate: sacrifice subtype
-                GameCard? sacrificeTarget = null;
-                if (cost.SacrificeSubtype != null)
-                {
-                    var eligible = player.Battlefield.Cards
-                        .Where(c => c.IsCreature && c.Subtypes.Contains(cost.SacrificeSubtype, StringComparer.OrdinalIgnoreCase))
-                        .ToList();
-
-                    if (eligible.Count == 0)
-                    {
-                        _state.Log($"Cannot activate {abilitySource.Name} — no eligible {cost.SacrificeSubtype} to sacrifice.");
-                        break;
-                    }
-
-                    var chosenId = await player.DecisionHandler.ChooseCard(
-                        eligible, $"Choose a {cost.SacrificeSubtype} to sacrifice", optional: false, ct);
-
-                    if (chosenId.HasValue)
-                        sacrificeTarget = eligible.FirstOrDefault(c => c.Id == chosenId.Value);
-
-                    if (sacrificeTarget == null)
-                    {
-                        _state.Log($"Cannot activate {abilitySource.Name} — no sacrifice target chosen.");
-                        break;
-                    }
-                }
-
-                // Validate: sacrifice card type
-                GameCard? sacrificeByType = null;
-                if (cost.SacrificeCardType.HasValue)
-                {
-                    var eligible = player.Battlefield.Cards
-                        .Where(c => c.CardTypes.HasFlag(cost.SacrificeCardType.Value))
-                        .ToList();
-
-                    if (eligible.Count == 0)
-                    {
-                        _state.Log($"Cannot activate {abilitySource.Name} — no {cost.SacrificeCardType.Value} to sacrifice.");
-                        break;
-                    }
-
-                    var chosenId = await player.DecisionHandler.ChooseCard(
-                        eligible, $"Choose a {cost.SacrificeCardType.Value} to sacrifice", optional: false, ct);
-
-                    if (chosenId.HasValue)
-                        sacrificeByType = eligible.FirstOrDefault(c => c.Id == chosenId.Value);
-
-                    if (sacrificeByType == null)
-                    {
-                        _state.Log($"Cannot activate {abilitySource.Name} — no sacrifice target chosen.");
-                        break;
-                    }
-                }
-
-                // Validate: discard card type from hand
-                GameCard? discardTarget = null;
-                if (cost.DiscardCardType.HasValue)
-                {
-                    var eligible = player.Hand.Cards
-                        .Where(c => c.CardTypes.HasFlag(cost.DiscardCardType.Value))
-                        .ToList();
-
-                    if (eligible.Count == 0)
-                    {
-                        _state.Log($"Cannot activate {abilitySource.Name} — no {cost.DiscardCardType.Value} in hand to discard.");
-                        break;
-                    }
-
-                    var chosenId = await player.DecisionHandler.ChooseCard(
-                        eligible, $"Choose a {cost.DiscardCardType.Value} to discard", optional: false, ct);
-
-                    if (chosenId.HasValue)
-                        discardTarget = eligible.FirstOrDefault(c => c.Id == chosenId.Value);
-
-                    if (discardTarget == null)
-                    {
-                        _state.Log($"Cannot activate {abilitySource.Name} — no discard target chosen.");
-                        break;
-                    }
-                }
-
-                // Pay costs: mana
-                if (cost.ManaCost != null)
-                {
-                    await PayManaCostAsync(cost.ManaCost, player, ct);
-                    player.PendingManaTaps.Clear();
-                }
-
-                // Pay costs: tap self
-                if (cost.TapSelf)
-                    abilitySource.IsTapped = true;
-
-                // Pay costs: sacrifice self
-                if (cost.SacrificeSelf)
-                {
-                    await FireLeaveBattlefieldTriggersAsync(abilitySource, player, ct);
-                    player.Battlefield.RemoveById(abilitySource.Id);
-                    player.Graveyard.Add(abilitySource);
-                    _state.Log($"{player.Name} sacrifices {abilitySource.Name}.");
-                }
-
-                // Pay costs: sacrifice subtype target
-                if (sacrificeTarget != null)
-                {
-                    await FireLeaveBattlefieldTriggersAsync(sacrificeTarget, player, ct);
-                    player.Battlefield.RemoveById(sacrificeTarget.Id);
-                    player.Graveyard.Add(sacrificeTarget);
-                    _state.Log($"{player.Name} sacrifices {sacrificeTarget.Name}.");
-                }
-
-                // Pay costs: sacrifice card type target
-                if (sacrificeByType != null)
-                {
-                    await FireLeaveBattlefieldTriggersAsync(sacrificeByType, player, ct);
-                    player.Battlefield.RemoveById(sacrificeByType.Id);
-                    player.Graveyard.Add(sacrificeByType);
-                    _state.Log($"{player.Name} sacrifices {sacrificeByType.Name}.");
-                }
-
-                // Pay costs: remove counter
-                if (cost.RemoveCounterType.HasValue)
-                {
-                    abilitySource.RemoveCounter(cost.RemoveCounterType.Value);
-                }
-
-                // Pay costs: discard card type
-                if (discardTarget != null)
-                {
-                    player.Hand.RemoveById(discardTarget.Id);
-                    player.Graveyard.Add(discardTarget);
-                    _state.Log($"{player.Name} discards {discardTarget.Name}.");
-                }
-
-                // Pay costs: life
-                if (cost.PayLife > 0)
-                {
-                    player.AdjustLife(-cost.PayLife);
-                    _state.Log($"{player.Name} pays {cost.PayLife} life.");
-                }
-
-                // Find or prompt for effect target
-                GameCard? effectTarget = null;
-                if (action.TargetCardId.HasValue)
-                {
-                    effectTarget = _state.Player1.Battlefield.Cards.FirstOrDefault(c => c.Id == action.TargetCardId.Value)
-                                ?? _state.Player2.Battlefield.Cards.FirstOrDefault(c => c.Id == action.TargetCardId.Value);
-                }
-                else if (ability.TargetFilter != null && !action.TargetPlayerId.HasValue)
-                {
-                    // No target was pre-selected — prompt for one
-                    var opponent = _state.GetOpponent(player);
-                    var eligible = player.Battlefield.Cards
-                        .Concat(opponent.Battlefield.Cards)
-                        .Where(c => ability.TargetFilter(c) && !CannotBeTargetedBy(c, player))
-                        .ToList();
-
-                    if (eligible.Count == 0)
-                    {
-                        _state.Log($"No legal targets for {abilitySource.Name}.");
-                        break;
-                    }
-
-                    var target = await player.DecisionHandler.ChooseTarget(
-                        abilitySource.Name, eligible, opponent.Id, ct);
-
-                    if (target == null)
-                    {
-                        _state.Log($"{player.Name} cancels activating {abilitySource.Name}.");
-                        break;
-                    }
-
-                    effectTarget = eligible.FirstOrDefault(c => c.Id == target.CardId);
-                }
-
-                // Shroud/Hexproof check: cannot target a permanent with shroud or hexproof (opponent only)
-                if (effectTarget != null && CannotBeTargetedBy(effectTarget, player))
-                {
-                    var reason = HasShroud(effectTarget) ? "shroud" : "hexproof";
-                    _state.Log($"{effectTarget.Name} has {reason} — cannot be targeted.");
-                    break;
-                }
-
-                // Player shroud check: cannot target a player with shroud
-                if (action.TargetPlayerId.HasValue && HasPlayerShroud(action.TargetPlayerId.Value))
-                {
-                    var targetPlayerName = action.TargetPlayerId.Value == _state.Player1.Id
-                        ? _state.Player1.Name : _state.Player2.Name;
-                    _state.Log($"{targetPlayerName} has shroud — cannot be targeted.");
-                    break;
-                }
-
-                // Push activated ability onto the stack (MTG rules: abilities use the stack)
-                var stackObj = new TriggeredAbilityStackObject(abilitySource, player.Id, ability.Effect, effectTarget)
-                {
-                    TargetPlayerId = action.TargetPlayerId,
-                };
-                _state.StackPush(stackObj);
-                _state.Log($"{abilitySource.Name}'s ability is put on the stack.");
-
-                player.ActionHistory.Push(action);
-                break;
-            }
-
-            case ActionType.Cycle:
-            {
-                var cycleCard = player.Hand.Cards.FirstOrDefault(c => c.Id == action.CardId);
-                if (cycleCard == null) break;
-
-                if (!CardDefinitions.TryGet(cycleCard.Name, out var cycleDef) || cycleDef.CyclingCost == null)
-                {
-                    _state.Log($"{cycleCard.Name} cannot be cycled.");
-                    break;
-                }
-
-                var cyclingCost = cycleDef.CyclingCost;
-                if (!player.ManaPool.CanPay(cyclingCost))
-                {
-                    _state.Log($"Cannot cycle {cycleCard.Name} — not enough mana.");
-                    break;
-                }
-
-                // Pay mana using ManaPool.Pay (handles colored + generic)
-                player.ManaPool.Pay(cyclingCost);
-                player.PendingManaTaps.Clear();
-
-                // Discard to graveyard
-                player.Hand.RemoveById(cycleCard.Id);
-                player.Graveyard.Add(cycleCard);
-
-                // Draw a card
-                DrawCards(player, 1);
-                _state.Log($"{player.Name} cycles {cycleCard.Name}.");
-
-                // Queue cycling triggers on stack
-                foreach (var trigger in cycleDef.CyclingTriggers)
-                {
-                    _state.Log($"{cycleCard.Name} triggers: {trigger.Effect.GetType().Name.Replace("Effect", "")}");
-                    _state.StackPush(new TriggeredAbilityStackObject(cycleCard, player.Id, trigger.Effect));
-                }
-
-                player.ActionHistory.Push(action);
-                break;
-            }
-
-            case ActionType.Flashback:
-            {
-                var fbPlayer = _state.GetPlayer(action.PlayerId);
-                var fbCard = fbPlayer.Graveyard.Cards.FirstOrDefault(c => c.Id == action.CardId);
-                if (fbCard == null)
-                {
-                    _state.Log("Card not found in graveyard.");
-                    return;
-                }
-
-                if (!CardDefinitions.TryGet(fbCard.Name, out var fbDef) || fbDef.FlashbackCost == null)
-                {
-                    _state.Log($"{fbCard.Name} has no flashback.");
-                    return;
-                }
-
-                bool fbIsInstant = fbDef.CardTypes.HasFlag(CardType.Instant);
-                bool fbHasFlash = fbDef.HasFlash;
-                if (!fbIsInstant && !fbHasFlash && !CanCastSorcery(fbPlayer.Id))
-                {
-                    _state.Log($"Cannot cast {fbCard.Name} at this time (sorcery-speed only).");
-                    return;
-                }
-
-                var fbCost = fbDef.FlashbackCost;
-
-                // Validate flashback mana cost
-                if (fbCost.ManaCost != null && !fbPlayer.ManaPool.CanPay(fbCost.ManaCost))
-                {
-                    _state.Log($"Not enough mana for flashback of {fbCard.Name}.");
-                    return;
-                }
-
-                // Validate life cost
-                if (fbCost.LifeCost > 0 && fbPlayer.Life <= fbCost.LifeCost)
-                {
-                    _state.Log($"Not enough life for flashback of {fbCard.Name}.");
-                    return;
-                }
-
-                // Validate sacrifice creature cost
-                GameCard? fbSacTarget = null;
-                if (fbCost.SacrificeCreature)
-                {
-                    var fbCreatures = fbPlayer.Battlefield.Cards.Where(c => c.IsCreature).ToList();
-                    if (fbCreatures.Count == 0)
-                    {
-                        _state.Log($"No creature to sacrifice for flashback of {fbCard.Name}.");
-                        return;
-                    }
-                    var chosenId = await fbPlayer.DecisionHandler.ChooseCard(
-                        fbCreatures, "Choose a creature to sacrifice for flashback", optional: false, ct);
-                    if (chosenId.HasValue)
-                        fbSacTarget = fbCreatures.FirstOrDefault(c => c.Id == chosenId.Value);
-                    if (fbSacTarget == null)
-                    {
-                        _state.Log($"No creature chosen for flashback sacrifice.");
-                        return;
-                    }
-                }
-
-                // Find targets (same logic as CastSpell)
-                var fbTargets = new List<TargetInfo>();
-                if (fbDef.TargetFilter != null)
-                {
-                    var fbOpponent = _state.GetOpponent(fbPlayer);
-                    var fbEligible = new List<GameCard>();
-
-                    foreach (var c in fbPlayer.Battlefield.Cards)
-                        if (fbDef.TargetFilter.IsLegal(c, ZoneType.Battlefield) && !CannotBeTargetedBy(c, fbPlayer))
-                            fbEligible.Add(c);
-                    foreach (var c in fbOpponent.Battlefield.Cards)
-                        if (fbDef.TargetFilter.IsLegal(c, ZoneType.Battlefield) && !CannotBeTargetedBy(c, fbPlayer))
-                            fbEligible.Add(c);
-
-                    // Player sentinels
-                    var dummyCard = new GameCard { Name = "Player" };
-                    if (fbDef.TargetFilter.IsLegal(dummyCard, ZoneType.None))
-                    {
-                        fbEligible.Add(new GameCard { Id = Guid.Empty, Name = fbPlayer.Name });
-                        fbEligible.Add(new GameCard { Id = Guid.Empty, Name = fbOpponent.Name });
-                    }
-
-                    // Stack targets
-                    if (fbDef.TargetFilter.IsLegal(dummyCard, ZoneType.Stack))
-                    {
-                        foreach (var so in _state.Stack.OfType<StackObject>())
-                            if (fbDef.TargetFilter.IsLegal(so.Card, ZoneType.Stack))
-                                fbEligible.Add(so.Card);
-                    }
-
-                    if (fbEligible.Count == 0)
-                    {
-                        _state.Log($"No legal targets for {fbCard.Name}.");
-                        return;
-                    }
-
-                    var fbTarget = await fbPlayer.DecisionHandler.ChooseTarget(
-                        fbCard.Name, fbEligible, fbOpponent.Id, ct);
-                    if (fbTarget == null)
-                    {
-                        _state.Log($"{fbPlayer.Name} cancels casting {fbCard.Name}.");
-                        return;
-                    }
-
-                    if (fbTarget.Zone == ZoneType.None)
-                        fbTargets.Add(new TargetInfo(Guid.Empty, fbTarget.PlayerId, ZoneType.None));
-                    else
-                    {
-                        var stackTarget = _state.Stack.OfType<StackObject>().FirstOrDefault(s => s.Card.Id == fbTarget.CardId);
-                        if (stackTarget != null)
-                            fbTargets.Add(new TargetInfo(stackTarget.Card.Id, stackTarget.ControllerId, ZoneType.Stack));
-                        else
-                            fbTargets.Add(fbTarget);
-                    }
-                }
-
-                // Pay all costs
-                Dictionary<ManaColor, int> fbManaPaid = new();
-                if (fbCost.ManaCost != null)
-                {
-                    fbManaPaid = await PayManaCostAsync(fbCost.ManaCost, fbPlayer, ct);
-                    fbPlayer.PendingManaTaps.Clear();
-                }
-
-                if (fbCost.LifeCost > 0)
-                {
-                    fbPlayer.AdjustLife(-fbCost.LifeCost);
-                    _state.Log($"{fbPlayer.Name} pays {fbCost.LifeCost} life for flashback.");
-                }
-
-                if (fbSacTarget != null)
-                {
-                    await FireLeaveBattlefieldTriggersAsync(fbSacTarget, fbPlayer, ct);
-                    fbPlayer.Battlefield.RemoveById(fbSacTarget.Id);
-                    fbPlayer.Graveyard.Add(fbSacTarget);
-                    _state.Log($"{fbPlayer.Name} sacrifices {fbSacTarget.Name} for flashback.");
-                }
-
-                // Move from graveyard to stack
-                fbPlayer.Graveyard.RemoveById(fbCard.Id);
-                var fbStackObj = new StackObject(fbCard, fbPlayer.Id, fbManaPaid, fbTargets, _state.StackCount)
-                {
-                    IsFlashback = true,
-                };
-                _state.StackPush(fbStackObj);
-
-                action.ManaCostPaid = fbCost.ManaCost;
-                fbPlayer.ActionHistory.Push(action);
-
-                _state.Log($"{fbPlayer.Name} casts {fbCard.Name} (flashback).");
-                await QueueBoardTriggersOnStackAsync(GameEvent.SpellCast, fbCard, ct);
-                break;
-            }
-
-            case ActionType.ActivateLoyaltyAbility:
-            {
-                var pwCard = player.Battlefield.Cards.FirstOrDefault(c => c.Id == action.CardId);
-                if (pwCard == null || !pwCard.IsPlaneswalker) break;
-
-                // Must be sorcery speed
-                if (!CanCastSorcery(player.Id))
-                {
-                    _state.Log($"Cannot activate {pwCard.Name} — not at sorcery speed.");
-                    break;
-                }
-
-                // One loyalty ability per planeswalker per turn
-                if (player.PlaneswalkerAbilitiesUsedThisTurn.Contains(pwCard.Id))
-                {
-                    _state.Log($"{pwCard.Name} has already activated a loyalty ability this turn.");
-                    break;
-                }
-
-                // Get card definition and validate ability index
-                // For transformed cards, check BackFaceDefinition first (back face name isn't in CardDefinitions)
-                CardDefinition? pwDef = null;
-                if (pwCard.IsTransformed && pwCard.BackFaceDefinition?.LoyaltyAbilities != null)
-                    pwDef = pwCard.BackFaceDefinition;
-                else if (CardDefinitions.TryGet(pwCard.Name, out var registeredDef))
-                    pwDef = registeredDef;
-
-                if (pwDef?.LoyaltyAbilities == null)
-                {
-                    _state.Log($"{pwCard.Name} has no loyalty abilities.");
-                    break;
-                }
-
-                var abilityIdx = action.AbilityIndex ?? -1;
-                if (abilityIdx < 0 || abilityIdx >= pwDef.LoyaltyAbilities.Count)
-                {
-                    _state.Log($"Invalid loyalty ability index for {pwCard.Name}.");
-                    break;
-                }
-
-                var loyaltyAbility = pwDef.LoyaltyAbilities[abilityIdx];
-
-                // Check loyalty cost is payable (negative costs: loyalty + cost >= 0)
-                if (loyaltyAbility.LoyaltyCost < 0 && pwCard.Loyalty + loyaltyAbility.LoyaltyCost < 0)
-                {
-                    _state.Log($"Not enough loyalty to activate {pwCard.Name} ({loyaltyAbility.Description}).");
-                    break;
-                }
-
-                // Pay loyalty cost
-                if (loyaltyAbility.LoyaltyCost > 0)
-                {
-                    pwCard.AddCounters(CounterType.Loyalty, loyaltyAbility.LoyaltyCost);
-                }
-                else if (loyaltyAbility.LoyaltyCost < 0)
-                {
-                    for (int i = 0; i < -loyaltyAbility.LoyaltyCost; i++)
-                        pwCard.RemoveCounter(CounterType.Loyalty);
-                }
-
-                // Mark as used this turn
-                player.PlaneswalkerAbilitiesUsedThisTurn.Add(pwCard.Id);
-
-                // Push to stack — default target is opponent (for damage/effect abilities)
-                var opponent = _state.GetOpponent(player);
-                var loyaltyStackObj = new ActivatedLoyaltyAbilityStackObject(
-                    pwCard, player.Id, loyaltyAbility.Effect, loyaltyAbility.Description)
-                {
-                    TargetPlayerId = opponent.Id,
-                };
-                _state.StackPush(loyaltyStackObj);
-
-                _state.Log($"{player.Name} activates {pwCard.Name}: {loyaltyAbility.Description}");
-                break;
-            }
-
-            case ActionType.Ninjutsu:
-            {
-                // Ninjutsu: pay cost, return unblocked attacker to hand, put ninja on battlefield tapped and attacking
-                var ninjutsuPlayer = _state.GetPlayer(action.PlayerId);
-                var ninjaCard = ninjutsuPlayer.Hand.Cards.FirstOrDefault(c => c.Id == action.CardId);
-                if (ninjaCard == null)
-                {
-                    _state.Log("Ninjutsu card not found in hand.");
-                    break;
-                }
-
-                // Must have NinjutsuCost registered
-                if (!CardDefinitions.TryGet(ninjaCard.Name, out var ninjutsuDef) || ninjutsuDef.NinjutsuCost == null)
-                {
-                    _state.Log($"{ninjaCard.Name} does not have ninjutsu.");
-                    break;
-                }
-
-                // Must be during combat, after blockers declared
-                if (_state.CurrentPhase != Phase.Combat || _state.Combat == null
-                    || _state.CombatStep < CombatStep.DeclareBlockers)
-                {
-                    _state.Log("Ninjutsu can only be activated during combat after blockers are declared.");
-                    break;
-                }
-
-                // Return creature must be an unblocked attacker you control
-                var returnCreatureId = action.ReturnCardId;
-                if (!returnCreatureId.HasValue)
-                {
-                    _state.Log("No creature specified to return.");
-                    break;
-                }
-
-                var returnCreature = ninjutsuPlayer.Battlefield.Cards.FirstOrDefault(c => c.Id == returnCreatureId.Value);
-                if (returnCreature == null)
-                {
-                    _state.Log("Return creature not found on battlefield.");
-                    break;
-                }
-
-                // Must be attacking and unblocked
-                if (!_state.Combat.Attackers.Contains(returnCreature.Id))
-                {
-                    _state.Log($"{returnCreature.Name} is not attacking.");
-                    break;
-                }
-
-                if (_state.Combat.IsBlocked(returnCreature.Id))
-                {
-                    _state.Log($"{returnCreature.Name} is blocked — cannot use ninjutsu.");
-                    break;
-                }
-
-                // Must be able to pay ninjutsu cost
-                var ninjutsuCost = ninjutsuDef.NinjutsuCost;
-                if (!ninjutsuPlayer.ManaPool.CanPay(ninjutsuCost))
-                {
-                    _state.Log($"Not enough mana to activate ninjutsu for {ninjaCard.Name}.");
-                    break;
-                }
-
-                // Pay ninjutsu cost
-                await PayManaCostAsync(ninjutsuCost, ninjutsuPlayer, ct);
-                ninjutsuPlayer.PendingManaTaps.Clear();
-
-                // Return attacker to hand
-                ninjutsuPlayer.Battlefield.RemoveById(returnCreature.Id);
-                returnCreature.IsTapped = false;
-                returnCreature.DamageMarked = 0;
-                ninjutsuPlayer.Hand.Add(returnCreature);
-                _state.Combat.RemoveAttacker(returnCreature.Id);
-
-                // Put ninja on battlefield tapped and attacking
-                ninjutsuPlayer.Hand.RemoveById(ninjaCard.Id);
-                ninjaCard.IsTapped = true;
-                ninjaCard.TurnEnteredBattlefield = _state.TurnNumber;
-                ninjutsuPlayer.Battlefield.Add(ninjaCard);
-
-                // Apply enters-with-counters (loyalty, +1/+1, etc.)
-                ApplyEntersWithCounters(ninjaCard);
-
-                // Add to combat as attacker
-                _state.Combat.DeclareAttacker(ninjaCard.Id);
-
-                // Fire ETB triggers
-                await QueueSelfTriggersOnStackAsync(GameEvent.EnterBattlefield, ninjaCard, ninjutsuPlayer, ct);
-                await OnBoardChangedAsync(ct);
-
-                _state.Log($"{ninjutsuPlayer.Name} activates ninjutsu: {returnCreature.Name} returns to hand, {ninjaCard.Name} enters attacking.");
-                break;
-            }
-
-            case ActionType.CastAdventure:
-            {
-                var advPlayer = _state.GetPlayer(action.PlayerId);
-                var advCard = advPlayer.Hand.Cards.FirstOrDefault(c => c.Id == action.CardId);
-                if (advCard == null)
-                {
-                    _state.Log("Card not found in hand.");
-                    return;
-                }
-
-                if (!CardDefinitions.TryGet(advCard.Name, out var advDef) || advDef.Adventure == null)
-                {
-                    _state.Log($"{advCard.Name} has no adventure.");
-                    return;
-                }
-
-                var adventure = advDef.Adventure;
-
-                // Check timing: adventure instants at instant speed, adventure sorceries at sorcery speed
-                // Brazen Borrower's Petty Theft is an instant, so check if the adventure's effect type
-                // For simplicity: if the main card has flash or the card is an instant, allow at instant speed
-                bool advIsInstant = advDef.CardTypes.HasFlag(CardType.Instant) || advDef.HasFlash;
-                if (!advIsInstant && !CanCastSorcery(advPlayer.Id))
-                {
-                    _state.Log($"Cannot cast {adventure.Name} at this time (sorcery-speed only).");
-                    return;
-                }
-
-                // Apply cost modification from continuous effects
-                var advEffectiveCost = adventure.Cost;
-                var advCostReduction = ComputeCostModification(advCard, advPlayer);
-                if (advCostReduction != 0)
-                    advEffectiveCost = advEffectiveCost.WithGenericReduction(-advCostReduction);
-
-                if (!advPlayer.ManaPool.CanPay(advEffectiveCost))
-                {
-                    _state.Log($"Not enough mana to cast {adventure.Name}.");
-                    return;
-                }
-
-                // Find targets if the adventure has a target filter
-                var advTargets = new List<TargetInfo>();
-                if (adventure.Filter != null)
-                {
-                    var advOpponent = _state.GetOpponent(advPlayer);
-                    var advEligible = new List<GameCard>();
-
-                    foreach (var c in advPlayer.Battlefield.Cards)
-                        if (adventure.Filter.IsLegal(c, ZoneType.Battlefield) && !CannotBeTargetedBy(c, advPlayer))
-                            advEligible.Add(c);
-                    foreach (var c in advOpponent.Battlefield.Cards)
-                        if (adventure.Filter.IsLegal(c, ZoneType.Battlefield) && !CannotBeTargetedBy(c, advPlayer))
-                            advEligible.Add(c);
-
-                    if (advEligible.Count == 0)
-                    {
-                        _state.Log($"No legal targets for {adventure.Name}.");
-                        return;
-                    }
-
-                    var advTarget = await advPlayer.DecisionHandler.ChooseTarget(
-                        adventure.Name, advEligible, advOpponent.Id, ct);
-
-                    if (advTarget == null)
-                    {
-                        _state.Log($"{advPlayer.Name} cancels casting {adventure.Name}.");
-                        return;
-                    }
-
-                    advTargets.Add(advTarget);
-                }
-
-                // Pay mana cost
-                var advManaPaid = await PayManaCostAsync(advEffectiveCost, advPlayer, ct);
-                advPlayer.PendingManaTaps.Clear();
-
-                // Move card from hand to stack
-                advPlayer.Hand.RemoveById(advCard.Id);
-                var advStackObj = new StackObject(advCard, advPlayer.Id, advManaPaid, advTargets, _state.StackCount)
-                {
-                    IsAdventure = true,
-                };
-                _state.StackPush(advStackObj);
-
-                action.ManaCostPaid = advEffectiveCost;
-                advPlayer.ActionHistory.Push(action);
-
-                _state.Log($"{advPlayer.Name} casts {adventure.Name} (adventure of {advCard.Name}).");
-                await QueueBoardTriggersOnStackAsync(GameEvent.SpellCast, advCard, ct);
-                break;
-            }
+            await handler.ExecuteAsync(action, this, _state, ct);
+            return;
         }
+
+        throw new InvalidOperationException($"No handler registered for action type: {action.Type}");
     }
 
     /// <summary>
@@ -1512,7 +327,7 @@ public class GameEngine
         return true;
     }
 
-    private async Task PayAlternateCostAsync(AlternateCost alt, Player player, GameCard castCard, CancellationToken ct)
+    internal async Task PayAlternateCostAsync(AlternateCost alt, Player player, GameCard castCard, CancellationToken ct)
     {
         // Pay life
         if (alt.LifeCost > 0)
@@ -1592,15 +407,74 @@ public class GameEngine
         }
     }
 
-    private bool HasShroud(GameCard card) => card.ActiveKeywords.Contains(Keyword.Shroud);
+    internal bool HasShroud(GameCard card) => card.ActiveKeywords.Contains(Keyword.Shroud);
 
     private bool HasHexproof(GameCard card) => card.ActiveKeywords.Contains(Keyword.Hexproof);
+
+    /// <summary>
+    /// Shared targeting helper — builds eligible targets, prompts player, validates choice.
+    /// Returns null if the player cancels targeting. Returns empty list if no legal targets exist.
+    /// </summary>
+    internal async Task<List<TargetInfo>?> FindAndChooseTargetsAsync(
+        TargetFilter filter, Player caster, IPlayerDecisionHandler handler,
+        string? spellName = null, CancellationToken ct = default)
+    {
+        var opponent = _state.GetOpponent(caster);
+        var eligible = new List<GameCard>();
+
+        foreach (var c in caster.Battlefield.Cards)
+            if (filter.IsLegal(c, ZoneType.Battlefield) && !CannotBeTargetedBy(c, caster))
+                eligible.Add(c);
+        foreach (var c in opponent.Battlefield.Cards)
+            if (filter.IsLegal(c, ZoneType.Battlefield) && !CannotBeTargetedBy(c, caster))
+                eligible.Add(c);
+
+        var dummyCard = new GameCard { Name = "Player" };
+        if (filter.IsLegal(dummyCard, ZoneType.None))
+        {
+            eligible.Add(new GameCard { Id = Guid.Empty, Name = caster.Name });
+            eligible.Add(new GameCard { Id = Guid.Empty, Name = opponent.Name });
+        }
+
+        if (filter.IsLegal(dummyCard, ZoneType.Stack))
+        {
+            foreach (var so in _state.Stack.OfType<StackObject>())
+                if (filter.IsLegal(so.Card, ZoneType.Stack))
+                    eligible.Add(so.Card);
+        }
+
+        if (eligible.Count == 0)
+            return new List<TargetInfo>();
+
+        var target = await handler.ChooseTarget(
+            spellName ?? "spell", eligible, opponent.Id, ct);
+
+        if (target == null)
+            return null;
+
+        var targets = new List<TargetInfo>();
+        if (target.Zone == ZoneType.None)
+        {
+            targets.Add(new TargetInfo(Guid.Empty, target.PlayerId, ZoneType.None));
+        }
+        else
+        {
+            var stackTarget = _state.Stack.OfType<StackObject>()
+                .FirstOrDefault(s => s.Card.Id == target.CardId);
+            if (stackTarget != null)
+                targets.Add(new TargetInfo(stackTarget.Card.Id, stackTarget.ControllerId, ZoneType.Stack));
+            else
+                targets.Add(target);
+        }
+
+        return targets;
+    }
 
     /// <summary>
     /// Returns true if the card cannot be targeted by the given player.
     /// Shroud prevents all targeting; Hexproof prevents only opponent targeting.
     /// </summary>
-    private bool CannotBeTargetedBy(GameCard card, Player caster)
+    internal bool CannotBeTargetedBy(GameCard card, Player caster)
     {
         if (HasShroud(card)) return true;
         if (HasHexproof(card))
@@ -1620,7 +494,7 @@ public class GameEngine
         return null;
     }
 
-    private bool HasPlayerShroud(Guid playerId)
+    internal bool HasPlayerShroud(Guid playerId)
     {
         return _state.ActiveEffects.Any(e =>
             e.Type == ContinuousEffectType.GrantPlayerShroud
@@ -1641,7 +515,7 @@ public class GameEngine
         return null;
     }
 
-    private async Task TryAttachAuraAsync(GameCard playCard, Player player, CancellationToken ct)
+    internal async Task TryAttachAuraAsync(GameCard playCard, Player player, CancellationToken ct)
     {
         if (!CardDefinitions.TryGet(playCard.Name, out var auraDef) || !auraDef.AuraTarget.HasValue)
             return;
@@ -2650,7 +1524,7 @@ public class GameEngine
     }
 
     /// <summary>Applies EntersWithCounters from CardDefinitions immediately when a permanent enters the battlefield.</summary>
-    private void ApplyEntersWithCounters(GameCard card)
+    internal void ApplyEntersWithCounters(GameCard card)
     {
         if (CardDefinitions.TryGet(card.Name, out var def))
         {
@@ -2808,7 +1682,7 @@ public class GameEngine
     }
 
     /// <summary>Queues cast triggers from the spell itself (e.g., Emrakul extra turn on cast).</summary>
-    private Task QueueSelfCastTriggersAsync(GameCard card, Player controller, CancellationToken ct)
+    internal Task QueueSelfCastTriggersAsync(GameCard card, Player controller, CancellationToken ct)
     {
         // Check triggers on the card instance first, then fall back to CardDefinitions
         var triggers = card.Triggers.Count > 0

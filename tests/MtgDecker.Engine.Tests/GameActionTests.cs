@@ -20,11 +20,11 @@ public class GameActionTests
     }
 
     [Fact]
-    public void PlayCard_CreatesPlayAction()
+    public void PlayLand_CreatesPlayAction()
     {
-        var action = GameAction.PlayCard(_playerId, _cardId);
+        var action = GameAction.PlayLand(_playerId, _cardId);
 
-        action.Type.Should().Be(ActionType.PlayCard);
+        action.Type.Should().Be(ActionType.PlayLand);
         action.PlayerId.Should().Be(_playerId);
         action.CardId.Should().Be(_cardId);
         action.SourceZone.Should().Be(ZoneType.Hand);

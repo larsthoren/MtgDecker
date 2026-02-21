@@ -33,6 +33,9 @@ public class UpdateDeckFormatHandler : IRequestHandler<UpdateDeckFormatCommand, 
         var deck = await _deckRepository.GetByIdAsync(request.DeckId, cancellationToken)
             ?? throw new KeyNotFoundException($"Deck {request.DeckId} not found.");
 
+        if (deck.IsSystemDeck)
+            throw new InvalidOperationException("System decks cannot be modified.");
+
         deck.Format = request.Format;
         deck.UpdatedAt = _timeProvider.GetUtcNow().UtcDateTime;
         await _deckRepository.UpdateAsync(deck, cancellationToken);

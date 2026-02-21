@@ -61,7 +61,7 @@ public class OnBoardChangedIntegrationTests
     }
 
     [Fact]
-    public async Task Exploration_Allows_Two_Land_Drops_Via_PlayCard()
+    public async Task Exploration_Allows_Two_Land_Drops_Via_PlayLand()
     {
         var p1 = new Player(Guid.NewGuid(), "P1", new TestDecisionHandler());
         var p2 = new Player(Guid.NewGuid(), "P2", new TestDecisionHandler());
@@ -78,8 +78,8 @@ public class OnBoardChangedIntegrationTests
         p1.Hand.Add(land1);
         p1.Hand.Add(land2);
 
-        await engine.ExecuteAction(GameAction.PlayCard(p1.Id, land1.Id));
-        await engine.ExecuteAction(GameAction.PlayCard(p1.Id, land2.Id));
+        await engine.ExecuteAction(GameAction.PlayLand(p1.Id, land1.Id));
+        await engine.ExecuteAction(GameAction.PlayLand(p1.Id, land2.Id));
 
         p1.Battlefield.Cards.Should().HaveCount(3); // exploration + 2 lands
         p1.LandsPlayedThisTurn.Should().Be(2);

@@ -37,6 +37,9 @@ public class UpdateCardQuantityHandler : IRequestHandler<UpdateCardQuantityComma
         var deck = await _deckRepository.GetByIdAsync(request.DeckId, cancellationToken)
             ?? throw new KeyNotFoundException($"Deck {request.DeckId} not found.");
 
+        if (deck.IsSystemDeck)
+            throw new InvalidOperationException("System decks cannot be modified.");
+
         var card = await _cardRepository.GetByIdAsync(request.CardId, cancellationToken)
             ?? throw new KeyNotFoundException($"Card {request.CardId} not found.");
 

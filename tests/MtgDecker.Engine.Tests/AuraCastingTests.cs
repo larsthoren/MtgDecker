@@ -17,6 +17,7 @@ public class AuraCastingTests
         var p2 = new Player(Guid.NewGuid(), "P2", new TestDecisionHandler());
         var state = new GameState(p1, p2);
         var engine = new GameEngine(state);
+        state.CurrentPhase = Phase.MainPhase1;
 
         var forest = GameCard.Create("Forest");
         p1.Battlefield.Add(forest);
@@ -29,8 +30,9 @@ public class AuraCastingTests
         // Queue the card choice: attach to forest
         handler.EnqueueCardChoice(forest.Id);
 
-        var action = GameAction.PlayCard(p1.Id, wildGrowth.Id);
+        var action = GameAction.CastSpell(p1.Id, wildGrowth.Id);
         await engine.ExecuteAction(action);
+        await engine.ResolveAllTriggersAsync();
 
         wildGrowth.AttachedTo.Should().Be(forest.Id);
         p1.Battlefield.Cards.Should().Contain(wildGrowth);
@@ -93,6 +95,7 @@ public class AuraCastingTests
         var p2 = new Player(Guid.NewGuid(), "P2", new TestDecisionHandler());
         var state = new GameState(p1, p2);
         var engine = new GameEngine(state);
+        state.CurrentPhase = Phase.MainPhase1;
 
         // No lands on battlefield
         var wildGrowth = GameCard.Create("Wild Growth");
@@ -100,8 +103,9 @@ public class AuraCastingTests
         p1.Hand.Add(wildGrowth);
         p1.ManaPool.Add(ManaColor.Green, 1);
 
-        var action = GameAction.PlayCard(p1.Id, wildGrowth.Id);
+        var action = GameAction.CastSpell(p1.Id, wildGrowth.Id);
         await engine.ExecuteAction(action);
+        await engine.ResolveAllTriggersAsync();
 
         p1.Battlefield.Cards.Should().NotContain(wildGrowth);
         p1.Graveyard.Cards.Should().Contain(wildGrowth);

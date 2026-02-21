@@ -33,9 +33,9 @@ public class GameAction
         PlayerId = playerId
     };
 
-    public static GameAction PlayCard(Guid playerId, Guid cardId) => new()
+    public static GameAction PlayLand(Guid playerId, Guid cardId) => new()
     {
-        Type = ActionType.PlayCard,
+        Type = ActionType.PlayLand,
         PlayerId = playerId,
         CardId = cardId,
         SourceZone = ZoneType.Hand,

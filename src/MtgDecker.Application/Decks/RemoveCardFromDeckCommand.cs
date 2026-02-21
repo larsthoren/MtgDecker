@@ -34,6 +34,9 @@ public class RemoveCardFromDeckHandler : IRequestHandler<RemoveCardFromDeckComma
         var deck = await _deckRepository.GetByIdAsync(request.DeckId, cancellationToken)
             ?? throw new KeyNotFoundException($"Deck {request.DeckId} not found.");
 
+        if (deck.IsSystemDeck)
+            throw new InvalidOperationException("System decks cannot be modified.");
+
         deck.RemoveCard(request.CardId, request.Category, _timeProvider.GetUtcNow().UtcDateTime);
         await _deckRepository.UpdateAsync(deck, cancellationToken);
 

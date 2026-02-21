@@ -138,7 +138,7 @@ public class BoardWideTriggerTests
         state.Player1.ManaPool.Add(ManaColor.Green, 1);
 
         var handCountBefore = state.Player1.Hand.Count;
-        p1Handler.EnqueueAction(GameAction.PlayCard(state.Player1.Id, enchantment.Id));
+        p1Handler.EnqueueAction(GameAction.CastSpell(state.Player1.Id, enchantment.Id));
         p1Handler.EnqueueAction(GameAction.Pass(state.Player1.Id));
         p2Handler.EnqueueAction(GameAction.Pass(state.Player2.Id));
 
@@ -179,7 +179,7 @@ public class BoardWideTriggerTests
         state.Player2.Hand.Add(enchantment);
         state.Player2.ManaPool.Add(ManaColor.Green, 1);
 
-        p2Handler.EnqueueAction(GameAction.PlayCard(state.Player2.Id, enchantment.Id));
+        p2Handler.EnqueueAction(GameAction.CastSpell(state.Player2.Id, enchantment.Id));
         p2Handler.EnqueueAction(GameAction.Pass(state.Player2.Id));
         p1Handler.EnqueueAction(GameAction.Pass(state.Player1.Id));
 

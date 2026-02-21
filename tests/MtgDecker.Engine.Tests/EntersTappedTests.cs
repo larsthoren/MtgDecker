@@ -34,7 +34,7 @@ public class EntersTappedTests
         var tower = GameCard.Create("Coastal Tower", "Land");
         state.Player1.Hand.Add(tower);
 
-        await engine.ExecuteAction(GameAction.PlayCard(state.Player1.Id, tower.Id));
+        await engine.ExecuteAction(GameAction.PlayLand(state.Player1.Id, tower.Id));
 
         state.Player1.Battlefield.Cards.Should().Contain(c => c.Name == "Coastal Tower");
         tower.IsTapped.Should().BeTrue("Coastal Tower should enter the battlefield tapped");
@@ -49,7 +49,7 @@ public class EntersTappedTests
         var mountain = GameCard.Create("Mountain", "Basic Land — Mountain");
         state.Player1.Hand.Add(mountain);
 
-        await engine.ExecuteAction(GameAction.PlayCard(state.Player1.Id, mountain.Id));
+        await engine.ExecuteAction(GameAction.PlayLand(state.Player1.Id, mountain.Id));
 
         mountain.IsTapped.Should().BeFalse("basic lands should not enter tapped");
     }
@@ -63,7 +63,7 @@ public class EntersTappedTests
         var treetopVillage = GameCard.Create("Treetop Village", "Land");
         state.Player1.Hand.Add(treetopVillage);
 
-        await engine.ExecuteAction(GameAction.PlayCard(state.Player1.Id, treetopVillage.Id));
+        await engine.ExecuteAction(GameAction.PlayLand(state.Player1.Id, treetopVillage.Id));
 
         treetopVillage.IsTapped.Should().BeTrue("Treetop Village should enter the battlefield tapped");
     }
@@ -81,7 +81,8 @@ public class EntersTappedTests
         state.Player1.Hand.Add(goblin);
         state.Player1.ManaPool.Add(ManaColor.Red);
 
-        await engine.ExecuteAction(GameAction.PlayCard(state.Player1.Id, goblin.Id));
+        await engine.ExecuteAction(GameAction.CastSpell(state.Player1.Id, goblin.Id));
+        await engine.ResolveAllTriggersAsync();
 
         goblin.IsTapped.Should().BeFalse("creatures should not enter tapped");
     }

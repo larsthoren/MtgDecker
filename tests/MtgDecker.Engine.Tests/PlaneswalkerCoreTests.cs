@@ -139,7 +139,8 @@ public class PlaneswalkerCoreTests
             state.Player1.Hand.Add(pw);
 
             // Cast the planeswalker
-            await engine.ExecuteAction(GameAction.PlayCard(state.Player1.Id, pw.Id));
+            await engine.ExecuteAction(GameAction.CastSpell(state.Player1.Id, pw.Id));
+            await engine.ResolveAllTriggersAsync();
 
             // The planeswalker should be on the battlefield with loyalty counters
             state.Player1.Battlefield.Cards.Should().Contain(c => c.Id == pw.Id);

@@ -68,7 +68,8 @@ public class CostModificationTests
         p1.ManaPool.Add(ManaColor.Colorless);
         p1.ManaPool.Add(ManaColor.Colorless);
 
-        await engine.ExecuteAction(GameAction.PlayCard(p1.Id, ringleader.Id));
+        await engine.ExecuteAction(GameAction.CastSpell(p1.Id, ringleader.Id));
+        await engine.ResolveAllTriggersAsync();
 
         // Should be cast successfully with reduced cost
         p1.Hand.Cards.Should().NotContain(c => c.Name == "Goblin Ringleader");
@@ -95,7 +96,8 @@ public class CostModificationTests
         // Only 1 green mana — not enough for {1}{G} without reduction
         p1.ManaPool.Add(ManaColor.Green);
 
-        await engine.ExecuteAction(GameAction.PlayCard(p1.Id, naturalize.Id));
+        await engine.ExecuteAction(GameAction.CastSpell(p1.Id, naturalize.Id));
+        await engine.ResolveAllTriggersAsync();
 
         // Should NOT be cast — still in hand
         p1.Hand.Cards.Should().Contain(c => c.Name == "Naturalize");
@@ -161,7 +163,8 @@ public class CostModificationTests
         p1.ManaPool.Add(ManaColor.Red);
         p1.ManaPool.Add(ManaColor.Colorless);
 
-        await engine.ExecuteAction(GameAction.PlayCard(p1.Id, ringleader.Id));
+        await engine.ExecuteAction(GameAction.CastSpell(p1.Id, ringleader.Id));
+        await engine.ResolveAllTriggersAsync();
 
         // Should be cast successfully with double reduction
         p1.Hand.Cards.Should().NotContain(c => c.Name == "Goblin Ringleader");

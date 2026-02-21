@@ -160,7 +160,7 @@ public class CastSpellStackIntegrationTests
         var forest = GameCard.Create("Forest", "Basic Land — Forest");
         state.Player1.Hand.Add(forest);
 
-        await engine.ExecuteAction(GameAction.PlayCard(state.Player1.Id, forest.Id));
+        await engine.ExecuteAction(GameAction.PlayLand(state.Player1.Id, forest.Id));
 
         state.Stack.Should().BeEmpty();
         state.Player1.Battlefield.Cards.Should().Contain(c => c.Id == forest.Id);

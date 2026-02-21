@@ -893,7 +893,7 @@
         if (_selectedCard == null) return;
         if (_selectedCard.IsLand)
         {
-            await OnAction.InvokeAsync(GameAction.PlayCard(LocalPlayer.Id, _selectedCard.Id));
+            await OnAction.InvokeAsync(GameAction.PlayLand(LocalPlayer.Id, _selectedCard.Id));
             ClearSelection();
             return;
         }

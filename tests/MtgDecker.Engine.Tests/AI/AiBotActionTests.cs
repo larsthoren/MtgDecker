@@ -26,7 +26,7 @@ public class AiBotActionTests
 
         var action = await ((AiBotDecisionHandler)player.DecisionHandler).GetAction(state, player.Id);
 
-        action.Type.Should().Be(ActionType.PlayCard);
+        action.Type.Should().Be(ActionType.PlayLand);
         action.CardId.Should().Be(mountain.Id);
     }
 
@@ -130,7 +130,7 @@ public class AiBotActionTests
 
         var action = await ((AiBotDecisionHandler)player.DecisionHandler).GetAction(state, player.Id);
 
-        action.Type.Should().Be(ActionType.PlayCard);
+        action.Type.Should().Be(ActionType.PlayLand);
         action.CardId.Should().Be(mountain.Id);
     }
 
@@ -199,7 +199,7 @@ public class AiBotActionTests
 
         var action = await bot.GetAction(state, p2.Id);
 
-        action.Type.Should().Be(ActionType.PlayCard);
+        action.Type.Should().Be(ActionType.PlayLand);
         action.CardId.Should().Be(mountain.Id);
     }
 

@@ -63,4 +63,20 @@ public class UpdateDeckFormatCommandTests
         var result = validator.Validate(new UpdateDeckFormatCommand(Guid.NewGuid(), Format.Legacy));
         result.IsValid.Should().BeTrue();
     }
+
+    [Fact]
+    public async Task Handle_SystemDeck_ThrowsInvalidOperationException()
+    {
+        var deckId = Guid.NewGuid();
+        var systemDeck = new Deck { Id = deckId, Name = "System", UserId = null };
+        _deckRepo.GetByIdAsync(deckId, Arg.Any<CancellationToken>())
+            .Returns(systemDeck);
+
+        var act = () => _handler.Handle(
+            new UpdateDeckFormatCommand(deckId, Format.Modern),
+            CancellationToken.None);
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("System decks cannot be modified.");
+    }
 }

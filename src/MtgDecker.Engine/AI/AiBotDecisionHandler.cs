@@ -52,7 +52,7 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
             if (land != null)
             {
                 await DelayAsync(ct);
-                return GameAction.PlayCard(playerId, land.Id);
+                return GameAction.PlayLand(playerId, land.Id);
             }
         }
 
@@ -128,11 +128,7 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
         if (castable != null)
         {
             await DelayAsync(ct);
-            // Use CastSpell for cards in the registry (proper stack/mana flow),
-            // fall back to PlayCard for unregistered cards with ManaCost (immediate mana payment)
-            if (CardDefinitions.TryGet(castable.Name, out _))
-                return GameAction.CastSpell(playerId, castable.Id);
-            return GameAction.PlayCard(playerId, castable.Id);
+            return GameAction.CastSpell(playerId, castable.Id);
         }
 
         // Priority 5: Cycling — if a card can be cycled but not cast, cycle it

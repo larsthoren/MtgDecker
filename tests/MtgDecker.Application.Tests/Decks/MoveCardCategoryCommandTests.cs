@@ -62,4 +62,20 @@ public class MoveCardCategoryCommandTests
 
         await act.Should().ThrowAsync<KeyNotFoundException>();
     }
+
+    [Fact]
+    public async Task Handle_SystemDeck_ThrowsInvalidOperationException()
+    {
+        var deckId = Guid.NewGuid();
+        var systemDeck = new Deck { Id = deckId, Name = "System", UserId = null };
+        _deckRepo.GetByIdAsync(deckId, Arg.Any<CancellationToken>())
+            .Returns(systemDeck);
+
+        var act = () => _handler.Handle(
+            new MoveCardCategoryCommand(deckId, Guid.NewGuid(), DeckCategory.Maybeboard, DeckCategory.MainDeck),
+            CancellationToken.None);
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("System decks cannot be modified.");
+    }
 }

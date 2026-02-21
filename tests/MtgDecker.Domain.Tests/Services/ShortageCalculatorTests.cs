@@ -32,7 +32,7 @@ public class ShortageCalculatorTests
         var deck = CreateDeckWithEntry(card, quantity: 4);
         var collection = new List<CollectionEntry>
         {
-            new() { CardId = card.Id, Quantity = 2, UserId = deck.UserId }
+            new() { CardId = card.Id, Quantity = 2, UserId = deck.UserId!.Value }
         };
 
         var shortages = ShortageCalculator.Calculate(deck, collection, cardLookup: new[] { card });
@@ -49,7 +49,7 @@ public class ShortageCalculatorTests
         var deck = CreateDeckWithEntry(card, quantity: 4);
         var collection = new List<CollectionEntry>
         {
-            new() { CardId = card.Id, Quantity = 4, UserId = deck.UserId }
+            new() { CardId = card.Id, Quantity = 4, UserId = deck.UserId!.Value }
         };
 
         var shortages = ShortageCalculator.Calculate(deck, collection, cardLookup: new[] { card });
@@ -66,7 +66,7 @@ public class ShortageCalculatorTests
         var deck = CreateDeckWithEntry(deckCard, quantity: 4);
         var collection = new List<CollectionEntry>
         {
-            new() { CardId = ownedCard.Id, Quantity = 3, UserId = deck.UserId }
+            new() { CardId = ownedCard.Id, Quantity = 3, UserId = deck.UserId!.Value }
         };
 
         var shortages = ShortageCalculator.Calculate(
@@ -86,7 +86,7 @@ public class ShortageCalculatorTests
         var deck = CreateDeckWithEntries(card, mainDeckQty: 4, sideboardQty: 2);
         var collection = new List<CollectionEntry>
         {
-            new() { CardId = card.Id, Quantity = 3, UserId = deck.UserId }
+            new() { CardId = card.Id, Quantity = 3, UserId = deck.UserId!.Value }
         };
 
         var shortages = ShortageCalculator.Calculate(deck, collection, cardLookup: new[] { card });
@@ -108,7 +108,7 @@ public class ShortageCalculatorTests
         var deck = CreateDeckWithEntries(card, mainDeckQty: 4, sideboardQty: 2);
         var collection = new List<CollectionEntry>
         {
-            new() { CardId = card.Id, Quantity = 6, UserId = deck.UserId }
+            new() { CardId = card.Id, Quantity = 6, UserId = deck.UserId!.Value }
         };
 
         var shortages = ShortageCalculator.Calculate(deck, collection, cardLookup: new[] { card });

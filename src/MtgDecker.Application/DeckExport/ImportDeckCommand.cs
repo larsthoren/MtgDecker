@@ -11,7 +11,7 @@ public record ImportDeckCommand(
     string ParserFormat,
     string DeckName,
     Format DeckFormat,
-    Guid UserId) : IRequest<ImportDeckResult>;
+    Guid? UserId) : IRequest<ImportDeckResult>;
 
 public class ImportDeckValidator : AbstractValidator<ImportDeckCommand>
 {
@@ -21,7 +21,6 @@ public class ImportDeckValidator : AbstractValidator<ImportDeckCommand>
         RuleFor(x => x.ParserFormat).NotEmpty();
         RuleFor(x => x.DeckName).NotEmpty().MaximumLength(200);
         RuleFor(x => x.DeckFormat).IsInEnum();
-        RuleFor(x => x.UserId).NotEmpty();
     }
 }
 

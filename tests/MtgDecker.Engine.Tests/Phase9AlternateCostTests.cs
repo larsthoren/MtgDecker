@@ -483,10 +483,10 @@ public class Phase9AlternateCostTests
         state.Player1.Hand.Add(mox);
         state.Player1.Hand.Add(forest);
 
-        // Mox costs {0} — play it via PlayCard
-        await engine.ExecuteAction(GameAction.PlayCard(state.Player1.Id, mox.Id));
+        // Mox costs {0} — cast it via CastSpell
+        await engine.ExecuteAction(GameAction.CastSpell(state.Player1.Id, mox.Id));
 
-        // Resolve the ETB trigger
+        // Resolve the stack (spell resolution + ETB trigger)
         await engine.ResolveAllTriggersAsync();
 
         // Forest should be discarded
@@ -508,9 +508,9 @@ public class Phase9AlternateCostTests
         state.Player1.Hand.Add(mox);
         // No lands in hand
 
-        await engine.ExecuteAction(GameAction.PlayCard(state.Player1.Id, mox.Id));
+        await engine.ExecuteAction(GameAction.CastSpell(state.Player1.Id, mox.Id));
 
-        // Resolve the ETB trigger
+        // Resolve the stack (spell resolution + ETB trigger)
         await engine.ResolveAllTriggersAsync();
 
         // Mox should be in graveyard (sacrificed)
@@ -531,7 +531,7 @@ public class Phase9AlternateCostTests
         state.Player1.Hand.Add(mox);
         state.Player1.Hand.Add(forest);
 
-        await engine.ExecuteAction(GameAction.PlayCard(state.Player1.Id, mox.Id));
+        await engine.ExecuteAction(GameAction.CastSpell(state.Player1.Id, mox.Id));
         await engine.ResolveAllTriggersAsync();
 
         // Mox should be on battlefield

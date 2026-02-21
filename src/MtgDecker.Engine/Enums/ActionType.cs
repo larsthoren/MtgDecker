@@ -3,7 +3,7 @@ namespace MtgDecker.Engine.Enums;
 public enum ActionType
 {
     PassPriority,
-    PlayCard,
+    PlayLand,
     TapCard,
     UntapCard,
     CastSpell,

@@ -36,7 +36,7 @@ public class StackTurnIntegrationTests
         // Draw: P1 passes (P2 auto-passes)
         h1.EnqueueAction(GameAction.Pass(p1.Id));
         // MainPhase1: play land, tap for mana, cast creature via stack
-        h1.EnqueueAction(GameAction.PlayCard(p1.Id, mountain.Id));
+        h1.EnqueueAction(GameAction.PlayLand(p1.Id, mountain.Id));
         h1.EnqueueAction(GameAction.TapCard(p1.Id, mountain.Id));
         h1.EnqueueAction(GameAction.CastSpell(p1.Id, goblin.Id));
         // After cast, P1 passes priority; P2 auto-passes -> stack resolves

@@ -19,14 +19,16 @@ public class GameEngineActionExecutionTests
     }
 
     [Fact]
-    public async Task ExecuteAction_PlayCard_MovesFromHandToBattlefield()
+    public async Task ExecuteAction_CastSpell_MovesFromHandToBattlefield()
     {
         var engine = CreateEngine(out var state, out var p1);
+        state.CurrentPhase = Phase.MainPhase1;
         var card = GameCard.Create("Goblin Lackey", "Creature — Goblin");
         p1.Hand.Add(card);
         p1.ManaPool.Add(ManaColor.Red, 1);
 
-        await engine.ExecuteAction(GameAction.PlayCard(p1.Id, card.Id));
+        await engine.ExecuteAction(GameAction.CastSpell(p1.Id, card.Id));
+        await engine.ResolveAllTriggersAsync();
 
         p1.Hand.Count.Should().Be(0);
         p1.Battlefield.Count.Should().Be(1);
@@ -34,14 +36,16 @@ public class GameEngineActionExecutionTests
     }
 
     [Fact]
-    public async Task ExecuteAction_PlayCard_LogsAction()
+    public async Task ExecuteAction_CastSpell_LogsAction()
     {
         var engine = CreateEngine(out var state, out var p1);
+        state.CurrentPhase = Phase.MainPhase1;
         var card = GameCard.Create("Goblin Lackey", "Creature — Goblin");
         p1.Hand.Add(card);
         p1.ManaPool.Add(ManaColor.Red, 1);
 
-        await engine.ExecuteAction(GameAction.PlayCard(p1.Id, card.Id));
+        await engine.ExecuteAction(GameAction.CastSpell(p1.Id, card.Id));
+        await engine.ResolveAllTriggersAsync();
 
         state.GameLog.Should().Contain(msg => msg.Contains("Alice") && msg.Contains("Goblin Lackey"));
     }
@@ -104,7 +108,7 @@ public class GameEngineActionExecutionTests
         var engine = CreateEngine(out _, out _);
         var unknownId = Guid.NewGuid();
 
-        var act = () => engine.ExecuteAction(GameAction.PlayCard(unknownId, Guid.NewGuid()));
+        var act = () => engine.ExecuteAction(GameAction.CastSpell(unknownId, Guid.NewGuid()));
 
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage($"*{unknownId}*");
