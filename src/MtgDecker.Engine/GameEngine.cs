@@ -15,6 +15,7 @@ public class GameEngine
     {
         _state = state;
         _handlers[ActionType.UntapCard] = new UntapCardHandler();
+        _handlers[ActionType.Cycle] = new CycleHandler();
     }
 
     public async Task StartGameAsync(CancellationToken ct = default)
@@ -929,47 +930,6 @@ public class GameEngine
                 };
                 _state.StackPush(stackObj);
                 _state.Log($"{abilitySource.Name}'s ability is put on the stack.");
-
-                player.ActionHistory.Push(action);
-                break;
-            }
-
-            case ActionType.Cycle:
-            {
-                var cycleCard = player.Hand.Cards.FirstOrDefault(c => c.Id == action.CardId);
-                if (cycleCard == null) break;
-
-                if (!CardDefinitions.TryGet(cycleCard.Name, out var cycleDef) || cycleDef.CyclingCost == null)
-                {
-                    _state.Log($"{cycleCard.Name} cannot be cycled.");
-                    break;
-                }
-
-                var cyclingCost = cycleDef.CyclingCost;
-                if (!player.ManaPool.CanPay(cyclingCost))
-                {
-                    _state.Log($"Cannot cycle {cycleCard.Name} — not enough mana.");
-                    break;
-                }
-
-                // Pay mana using ManaPool.Pay (handles colored + generic)
-                player.ManaPool.Pay(cyclingCost);
-                player.PendingManaTaps.Clear();
-
-                // Discard to graveyard
-                player.Hand.RemoveById(cycleCard.Id);
-                player.Graveyard.Add(cycleCard);
-
-                // Draw a card
-                DrawCards(player, 1);
-                _state.Log($"{player.Name} cycles {cycleCard.Name}.");
-
-                // Queue cycling triggers on stack
-                foreach (var trigger in cycleDef.CyclingTriggers)
-                {
-                    _state.Log($"{cycleCard.Name} triggers: {trigger.Effect.GetType().Name.Replace("Effect", "")}");
-                    _state.StackPush(new TriggeredAbilityStackObject(cycleCard, player.Id, trigger.Effect));
-                }
 
                 player.ActionHistory.Push(action);
                 break;
