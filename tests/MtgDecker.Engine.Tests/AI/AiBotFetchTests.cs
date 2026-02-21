@@ -58,7 +58,7 @@ public class AiBotFetchTests
 
         var action = await bot.GetAction(state, player.Id);
 
-        action.Type.Should().Be(ActionType.PlayCard);
+        action.Type.Should().Be(ActionType.PlayLand);
         action.CardId.Should().Be(handLand.Id);
     }
 
