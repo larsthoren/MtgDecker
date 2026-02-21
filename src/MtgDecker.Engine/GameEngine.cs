@@ -17,6 +17,7 @@ public class GameEngine
         _handlers[ActionType.UntapCard] = new UntapCardHandler();
         _handlers[ActionType.Cycle] = new CycleHandler();
         _handlers[ActionType.ActivateFetch] = new ActivateFetchHandler();
+        _handlers[ActionType.ActivateLoyaltyAbility] = new ActivateLoyaltyAbilityHandler();
     }
 
     public async Task StartGameAsync(CancellationToken ct = default)
@@ -1034,82 +1035,6 @@ public class GameEngine
 
                 _state.Log($"{fbPlayer.Name} casts {fbCard.Name} (flashback).");
                 await QueueBoardTriggersOnStackAsync(GameEvent.SpellCast, fbCard, ct);
-                break;
-            }
-
-            case ActionType.ActivateLoyaltyAbility:
-            {
-                var pwCard = player.Battlefield.Cards.FirstOrDefault(c => c.Id == action.CardId);
-                if (pwCard == null || !pwCard.IsPlaneswalker) break;
-
-                // Must be sorcery speed
-                if (!CanCastSorcery(player.Id))
-                {
-                    _state.Log($"Cannot activate {pwCard.Name} — not at sorcery speed.");
-                    break;
-                }
-
-                // One loyalty ability per planeswalker per turn
-                if (player.PlaneswalkerAbilitiesUsedThisTurn.Contains(pwCard.Id))
-                {
-                    _state.Log($"{pwCard.Name} has already activated a loyalty ability this turn.");
-                    break;
-                }
-
-                // Get card definition and validate ability index
-                // For transformed cards, check BackFaceDefinition first (back face name isn't in CardDefinitions)
-                CardDefinition? pwDef = null;
-                if (pwCard.IsTransformed && pwCard.BackFaceDefinition?.LoyaltyAbilities != null)
-                    pwDef = pwCard.BackFaceDefinition;
-                else if (CardDefinitions.TryGet(pwCard.Name, out var registeredDef))
-                    pwDef = registeredDef;
-
-                if (pwDef?.LoyaltyAbilities == null)
-                {
-                    _state.Log($"{pwCard.Name} has no loyalty abilities.");
-                    break;
-                }
-
-                var abilityIdx = action.AbilityIndex ?? -1;
-                if (abilityIdx < 0 || abilityIdx >= pwDef.LoyaltyAbilities.Count)
-                {
-                    _state.Log($"Invalid loyalty ability index for {pwCard.Name}.");
-                    break;
-                }
-
-                var loyaltyAbility = pwDef.LoyaltyAbilities[abilityIdx];
-
-                // Check loyalty cost is payable (negative costs: loyalty + cost >= 0)
-                if (loyaltyAbility.LoyaltyCost < 0 && pwCard.Loyalty + loyaltyAbility.LoyaltyCost < 0)
-                {
-                    _state.Log($"Not enough loyalty to activate {pwCard.Name} ({loyaltyAbility.Description}).");
-                    break;
-                }
-
-                // Pay loyalty cost
-                if (loyaltyAbility.LoyaltyCost > 0)
-                {
-                    pwCard.AddCounters(CounterType.Loyalty, loyaltyAbility.LoyaltyCost);
-                }
-                else if (loyaltyAbility.LoyaltyCost < 0)
-                {
-                    for (int i = 0; i < -loyaltyAbility.LoyaltyCost; i++)
-                        pwCard.RemoveCounter(CounterType.Loyalty);
-                }
-
-                // Mark as used this turn
-                player.PlaneswalkerAbilitiesUsedThisTurn.Add(pwCard.Id);
-
-                // Push to stack — default target is opponent (for damage/effect abilities)
-                var opponent = _state.GetOpponent(player);
-                var loyaltyStackObj = new ActivatedLoyaltyAbilityStackObject(
-                    pwCard, player.Id, loyaltyAbility.Effect, loyaltyAbility.Description)
-                {
-                    TargetPlayerId = opponent.Id,
-                };
-                _state.StackPush(loyaltyStackObj);
-
-                _state.Log($"{player.Name} activates {pwCard.Name}: {loyaltyAbility.Description}");
                 break;
             }
 
