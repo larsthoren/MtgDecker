@@ -28,6 +28,14 @@ public class DeckRepository : IDeckRepository
             .ToListAsync(ct);
     }
 
+    public async Task<List<Deck>> ListSystemDecksAsync(CancellationToken ct = default)
+    {
+        return await _context.Decks
+            .Where(d => d.UserId == null)
+            .OrderBy(d => d.Name)
+            .ToListAsync(ct);
+    }
+
     public async Task AddAsync(Deck deck, CancellationToken ct = default)
     {
         _context.Decks.Add(deck);
