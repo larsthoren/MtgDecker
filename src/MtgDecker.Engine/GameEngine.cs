@@ -20,6 +20,7 @@ public class GameEngine
         _handlers[ActionType.ActivateLoyaltyAbility] = new ActivateLoyaltyAbilityHandler();
         _handlers[ActionType.PlayCard] = new PlayCardHandler();
         _handlers[ActionType.CastAdventure] = new CastAdventureHandler();
+        _handlers[ActionType.Ninjutsu] = new NinjutsuHandler();
     }
 
     public async Task StartGameAsync(CancellationToken ct = default)
@@ -952,99 +953,6 @@ public class GameEngine
 
                 _state.Log($"{fbPlayer.Name} casts {fbCard.Name} (flashback).");
                 await QueueBoardTriggersOnStackAsync(GameEvent.SpellCast, fbCard, ct);
-                break;
-            }
-
-            case ActionType.Ninjutsu:
-            {
-                // Ninjutsu: pay cost, return unblocked attacker to hand, put ninja on battlefield tapped and attacking
-                var ninjutsuPlayer = _state.GetPlayer(action.PlayerId);
-                var ninjaCard = ninjutsuPlayer.Hand.Cards.FirstOrDefault(c => c.Id == action.CardId);
-                if (ninjaCard == null)
-                {
-                    _state.Log("Ninjutsu card not found in hand.");
-                    break;
-                }
-
-                // Must have NinjutsuCost registered
-                if (!CardDefinitions.TryGet(ninjaCard.Name, out var ninjutsuDef) || ninjutsuDef.NinjutsuCost == null)
-                {
-                    _state.Log($"{ninjaCard.Name} does not have ninjutsu.");
-                    break;
-                }
-
-                // Must be during combat, after blockers declared
-                if (_state.CurrentPhase != Phase.Combat || _state.Combat == null
-                    || _state.CombatStep < CombatStep.DeclareBlockers)
-                {
-                    _state.Log("Ninjutsu can only be activated during combat after blockers are declared.");
-                    break;
-                }
-
-                // Return creature must be an unblocked attacker you control
-                var returnCreatureId = action.ReturnCardId;
-                if (!returnCreatureId.HasValue)
-                {
-                    _state.Log("No creature specified to return.");
-                    break;
-                }
-
-                var returnCreature = ninjutsuPlayer.Battlefield.Cards.FirstOrDefault(c => c.Id == returnCreatureId.Value);
-                if (returnCreature == null)
-                {
-                    _state.Log("Return creature not found on battlefield.");
-                    break;
-                }
-
-                // Must be attacking and unblocked
-                if (!_state.Combat.Attackers.Contains(returnCreature.Id))
-                {
-                    _state.Log($"{returnCreature.Name} is not attacking.");
-                    break;
-                }
-
-                if (_state.Combat.IsBlocked(returnCreature.Id))
-                {
-                    _state.Log($"{returnCreature.Name} is blocked — cannot use ninjutsu.");
-                    break;
-                }
-
-                // Must be able to pay ninjutsu cost
-                var ninjutsuCost = ninjutsuDef.NinjutsuCost;
-                if (!ninjutsuPlayer.ManaPool.CanPay(ninjutsuCost))
-                {
-                    _state.Log($"Not enough mana to activate ninjutsu for {ninjaCard.Name}.");
-                    break;
-                }
-
-                // Pay ninjutsu cost
-                await PayManaCostAsync(ninjutsuCost, ninjutsuPlayer, ct);
-                ninjutsuPlayer.PendingManaTaps.Clear();
-
-                // Return attacker to hand
-                ninjutsuPlayer.Battlefield.RemoveById(returnCreature.Id);
-                returnCreature.IsTapped = false;
-                returnCreature.DamageMarked = 0;
-                ninjutsuPlayer.Hand.Add(returnCreature);
-                _state.Combat.RemoveAttacker(returnCreature.Id);
-
-                // Put ninja on battlefield tapped and attacking
-                ninjutsuPlayer.Hand.RemoveById(ninjaCard.Id);
-                ninjaCard.IsTapped = true;
-                ninjaCard.TurnEnteredBattlefield = _state.TurnNumber;
-                ninjutsuPlayer.Battlefield.Add(ninjaCard);
-
-                // Apply enters-with-counters (loyalty, +1/+1, etc.)
-                ApplyEntersWithCounters(ninjaCard);
-
-                // Add to combat as attacker
-                _state.Combat.DeclareAttacker(ninjaCard.Id);
-
-                // Fire ETB triggers
-                await QueueSelfTriggersOnStackAsync(GameEvent.EnterBattlefield, ninjaCard, ninjutsuPlayer, ct);
-                await OnBoardChangedAsync(ct);
-
-                _state.Log($"{ninjutsuPlayer.Name} activates ninjutsu: {returnCreature.Name} returns to hand, {ninjaCard.Name} enters attacking.");
                 break;
             }
 
