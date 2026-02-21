@@ -1,6 +1,7 @@
 using MtgDecker.Engine.Enums;
 using MtgDecker.Engine.Mana;
 using MtgDecker.Engine.Triggers;
+using MtgDecker.Engine.Actions;
 
 namespace MtgDecker.Engine;
 
@@ -8,6 +9,7 @@ public class GameEngine
 {
     private readonly GameState _state;
     private readonly TurnStateMachine _turnStateMachine = new();
+    private readonly Dictionary<ActionType, IActionHandler> _handlers = new();
 
     public GameEngine(GameState state)
     {
@@ -183,6 +185,13 @@ public class GameEngine
     {
         if (action.PlayerId != _state.Player1.Id && action.PlayerId != _state.Player2.Id)
             throw new InvalidOperationException($"Unknown player ID: {action.PlayerId}");
+
+        // Dispatch to extracted handler if available
+        if (_handlers.TryGetValue(action.Type, out var handler))
+        {
+            await handler.ExecuteAsync(action, this, _state, ct);
+            return;
+        }
 
         var player = _state.GetPlayer(action.PlayerId);
 
@@ -1512,7 +1521,7 @@ public class GameEngine
         return true;
     }
 
-    private async Task PayAlternateCostAsync(AlternateCost alt, Player player, GameCard castCard, CancellationToken ct)
+    internal async Task PayAlternateCostAsync(AlternateCost alt, Player player, GameCard castCard, CancellationToken ct)
     {
         // Pay life
         if (alt.LifeCost > 0)
@@ -1592,7 +1601,7 @@ public class GameEngine
         }
     }
 
-    private bool HasShroud(GameCard card) => card.ActiveKeywords.Contains(Keyword.Shroud);
+    internal bool HasShroud(GameCard card) => card.ActiveKeywords.Contains(Keyword.Shroud);
 
     private bool HasHexproof(GameCard card) => card.ActiveKeywords.Contains(Keyword.Hexproof);
 
@@ -1600,7 +1609,7 @@ public class GameEngine
     /// Returns true if the card cannot be targeted by the given player.
     /// Shroud prevents all targeting; Hexproof prevents only opponent targeting.
     /// </summary>
-    private bool CannotBeTargetedBy(GameCard card, Player caster)
+    internal bool CannotBeTargetedBy(GameCard card, Player caster)
     {
         if (HasShroud(card)) return true;
         if (HasHexproof(card))
@@ -1620,7 +1629,7 @@ public class GameEngine
         return null;
     }
 
-    private bool HasPlayerShroud(Guid playerId)
+    internal bool HasPlayerShroud(Guid playerId)
     {
         return _state.ActiveEffects.Any(e =>
             e.Type == ContinuousEffectType.GrantPlayerShroud
@@ -1641,7 +1650,7 @@ public class GameEngine
         return null;
     }
 
-    private async Task TryAttachAuraAsync(GameCard playCard, Player player, CancellationToken ct)
+    internal async Task TryAttachAuraAsync(GameCard playCard, Player player, CancellationToken ct)
     {
         if (!CardDefinitions.TryGet(playCard.Name, out var auraDef) || !auraDef.AuraTarget.HasValue)
             return;
@@ -2650,7 +2659,7 @@ public class GameEngine
     }
 
     /// <summary>Applies EntersWithCounters from CardDefinitions immediately when a permanent enters the battlefield.</summary>
-    private void ApplyEntersWithCounters(GameCard card)
+    internal void ApplyEntersWithCounters(GameCard card)
     {
         if (CardDefinitions.TryGet(card.Name, out var def))
         {
@@ -2808,7 +2817,7 @@ public class GameEngine
     }
 
     /// <summary>Queues cast triggers from the spell itself (e.g., Emrakul extra turn on cast).</summary>
-    private Task QueueSelfCastTriggersAsync(GameCard card, Player controller, CancellationToken ct)
+    internal Task QueueSelfCastTriggersAsync(GameCard card, Player controller, CancellationToken ct)
     {
         // Check triggers on the card instance first, then fall back to CardDefinitions
         var triggers = card.Triggers.Count > 0
