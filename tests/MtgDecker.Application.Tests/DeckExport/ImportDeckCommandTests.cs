@@ -1,4 +1,5 @@
 using FluentAssertions;
+using FluentValidation.TestHelper;
 using NSubstitute;
 using MtgDecker.Application.DeckExport;
 using MtgDecker.Application.Interfaces;
@@ -127,5 +128,32 @@ public class ImportDeckCommandTests
         result.Deck.Entries.Should().HaveCount(2);
         result.Deck.Entries.Should().Contain(e => e.CardId == bolt.Id && e.Category == DeckCategory.MainDeck);
         result.Deck.Entries.Should().Contain(e => e.CardId == guide.Id && e.Category == DeckCategory.Sideboard);
+    }
+
+    [Fact]
+    public async Task Handle_NullUserId_CreatesDeckWithNullUserId()
+    {
+        var card = new Card { Id = Guid.NewGuid(), Name = "Lightning Bolt", TypeLine = "Instant" };
+        _mtgoParser.Parse(Arg.Any<string>()).Returns(new ParsedDeck
+        {
+            MainDeck = new List<ParsedDeckEntry> { new() { Quantity = 4, CardName = "Lightning Bolt" } }
+        });
+        _cardRepo.GetByNamesAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>())
+            .Returns(new List<Card> { card });
+
+        var result = await _handler.Handle(
+            new ImportDeckCommand("4 Lightning Bolt", "MTGO", "System Deck", Format.Legacy, null),
+            CancellationToken.None);
+
+        result.Deck.UserId.Should().BeNull();
+    }
+
+    [Fact]
+    public void Validator_NullUserId_Passes()
+    {
+        var validator = new ImportDeckValidator();
+        var command = new ImportDeckCommand("some text", "MTGO", "Test", Format.Modern, null);
+        var result = validator.TestValidate(command);
+        result.ShouldNotHaveAnyValidationErrors();
     }
 }
