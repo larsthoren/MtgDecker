@@ -586,6 +586,28 @@
         </div>
     }
 
+    @* Phyrexian mana payment prompt *@
+    @if (Handler?.IsWaitingForPhyrexianPayment == true)
+    {
+        <div class="prompt-overlay">
+            <MudPaper Class="pa-3 mb-2" Elevation="2" Style="background: var(--mud-palette-surface);">
+                <MudText Typo="Typo.body1" Class="mb-2">
+                    Pay @FormatPhyrexianColor(Handler.PhyrexianPaymentColor!.Value) mana or 2 life?
+                </MudText>
+                <MudStack Row="true" Spacing="2">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
+                               OnClick="@(() => Handler.SubmitPhyrexianPayment(true))">
+                        Pay Mana
+                    </MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Error" Size="Size.Small"
+                               OnClick="@(() => Handler.SubmitPhyrexianPayment(false))">
+                        Pay 2 Life
+                    </MudButton>
+                </MudStack>
+            </MudPaper>
+        </div>
+    }
+
     @* Blocker assignment prompt (when blocker selected, show attackers to assign to) *@
     @if (Handler?.IsWaitingForBlockers == true && IsLocalDefending && _selectedBlocker != null && Handler?.CurrentAttackers != null)
     {
@@ -902,7 +924,15 @@
         if (_selectedCard.ManaCost != null && !LocalPlayer.ManaPool.CanPay(_selectedCard.ManaCost))
         {
             // Check for alternate cost — let engine handle the choice
-            if (CardDefinitions.TryGet(_selectedCard.Name, out var def) && def.AlternateCost != null)
+            if (CardDefinitions.TryGet(_selectedCard.Name, out var altDef) && altDef.AlternateCost != null)
+            {
+                await OnAction.InvokeAsync(GameAction.CastSpell(LocalPlayer.Id, _selectedCard.Id));
+                ClearSelection();
+                return;
+            }
+
+            // Check for Phyrexian mana cost — let engine handle payment prompts
+            if (_selectedCard.ManaCost.HasPhyrexianCost)
             {
                 await OnAction.InvokeAsync(GameAction.CastSpell(LocalPlayer.Id, _selectedCard.Id));
                 ClearSelection();
@@ -1108,4 +1138,14 @@
         (ManaColor.White, "W"), (ManaColor.Blue, "U"), (ManaColor.Black, "B"),
         (ManaColor.Red, "R"), (ManaColor.Green, "G"), (ManaColor.Colorless, "C")
     ];
+
+    private static string FormatPhyrexianColor(ManaColor color) => color switch
+    {
+        ManaColor.White => "White",
+        ManaColor.Blue => "Blue",
+        ManaColor.Black => "Black",
+        ManaColor.Red => "Red",
+        ManaColor.Green => "Green",
+        _ => color.ToString()
+    };
 }
