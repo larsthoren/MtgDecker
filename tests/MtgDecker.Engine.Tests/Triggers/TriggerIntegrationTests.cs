@@ -25,6 +25,7 @@ public class TriggerIntegrationTests
     {
         var (engine, state, p1Handler, p2Handler) = CreateSetup();
         await engine.StartGameAsync();
+        state.CurrentPhase = Phase.MainPhase1;
 
         var commander = new GameCard
         {
@@ -61,6 +62,7 @@ public class TriggerIntegrationTests
     {
         var (engine, state, p1Handler, p2Handler) = CreateSetup();
         await engine.StartGameAsync();
+        state.CurrentPhase = Phase.MainPhase1;
 
         var bear = new GameCard
         {

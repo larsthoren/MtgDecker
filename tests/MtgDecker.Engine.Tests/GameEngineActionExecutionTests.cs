@@ -19,9 +19,10 @@ public class GameEngineActionExecutionTests
     }
 
     [Fact]
-    public async Task ExecuteAction_PlayCard_MovesFromHandToBattlefield()
+    public async Task ExecuteAction_CastSpell_MovesFromHandToBattlefield()
     {
         var engine = CreateEngine(out var state, out var p1);
+        state.CurrentPhase = Phase.MainPhase1;
         var card = GameCard.Create("Goblin Lackey", "Creature — Goblin");
         p1.Hand.Add(card);
         p1.ManaPool.Add(ManaColor.Red, 1);
@@ -35,9 +36,10 @@ public class GameEngineActionExecutionTests
     }
 
     [Fact]
-    public async Task ExecuteAction_PlayCard_LogsAction()
+    public async Task ExecuteAction_CastSpell_LogsAction()
     {
         var engine = CreateEngine(out var state, out var p1);
+        state.CurrentPhase = Phase.MainPhase1;
         var card = GameCard.Create("Goblin Lackey", "Creature — Goblin");
         p1.Hand.Add(card);
         p1.ManaPool.Add(ManaColor.Red, 1);

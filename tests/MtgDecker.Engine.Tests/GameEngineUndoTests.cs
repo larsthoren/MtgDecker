@@ -93,7 +93,7 @@ public class GameEngineUndoTests
     }
 
     [Fact]
-    public async Task Undo_PlayCard_Rejected()
+    public async Task Undo_PlayLand_Rejected()
     {
         var engine = CreateEngine(out var state, out var p1, out _);
         var land = GameCard.Create("Forest", "Basic Land — Forest");
@@ -221,7 +221,8 @@ public class GameEngineUndoTests
     [Fact]
     public async Task PendingManaTaps_ClearedOnPlaySpell()
     {
-        var engine = CreateEngine(out _, out var p1, out _);
+        var engine = CreateEngine(out var state, out var p1, out _);
+        state.CurrentPhase = Phase.MainPhase1;
         var mountain = GameCard.Create("Mountain", "Basic Land — Mountain");
         mountain.ManaAbility = ManaAbility.Fixed(ManaColor.Red);
         p1.Battlefield.Add(mountain);
@@ -229,7 +230,7 @@ public class GameEngineUndoTests
         await engine.ExecuteAction(GameAction.TapCard(p1.Id, mountain.Id));
         p1.PendingManaTaps.Should().Contain(mountain.Id);
 
-        // Play a creature using PlayCard (which pays mana)
+        // Cast a creature using CastSpell (which pays mana)
         var goblin = GameCard.Create("Goblin Lackey", "Creature — Goblin");
         p1.Hand.Add(goblin);
 

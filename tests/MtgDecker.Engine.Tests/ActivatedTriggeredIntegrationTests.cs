@@ -149,6 +149,10 @@ public class ActivatedTriggeredIntegrationTests
         for (int i = 0; i < 5; i++)
             p2.Library.Add(new GameCard { Name = $"P2Card{i}" });
 
+        // Pass through Upkeep and Draw phases before Main Phase 1
+        handler.EnqueueAction(GameAction.Pass(p1.Id)); // upkeep
+        handler.EnqueueAction(GameAction.Pass(p1.Id)); // draw
+
         // Main phase 1 actions: tap 4 mountains, then cast Pyromancer, then pass
         foreach (var mtn in mountains)
             handler.EnqueueAction(GameAction.TapCard(p1.Id, mtn.Id));

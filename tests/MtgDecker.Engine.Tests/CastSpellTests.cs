@@ -110,6 +110,7 @@ public class CastSpellTests
     {
         var (engine, state, _) = CreateSetup();
         await engine.StartGameAsync();
+        state.CurrentPhase = Phase.MainPhase1;
 
         var goblin = GameCard.Create("Goblin Lackey", "Creature — Goblin");
         state.Player1.Hand.Add(goblin);
@@ -144,6 +145,7 @@ public class CastSpellTests
     {
         var (engine, state, _) = CreateSetup();
         await engine.StartGameAsync();
+        state.CurrentPhase = Phase.MainPhase1;
 
         var goblin = GameCard.Create("Goblin Lackey", "Creature — Goblin");
         state.Player1.Hand.Add(goblin);
@@ -160,6 +162,11 @@ public class CastSpellTests
     {
         var (engine, state, _) = CreateSetup();
         await engine.StartGameAsync();
+        state.CurrentPhase = Phase.MainPhase1;
+
+        // Swords to Plowshares needs a creature target
+        var target = new GameCard { Name = "Bear", CardTypes = CardType.Creature, BasePower = 2, BaseToughness = 2 };
+        state.Player2.Battlefield.Add(target);
 
         var swords = GameCard.Create("Swords to Plowshares", "Instant");
         state.Player1.Hand.Add(swords);
@@ -177,6 +184,7 @@ public class CastSpellTests
     {
         var (engine, state, _) = CreateSetup();
         await engine.StartGameAsync();
+        state.CurrentPhase = Phase.MainPhase1;
 
         var replenish = GameCard.Create("Replenish", "Sorcery");
         state.Player1.Hand.Add(replenish);
@@ -194,6 +202,7 @@ public class CastSpellTests
     {
         var (engine, state, handler) = CreateSetup();
         await engine.StartGameAsync();
+        state.CurrentPhase = Phase.MainPhase1;
 
         // Goblin Piledriver: {1}{R} — need 1R + 1 generic
         var piledriver = GameCard.Create("Goblin Piledriver", "Creature — Goblin");
@@ -217,6 +226,7 @@ public class CastSpellTests
     {
         var (engine, state, _) = CreateSetup();
         await engine.StartGameAsync();
+        state.CurrentPhase = Phase.MainPhase1;
 
         // Goblin Piledriver: {1}{R} — give exactly {R}{R}: after color, only R=1 left
         var piledriver = GameCard.Create("Goblin Piledriver", "Creature — Goblin");
@@ -235,6 +245,7 @@ public class CastSpellTests
     {
         var (engine, state, _) = CreateSetup();
         await engine.StartGameAsync();
+        state.CurrentPhase = Phase.MainPhase1;
 
         var goblin = GameCard.Create("Goblin Lackey", "Creature — Goblin");
         state.Player1.Hand.Add(goblin);
@@ -253,6 +264,7 @@ public class CastSpellTests
     {
         var (engine, state, _) = CreateSetup();
         await engine.StartGameAsync();
+        state.CurrentPhase = Phase.MainPhase1;
 
         var card = GameCard.Create("Unknown Creature", "Creature — Mystery");
         state.Player1.Hand.Add(card);
@@ -262,7 +274,7 @@ public class CastSpellTests
 
         state.Player1.Battlefield.Cards.Should().NotContain(c => c.Id == card.Id);
         state.Player1.Hand.Cards.Should().Contain(c => c.Id == card.Id);
-        state.GameLog.Should().Contain(l => l.Contains("not supported"));
+        state.GameLog.Should().Contain(l => l.Contains("no mana cost defined"));
     }
 
     // === Task 3: Generic payment validation ===
@@ -272,6 +284,7 @@ public class CastSpellTests
     {
         var (engine, state, handler) = CreateSetup();
         await engine.StartGameAsync();
+        state.CurrentPhase = Phase.MainPhase1;
 
         // Goblin Piledriver costs {1}{R}
         var piledriver = GameCard.Create("Goblin Piledriver", "Creature — Goblin");

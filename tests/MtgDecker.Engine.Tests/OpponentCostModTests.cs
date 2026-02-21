@@ -123,6 +123,7 @@ public class OpponentCostModTests
         p1.ManaPool.Add(ManaColor.Colorless, 1);
 
         state.ActivePlayer = p1;
+        state.CurrentPhase = Phase.MainPhase1;
         var action = GameAction.CastSpell(p1.Id, enchantment.Id);
         await engine.ExecuteAction(action);
         await engine.ResolveAllTriggersAsync();
@@ -160,6 +161,7 @@ public class OpponentCostModTests
         p2.ManaPool.Add(ManaColor.Colorless, 1);
 
         state.ActivePlayer = p2;
+        state.CurrentPhase = Phase.MainPhase1;
         var action = GameAction.CastSpell(p2.Id, creature.Id);
         await engine.ExecuteAction(action);
         await engine.ResolveAllTriggersAsync();
@@ -195,6 +197,7 @@ public class OpponentCostModTests
         p2.ManaPool.Add(ManaColor.Colorless, 3);
 
         state.ActivePlayer = p2;
+        state.CurrentPhase = Phase.MainPhase1;
         var action = GameAction.CastSpell(p2.Id, enchantment.Id);
         await engine.ExecuteAction(action);
         await engine.ResolveAllTriggersAsync();

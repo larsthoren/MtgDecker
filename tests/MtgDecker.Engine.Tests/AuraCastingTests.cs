@@ -17,6 +17,7 @@ public class AuraCastingTests
         var p2 = new Player(Guid.NewGuid(), "P2", new TestDecisionHandler());
         var state = new GameState(p1, p2);
         var engine = new GameEngine(state);
+        state.CurrentPhase = Phase.MainPhase1;
 
         var forest = GameCard.Create("Forest");
         p1.Battlefield.Add(forest);
@@ -94,6 +95,7 @@ public class AuraCastingTests
         var p2 = new Player(Guid.NewGuid(), "P2", new TestDecisionHandler());
         var state = new GameState(p1, p2);
         var engine = new GameEngine(state);
+        state.CurrentPhase = Phase.MainPhase1;
 
         // No lands on battlefield
         var wildGrowth = GameCard.Create("Wild Growth");
