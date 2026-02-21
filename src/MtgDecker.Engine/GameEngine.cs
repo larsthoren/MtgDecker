@@ -16,6 +16,7 @@ public class GameEngine
         _state = state;
         _handlers[ActionType.UntapCard] = new UntapCardHandler();
         _handlers[ActionType.Cycle] = new CycleHandler();
+        _handlers[ActionType.ActivateFetch] = new ActivateFetchHandler();
     }
 
     public async Task StartGameAsync(CancellationToken ct = default)
@@ -442,60 +443,6 @@ public class GameEngine
                 }
                 break;
 
-
-            case ActionType.ActivateFetch:
-            {
-                var fetchLand = player.Battlefield.Cards.FirstOrDefault(c => c.Id == action.CardId);
-                if (fetchLand == null || fetchLand.IsTapped) break;
-
-                var fetchDef = CardDefinitions.TryGet(fetchLand.Name, out var fd) ? fd : null;
-                var fetchAbility = fetchDef?.FetchAbility ?? fetchLand.FetchAbility;
-                if (fetchAbility == null) break;
-
-                // Pay costs: 1 life + sacrifice
-                player.AdjustLife(-1);
-                await FireLeaveBattlefieldTriggersAsync(fetchLand, player, ct);
-                player.Battlefield.RemoveById(fetchLand.Id);
-                player.Graveyard.Add(fetchLand);
-                _state.Log($"{player.Name} sacrifices {fetchLand.Name}, pays 1 life ({player.Life}).");
-
-                // Search library for matching land
-                var searchTypes = fetchAbility.SearchTypes;
-                var eligible = player.Library.Cards
-                    .Where(c => c.IsLand && searchTypes.Any(t =>
-                        c.Subtypes.Contains(t) || c.Name.Equals(t, StringComparison.OrdinalIgnoreCase)))
-                    .ToList();
-
-                if (eligible.Count > 0)
-                {
-                    var chosenId = await player.DecisionHandler.ChooseCard(
-                        eligible, $"Search for a land ({string.Join(" or ", searchTypes)})",
-                        optional: true, ct);
-
-                    if (chosenId != null)
-                    {
-                        var land = player.Library.RemoveById(chosenId.Value);
-                        if (land != null)
-                        {
-                            player.Battlefield.Add(land);
-                            land.TurnEnteredBattlefield = _state.TurnNumber;
-                            if (land.EntersTapped) land.IsTapped = true;
-                            _state.Log($"{player.Name} fetches {land.Name}.");
-                            ApplyEntersWithCounters(land);
-                            await QueueSelfTriggersOnStackAsync(GameEvent.EnterBattlefield, land, player, ct);
-                            await OnBoardChangedAsync(ct);
-                        }
-                    }
-                }
-                else
-                {
-                    _state.Log($"{player.Name} finds no matching land.");
-                }
-
-                player.Library.Shuffle();
-                player.ActionHistory.Push(action);
-                break;
-            }
 
             case ActionType.CastSpell:
             {
