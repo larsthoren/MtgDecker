@@ -28,8 +28,8 @@ public class BowmastersEffectTests
     {
         var (context, controller, opponent, state, handler) = CreateContext();
 
-        // No target creature chosen — damage goes to opponent
-        handler.EnqueueCardChoice(null); // decline creature target
+        // Target opponent player
+        handler.EnqueueTarget(new TargetInfo(Guid.Empty, opponent.Id, ZoneType.None));
 
         var effect = new BowmastersEffect();
         await effect.Execute(context);
@@ -60,7 +60,7 @@ public class BowmastersEffectTests
         opponent.Battlefield.Add(targetCreature);
 
         // Choose the creature as target
-        handler.EnqueueCardChoice(targetCreature.Id);
+        handler.EnqueueTarget(new TargetInfo(targetCreature.Id, opponent.Id, ZoneType.Battlefield));
 
         var effect = new BowmastersEffect();
         await effect.Execute(context);
@@ -90,7 +90,7 @@ public class BowmastersEffectTests
         army.AddCounters(CounterType.PlusOnePlusOne, 2);
         controller.Battlefield.Add(army);
 
-        handler.EnqueueCardChoice(null); // target opponent
+        handler.EnqueueTarget(new TargetInfo(Guid.Empty, opponent.Id, ZoneType.None)); // target opponent
 
         var effect = new BowmastersEffect();
         await effect.Execute(context);
