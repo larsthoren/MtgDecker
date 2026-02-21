@@ -4,7 +4,7 @@ namespace MtgDecker.Engine.Triggers.Effects;
 
 /// <summary>
 /// Orcish Bowmasters' combined effect: amass Orcs 1, then deal 1 damage to any target.
-/// Target selection happens during resolution via the decision handler.
+/// Target selection happens during resolution via ChooseTarget (board targeting UI).
 /// </summary>
 public class BowmastersEffect : IEffect
 {
@@ -15,8 +15,10 @@ public class BowmastersEffect : IEffect
         await amass.Execute(context, ct);
 
         // Step 2: Deal 1 damage to any target (creature or player)
-        // Get all eligible creature targets (exclude shroud and opponent hexproof)
-        var eligibleCreatures = context.State.Player1.Battlefield.Cards
+        var opponent = context.State.GetOpponent(context.Controller);
+
+        // Build eligible targets: all creatures (excluding shroud / opponent hexproof) + both players
+        var eligibleTargets = context.State.Player1.Battlefield.Cards
             .Concat(context.State.Player2.Battlefield.Cards)
             .Where(c => c.IsCreature
                 && !c.ActiveKeywords.Contains(Keyword.Shroud)
@@ -24,42 +26,60 @@ public class BowmastersEffect : IEffect
                     && !context.Controller.Battlefield.Contains(c.Id)))
             .ToList();
 
-        GameCard? targetCreature = null;
-        if (eligibleCreatures.Count > 0)
+        // Add player sentinel cards so the UI player info bars are clickable
+        eligibleTargets.Add(new GameCard { Id = Guid.Empty, Name = context.Controller.Name });
+        eligibleTargets.Add(new GameCard { Id = Guid.Empty, Name = opponent.Name });
+
+        // Mandatory targeting — no optional parameter
+        var target = await context.DecisionHandler.ChooseTarget(
+            "Orcish Bowmasters", eligibleTargets, opponent.Id, ct);
+
+        if (target != null && target.CardId != Guid.Empty)
         {
-            var chosenId = await context.DecisionHandler.ChooseCard(
-                eligibleCreatures,
-                "Choose target for Orcish Bowmasters (1 damage), or decline to target opponent",
-                optional: true, ct);
+            // Creature target
+            var creature = context.State.Player1.Battlefield.Cards
+                .Concat(context.State.Player2.Battlefield.Cards)
+                .FirstOrDefault(c => c.Id == target.CardId);
 
-            if (chosenId.HasValue)
-                targetCreature = eligibleCreatures.FirstOrDefault(c => c.Id == chosenId.Value);
-        }
-
-        if (targetCreature != null)
-        {
-            targetCreature.DamageMarked += 1;
-            context.State.Log($"{context.Source.Name} deals 1 damage to {targetCreature.Name}.");
-        }
-        else
-        {
-            // Default: deal 1 damage to opponent (respecting damage prevention)
-            var opponent = context.State.GetOpponent(context.Controller);
-
-            var hasDamageProtection = context.State.ActiveEffects.Any(e =>
-                e.Type == ContinuousEffectType.PreventDamageToPlayer
-                && (context.State.Player1.Battlefield.Contains(e.SourceId)
-                    ? context.State.Player1 : context.State.Player2).Id == opponent.Id);
-
-            if (hasDamageProtection)
+            if (creature != null)
             {
-                context.State.Log($"Damage to {opponent.Name} is prevented (protection).");
+                creature.DamageMarked += 1;
+                context.State.Log($"{context.Source.Name} deals 1 damage to {creature.Name}.");
             }
             else
             {
-                opponent.AdjustLife(-1);
-                context.State.Log($"{context.Source.Name} deals 1 damage to {opponent.Name}. ({opponent.Life} life)");
+                // Creature no longer on battlefield — fall back to opponent
+                DealDamageToPlayer(context, opponent);
             }
+        }
+        else if (target != null && target.CardId == Guid.Empty && target.Zone == ZoneType.None)
+        {
+            // Player target
+            var targetPlayer = context.State.GetPlayer(target.PlayerId);
+            DealDamageToPlayer(context, targetPlayer);
+        }
+        else
+        {
+            // Defensive fallback (shouldn't happen since targeting is mandatory)
+            DealDamageToPlayer(context, opponent);
+        }
+    }
+
+    private static void DealDamageToPlayer(EffectContext context, Player player)
+    {
+        var hasDamageProtection = context.State.ActiveEffects.Any(e =>
+            e.Type == ContinuousEffectType.PreventDamageToPlayer
+            && (context.State.Player1.Battlefield.Contains(e.SourceId)
+                ? context.State.Player1 : context.State.Player2).Id == player.Id);
+
+        if (hasDamageProtection)
+        {
+            context.State.Log($"Damage to {player.Name} is prevented (protection).");
+        }
+        else
+        {
+            player.AdjustLife(-1);
+            context.State.Log($"{context.Source.Name} deals 1 damage to {player.Name}. ({player.Life} life)");
         }
     }
 }

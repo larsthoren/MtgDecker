@@ -87,8 +87,8 @@ public class OrcishBowmastersTests
         // Bowmasters should be on the stack
         state.StackCount.Should().BeGreaterThanOrEqualTo(1);
 
-        // Enqueue card choice for BowmastersEffect: decline creature target → hit opponent
-        h1.EnqueueCardChoice(null);
+        // Target opponent player for BowmastersEffect damage
+        h1.EnqueueTarget(new TargetInfo(Guid.Empty, p2.Id, ZoneType.None));
 
         // Resolve the stack: spell resolves → creature ETB → BowmastersEffect resolves
         await engine.ResolveAllTriggersAsync();
@@ -160,8 +160,8 @@ public class OrcishBowmastersTests
         // Put a card in opponent's library so they can draw
         p2.Library.Add(GameCard.Create("Island", "Basic Land — Island"));
 
-        // Decline creature target → hit opponent
-        h1.EnqueueCardChoice(null);
+        // Target opponent player for BowmastersEffect damage
+        h1.EnqueueTarget(new TargetInfo(Guid.Empty, p2.Id, ZoneType.None));
 
         // Opponent draws extra card
         engine.DrawCards(p2, 1);
