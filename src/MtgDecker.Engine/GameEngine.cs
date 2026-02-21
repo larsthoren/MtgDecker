@@ -19,6 +19,7 @@ public class GameEngine
         _handlers[ActionType.ActivateFetch] = new ActivateFetchHandler();
         _handlers[ActionType.ActivateLoyaltyAbility] = new ActivateLoyaltyAbilityHandler();
         _handlers[ActionType.PlayCard] = new PlayCardHandler();
+        _handlers[ActionType.CastAdventure] = new CastAdventureHandler();
     }
 
     public async Task StartGameAsync(CancellationToken ct = default)
@@ -1047,97 +1048,6 @@ public class GameEngine
                 break;
             }
 
-            case ActionType.CastAdventure:
-            {
-                var advPlayer = _state.GetPlayer(action.PlayerId);
-                var advCard = advPlayer.Hand.Cards.FirstOrDefault(c => c.Id == action.CardId);
-                if (advCard == null)
-                {
-                    _state.Log("Card not found in hand.");
-                    return;
-                }
-
-                if (!CardDefinitions.TryGet(advCard.Name, out var advDef) || advDef.Adventure == null)
-                {
-                    _state.Log($"{advCard.Name} has no adventure.");
-                    return;
-                }
-
-                var adventure = advDef.Adventure;
-
-                // Check timing: adventure instants at instant speed, adventure sorceries at sorcery speed
-                // Brazen Borrower's Petty Theft is an instant, so check if the adventure's effect type
-                // For simplicity: if the main card has flash or the card is an instant, allow at instant speed
-                bool advIsInstant = advDef.CardTypes.HasFlag(CardType.Instant) || advDef.HasFlash;
-                if (!advIsInstant && !CanCastSorcery(advPlayer.Id))
-                {
-                    _state.Log($"Cannot cast {adventure.Name} at this time (sorcery-speed only).");
-                    return;
-                }
-
-                // Apply cost modification from continuous effects
-                var advEffectiveCost = adventure.Cost;
-                var advCostReduction = ComputeCostModification(advCard, advPlayer);
-                if (advCostReduction != 0)
-                    advEffectiveCost = advEffectiveCost.WithGenericReduction(-advCostReduction);
-
-                if (!advPlayer.ManaPool.CanPay(advEffectiveCost))
-                {
-                    _state.Log($"Not enough mana to cast {adventure.Name}.");
-                    return;
-                }
-
-                // Find targets if the adventure has a target filter
-                var advTargets = new List<TargetInfo>();
-                if (adventure.Filter != null)
-                {
-                    var advOpponent = _state.GetOpponent(advPlayer);
-                    var advEligible = new List<GameCard>();
-
-                    foreach (var c in advPlayer.Battlefield.Cards)
-                        if (adventure.Filter.IsLegal(c, ZoneType.Battlefield) && !CannotBeTargetedBy(c, advPlayer))
-                            advEligible.Add(c);
-                    foreach (var c in advOpponent.Battlefield.Cards)
-                        if (adventure.Filter.IsLegal(c, ZoneType.Battlefield) && !CannotBeTargetedBy(c, advPlayer))
-                            advEligible.Add(c);
-
-                    if (advEligible.Count == 0)
-                    {
-                        _state.Log($"No legal targets for {adventure.Name}.");
-                        return;
-                    }
-
-                    var advTarget = await advPlayer.DecisionHandler.ChooseTarget(
-                        adventure.Name, advEligible, advOpponent.Id, ct);
-
-                    if (advTarget == null)
-                    {
-                        _state.Log($"{advPlayer.Name} cancels casting {adventure.Name}.");
-                        return;
-                    }
-
-                    advTargets.Add(advTarget);
-                }
-
-                // Pay mana cost
-                var advManaPaid = await PayManaCostAsync(advEffectiveCost, advPlayer, ct);
-                advPlayer.PendingManaTaps.Clear();
-
-                // Move card from hand to stack
-                advPlayer.Hand.RemoveById(advCard.Id);
-                var advStackObj = new StackObject(advCard, advPlayer.Id, advManaPaid, advTargets, _state.StackCount)
-                {
-                    IsAdventure = true,
-                };
-                _state.StackPush(advStackObj);
-
-                action.ManaCostPaid = advEffectiveCost;
-                advPlayer.ActionHistory.Push(action);
-
-                _state.Log($"{advPlayer.Name} casts {adventure.Name} (adventure of {advCard.Name}).");
-                await QueueBoardTriggersOnStackAsync(GameEvent.SpellCast, advCard, ct);
-                break;
-            }
         }
     }
 
