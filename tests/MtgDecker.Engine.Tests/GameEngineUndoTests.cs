@@ -99,7 +99,7 @@ public class GameEngineUndoTests
         var land = GameCard.Create("Forest", "Basic Land — Forest");
         p1.Hand.Add(land);
 
-        await engine.ExecuteAction(GameAction.PlayCard(p1.Id, land.Id));
+        await engine.ExecuteAction(GameAction.PlayLand(p1.Id, land.Id));
 
         var result = engine.UndoLastAction(p1.Id);
 
@@ -233,9 +233,10 @@ public class GameEngineUndoTests
         var goblin = GameCard.Create("Goblin Lackey", "Creature — Goblin");
         p1.Hand.Add(goblin);
 
-        await engine.ExecuteAction(GameAction.PlayCard(p1.Id, goblin.Id));
+        await engine.ExecuteAction(GameAction.CastSpell(p1.Id, goblin.Id));
+        await engine.ResolveAllTriggersAsync();
 
-        p1.PendingManaTaps.Should().BeEmpty("pending taps should be cleared when mana is spent via PlayCard");
+        p1.PendingManaTaps.Should().BeEmpty("pending taps should be cleared when mana is spent via CastSpell");
     }
 
     [Fact]

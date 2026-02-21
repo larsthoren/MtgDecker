@@ -45,7 +45,7 @@ public class TriggerIntegrationTests
         state.Player1.ManaPool.Add(MtgDecker.Engine.Enums.ManaColor.Red, 5);
 
         // Cast it
-        p1Handler.EnqueueAction(GameAction.PlayCard(state.Player1.Id, commander.Id));
+        p1Handler.EnqueueAction(GameAction.CastSpell(state.Player1.Id, commander.Id));
         p1Handler.EnqueueAction(GameAction.Pass(state.Player1.Id));
         p2Handler.EnqueueAction(GameAction.Pass(state.Player2.Id));
 
@@ -73,7 +73,7 @@ public class TriggerIntegrationTests
         state.Player1.Hand.Add(bear);
         state.Player1.ManaPool.Add(MtgDecker.Engine.Enums.ManaColor.Green, 2);
 
-        p1Handler.EnqueueAction(GameAction.PlayCard(state.Player1.Id, bear.Id));
+        p1Handler.EnqueueAction(GameAction.CastSpell(state.Player1.Id, bear.Id));
         p1Handler.EnqueueAction(GameAction.Pass(state.Player1.Id));
         p2Handler.EnqueueAction(GameAction.Pass(state.Player2.Id));
 

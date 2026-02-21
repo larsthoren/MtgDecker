@@ -26,7 +26,8 @@ public class GameEngineActionExecutionTests
         p1.Hand.Add(card);
         p1.ManaPool.Add(ManaColor.Red, 1);
 
-        await engine.ExecuteAction(GameAction.PlayCard(p1.Id, card.Id));
+        await engine.ExecuteAction(GameAction.CastSpell(p1.Id, card.Id));
+        await engine.ResolveAllTriggersAsync();
 
         p1.Hand.Count.Should().Be(0);
         p1.Battlefield.Count.Should().Be(1);
@@ -41,7 +42,8 @@ public class GameEngineActionExecutionTests
         p1.Hand.Add(card);
         p1.ManaPool.Add(ManaColor.Red, 1);
 
-        await engine.ExecuteAction(GameAction.PlayCard(p1.Id, card.Id));
+        await engine.ExecuteAction(GameAction.CastSpell(p1.Id, card.Id));
+        await engine.ResolveAllTriggersAsync();
 
         state.GameLog.Should().Contain(msg => msg.Contains("Alice") && msg.Contains("Goblin Lackey"));
     }
@@ -104,7 +106,7 @@ public class GameEngineActionExecutionTests
         var engine = CreateEngine(out _, out _);
         var unknownId = Guid.NewGuid();
 
-        var act = () => engine.ExecuteAction(GameAction.PlayCard(unknownId, Guid.NewGuid()));
+        var act = () => engine.ExecuteAction(GameAction.CastSpell(unknownId, Guid.NewGuid()));
 
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage($"*{unknownId}*");

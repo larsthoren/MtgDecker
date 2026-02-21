@@ -62,8 +62,8 @@ public class ActivatedTriggeredIntegrationTests
         p1.Hand.Add(enchantment);
         p1.ManaPool.Add(ManaColor.Green);
 
-        await engine.ExecuteAction(GameAction.PlayCard(p1.Id, enchantment.Id));
-        // Triggers now queue on the stack — resolve them so the draw trigger fires
+        await engine.ExecuteAction(GameAction.CastSpell(p1.Id, enchantment.Id));
+        // Resolve the stack so the spell resolves and triggers fire
         await engine.ResolveAllTriggersAsync();
 
         // Enchantress should have triggered and drawn a card
@@ -152,7 +152,7 @@ public class ActivatedTriggeredIntegrationTests
         // Main phase 1 actions: tap 4 mountains, then cast Pyromancer, then pass
         foreach (var mtn in mountains)
             handler.EnqueueAction(GameAction.TapCard(p1.Id, mtn.Id));
-        handler.EnqueueAction(GameAction.PlayCard(p1.Id, pyro.Id));
+        handler.EnqueueAction(GameAction.CastSpell(p1.Id, pyro.Id));
         handler.EnqueueAction(GameAction.Pass(p1.Id)); // main1 done
         handler.EnqueueAction(GameAction.Pass(p1.Id)); // main2 done
 

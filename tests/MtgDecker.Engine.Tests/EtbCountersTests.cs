@@ -29,7 +29,8 @@ public class EtbCountersTests
         state.Player1.Hand.Add(wave);
 
         // Cast Parallax Wave
-        await engine.ExecuteAction(GameAction.PlayCard(state.Player1.Id, wave.Id));
+        await engine.ExecuteAction(GameAction.CastSpell(state.Player1.Id, wave.Id));
+        await engine.ResolveAllTriggersAsync();
 
         // Counters should be present IMMEDIATELY — no need to resolve triggers
         wave.GetCounters(CounterType.Fade).Should().Be(5,
@@ -53,7 +54,8 @@ public class EtbCountersTests
         var wave = GameCard.Create("Parallax Wave", "Enchantment");
         state.Player1.Hand.Add(wave);
 
-        await engine.ExecuteAction(GameAction.PlayCard(state.Player1.Id, wave.Id));
+        await engine.ExecuteAction(GameAction.CastSpell(state.Player1.Id, wave.Id));
+        await engine.ResolveAllTriggersAsync();
 
         // The stack should NOT contain an AddCountersEffect trigger for Parallax Wave
         // (The ETB counter placement should be immediate, not a triggered ability)
@@ -80,7 +82,7 @@ public class EtbCountersTests
         state.Player1.Hand.Add(mine);
 
         // Play Gemstone Mine as a land drop
-        await engine.ExecuteAction(GameAction.PlayCard(state.Player1.Id, mine.Id));
+        await engine.ExecuteAction(GameAction.PlayLand(state.Player1.Id, mine.Id));
 
         // Counters should be present IMMEDIATELY — no need to resolve triggers
         mine.GetCounters(CounterType.Mining).Should().Be(3,
@@ -101,7 +103,7 @@ public class EtbCountersTests
         var mine = GameCard.Create("Gemstone Mine", "Land");
         state.Player1.Hand.Add(mine);
 
-        await engine.ExecuteAction(GameAction.PlayCard(state.Player1.Id, mine.Id));
+        await engine.ExecuteAction(GameAction.PlayLand(state.Player1.Id, mine.Id));
 
         // The stack should be empty — no trigger should be queued for counter placement
         state.StackCount.Should().Be(0,
@@ -127,7 +129,8 @@ public class EtbCountersTests
         state.Player1.Hand.Add(wave);
 
         // Cast Parallax Wave
-        await engine.ExecuteAction(GameAction.PlayCard(state.Player1.Id, wave.Id));
+        await engine.ExecuteAction(GameAction.CastSpell(state.Player1.Id, wave.Id));
+        await engine.ResolveAllTriggersAsync();
 
         // Resolve any triggers (should be none for counters, but resolve anyway to be safe)
         await engine.ResolveAllTriggersAsync();

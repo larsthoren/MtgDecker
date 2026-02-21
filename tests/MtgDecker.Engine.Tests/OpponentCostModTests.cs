@@ -53,8 +53,9 @@ public class OpponentCostModTests
         p2.ManaPool.Add(ManaColor.Colorless, 1);
 
         state.ActivePlayer = p2;
-        var action = GameAction.PlayCard(p2.Id, enchantment.Id);
+        var action = GameAction.CastSpell(p2.Id, enchantment.Id);
         await engine.ExecuteAction(action);
+        await engine.ResolveAllTriggersAsync();
 
         // Card should still be in hand (not enough mana)
         p2.Hand.Cards.Should().Contain(c => c.Name == "Test Enchantment");
@@ -88,8 +89,9 @@ public class OpponentCostModTests
         p2.ManaPool.Add(ManaColor.Colorless, 2);
 
         state.ActivePlayer = p2;
-        var action = GameAction.PlayCard(p2.Id, artifact.Id);
+        var action = GameAction.CastSpell(p2.Id, artifact.Id);
         await engine.ExecuteAction(action);
+        await engine.ResolveAllTriggersAsync();
 
         // Card should still be in hand (not enough mana)
         p2.Hand.Cards.Should().Contain(c => c.Name == "Test Artifact");
@@ -121,8 +123,9 @@ public class OpponentCostModTests
         p1.ManaPool.Add(ManaColor.Colorless, 1);
 
         state.ActivePlayer = p1;
-        var action = GameAction.PlayCard(p1.Id, enchantment.Id);
+        var action = GameAction.CastSpell(p1.Id, enchantment.Id);
         await engine.ExecuteAction(action);
+        await engine.ResolveAllTriggersAsync();
 
         // Card should be on battlefield (enough mana without tax)
         p1.Battlefield.Cards.Should().Contain(c => c.Name == "Test Enchantment");
@@ -157,8 +160,9 @@ public class OpponentCostModTests
         p2.ManaPool.Add(ManaColor.Colorless, 1);
 
         state.ActivePlayer = p2;
-        var action = GameAction.PlayCard(p2.Id, creature.Id);
+        var action = GameAction.CastSpell(p2.Id, creature.Id);
         await engine.ExecuteAction(action);
+        await engine.ResolveAllTriggersAsync();
 
         // Card should be on battlefield (creature is not taxed)
         p2.Battlefield.Cards.Should().Contain(c => c.Name == "Test Creature");
@@ -191,8 +195,9 @@ public class OpponentCostModTests
         p2.ManaPool.Add(ManaColor.Colorless, 3);
 
         state.ActivePlayer = p2;
-        var action = GameAction.PlayCard(p2.Id, enchantment.Id);
+        var action = GameAction.CastSpell(p2.Id, enchantment.Id);
         await engine.ExecuteAction(action);
+        await engine.ResolveAllTriggersAsync();
 
         // Card should be on battlefield (enough mana with tax)
         p2.Battlefield.Cards.Should().Contain(c => c.Name == "Test Enchantment");

@@ -36,7 +36,7 @@ public class CastSpellTests
         var forest = GameCard.Create("Forest", "Basic Land — Forest");
         state.Player1.Hand.Add(forest);
 
-        await engine.ExecuteAction(GameAction.PlayCard(state.Player1.Id, forest.Id));
+        await engine.ExecuteAction(GameAction.PlayLand(state.Player1.Id, forest.Id));
 
         state.Player1.Battlefield.Cards.Should().Contain(c => c.Id == forest.Id);
         state.Player1.Hand.Cards.Should().NotContain(c => c.Id == forest.Id);
@@ -51,7 +51,7 @@ public class CastSpellTests
         var forest = GameCard.Create("Forest", "Basic Land — Forest");
         state.Player1.Hand.Add(forest);
 
-        await engine.ExecuteAction(GameAction.PlayCard(state.Player1.Id, forest.Id));
+        await engine.ExecuteAction(GameAction.PlayLand(state.Player1.Id, forest.Id));
 
         state.Player1.LandsPlayedThisTurn.Should().Be(1);
     }
@@ -67,8 +67,8 @@ public class CastSpellTests
         state.Player1.Hand.Add(forest1);
         state.Player1.Hand.Add(forest2);
 
-        await engine.ExecuteAction(GameAction.PlayCard(state.Player1.Id, forest1.Id));
-        await engine.ExecuteAction(GameAction.PlayCard(state.Player1.Id, forest2.Id));
+        await engine.ExecuteAction(GameAction.PlayLand(state.Player1.Id, forest1.Id));
+        await engine.ExecuteAction(GameAction.PlayLand(state.Player1.Id, forest2.Id));
 
         state.Player1.Battlefield.Cards.Where(c => c.Name == "Forest").Should().HaveCount(1);
         state.Player1.Hand.Cards.Should().Contain(c => c.Id == forest2.Id);
@@ -84,7 +84,7 @@ public class CastSpellTests
         var forest = GameCard.Create("Forest", "Basic Land — Forest");
         state.Player1.Hand.Add(forest);
 
-        await engine.ExecuteAction(GameAction.PlayCard(state.Player1.Id, forest.Id));
+        await engine.ExecuteAction(GameAction.PlayLand(state.Player1.Id, forest.Id));
 
         state.Player1.ManaPool.Total.Should().Be(3, "playing a land should not cost mana");
     }
@@ -98,7 +98,7 @@ public class CastSpellTests
         var forest = GameCard.Create("Forest", "Basic Land — Forest");
         state.Player1.Hand.Add(forest);
 
-        await engine.ExecuteAction(GameAction.PlayCard(state.Player1.Id, forest.Id));
+        await engine.ExecuteAction(GameAction.PlayLand(state.Player1.Id, forest.Id));
 
         state.GameLog.Should().Contain(m => m.Contains("land drop"));
     }
@@ -115,7 +115,8 @@ public class CastSpellTests
         state.Player1.Hand.Add(goblin);
         state.Player1.ManaPool.Add(ManaColor.Red, 1);
 
-        await engine.ExecuteAction(GameAction.PlayCard(state.Player1.Id, goblin.Id));
+        await engine.ExecuteAction(GameAction.CastSpell(state.Player1.Id, goblin.Id));
+        await engine.ResolveAllTriggersAsync();
 
         state.Player1.ManaPool.Total.Should().Be(0);
         state.Player1.Battlefield.Cards.Should().Contain(c => c.Id == goblin.Id);
@@ -131,7 +132,8 @@ public class CastSpellTests
         state.Player1.Hand.Add(goblin);
         // No mana in pool
 
-        await engine.ExecuteAction(GameAction.PlayCard(state.Player1.Id, goblin.Id));
+        await engine.ExecuteAction(GameAction.CastSpell(state.Player1.Id, goblin.Id));
+        await engine.ResolveAllTriggersAsync();
 
         state.Player1.Hand.Cards.Should().Contain(c => c.Id == goblin.Id);
         state.Player1.Battlefield.Cards.Should().NotContain(c => c.Id == goblin.Id);
@@ -147,7 +149,8 @@ public class CastSpellTests
         state.Player1.Hand.Add(goblin);
         state.Player1.ManaPool.Add(ManaColor.Red, 1);
 
-        await engine.ExecuteAction(GameAction.PlayCard(state.Player1.Id, goblin.Id));
+        await engine.ExecuteAction(GameAction.CastSpell(state.Player1.Id, goblin.Id));
+        await engine.ResolveAllTriggersAsync();
 
         state.Player1.Battlefield.Cards.Should().Contain(c => c.Id == goblin.Id);
     }
@@ -162,7 +165,8 @@ public class CastSpellTests
         state.Player1.Hand.Add(swords);
         state.Player1.ManaPool.Add(ManaColor.White, 1);
 
-        await engine.ExecuteAction(GameAction.PlayCard(state.Player1.Id, swords.Id));
+        await engine.ExecuteAction(GameAction.CastSpell(state.Player1.Id, swords.Id));
+        await engine.ResolveAllTriggersAsync();
 
         state.Player1.Graveyard.Cards.Should().Contain(c => c.Id == swords.Id);
         state.Player1.Battlefield.Cards.Should().NotContain(c => c.Id == swords.Id);
@@ -178,7 +182,8 @@ public class CastSpellTests
         state.Player1.Hand.Add(replenish);
         state.Player1.ManaPool.Add(ManaColor.White, 4); // {3}{W} — need 1W + 3 generic
 
-        await engine.ExecuteAction(GameAction.PlayCard(state.Player1.Id, replenish.Id));
+        await engine.ExecuteAction(GameAction.CastSpell(state.Player1.Id, replenish.Id));
+        await engine.ResolveAllTriggersAsync();
 
         state.Player1.Graveyard.Cards.Should().Contain(c => c.Id == replenish.Id);
         state.Player1.Battlefield.Cards.Should().NotContain(c => c.Id == replenish.Id);
@@ -199,7 +204,8 @@ public class CastSpellTests
 
         handler.EnqueueGenericPayment(new Dictionary<ManaColor, int> { { ManaColor.Green, 1 } });
 
-        await engine.ExecuteAction(GameAction.PlayCard(state.Player1.Id, piledriver.Id));
+        await engine.ExecuteAction(GameAction.CastSpell(state.Player1.Id, piledriver.Id));
+        await engine.ResolveAllTriggersAsync();
 
         state.Player1.Battlefield.Cards.Should().Contain(c => c.Id == piledriver.Id);
         state.Player1.ManaPool[ManaColor.Red].Should().Be(1);
@@ -217,7 +223,8 @@ public class CastSpellTests
         state.Player1.Hand.Add(piledriver);
         state.Player1.ManaPool.Add(ManaColor.Red, 2);
 
-        await engine.ExecuteAction(GameAction.PlayCard(state.Player1.Id, piledriver.Id));
+        await engine.ExecuteAction(GameAction.CastSpell(state.Player1.Id, piledriver.Id));
+        await engine.ResolveAllTriggersAsync();
 
         state.Player1.Battlefield.Cards.Should().Contain(c => c.Id == piledriver.Id);
         state.Player1.ManaPool.Total.Should().Be(0);
@@ -233,7 +240,8 @@ public class CastSpellTests
         state.Player1.Hand.Add(goblin);
         state.Player1.ManaPool.Add(ManaColor.Red, 1);
 
-        await engine.ExecuteAction(GameAction.PlayCard(state.Player1.Id, goblin.Id));
+        await engine.ExecuteAction(GameAction.CastSpell(state.Player1.Id, goblin.Id));
+        await engine.ResolveAllTriggersAsync();
 
         state.GameLog.Should().Contain(m => m.Contains("casts"));
     }
@@ -249,7 +257,8 @@ public class CastSpellTests
         var card = GameCard.Create("Unknown Creature", "Creature — Mystery");
         state.Player1.Hand.Add(card);
 
-        await engine.ExecuteAction(GameAction.PlayCard(state.Player1.Id, card.Id));
+        await engine.ExecuteAction(GameAction.CastSpell(state.Player1.Id, card.Id));
+        await engine.ResolveAllTriggersAsync();
 
         state.Player1.Battlefield.Cards.Should().NotContain(c => c.Id == card.Id);
         state.Player1.Hand.Cards.Should().Contain(c => c.Id == card.Id);
@@ -277,7 +286,8 @@ public class CastSpellTests
             { ManaColor.Green, 1 } // Total 3 instead of 1
         });
 
-        await engine.ExecuteAction(GameAction.PlayCard(state.Player1.Id, piledriver.Id));
+        await engine.ExecuteAction(GameAction.CastSpell(state.Player1.Id, piledriver.Id));
+        await engine.ResolveAllTriggersAsync();
 
         // Card should still be cast (auto-pay fallback)
         state.Player1.Battlefield.Cards.Should().Contain(c => c.Name == "Goblin Piledriver");

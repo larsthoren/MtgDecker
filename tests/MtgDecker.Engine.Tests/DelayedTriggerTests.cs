@@ -185,7 +185,7 @@ public class DelayedTriggerTests
         state.Player1.ManaPool.Add(ManaColor.Red, 4);
 
         // Play Pyromancer, then pass everything
-        p1Handler.EnqueueAction(GameAction.PlayCard(state.Player1.Id, pyromancer.Id));
+        p1Handler.EnqueueAction(GameAction.CastSpell(state.Player1.Id, pyromancer.Id));
         EnqueuePassAll(p1Handler, state.Player1.Id);
         EnqueuePassAll(p2Handler, state.Player2.Id);
 

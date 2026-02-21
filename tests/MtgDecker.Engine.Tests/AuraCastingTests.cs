@@ -29,8 +29,9 @@ public class AuraCastingTests
         // Queue the card choice: attach to forest
         handler.EnqueueCardChoice(forest.Id);
 
-        var action = GameAction.PlayCard(p1.Id, wildGrowth.Id);
+        var action = GameAction.CastSpell(p1.Id, wildGrowth.Id);
         await engine.ExecuteAction(action);
+        await engine.ResolveAllTriggersAsync();
 
         wildGrowth.AttachedTo.Should().Be(forest.Id);
         p1.Battlefield.Cards.Should().Contain(wildGrowth);
@@ -100,8 +101,9 @@ public class AuraCastingTests
         p1.Hand.Add(wildGrowth);
         p1.ManaPool.Add(ManaColor.Green, 1);
 
-        var action = GameAction.PlayCard(p1.Id, wildGrowth.Id);
+        var action = GameAction.CastSpell(p1.Id, wildGrowth.Id);
         await engine.ExecuteAction(action);
+        await engine.ResolveAllTriggersAsync();
 
         p1.Battlefield.Cards.Should().NotContain(wildGrowth);
         p1.Graveyard.Cards.Should().Contain(wildGrowth);
