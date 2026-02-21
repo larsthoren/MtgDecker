@@ -24,27 +24,30 @@ internal class CastSpellHandler : IActionHandler
             return;
         }
 
-        if (!CardDefinitions.TryGet(castCard.Name, out var def) || def.ManaCost == null)
+        CardDefinitions.TryGet(castCard.Name, out var def);
+
+        ManaCost? baseCost = def?.ManaCost ?? castCard.ManaCost;
+        if (baseCost == null)
         {
-            state.Log($"Cannot cast {castCard.Name} — no registered mana cost.");
+            state.Log($"Cannot cast {castCard.Name} — no mana cost defined.");
             return;
         }
 
-        bool isInstant = def.CardTypes.HasFlag(CardType.Instant);
-        bool hasFlash = def.HasFlash;
+        bool isInstant = def?.CardTypes.HasFlag(CardType.Instant) ?? castCard.CardTypes.HasFlag(CardType.Instant);
+        bool hasFlash = def?.HasFlash ?? false;
         if (!isInstant && !hasFlash && !engine.CanCastSorcery(castPlayer.Id))
         {
             state.Log($"Cannot cast {castCard.Name} at this time (sorcery-speed only).");
             return;
         }
 
-        var castEffectiveCost = def.ManaCost;
+        var castEffectiveCost = baseCost;
         var castCostReduction = engine.ComputeCostModification(castCard, castPlayer);
         if (castCostReduction != 0)
             castEffectiveCost = castEffectiveCost.WithGenericReduction(-castCostReduction);
 
         bool canPayMana = castPlayer.ManaPool.CanPay(castEffectiveCost);
-        bool canPayAlternate = def.AlternateCost != null && engine.CanPayAlternateCost(def.AlternateCost, castPlayer, castCard);
+        bool canPayAlternate = def?.AlternateCost != null && engine.CanPayAlternateCost(def.AlternateCost, castPlayer, castCard);
         bool useAlternateCost = false;
 
         if (!canPayMana && !canPayAlternate)
@@ -66,7 +69,7 @@ internal class CastSpellHandler : IActionHandler
 
         // Use shared targeting helper
         var targets = new List<TargetInfo>();
-        if (def.TargetFilter != null)
+        if (def?.TargetFilter != null)
         {
             var result = await engine.FindAndChooseTargetsAsync(
                 def.TargetFilter, castPlayer, castPlayer.DecisionHandler, castCard.Name, ct);
@@ -89,7 +92,7 @@ internal class CastSpellHandler : IActionHandler
         Dictionary<ManaColor, int> manaPaid;
         if (useAlternateCost)
         {
-            await engine.PayAlternateCostAsync(def.AlternateCost!, castPlayer, castCard, ct);
+            await engine.PayAlternateCostAsync(def!.AlternateCost!, castPlayer, castCard, ct);
             manaPaid = new Dictionary<ManaColor, int>();
         }
         else
