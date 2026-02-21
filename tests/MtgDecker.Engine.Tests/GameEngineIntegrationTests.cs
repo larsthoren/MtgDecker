@@ -80,7 +80,7 @@ public class GameEngineIntegrationTests
 
         // Pick first land in hand to play (land drop — no mana needed)
         var cardToPlay = FindLandInHand(state.Player1);
-        p1Handler.EnqueueAction(GameAction.PlayCard(state.Player1.Id, cardToPlay.Id));
+        p1Handler.EnqueueAction(GameAction.PlayLand(state.Player1.Id, cardToPlay.Id));
 
         state.IsFirstTurn = true;
         await engine.RunTurnAsync();
@@ -98,7 +98,7 @@ public class GameEngineIntegrationTests
 
         // P1 plays a land and taps it on turn 1
         var cardToPlay = FindLandInHand(state.Player1);
-        p1Handler.EnqueueAction(GameAction.PlayCard(state.Player1.Id, cardToPlay.Id));
+        p1Handler.EnqueueAction(GameAction.PlayLand(state.Player1.Id, cardToPlay.Id));
         p1Handler.EnqueueAction(GameAction.TapCard(state.Player1.Id, cardToPlay.Id));
 
         state.IsFirstTurn = true;
@@ -144,7 +144,7 @@ public class GameEngineIntegrationTests
             // Skip test rather than fail flakily.
             return;
         }
-        p1Handler.EnqueueAction(GameAction.PlayCard(state.Player1.Id, cardToPlay.Id));
+        p1Handler.EnqueueAction(GameAction.PlayLand(state.Player1.Id, cardToPlay.Id));
 
         state.IsFirstTurn = true;
         await engine.RunTurnAsync();
@@ -162,8 +162,8 @@ public class GameEngineIntegrationTests
         // Both players play a land (land drops — no mana needed)
         var p1Card = FindLandInHand(state.Player1);
         var p2Card = FindLandInHand(state.Player2);
-        p1Handler.EnqueueAction(GameAction.PlayCard(state.Player1.Id, p1Card.Id));
-        p2Handler.EnqueueAction(GameAction.PlayCard(state.Player2.Id, p2Card.Id));
+        p1Handler.EnqueueAction(GameAction.PlayLand(state.Player1.Id, p1Card.Id));
+        p2Handler.EnqueueAction(GameAction.PlayLand(state.Player2.Id, p2Card.Id));
 
         state.IsFirstTurn = true;
         await engine.RunTurnAsync();
@@ -200,25 +200,25 @@ public class GameEngineIntegrationTests
 
         // Turn 1 (P1): play a land
         var p1Card1 = FindLandInHand(state.Player1);
-        p1Handler.EnqueueAction(GameAction.PlayCard(state.Player1.Id, p1Card1.Id));
+        p1Handler.EnqueueAction(GameAction.PlayLand(state.Player1.Id, p1Card1.Id));
         await engine.RunTurnAsync();
         state.Player1.Battlefield.Count.Should().Be(1);
 
         // Turn 2 (P2): play a land
         var p2Card1 = FindLandInHand(state.Player2);
-        p2Handler.EnqueueAction(GameAction.PlayCard(state.Player2.Id, p2Card1.Id));
+        p2Handler.EnqueueAction(GameAction.PlayLand(state.Player2.Id, p2Card1.Id));
         await engine.RunTurnAsync();
         state.Player2.Battlefield.Count.Should().Be(1);
 
         // Turn 3 (P1): play another land (drew one in draw step)
         var p1Card2 = FindLandInHand(state.Player1);
-        p1Handler.EnqueueAction(GameAction.PlayCard(state.Player1.Id, p1Card2.Id));
+        p1Handler.EnqueueAction(GameAction.PlayLand(state.Player1.Id, p1Card2.Id));
         await engine.RunTurnAsync();
         state.Player1.Battlefield.Count.Should().Be(2);
 
         // Turn 4 (P2): play another land
         var p2Card2 = FindLandInHand(state.Player2);
-        p2Handler.EnqueueAction(GameAction.PlayCard(state.Player2.Id, p2Card2.Id));
+        p2Handler.EnqueueAction(GameAction.PlayLand(state.Player2.Id, p2Card2.Id));
         await engine.RunTurnAsync();
         state.Player2.Battlefield.Count.Should().Be(2);
 
@@ -237,7 +237,7 @@ public class GameEngineIntegrationTests
 
         // During P1's turn, P2 plays a land from hand
         var p2Card = FindLandInHand(state.Player2);
-        p2Handler.EnqueueAction(GameAction.PlayCard(state.Player2.Id, p2Card.Id));
+        p2Handler.EnqueueAction(GameAction.PlayLand(state.Player2.Id, p2Card.Id));
 
         state.IsFirstTurn = true;
         await engine.RunTurnAsync();
@@ -248,13 +248,13 @@ public class GameEngineIntegrationTests
     }
 
     [Fact]
-    public async Task PlayCard_TapIt_ThenManuallyMoveToGraveyard()
+    public async Task PlayLand_TapIt_ThenManuallyMoveToGraveyard()
     {
         var engine = CreateGame(out var state, out var p1Handler, out _);
         await engine.StartGameAsync();
 
         var card = FindLandInHand(state.Player1);
-        p1Handler.EnqueueAction(GameAction.PlayCard(state.Player1.Id, card.Id));
+        p1Handler.EnqueueAction(GameAction.PlayLand(state.Player1.Id, card.Id));
         p1Handler.EnqueueAction(GameAction.TapCard(state.Player1.Id, card.Id));
 
         state.IsFirstTurn = true;
@@ -277,7 +277,7 @@ public class GameEngineIntegrationTests
         await engine.StartGameAsync();
 
         var card = FindLandInHand(state.Player1);
-        p1Handler.EnqueueAction(GameAction.PlayCard(state.Player1.Id, card.Id));
+        p1Handler.EnqueueAction(GameAction.PlayLand(state.Player1.Id, card.Id));
 
         state.IsFirstTurn = true;
         await engine.RunTurnAsync();
@@ -329,8 +329,8 @@ public class GameEngineIntegrationTests
         // P1 plays two lands in the same turn
         var card1 = p1.Hand.Cards[0];
         var card2 = p1.Hand.Cards[1];
-        p1Handler.EnqueueAction(GameAction.PlayCard(p1.Id, card1.Id));
-        p1Handler.EnqueueAction(GameAction.PlayCard(p1.Id, card2.Id));
+        p1Handler.EnqueueAction(GameAction.PlayLand(p1.Id, card1.Id));
+        p1Handler.EnqueueAction(GameAction.PlayLand(p1.Id, card2.Id));
 
         state.IsFirstTurn = true;
         await engine.RunTurnAsync();
