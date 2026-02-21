@@ -18,6 +18,7 @@ public class GameEngine
         _handlers[ActionType.Cycle] = new CycleHandler();
         _handlers[ActionType.ActivateFetch] = new ActivateFetchHandler();
         _handlers[ActionType.ActivateLoyaltyAbility] = new ActivateLoyaltyAbilityHandler();
+        _handlers[ActionType.PlayCard] = new PlayCardHandler();
     }
 
     public async Task StartGameAsync(CancellationToken ct = default)
@@ -201,91 +202,6 @@ public class GameEngine
 
         switch (action.Type)
         {
-            case ActionType.PlayCard:
-                var playCard = player.Hand.Cards.FirstOrDefault(c => c.Id == action.CardId);
-                if (playCard == null) break;
-
-                if (playCard.IsLand)
-                {
-                    // Part A: Land drop enforcement
-                    if (player.LandsPlayedThisTurn >= player.MaxLandDrops)
-                    {
-                        _state.Log($"{player.Name} cannot play another land this turn.");
-                        break;
-                    }
-                    player.Hand.RemoveById(playCard.Id);
-                    player.Battlefield.Add(playCard);
-                    playCard.TurnEnteredBattlefield = _state.TurnNumber;
-                    if (playCard.EntersTapped) playCard.IsTapped = true;
-                    player.LandsPlayedThisTurn++;
-                    action.IsLandDrop = true;
-                    action.DestinationZone = ZoneType.Battlefield;
-                    player.ActionHistory.Push(action);
-                    _state.Log($"{player.Name} plays {playCard.Name} (land drop).");
-                    ApplyEntersWithCounters(playCard);
-                    await QueueSelfTriggersOnStackAsync(GameEvent.EnterBattlefield, playCard, player, ct);
-                    await OnBoardChangedAsync(ct);
-
-                    // Fire LandPlayed triggers (e.g., City of Traitors)
-                    await QueueBoardTriggersOnStackAsync(GameEvent.LandPlayed, playCard, ct);
-                }
-                else if (playCard.ManaCost != null)
-                {
-                    // Part B: Cast spell with mana payment
-                    // Apply cost modification from continuous effects
-                    var effectiveCost = playCard.ManaCost;
-                    var costReduction = ComputeCostModification(playCard, player);
-                    if (costReduction != 0)
-                        effectiveCost = effectiveCost.WithGenericReduction(-costReduction);
-
-                    if (!player.ManaPool.CanPay(effectiveCost))
-                    {
-                        _state.Log($"{player.Name} cannot cast {playCard.Name} — not enough mana.");
-                        break;
-                    }
-
-                    var playManaPaid = await PayManaCostAsync(effectiveCost, player, ct);
-                    player.PendingManaTaps.Clear();
-
-                    // Move card to destination
-                    player.Hand.RemoveById(playCard.Id);
-                    bool isInstantOrSorcery = playCard.CardTypes.HasFlag(CardType.Instant)
-                                            || playCard.CardTypes.HasFlag(CardType.Sorcery);
-                    if (isInstantOrSorcery)
-                    {
-                        player.Graveyard.Add(playCard);
-                        action.DestinationZone = ZoneType.Graveyard;
-                        _state.Log($"{player.Name} casts {playCard.Name} (→ graveyard).");
-                    }
-                    else
-                    {
-                        player.Battlefield.Add(playCard);
-                        playCard.TurnEnteredBattlefield = _state.TurnNumber;
-                        if (playCard.EntersTapped) playCard.IsTapped = true;
-                        action.DestinationZone = ZoneType.Battlefield;
-                        _state.Log($"{player.Name} casts {playCard.Name}.");
-
-                        // Aura attachment: prompt for target after entering battlefield
-                        await TryAttachAuraAsync(playCard, player, ct);
-
-                        ApplyEntersWithCounters(playCard);
-                        await QueueSelfTriggersOnStackAsync(GameEvent.EnterBattlefield, playCard, player, ct);
-                        await OnBoardChangedAsync(ct);
-                    }
-                    // Fire SpellCast board triggers (e.g., enchantress draw on enchantment cast)
-                    await QueueBoardTriggersOnStackAsync(GameEvent.SpellCast, playCard, ct);
-                    action.ManaCostPaid = effectiveCost;
-                    action.ActualManaPaid = playManaPaid;
-                    player.ActionHistory.Push(action);
-                }
-                else
-                {
-                    // No ManaCost, not a land — card not supported in engine
-                    _state.Log($"{playCard.Name} is not supported in the engine (no card definition).");
-                    break;
-                }
-                break;
-
             case ActionType.TapCard:
                 var tapTarget = player.Battlefield.Cards.FirstOrDefault(c => c.Id == action.CardId);
                 if (tapTarget != null && !tapTarget.IsTapped)
