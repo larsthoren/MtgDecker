@@ -96,6 +96,7 @@ public class GameEngineUndoTests
     public async Task Undo_PlayLand_Rejected()
     {
         var engine = CreateEngine(out var state, out var p1, out _);
+        state.CurrentPhase = Phase.MainPhase1;
         var land = GameCard.Create("Forest", "Basic Land — Forest");
         p1.Hand.Add(land);
 

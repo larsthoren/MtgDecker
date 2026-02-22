@@ -349,3 +349,26 @@
     box-shadow: 0 0 10px gold;
     border-radius: 8px;
 }
+
+/* Graveyard viewer panel */
+.graveyard-panel {
+    background: rgba(20, 20, 20, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    padding: 8px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.graveyard-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+}
+
+.graveyard-cards {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}

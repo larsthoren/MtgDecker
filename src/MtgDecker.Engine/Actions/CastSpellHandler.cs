@@ -52,27 +52,49 @@ internal class CastSpellHandler : IActionHandler
         if (castCostReduction != 0)
             castEffectiveCost = castEffectiveCost.WithGenericReduction(-castCostReduction);
 
+        // Delve: exile cards from graveyard to reduce generic cost
+        IReadOnlyList<GameCard>? delveExiledCards = null;
+        if (def?.HasDelve == true && castEffectiveCost.GenericCost > 0 && castPlayer.Graveyard.Count > 0)
+        {
+            var graveyardCards = castPlayer.Graveyard.Cards.ToList();
+            var maxExile = Math.Min(castEffectiveCost.GenericCost, graveyardCards.Count);
+
+            delveExiledCards = await castPlayer.DecisionHandler.ChooseCardsToExile(
+                graveyardCards, maxExile, $"Exile cards for Delve ({castCard.Name})", ct);
+
+            if (delveExiledCards.Count > 0)
+                castEffectiveCost = castEffectiveCost.WithGenericReduction(delveExiledCards.Count);
+        }
+
         bool canPayMana = castEffectiveCost.HasPhyrexianCost
             ? castPlayer.ManaPool.CanPayWithPhyrexian(castEffectiveCost, castPlayer.Life)
             : castPlayer.ManaPool.CanPay(castEffectiveCost);
         bool canPayAlternate = def?.AlternateCost != null && engine.CanPayAlternateCost(def.AlternateCost, castPlayer, castCard);
-        bool useAlternateCost = false;
+        bool useAlternateCost = action.UseAlternateCost;
 
-        if (!canPayMana && !canPayAlternate)
+        if (!useAlternateCost)
         {
-            state.Log($"Not enough mana to cast {castCard.Name}.");
+            if (!canPayMana && !canPayAlternate)
+            {
+                state.Log($"Not enough mana to cast {castCard.Name}.");
+                return;
+            }
+
+            if (canPayAlternate && !canPayMana)
+            {
+                useAlternateCost = true;
+            }
+            else if (canPayAlternate && canPayMana)
+            {
+                var choice = await castPlayer.DecisionHandler.ChooseCard(
+                    [castCard], $"Pay mana for {castCard.Name}? (skip to use alternate cost)", optional: true, ct);
+                useAlternateCost = !choice.HasValue;
+            }
+        }
+        else if (!canPayAlternate)
+        {
+            state.Log($"Cannot pay alternate cost for {castCard.Name}.");
             return;
-        }
-
-        if (canPayAlternate && !canPayMana)
-        {
-            useAlternateCost = true;
-        }
-        else if (canPayAlternate && canPayMana)
-        {
-            var choice = await castPlayer.DecisionHandler.ChooseCard(
-                [castCard], $"Pay mana for {castCard.Name}? (skip to use alternate cost)", optional: true, ct);
-            useAlternateCost = !choice.HasValue;
         }
 
         // Use shared targeting helper
@@ -185,6 +207,16 @@ internal class CastSpellHandler : IActionHandler
                 {
                     await engine.AutoResolveMidCastForAi(state, castPlayer, ct);
                 }
+            }
+        }
+
+        // Exile Delve cards
+        if (delveExiledCards != null)
+        {
+            foreach (var exiled in delveExiledCards)
+            {
+                castPlayer.Graveyard.RemoveById(exiled.Id);
+                castPlayer.Exile.Add(exiled);
             }
         }
     }

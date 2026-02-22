@@ -16,6 +16,24 @@ internal class PlayLandHandler : IActionHandler
             return;
         }
 
+        if (state.ActivePlayer.Id != action.PlayerId)
+        {
+            state.Log($"Cannot play land — only the active player can play lands.");
+            return;
+        }
+
+        if (state.CurrentPhase != Phase.MainPhase1 && state.CurrentPhase != Phase.MainPhase2)
+        {
+            state.Log($"Cannot play land — lands can only be played during main phases.");
+            return;
+        }
+
+        if (state.StackCount > 0)
+        {
+            state.Log($"Cannot play land — the stack must be empty.");
+            return;
+        }
+
         if (player.LandsPlayedThisTurn >= player.MaxLandDrops)
         {
             state.Log($"{player.Name} cannot play another land this turn.");

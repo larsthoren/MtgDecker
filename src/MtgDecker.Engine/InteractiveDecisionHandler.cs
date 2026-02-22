@@ -38,6 +38,7 @@ public class InteractiveDecisionHandler : IPlayerDecisionHandler, IManualManaPay
     public bool IsWaitingForDiscard => _discardTcs is { Task.IsCompleted: false };
     public IReadOnlyList<GameCard>? DiscardOptions { get; private set; }
     public int DiscardCount { get; private set; }
+    public string? DiscardPrompt { get; private set; }
     public bool IsWaitingForSplit => _splitCardsTcs is { Task.IsCompleted: false };
     public IReadOnlyList<GameCard>? SplitOptions { get; private set; }
     public string? SplitPrompt { get; private set; }
@@ -296,8 +297,9 @@ public class InteractiveDecisionHandler : IPlayerDecisionHandler, IManualManaPay
     {
         DiscardOptions = hand;
         DiscardCount = discardCount;
+        DiscardPrompt = $"Discard {discardCount} card(s) to hand size";
         _discardTcs = new TaskCompletionSource<IReadOnlyList<GameCard>>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var registration = ct.Register(() => { DiscardOptions = null; DiscardCount = 0; _discardTcs.TrySetCanceled(); });
+        var registration = ct.Register(() => { DiscardOptions = null; DiscardCount = 0; DiscardPrompt = null; _discardTcs.TrySetCanceled(); });
         _discardTcs.Task.ContinueWith(_ => registration.Dispose(), TaskContinuationOptions.ExecuteSynchronously);
         OnWaitingForInput?.Invoke();
         return _discardTcs.Task;
@@ -307,6 +309,7 @@ public class InteractiveDecisionHandler : IPlayerDecisionHandler, IManualManaPay
     {
         DiscardOptions = null;
         DiscardCount = 0;
+        DiscardPrompt = null;
         _discardTcs?.TrySetResult(cards);
     }
 
@@ -367,4 +370,26 @@ public class InteractiveDecisionHandler : IPlayerDecisionHandler, IManualManaPay
         _reorderTcs?.TrySetResult((ordered, shuffle));
     }
 
+
+
+    // Reuses the discard UI state (DiscardOptions/DiscardCount/DiscardPrompt) since the
+    // interaction is identical (select N cards, confirm). Safe because the engine processes
+    // costs sequentially — discard and exile never overlap.
+    public async Task<IReadOnlyList<GameCard>> ChooseCardsToExile(
+        IReadOnlyList<GameCard> options, int maxCount, string prompt, CancellationToken ct = default)
+    {
+        DiscardOptions = options.ToList();
+        DiscardCount = maxCount;
+        DiscardPrompt = prompt;
+        _discardTcs = new TaskCompletionSource<IReadOnlyList<GameCard>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var registration = ct.Register(() => { DiscardOptions = null; DiscardCount = 0; DiscardPrompt = null; _discardTcs.TrySetCanceled(); });
+        _ = _discardTcs.Task.ContinueWith(_ => registration.Dispose(), TaskContinuationOptions.ExecuteSynchronously);
+        OnWaitingForInput?.Invoke();
+
+        var result = await _discardTcs.Task;
+        DiscardOptions = null;
+        DiscardCount = 0;
+        DiscardPrompt = null;
+        return result;
+    }
 }

@@ -34,6 +34,8 @@ public interface IPlayerDecisionHandler
     Task<(IReadOnlyList<GameCard> ordered, bool shuffle)> ReorderCards(
         IReadOnlyList<GameCard> cards, string prompt, CancellationToken ct = default);
 
+    Task<IReadOnlyList<GameCard>> ChooseCardsToExile(
+        IReadOnlyList<GameCard> options, int maxCount, string prompt, CancellationToken ct = default);
 }
 
 /// <summary>
