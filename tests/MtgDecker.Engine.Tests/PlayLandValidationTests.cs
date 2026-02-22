@@ -30,7 +30,7 @@ public class PlayLandValidationTests
     [Fact]
     public async Task PlayLand_OnOpponentsTurn_IsRejected()
     {
-        var engine = CreateGame(out var state, out _, out var p2Handler);
+        var engine = CreateGame(out var state, out _, out _);
         await engine.StartGameAsync();
 
         // It's P1's turn — P2 tries to play a land
@@ -38,7 +38,6 @@ public class PlayLandValidationTests
         var p2Land = state.Player2.Hand.Cards.First(c => c.IsLand);
         var beforeCount = state.Player2.Battlefield.Cards.Count;
 
-        p2Handler.EnqueueAction(GameAction.PlayLand(state.Player2.Id, p2Land.Id));
         state.CurrentPhase = Phase.MainPhase1;
         await engine.ExecuteAction(GameAction.PlayLand(state.Player2.Id, p2Land.Id));
 

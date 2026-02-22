@@ -588,7 +588,7 @@
         <div class="prompt-overlay">
             <MudPaper Class="pa-3" Elevation="8">
                 <MudText Typo="Typo.body2" Class="mb-2">
-                    Discard @Handler.DiscardCount card(s) to hand size
+                    @(Handler.DiscardPrompt ?? $"Discard {Handler.DiscardCount} card(s)")
                 </MudText>
                 <div style="display: flex; flex-wrap: wrap; gap: 4px;">
                     @foreach (var card in Handler.DiscardOptions)
