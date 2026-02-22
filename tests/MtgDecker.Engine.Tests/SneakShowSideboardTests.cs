@@ -1,5 +1,6 @@
 using FluentAssertions;
 using MtgDecker.Engine.Enums;
+using MtgDecker.Engine.Mana;
 
 namespace MtgDecker.Engine.Tests;
 
@@ -27,11 +28,13 @@ public class SneakShowSideboardTests
     }
 
     [Fact]
-    public void SurgicalExtraction_HasAlternateCost()
+    public void SurgicalExtraction_HasPhyrexianManaCost()
     {
         CardDefinitions.TryGet("Surgical Extraction", out var def).Should().BeTrue();
-        def!.AlternateCost.Should().NotBeNull();
-        def.AlternateCost!.LifeCost.Should().Be(2);
+        def!.ManaCost.Should().NotBeNull();
+        def.ManaCost!.PhyrexianRequirements.Should().ContainKey(ManaColor.Black);
+        def.ManaCost.PhyrexianRequirements[ManaColor.Black].Should().Be(1);
+        def.AlternateCost.Should().BeNull();
     }
 
     [Fact]

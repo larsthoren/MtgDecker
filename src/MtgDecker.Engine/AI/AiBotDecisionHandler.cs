@@ -20,6 +20,10 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
     // Colors needed by spells in hand, cached by GetAction for ChooseManaColor to consult
     private HashSet<ManaColor> _neededColors = new();
 
+    // Cached from GetAction so ChoosePhyrexianPayment can check life total
+    private GameState? _lastState;
+    private Guid _lastPlayerId;
+
     private async Task DelayAsync(CancellationToken ct)
     {
         if (ActionDelayMs > 0)
@@ -35,6 +39,9 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
     /// </summary>
     public async Task<GameAction> GetAction(GameState gameState, Guid playerId, CancellationToken ct = default)
     {
+        _lastState = gameState;
+        _lastPlayerId = playerId;
+
         if (gameState.CurrentPhase != Phase.MainPhase1 && gameState.CurrentPhase != Phase.MainPhase2)
             return GameAction.Pass(playerId);
 
@@ -469,6 +476,22 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
     {
         await DelayAsync(ct);
         return (cards.ToList(), false);
+    }
+
+    /// <summary>
+    /// Choose whether to pay a Phyrexian mana symbol with colored mana (true) or 2 life (false).
+    /// Heuristic: pay life if life is above 10, otherwise pay mana to preserve life total.
+    /// </summary>
+    public Task<bool> ChoosePhyrexianPayment(ManaColor color, CancellationToken ct = default)
+    {
+        if (_lastState != null)
+        {
+            var player = _lastState.GetPlayer(_lastPlayerId);
+            // Pay with mana (true) when life is low, pay with life (false) when life is comfortable
+            return Task.FromResult(player.Life <= 10);
+        }
+        // Fallback: pay with life (aggressive default for Phyrexian mana)
+        return Task.FromResult(false);
     }
 
     /// <summary>

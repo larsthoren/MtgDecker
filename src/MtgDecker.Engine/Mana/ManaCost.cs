@@ -18,18 +18,21 @@ public sealed partial class ManaCost
             ["C"] = ManaColor.Colorless
         });
 
-    public static ManaCost Zero { get; } = new(new Dictionary<ManaColor, int>(), 0);
+    public static ManaCost Zero { get; } = new(new Dictionary<ManaColor, int>(), new Dictionary<ManaColor, int>(), 0);
 
     public IReadOnlyDictionary<ManaColor, int> ColorRequirements { get; }
+    public IReadOnlyDictionary<ManaColor, int> PhyrexianRequirements { get; }
     public int GenericCost { get; }
     public int ConvertedManaCost { get; }
     public bool IsColored => ColorRequirements.Keys.Any(c => c != ManaColor.Colorless);
+    public bool HasPhyrexianCost => PhyrexianRequirements.Count > 0;
 
-    private ManaCost(Dictionary<ManaColor, int> colorRequirements, int genericCost)
+    private ManaCost(Dictionary<ManaColor, int> colorRequirements, Dictionary<ManaColor, int> phyrexianRequirements, int genericCost)
     {
         ColorRequirements = new ReadOnlyDictionary<ManaColor, int>(colorRequirements);
+        PhyrexianRequirements = new ReadOnlyDictionary<ManaColor, int>(phyrexianRequirements);
         GenericCost = genericCost;
-        ConvertedManaCost = genericCost + colorRequirements.Values.Sum();
+        ConvertedManaCost = genericCost + colorRequirements.Values.Sum() + phyrexianRequirements.Values.Sum();
     }
 
     public static ManaCost Parse(string? manaCostString)
@@ -38,11 +41,24 @@ public sealed partial class ManaCost
             return Zero;
 
         var colorRequirements = new Dictionary<ManaColor, int>();
+        var phyrexianRequirements = new Dictionary<ManaColor, int>();
         var genericCost = 0;
 
         foreach (Match match in ManaSymbolRegex().Matches(manaCostString))
         {
             var symbol = match.Groups[1].Value;
+
+            // Check for Phyrexian mana: {W/P}, {U/P}, {B/P}, {R/P}, {G/P}
+            if (symbol.Length == 3 && symbol[1] == '/' && symbol[2] == 'P')
+            {
+                var colorChar = symbol[0..1];
+                if (SymbolToColor.TryGetValue(colorChar, out var phyColor))
+                {
+                    phyrexianRequirements.TryGetValue(phyColor, out var current);
+                    phyrexianRequirements[phyColor] = current + 1;
+                }
+                continue;
+            }
 
             if (SymbolToColor.TryGetValue(symbol, out var color))
             {
@@ -55,14 +71,15 @@ public sealed partial class ManaCost
             }
         }
 
-        return new ManaCost(colorRequirements, genericCost);
+        return new ManaCost(colorRequirements, phyrexianRequirements, genericCost);
     }
 
     public ManaCost WithGenericReduction(int reduction)
     {
         var newGeneric = Math.Max(0, GenericCost - reduction);
         var colorReqs = new Dictionary<ManaColor, int>(ColorRequirements);
-        return new ManaCost(colorReqs, newGeneric);
+        var phyrexianReqs = new Dictionary<ManaColor, int>(PhyrexianRequirements);
+        return new ManaCost(colorReqs, phyrexianReqs, newGeneric);
     }
 
     private static readonly Dictionary<ManaColor, string> ColorToSymbol = new()
@@ -88,6 +105,16 @@ public sealed partial class ManaCost
                 var symbol = ColorToSymbol[color];
                 for (int i = 0; i < count; i++)
                     sb.Append($"{{{symbol}}}");
+            }
+        }
+        // Phyrexian symbols in WUBRG order, after regular color requirements
+        foreach (var color in new[] { ManaColor.White, ManaColor.Blue, ManaColor.Black, ManaColor.Red, ManaColor.Green })
+        {
+            if (PhyrexianRequirements.TryGetValue(color, out var count))
+            {
+                var symbol = ColorToSymbol[color];
+                for (int i = 0; i < count; i++)
+                    sb.Append($"{{{symbol}/P}}");
             }
         }
         return sb.Length > 0 ? sb.ToString() : "{0}";

@@ -235,6 +235,59 @@ public class GameEngine
             manaPaid[color] = required;
         }
 
+        // Handle Phyrexian mana requirements
+        if (cost.HasPhyrexianCost)
+        {
+            foreach (var (color, required) in cost.PhyrexianRequirements)
+            {
+                for (int i = 0; i < required; i++)
+                {
+                    bool hasMana = pool[color] > 0;
+                    bool hasLife = player.Life > 2;
+
+                    bool payWithMana;
+                    if (hasMana && hasLife)
+                    {
+                        payWithMana = await player.DecisionHandler.ChoosePhyrexianPayment(color, ct);
+                    }
+                    else if (hasMana)
+                    {
+                        payWithMana = true;
+                    }
+                    else
+                    {
+                        payWithMana = false;
+                    }
+
+                    if (payWithMana)
+                    {
+                        pool.Deduct(color, 1);
+                        manaPaid[color] = manaPaid.GetValueOrDefault(color) + 1;
+                        // Also update remaining for generic calculation
+                        if (remaining.ContainsKey(color))
+                        {
+                            remaining[color] -= 1;
+                            if (remaining[color] <= 0) remaining.Remove(color);
+                        }
+                        _state.Log($"{player.Name} pays {{{GetColorSymbol(color)}}} for Phyrexian mana.");
+                    }
+                    else
+                    {
+                        player.AdjustLife(-2);
+                        _state.Log($"{player.Name} pays 2 life for Phyrexian mana.");
+                    }
+                }
+            }
+
+            // Recalculate remaining after Phyrexian payment for generic cost handling
+            remaining.Clear();
+            foreach (var kvp in pool.Available)
+            {
+                if (kvp.Value > 0)
+                    remaining[kvp.Key] = kvp.Value;
+            }
+        }
+
         // Handle generic cost
         if (cost.GenericCost > 0)
         {
@@ -285,6 +338,17 @@ public class GameEngine
 
         return manaPaid;
     }
+
+    private static string GetColorSymbol(ManaColor color) => color switch
+    {
+        ManaColor.White => "W",
+        ManaColor.Blue => "U",
+        ManaColor.Black => "B",
+        ManaColor.Red => "R",
+        ManaColor.Green => "G",
+        ManaColor.Colorless => "C",
+        _ => color.ToString()
+    };
 
     internal bool CanPayAlternateCost(AlternateCost alt, Player player, GameCard castCard)
     {

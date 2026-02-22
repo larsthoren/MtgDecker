@@ -21,6 +21,7 @@ public class TestDecisionHandler : IPlayerDecisionHandler
     private readonly Queue<Func<IReadOnlyList<GameCard>, IReadOnlyList<GameCard>>> _splitChoices = new();
     private readonly Queue<int> _pileChoices = new();
     private readonly Queue<(Func<IReadOnlyList<GameCard>, IReadOnlyList<GameCard>> orderer, bool shuffle)> _reorderQueue = new();
+    private readonly Queue<bool> _phyrexianPaymentQueue = new();
 
     public void EnqueueAction(GameAction action) => _actions.Enqueue(action);
 
@@ -49,6 +50,8 @@ public class TestDecisionHandler : IPlayerDecisionHandler
 
     public void EnqueueReorder(Func<IReadOnlyList<GameCard>, IReadOnlyList<GameCard>> orderer, bool shuffle)
         => _reorderQueue.Enqueue((orderer, shuffle));
+
+    public void EnqueuePhyrexianPayment(bool payWithMana) => _phyrexianPaymentQueue.Enqueue(payWithMana);
 
     public Action? OnBeforeAction { get; set; }
 
@@ -178,5 +181,13 @@ public class TestDecisionHandler : IPlayerDecisionHandler
         }
         // Default: keep original order, no shuffle
         return Task.FromResult(((IReadOnlyList<GameCard>)cards.ToList(), false));
+    }
+
+    public Task<bool> ChoosePhyrexianPayment(ManaColor color, CancellationToken ct = default)
+    {
+        if (_phyrexianPaymentQueue.Count > 0)
+            return Task.FromResult(_phyrexianPaymentQueue.Dequeue());
+        // Default: pay with mana if not specified
+        return Task.FromResult(true);
     }
 }

@@ -47,6 +47,49 @@ public class ManaPool
         return true;
     }
 
+    public bool CanPayWithPhyrexian(ManaCost cost, int playerLife)
+    {
+        // If no Phyrexian cost, delegate to regular CanPay
+        if (!cost.HasPhyrexianCost)
+            return CanPay(cost);
+
+        // Check color requirements first
+        foreach (var (color, required) in cost.ColorRequirements)
+            if (this[color] < required) return false;
+
+        // Calculate remaining mana after color requirements
+        var remainingPool = new Dictionary<ManaColor, int>();
+        foreach (var kvp in Available)
+        {
+            var after = kvp.Value;
+            if (cost.ColorRequirements.TryGetValue(kvp.Key, out var needed))
+                after -= needed;
+            if (after > 0)
+                remainingPool[kvp.Key] = after;
+        }
+
+        // For Phyrexian requirements: use colored mana where available, life for the rest
+        int lifeNeeded = 0;
+        foreach (var (color, required) in cost.PhyrexianRequirements)
+        {
+            var availableMana = remainingPool.GetValueOrDefault(color, 0);
+            var paidWithMana = Math.Min(availableMana, required);
+            var paidWithLife = required - paidWithMana;
+            lifeNeeded += paidWithLife * 2;
+            if (paidWithMana > 0)
+            {
+                remainingPool[color] = availableMana - paidWithMana;
+                if (remainingPool[color] == 0) remainingPool.Remove(color);
+            }
+        }
+
+        if (playerLife <= lifeNeeded) return false;
+
+        // Check generic cost against remaining pool
+        var totalRemaining = remainingPool.Values.Sum();
+        return totalRemaining >= cost.GenericCost;
+    }
+
     public void Deduct(ManaColor color, int amount)
     {
         if (!_pool.ContainsKey(color)) return;

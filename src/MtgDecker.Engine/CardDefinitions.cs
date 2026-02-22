@@ -939,10 +939,10 @@ public static class CardDefinitions
             ["Pyroblast"] = new(ManaCost.Parse("{R}"), null, null, null, CardType.Instant,
                 TargetFilter.Spell(), new PyroblastEffect()),
 
-            ["Surgical Extraction"] = new(ManaCost.Parse("{B}"), null, null, null, CardType.Instant)
-            {
-                AlternateCost = new AlternateCost(LifeCost: 2),
-            },
+            ["Surgical Extraction"] = new(ManaCost.Parse("{B/P}"), null, null, null, CardType.Instant),
+
+            ["Dismember"] = new(ManaCost.Parse("{1}{B/P}{B/P}"), null, null, null, CardType.Instant,
+                TargetFilter.Creature(), new PumpTargetEffect(-5, -5)),
 
             ["Grafdigger's Cage"] = new(ManaCost.Parse("{1}"), null, null, null, CardType.Artifact),
 
