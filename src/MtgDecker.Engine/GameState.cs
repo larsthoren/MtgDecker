@@ -113,6 +113,12 @@ public class GameState
     internal Dictionary<ManaColor, int> MidCastAutoDeducted { get; set; } = new();
     internal int MidCastLifePaid { get; set; }
 
+    // Context preserved for CompleteMidCastAsync
+    internal List<TargetInfo>? MidCastTargets { get; set; }
+    internal GameAction? MidCastAction { get; set; }
+    internal ManaCost? MidCastEffectiveCost { get; set; }
+    internal bool MidCastFromExileAdventure { get; set; }
+
     public void BeginMidCast(Guid playerId, GameCard card, int genericCost, Dictionary<ManaColor, int> phyrexianCost)
     {
         PendingCastPlayerId = playerId;
@@ -131,6 +137,10 @@ public class GameState
         RemainingPhyrexianCost.Clear();
         MidCastAutoDeducted.Clear();
         MidCastLifePaid = 0;
+        MidCastTargets = null;
+        MidCastAction = null;
+        MidCastEffectiveCost = null;
+        MidCastFromExileAdventure = false;
     }
 
     public void ApplyManaPayment(ManaColor color)

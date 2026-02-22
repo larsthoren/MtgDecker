@@ -25,6 +25,7 @@ public class GameEngine
         _handlers[ActionType.TapCard] = new TapCardHandler();
         _handlers[ActionType.CastSpell] = new CastSpellHandler();
         _handlers[ActionType.ActivateAbility] = new ActivateAbilityHandler();
+        _handlers[ActionType.PayManaFromPool] = new PayManaFromPoolHandler();
     }
 
     public async Task StartGameAsync(CancellationToken ct = default)
@@ -339,7 +340,46 @@ public class GameEngine
         return manaPaid;
     }
 
-    private static string GetColorSymbol(ManaColor color) => color switch
+    internal async Task CompleteMidCastAsync(GameState state, Player player, CancellationToken ct)
+    {
+        var card = state.PendingCastCard!;
+        var targets = state.MidCastTargets ?? new List<TargetInfo>();
+        var action = state.MidCastAction;
+        var effectiveCost = state.MidCastEffectiveCost;
+        var fromExileAdventure = state.MidCastFromExileAdventure;
+
+        // Build manaPaid from auto-deducted colored mana
+        var manaPaid = new Dictionary<ManaColor, int>(state.MidCastAutoDeducted);
+
+        state.ClearMidCast();
+
+        // Remove card from source zone
+        if (fromExileAdventure)
+        {
+            player.Exile.RemoveById(card.Id);
+            card.IsOnAdventure = false;
+        }
+        else
+        {
+            player.Hand.RemoveById(card.Id);
+        }
+
+        var stackObj = new StackObject(card, player.Id, manaPaid, targets, state.StackCount);
+        state.StackPush(stackObj);
+
+        if (action != null)
+        {
+            action.ManaCostPaid = effectiveCost;
+            player.ActionHistory.Push(action);
+        }
+
+        state.Log($"{player.Name} casts {card.Name}.");
+
+        await QueueBoardTriggersOnStackAsync(GameEvent.SpellCast, card, ct);
+        await QueueSelfCastTriggersAsync(card, player, ct);
+    }
+
+    internal static string GetColorSymbol(ManaColor color) => color switch
     {
         ManaColor.White => "W",
         ManaColor.Blue => "U",
