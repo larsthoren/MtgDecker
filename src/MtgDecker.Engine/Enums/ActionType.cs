@@ -13,5 +13,8 @@ public enum ActionType
     Flashback,
     ActivateLoyaltyAbility,
     Ninjutsu,
-    CastAdventure
+    CastAdventure,
+    PayManaFromPool,
+    PayLifeForPhyrexian,
+    CancelCast
 }
