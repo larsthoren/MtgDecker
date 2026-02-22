@@ -734,16 +734,53 @@
         </div>
     }
 
-    @* Log toggle button *@
+    @* Log/Chat toggle button *@
     <MudButton StartIcon="@Icons.Material.Filled.Article" Size="Size.Small"
-               Variant="Variant.Outlined" Class="log-toggle-btn" OnClick="ToggleLog" Title="Toggle Game Log">Log</MudButton>
+               Variant="Variant.Outlined" Class="log-toggle-btn" OnClick="ToggleLog"
+               title="Toggle Panel">@(_activeTab == "chat" ? "Chat" : "Log")</MudButton>
 
-    @* Log overlay *@
+    @* Log/Chat overlay *@
     @if (_showLog)
     {
         <div class="log-overlay" @onclick="ToggleLog">
             <div class="log-panel" @onclick:stopPropagation>
-                <GameLogPanel GameLog="@State.GameLog" />
+                <div class="panel-tabs">
+                    <MudButton Size="Size.Small" Variant="@(_activeTab == "log" ? Variant.Filled : Variant.Text)"
+                               Color="Color.Primary" OnClick='@(() => _activeTab = "log")'>Log</MudButton>
+                    <MudButton Size="Size.Small" Variant="@(_activeTab == "chat" ? Variant.Filled : Variant.Text)"
+                               Color="Color.Primary" OnClick='@(() => _activeTab = "chat")'>Chat</MudButton>
+                </div>
+
+                @if (_activeTab == "log")
+                {
+                    <GameLogPanel GameLog="@State.GameLog" />
+                }
+                else
+                {
+                    <div class="chat-panel">
+                        <div class="chat-messages" @ref="_chatContainer">
+                            @if (ChatMessages != null)
+                            {
+                                @foreach (var msg in ChatMessages)
+                                {
+                                    var isLocal = msg.PlayerName == LocalPlayerName;
+                                    <div class="chat-message @(isLocal ? "chat-local" : "chat-remote")">
+                                        <span class="chat-sender">@msg.PlayerName:</span>
+                                        <span class="chat-text">@msg.Text</span>
+                                    </div>
+                                }
+                            }
+                        </div>
+                        <div class="chat-input-row">
+                            <MudTextField @bind-Value="_chatInput" Placeholder="Type a message..."
+                                          Variant="Variant.Outlined" Margin="Margin.Dense"
+                                          Immediate="true" Class="chat-input"
+                                          OnKeyDown="HandleChatKeyDown" />
+                            <MudIconButton Icon="@Icons.Material.Filled.Send" Size="Size.Small"
+                                           Color="Color.Primary" OnClick="SendChat" />
+                        </div>
+                    </div>
+                }
             </div>
         </div>
     }
@@ -765,10 +802,18 @@
     [Parameter] public EventCallback<Guid?> OnCardChosen { get; set; }
     [Parameter] public EventCallback OnRevealAcknowledged { get; set; }
     [Parameter] public EventCallback<(IReadOnlyList<GameCard> ordered, bool shuffle)> OnReorderSubmitted { get; set; }
+    [Parameter] public IReadOnlyList<ChatMessage>? ChatMessages { get; set; }
+    [Parameter] public EventCallback<string> OnChatSent { get; set; }
+    [Parameter] public string? LocalPlayerName { get; set; }
+
+    [Inject] private IJSRuntime JS { get; set; } = default!;
 
     private ElementReference _boardRef;
     private PhaseStopSettings _phaseStops = new();
     private bool _showLog = false;
+    private string _activeTab = "log";
+    private string _chatInput = "";
+    private ElementReference _chatContainer;
 
     // Card selection state
     private GameCard? _selectedCard;
@@ -839,6 +884,11 @@
         if (firstRender)
         {
             await _boardRef.FocusAsync();
+        }
+
+        if (_activeTab == "chat" && _showLog && ChatMessages?.Count > 0)
+        {
+            await JS.InvokeVoidAsync("scrollToBottom", _chatContainer);
         }
     }
 
@@ -1283,5 +1333,20 @@
         (ManaColor.White, "W"), (ManaColor.Blue, "U"), (ManaColor.Black, "B"),
         (ManaColor.Red, "R"), (ManaColor.Green, "G"), (ManaColor.Colorless, "C")
     ];
+
+    // --- Chat methods ---
+
+    private async Task HandleChatKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+            await SendChat();
+    }
+
+    private async Task SendChat()
+    {
+        if (string.IsNullOrWhiteSpace(_chatInput)) return;
+        await OnChatSent.InvokeAsync(_chatInput.Trim());
+        _chatInput = "";
+    }
 
 }
