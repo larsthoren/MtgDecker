@@ -17,6 +17,13 @@ public class CounterSpellEffect : SpellEffect
             return;
         }
 
+        // Check if the target spell can't be countered
+        if (CardDefinitions.TryGet(targetSpell.Card.Name, out var def) && def.CannotBeCountered)
+        {
+            state.Log($"{targetSpell.Card.Name} can't be countered.");
+            return;
+        }
+
         // Remove from stack
         state.StackRemove(targetSpell);
 

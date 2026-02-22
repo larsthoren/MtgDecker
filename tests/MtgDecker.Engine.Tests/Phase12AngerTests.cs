@@ -17,10 +17,12 @@ public class Phase12AngerTests
     }
 
     [Fact]
-    public void Anger_NoLongerHasBattlefieldContinuousEffects()
+    public void Anger_HasBattlefieldHasteKeyword()
     {
         CardDefinitions.TryGet("Anger", out var def).Should().BeTrue();
-        def!.ContinuousEffects.Should().BeEmpty();
+        def!.ContinuousEffects.Should().ContainSingle(e =>
+            e.Type == ContinuousEffectType.GrantKeyword && e.GrantedKeyword == Keyword.Haste,
+            "Anger the creature itself has haste");
     }
 
     [Fact]

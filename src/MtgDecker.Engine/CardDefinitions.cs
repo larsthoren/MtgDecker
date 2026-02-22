@@ -31,7 +31,7 @@ public static class CardDefinitions
             },
             ["Goblin Piledriver"] = new(ManaCost.Parse("{1}{R}"), null, 1, 2, CardType.Creature)
             {
-                Subtypes = ["Goblin"],
+                Subtypes = ["Goblin", "Warrior"],
                 ContinuousEffects =
                 [
                     new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
@@ -55,7 +55,7 @@ public static class CardDefinitions
             },
             ["Goblin Warchief"] = new(ManaCost.Parse("{1}{R}{R}"), null, 2, 2, CardType.Creature)
             {
-                Subtypes = ["Goblin"],
+                Subtypes = ["Goblin", "Warrior"],
                 ContinuousEffects =
                 [
                     new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
@@ -72,7 +72,7 @@ public static class CardDefinitions
                 Subtypes = ["Goblin"],
                 ActivatedAbility = new(new ActivatedAbilityCost(SacrificeSelf: true), new DealDamageEffect(1), c => c.IsCreature, CanTargetPlayer: true),
             },
-            ["Gempalm Incinerator"] = new(ManaCost.Parse("{1}{R}"), null, 2, 1, CardType.Creature)
+            ["Gempalm Incinerator"] = new(ManaCost.Parse("{2}{R}"), null, 2, 1, CardType.Creature)
             {
                 Subtypes = ["Goblin"],
                 CyclingCost = ManaCost.Parse("{1}{R}"),
@@ -102,7 +102,7 @@ public static class CardDefinitions
             },
             ["Goblin Pyromancer"] = new(ManaCost.Parse("{3}{R}"), null, 2, 2, CardType.Creature)
             {
-                Subtypes = ["Goblin"],
+                Subtypes = ["Goblin", "Wizard"],
                 Triggers = [new Trigger(GameEvent.EnterBattlefield, TriggerCondition.Self, new PyromancerEffect())],
             },
             ["Goblin Sharpshooter"] = new(ManaCost.Parse("{2}{R}"), null, 1, 1, CardType.Creature)
@@ -111,7 +111,7 @@ public static class CardDefinitions
                 ActivatedAbility = new(new ActivatedAbilityCost(TapSelf: true), new DealDamageEffect(1), c => c.IsCreature, CanTargetPlayer: true),
                 Triggers = [new Trigger(GameEvent.Dies, TriggerCondition.AnyCreatureDies, new UntapSelfEffect())],
             },
-            ["Goblin Tinkerer"] = new(ManaCost.Parse("{1}{R}"), null, 1, 1, CardType.Creature)
+            ["Goblin Tinkerer"] = new(ManaCost.Parse("{1}{R}"), null, 1, 2, CardType.Creature)
             {
                 Subtypes = ["Goblin"],
                 ActivatedAbility = new(new ActivatedAbilityCost(SacrificeSelf: true, ManaCost: ManaCost.Parse("{R}")), new DestroyTargetEffect(), c => c.CardTypes.HasFlag(CardType.Artifact)),
@@ -264,7 +264,7 @@ public static class CardDefinitions
                 TargetFilter.CreatureOrPlayer(), new DamageEffect(3)),
             ["Lava Spike"] = new(ManaCost.Parse("{R}"), null, null, null, CardType.Sorcery,
                 TargetFilter.Player(), new DamageEffect(3, canTargetCreature: false)),
-            ["Rift Bolt"] = new(ManaCost.Parse("{1}{R}"), null, null, null, CardType.Sorcery,
+            ["Rift Bolt"] = new(ManaCost.Parse("{2}{R}"), null, null, null, CardType.Sorcery,
                 TargetFilter.CreatureOrPlayer(), new DamageEffect(3)),
             ["Fireblast"] = new(ManaCost.Parse("{4}{R}{R}"), null, null, null, CardType.Instant,
                 TargetFilter.CreatureOrPlayer(), new DamageEffect(4))
@@ -273,7 +273,7 @@ public static class CardDefinitions
             },
             ["Goblin Guide"] = new(ManaCost.Parse("{R}"), null, 2, 2, CardType.Creature)
             {
-                Subtypes = ["Goblin"],
+                Subtypes = ["Goblin", "Scout"],
                 ContinuousEffects =
                 [
                     new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
@@ -328,7 +328,18 @@ public static class CardDefinitions
                 AlternateCost = new AlternateCost(LifeCost: 1, ExileCardColor: ManaColor.Blue),
             },
             ["Delver of Secrets"] = new(ManaCost.Parse("{U}"), null, 1, 1, CardType.Creature) { Subtypes = ["Human", "Wizard"] },
-            ["Murktide Regent"] = new(ManaCost.Parse("{5}{U}{U}"), null, 3, 3, CardType.Creature) { Subtypes = ["Dragon"], HasDelve = true },
+            ["Murktide Regent"] = new(ManaCost.Parse("{5}{U}{U}"), null, 3, 3, CardType.Creature)
+            {
+                Subtypes = ["Dragon"],
+                HasDelve = true,
+                ContinuousEffects =
+                [
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
+                        (card, _) => card.Name == "Murktide Regent",
+                        GrantedKeyword: Keyword.Flying,
+                        Layer: EffectLayer.Layer6_AbilityAddRemove),
+                ],
+            },
             ["Dragon's Rage Channeler"] = new(ManaCost.Parse("{R}"), null, 1, 1, CardType.Creature) { Subtypes = ["Human", "Shaman"] },
 
             // === UR Delver lands ===
@@ -442,7 +453,7 @@ public static class CardDefinitions
                 Subtypes = ["Human", "Wizard"],
                 ActivatedAbility = new(new ActivatedAbilityCost(TapSelf: true, ManaCost: ManaCost.Parse("{R}")), new DealDamageEffect(2), c => c.IsCreature, CanTargetPlayer: true),
             },
-            ["Jackal Pup"] = new(ManaCost.Parse("{R}"), null, 2, 1, CardType.Creature) { Subtypes = ["Hound"] },
+            ["Jackal Pup"] = new(ManaCost.Parse("{R}"), null, 2, 1, CardType.Creature) { Subtypes = ["Jackal"] },
             ["Incinerate"] = new(ManaCost.Parse("{1}{R}"), null, null, null, CardType.Instant,
                 TargetFilter.CreatureOrPlayer(), new DamageEffect(3)),
             ["Shock"] = new(ManaCost.Parse("{R}"), null, null, null, CardType.Instant,
@@ -466,10 +477,10 @@ public static class CardDefinitions
             },
 
             // === Mono Black Control deck ===
-            ["Bane of the Living"] = new(ManaCost.Parse("{2}{B}{B}"), null, 4, 3, CardType.Creature) { Subtypes = ["Zombie"] },
+            ["Bane of the Living"] = new(ManaCost.Parse("{2}{B}{B}"), null, 4, 3, CardType.Creature) { Subtypes = ["Insect"] },
             ["Plague Spitter"] = new(ManaCost.Parse("{2}{B}"), null, 2, 2, CardType.Creature)
             {
-                Subtypes = ["Zombie"],
+                Subtypes = ["Phyrexian", "Horror"],
                 Triggers =
                 [
                     new Trigger(GameEvent.Upkeep, TriggerCondition.Upkeep,
@@ -549,7 +560,7 @@ public static class CardDefinitions
                 EntersTapped = true,
                 ActivatedAbility = new(new ActivatedAbilityCost(ManaCost: ManaCost.Parse("{1}{B}")), new BecomeCreatureEffect(1, 1, "Skeleton")),
             },
-            ["Skeletal Scrying"] = new(ManaCost.Parse("{1}{B}"), null, null, null, CardType.Instant,
+            ["Skeletal Scrying"] = new(ManaCost.Parse("{0}{B}"), null, null, null, CardType.Instant,
                 Effect: new SkeletalScryingEffect()),
 
             // === Deadguy Ale deck ===
@@ -586,7 +597,7 @@ public static class CardDefinitions
             },
             ["Phyrexian Rager"] = new(ManaCost.Parse("{2}{B}"), null, 2, 2, CardType.Creature)
             {
-                Subtypes = ["Horror"],
+                Subtypes = ["Phyrexian", "Horror"],
                 Triggers = [new Trigger(GameEvent.EnterBattlefield, TriggerCondition.Self, new DrawAndLoseLifeEffect(1, 1))],
             },
             ["Phyrexian Arena"] = new(ManaCost.Parse("{1}{B}{B}"), null, null, null, CardType.Enchantment)
@@ -624,7 +635,7 @@ public static class CardDefinitions
             ["Faerie Conclave"] = new(null, ManaAbility.Fixed(ManaColor.Blue), null, null, CardType.Land)
             {
                 EntersTapped = true,
-                ActivatedAbility = new(new ActivatedAbilityCost(ManaCost: ManaCost.Parse("{1}{U}")), new BecomeCreatureEffect(2, 1, "Faerie")),
+                ActivatedAbility = new(new ActivatedAbilityCost(ManaCost: ManaCost.Parse("{1}{U}")), new BecomeCreatureEffect(2, 1, [Keyword.Flying], "Faerie")),
             },
             ["Mishra's Factory"] = new(null, ManaAbility.Fixed(ManaColor.Colorless), null, null, CardType.Land)
             {
@@ -637,6 +648,13 @@ public static class CardDefinitions
                 Subtypes = ["Lhurgoyf"],
                 DynamicBasePower = state => CountLandsInAllGraveyards(state),
                 DynamicBaseToughness = state => CountLandsInAllGraveyards(state),
+                ContinuousEffects =
+                [
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
+                        (card, _) => card.Name == "Terravore",
+                        GrantedKeyword: Keyword.Trample,
+                        Layer: EffectLayer.Layer6_AbilityAddRemove),
+                ],
             },
             ["Call of the Herd"] = new(ManaCost.Parse("{2}{G}"), null, null, null, CardType.Sorcery,
                 Effect: new CreateTokenSpellEffect("Elephant", 3, 3, CardType.Creature, ["Elephant"]))
@@ -667,7 +685,7 @@ public static class CardDefinitions
             ["Treetop Village"] = new(null, ManaAbility.Fixed(ManaColor.Green), null, null, CardType.Land)
             {
                 EntersTapped = true,
-                ActivatedAbility = new(new ActivatedAbilityCost(ManaCost: ManaCost.Parse("{1}{G}")), new BecomeCreatureEffect(3, 3, "Ape")),
+                ActivatedAbility = new(new ActivatedAbilityCost(ManaCost: ManaCost.Parse("{1}{G}")), new BecomeCreatureEffect(3, 3, [Keyword.Trample], "Ape")),
             },
 
             // === Terrageddon deck ===
@@ -718,7 +736,7 @@ public static class CardDefinitions
                     new DynamicAddManaEffect(ManaColor.Green,
                         p => p.Battlefield.Cards.Count(c => c.Subtypes.Contains("Elf", StringComparer.OrdinalIgnoreCase)))),
             },
-            ["Quirion Ranger"] = new(ManaCost.Parse("{G}"), null, 1, 1, CardType.Creature) { Subtypes = ["Elf"] },
+            ["Quirion Ranger"] = new(ManaCost.Parse("{G}"), null, 1, 1, CardType.Creature) { Subtypes = ["Elf", "Ranger"] },
             ["Wirewood Symbiote"] = new(ManaCost.Parse("{G}"), null, 1, 1, CardType.Creature) { Subtypes = ["Insect"] },
             ["Multani's Acolyte"] = new(ManaCost.Parse("{G}{G}"), null, 2, 1, CardType.Creature)
             {
@@ -751,7 +769,17 @@ public static class CardDefinitions
                         Layer: EffectLayer.Layer6_AbilityAddRemove),
                 ],
             },
-            ["Wall of Roots"] = new(ManaCost.Parse("{1}{G}"), null, 0, 5, CardType.Creature) { Subtypes = ["Plant", "Wall"] },
+            ["Wall of Roots"] = new(ManaCost.Parse("{1}{G}"), null, 0, 5, CardType.Creature)
+            {
+                Subtypes = ["Plant", "Wall"],
+                ContinuousEffects =
+                [
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
+                        (card, _) => card.Name == "Wall of Roots",
+                        GrantedKeyword: Keyword.Defender,
+                        Layer: EffectLayer.Layer6_AbilityAddRemove),
+                ],
+            },
             ["Ravenous Baloth"] = new(ManaCost.Parse("{2}{G}{G}"), null, 4, 4, CardType.Creature)
             {
                 Subtypes = ["Beast"],
@@ -772,13 +800,14 @@ public static class CardDefinitions
             },
             ["Masticore"] = new(ManaCost.Parse("{4}"), null, 4, 4, CardType.Artifact | CardType.Creature)
             {
+                Subtypes = ["Masticore"],
                 Triggers = [new Trigger(GameEvent.Upkeep, TriggerCondition.Upkeep, new MasticoreUpkeepEffect())],
                 ActivatedAbility = new(
                     new ActivatedAbilityCost(ManaCost: ManaCost.Parse("{2}")),
                     new DealDamageEffect(1),
                     TargetFilter: c => c.IsCreature),
             },
-            ["Nantuko Vigilante"] = new(ManaCost.Parse("{3}{G}"), null, 3, 2, CardType.Creature) { Subtypes = ["Insect", "Druid"] },
+            ["Nantuko Vigilante"] = new(ManaCost.Parse("{3}{G}"), null, 3, 2, CardType.Creature) { Subtypes = ["Insect", "Druid", "Mutant"] },
             ["Yavimaya Granger"] = new(ManaCost.Parse("{2}{G}"), null, 2, 2, CardType.Creature)
             {
                 Subtypes = ["Elf"],
@@ -788,6 +817,13 @@ public static class CardDefinitions
             ["Anger"] = new(ManaCost.Parse("{3}{R}"), null, 2, 2, CardType.Creature)
             {
                 Subtypes = ["Incarnation"],
+                ContinuousEffects =
+                [
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
+                        (card, _) => card.Name == "Anger",
+                        GrantedKeyword: Keyword.Haste,
+                        Layer: EffectLayer.Layer6_AbilityAddRemove),
+                ],
                 GraveyardAbilities =
                 [
                     new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
@@ -839,7 +875,7 @@ public static class CardDefinitions
 
             // ─── Legacy Sneak and Show ──────────────────────────────────────────
 
-            ["Show and Tell"] = new(ManaCost.Parse("{1}{U}{U}"), null, null, null, CardType.Sorcery,
+            ["Show and Tell"] = new(ManaCost.Parse("{2}{U}"), null, null, null, CardType.Sorcery,
                 Effect: new ShowAndTellEffect()),
 
             ["Sneak Attack"] = new(ManaCost.Parse("{3}{R}"), null, null, null, CardType.Enchantment)
@@ -854,6 +890,7 @@ public static class CardDefinitions
                 IsLegendary = true,
                 Subtypes = ["Eldrazi"],
                 ShuffleGraveyardOnDeath = true,
+                CannotBeCountered = true,
                 ContinuousEffects =
                 [
                     new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,

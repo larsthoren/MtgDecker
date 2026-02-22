@@ -468,4 +468,154 @@ public class CardDefinitionsTests
         def!.Effect.Should().BeOfType<GerrardVerdictEffect>(
             because: "Gerrard's Verdict target discards 2, caster gains 3 life per land");
     }
+
+    // === Card audit: mana cost corrections ===
+
+    [Fact]
+    public void GempalmIncinerator_HasCorrectCost()
+    {
+        CardDefinitions.TryGet("Gempalm Incinerator", out var def);
+
+        def!.ManaCost.Should().NotBeNull();
+        def.ManaCost!.ConvertedManaCost.Should().Be(3);
+        def.ManaCost.ColorRequirements.Should().ContainKey(ManaColor.Red).WhoseValue.Should().Be(1);
+        def.ManaCost.GenericCost.Should().Be(2);
+    }
+
+    [Fact]
+    public void RiftBolt_HasCorrectCost()
+    {
+        CardDefinitions.TryGet("Rift Bolt", out var def);
+
+        def!.ManaCost.Should().NotBeNull();
+        def.ManaCost!.ConvertedManaCost.Should().Be(3);
+        def.ManaCost.ColorRequirements.Should().ContainKey(ManaColor.Red).WhoseValue.Should().Be(1);
+        def.ManaCost.GenericCost.Should().Be(2);
+    }
+
+    [Fact]
+    public void ShowAndTell_HasCorrectCost()
+    {
+        CardDefinitions.TryGet("Show and Tell", out var def);
+
+        def!.ManaCost.Should().NotBeNull();
+        def.ManaCost!.ConvertedManaCost.Should().Be(3);
+        def.ManaCost.ColorRequirements.Should().ContainKey(ManaColor.Blue).WhoseValue.Should().Be(1);
+        def.ManaCost.GenericCost.Should().Be(2);
+    }
+
+    [Fact]
+    public void SkeletalScrying_HasCorrectCost()
+    {
+        CardDefinitions.TryGet("Skeletal Scrying", out var def);
+
+        def!.ManaCost.Should().NotBeNull();
+        def.ManaCost!.ConvertedManaCost.Should().Be(1);
+        def.ManaCost.ColorRequirements.Should().ContainKey(ManaColor.Black).WhoseValue.Should().Be(1);
+        def.ManaCost.GenericCost.Should().Be(0);
+    }
+
+    // === Card audit: P/T fix ===
+
+    [Fact]
+    public void GoblinTinkerer_HasCorrectPT()
+    {
+        CardDefinitions.TryGet("Goblin Tinkerer", out var def);
+        def!.Power.Should().Be(1);
+        def!.Toughness.Should().Be(2,
+            because: "Goblin Tinkerer is a 1/2, not 1/1");
+    }
+
+    // === Card audit: subtype fixes ===
+
+    [Theory]
+    [InlineData("Goblin Piledriver", new[] { "Goblin", "Warrior" })]
+    [InlineData("Goblin Warchief", new[] { "Goblin", "Warrior" })]
+    [InlineData("Goblin Pyromancer", new[] { "Goblin", "Wizard" })]
+    [InlineData("Goblin Guide", new[] { "Goblin", "Scout" })]
+    [InlineData("Quirion Ranger", new[] { "Elf", "Ranger" })]
+    [InlineData("Bane of the Living", new[] { "Insect" })]
+    [InlineData("Plague Spitter", new[] { "Phyrexian", "Horror" })]
+    [InlineData("Phyrexian Rager", new[] { "Phyrexian", "Horror" })]
+    [InlineData("Jackal Pup", new[] { "Jackal" })]
+    [InlineData("Masticore", new[] { "Masticore" })]
+    [InlineData("Nantuko Vigilante", new[] { "Insect", "Druid", "Mutant" })]
+    public void Card_HasCorrectSubtypes(string cardName, string[] expectedSubtypes)
+    {
+        CardDefinitions.TryGet(cardName, out var def);
+        def.Should().NotBeNull(because: $"'{cardName}' should be registered");
+        def!.Subtypes.Should().BeEquivalentTo(expectedSubtypes,
+            because: $"{cardName} should have subtypes [{string.Join(", ", expectedSubtypes)}]");
+    }
+
+    // === Card audit: missing keywords for 7 cards ===
+
+    [Theory]
+    [InlineData("Anger")]
+    [InlineData("Terravore")]
+    [InlineData("Murktide Regent")]
+    [InlineData("Wall of Roots")]
+    public void Card_HasKeyword(string cardName)
+    {
+        CardDefinitions.TryGet(cardName, out var def);
+        def!.ContinuousEffects.Should().NotBeEmpty(
+            because: $"{cardName} should have keyword-granting continuous effects");
+    }
+
+    [Fact]
+    public void Anger_HasHasteOnCreature()
+    {
+        CardDefinitions.TryGet("Anger", out var def);
+        def!.ContinuousEffects.Should().Contain(e =>
+            e.Type == ContinuousEffectType.GrantKeyword && e.GrantedKeyword == Keyword.Haste);
+    }
+
+    [Fact]
+    public void Terravore_HasTrample()
+    {
+        CardDefinitions.TryGet("Terravore", out var def);
+        def!.ContinuousEffects.Should().Contain(e =>
+            e.Type == ContinuousEffectType.GrantKeyword && e.GrantedKeyword == Keyword.Trample);
+    }
+
+    [Fact]
+    public void MurktideRegent_HasFlying()
+    {
+        CardDefinitions.TryGet("Murktide Regent", out var def);
+        def!.ContinuousEffects.Should().Contain(e =>
+            e.Type == ContinuousEffectType.GrantKeyword && e.GrantedKeyword == Keyword.Flying);
+    }
+
+    [Fact]
+    public void WallOfRoots_HasDefender()
+    {
+        CardDefinitions.TryGet("Wall of Roots", out var def);
+        def!.ContinuousEffects.Should().Contain(e =>
+            e.Type == ContinuousEffectType.GrantKeyword && e.GrantedKeyword == Keyword.Defender);
+    }
+
+    [Fact]
+    public void Emrakul_CannotBeCountered()
+    {
+        CardDefinitions.TryGet("Emrakul, the Aeons Torn", out var def);
+        def!.CannotBeCountered.Should().BeTrue();
+    }
+
+    [Fact]
+    public void FaerieConclave_BecomeCreatureHasFlying()
+    {
+        CardDefinitions.TryGet("Faerie Conclave", out var def);
+        var effect = def!.ActivatedAbility!.Effect as BecomeCreatureEffect;
+        effect.Should().NotBeNull();
+        effect!.Keywords.Should().Contain(Keyword.Flying);
+    }
+
+    [Fact]
+    public void TreetopVillage_BecomeCreatureHasTrample()
+    {
+        CardDefinitions.TryGet("Treetop Village", out var def);
+        var effect = def!.ActivatedAbility!.Effect as BecomeCreatureEffect;
+        effect.Should().NotBeNull();
+        effect!.Keywords.Should().Contain(Keyword.Trample);
+    }
 }
