@@ -18,6 +18,7 @@ internal class PayManaFromPoolHandler : IActionHandler
 
         player.ManaPool.Deduct(color, 1);
         state.ApplyManaPayment(color);
+        state.MidCastManuallyPaid[color] = state.MidCastManuallyPaid.GetValueOrDefault(color) + 1;
         state.Log($"{player.Name} pays {{{GameEngine.GetColorSymbol(color)}}} from pool.");
 
         if (state.IsFullyPaid)

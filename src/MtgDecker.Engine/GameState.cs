@@ -111,6 +111,7 @@ public class GameState
 
     // Refunded mana tracking for cancel
     internal Dictionary<ManaColor, int> MidCastAutoDeducted { get; set; } = new();
+    internal Dictionary<ManaColor, int> MidCastManuallyPaid { get; set; } = new();
     internal int MidCastLifePaid { get; set; }
 
     // Context preserved for CompleteMidCastAsync
@@ -126,6 +127,7 @@ public class GameState
         RemainingGenericCost = genericCost;
         RemainingPhyrexianCost = new Dictionary<ManaColor, int>(phyrexianCost);
         MidCastAutoDeducted = new Dictionary<ManaColor, int>();
+        MidCastManuallyPaid = new Dictionary<ManaColor, int>();
         MidCastLifePaid = 0;
     }
 
@@ -136,6 +138,7 @@ public class GameState
         RemainingGenericCost = 0;
         RemainingPhyrexianCost.Clear();
         MidCastAutoDeducted.Clear();
+        MidCastManuallyPaid.Clear();
         MidCastLifePaid = 0;
         MidCastTargets = null;
         MidCastAction = null;

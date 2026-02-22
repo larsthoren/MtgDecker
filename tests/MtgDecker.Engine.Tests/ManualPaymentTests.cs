@@ -160,6 +160,92 @@ public class ManualPaymentTests
     }
 
     [Fact]
+    public async Task CancelCast_RefundsMana_ReturnsCardToHand()
+    {
+        var (engine, state, h1, _) = CreateSetup();
+        await engine.StartGameAsync();
+        state.CurrentPhase = Phase.MainPhase1;
+        state.ActivePlayer = state.Player1;
+
+        var card = new GameCard { Name = "TestSpell", ManaCost = ManaCost.Parse("{1}{R}"), CardTypes = CardType.Instant };
+        state.Player1.Hand.Add(card);
+        state.Player1.ManaPool.Add(ManaColor.Red, 1);
+        state.Player1.ManaPool.Add(ManaColor.Blue, 1);
+
+        await engine.ExecuteAction(GameAction.CastSpell(state.Player1.Id, card.Id));
+        // R was auto-deducted, mid-cast for {1}
+        state.Player1.ManaPool[ManaColor.Red].Should().Be(0);
+
+        await engine.ExecuteAction(GameAction.CancelCast(state.Player1.Id));
+
+        state.IsMidCast.Should().BeFalse();
+        state.Player1.Hand.Cards.Should().Contain(card);
+        state.Player1.ManaPool[ManaColor.Red].Should().Be(1); // Refunded
+        state.Player1.ManaPool[ManaColor.Blue].Should().Be(1); // Untouched
+    }
+
+    [Fact]
+    public async Task CancelCast_RefundsLifePayments()
+    {
+        var (engine, state, h1, _) = CreateSetup();
+        await engine.StartGameAsync();
+        state.CurrentPhase = Phase.MainPhase1;
+        state.ActivePlayer = state.Player1;
+
+        // {1}{B/P}{B/P} - Dismember-like, needs generic + phyrexian
+        var card = new GameCard { Name = "TestPhyrexian", ManaCost = ManaCost.Parse("{1}{B/P}{B/P}"), CardTypes = CardType.Instant };
+        state.Player1.Hand.Add(card);
+        state.Player1.ManaPool.Add(ManaColor.Red, 1);
+
+        var lifeBefore = state.Player1.Life;
+        await engine.ExecuteAction(GameAction.CastSpell(state.Player1.Id, card.Id));
+        state.IsMidCast.Should().BeTrue();
+
+        // Pay life for one Phyrexian symbol
+        await engine.ExecuteAction(GameAction.PayLifeForPhyrexian(state.Player1.Id));
+        state.Player1.Life.Should().Be(lifeBefore - 2);
+
+        // Cancel — should refund life
+        await engine.ExecuteAction(GameAction.CancelCast(state.Player1.Id));
+
+        state.Player1.Life.Should().Be(lifeBefore); // Life refunded
+        state.Player1.Hand.Cards.Should().Contain(card);
+        state.IsMidCast.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task CancelCast_RefundsManaPayments()
+    {
+        var (engine, state, h1, _) = CreateSetup();
+        await engine.StartGameAsync();
+        state.CurrentPhase = Phase.MainPhase1;
+        state.ActivePlayer = state.Player1;
+
+        // {2}{R} — R auto-deducted, {2} generic manual
+        var card = new GameCard { Name = "TestSpell2", ManaCost = ManaCost.Parse("{2}{R}"), CardTypes = CardType.Instant };
+        state.Player1.Hand.Add(card);
+        state.Player1.ManaPool.Add(ManaColor.Red, 1);
+        state.Player1.ManaPool.Add(ManaColor.Blue, 2);
+
+        await engine.ExecuteAction(GameAction.CastSpell(state.Player1.Id, card.Id));
+        state.IsMidCast.Should().BeTrue();
+
+        // Pay 1 Blue toward generic
+        await engine.ExecuteAction(GameAction.PayManaFromPool(state.Player1.Id, ManaColor.Blue));
+        state.Player1.ManaPool[ManaColor.Blue].Should().Be(1);
+
+        // Cancel
+        await engine.ExecuteAction(GameAction.CancelCast(state.Player1.Id));
+
+        state.IsMidCast.Should().BeFalse();
+        state.Player1.Hand.Cards.Should().Contain(card);
+        // Red auto-deducted should be refunded
+        state.Player1.ManaPool[ManaColor.Red].Should().Be(1);
+        // Blue manually paid should ALSO be refunded
+        state.Player1.ManaPool[ManaColor.Blue].Should().Be(2);
+    }
+
+    [Fact]
     public async Task MixedPayment_ManaAndLife_ForDismember()
     {
         var (engine, state, h1, _) = CreateSetup();
