@@ -274,7 +274,22 @@
     <div class="player-info-bar @(IsPlayerTargetable ? "targetable" : "")"
          @onclick="HandlePlayerInfoBarClick">
         <MudText Typo="Typo.subtitle2">@LocalPlayer.Name</MudText>
-        <MudChip T="string" Size="Size.Small" Color="Color.Error">@LocalPlayer.Life HP</MudChip>
+        @{
+            bool canPayLife = State.IsMidCast
+                && State.PendingCastPlayerId == LocalPlayer.Id
+                && State.TotalRemainingPhyrexian > 0
+                && LocalPlayer.Life > 2;
+        }
+        @if (canPayLife)
+        {
+            <MudChip T="string" Size="Size.Small" Color="Color.Warning"
+                     Style="cursor: pointer;"
+                     OnClick="PayLifeForPhyrexian">@LocalPlayer.Life HP (click: -2 life)</MudChip>
+        }
+        else
+        {
+            <MudChip T="string" Size="Size.Small" Color="Color.Error">@LocalPlayer.Life HP</MudChip>
+        }
         <MudChip T="string" Size="Size.Small" Color="Color.Default">Hand: @LocalPlayer.Hand.Cards.Count</MudChip>
         @if (IsLocalActive)
         {
@@ -287,11 +302,25 @@
                 {
                     @if (LocalPlayer.ManaPool[color] > 0)
                     {
-                        <span class="mana-entry">
-                            <img src="https://svgs.scryfall.io/card-symbols/@(symbol).svg"
-                                 alt="@color" class="mana-symbol" />
-                            <span class="mana-count">@LocalPlayer.ManaPool[color]</span>
-                        </span>
+                        @if (State.IsMidCast && State.PendingCastPlayerId == LocalPlayer.Id)
+                        {
+                            @for (int i = 0; i < LocalPlayer.ManaPool[color]; i++)
+                            {
+                                var c = color;
+                                <span class="mana-entry clickable-mana" @onclick="() => PayManaFromPool(c)">
+                                    <img src="https://svgs.scryfall.io/card-symbols/@(symbol).svg"
+                                         alt="@color" class="mana-symbol" />
+                                </span>
+                            }
+                        }
+                        else
+                        {
+                            <span class="mana-entry">
+                                <img src="https://svgs.scryfall.io/card-symbols/@(symbol).svg"
+                                     alt="@color" class="mana-symbol" />
+                                <span class="mana-count">@LocalPlayer.ManaPool[color]</span>
+                            </span>
+                        }
                     }
                 }
             </div>
@@ -301,17 +330,45 @@
         <MudChip T="string" Size="Size.Small" Color="Color.Default">Lib: @LocalPlayer.Library.Count</MudChip>
     </div>
 
+    @* Mid-cast payment bar *@
+    @if (State.IsMidCast && State.PendingCastPlayerId == LocalPlayer.Id)
+    {
+        <div class="mid-cast-bar">
+            <MudText Typo="Typo.body2" Class="mr-2">
+                Casting @(State.PendingCastCard?.Name) — Remaining:
+                @if (State.RemainingGenericCost > 0)
+                {
+                    <img src="https://svgs.scryfall.io/card-symbols/@(State.RemainingGenericCost).svg"
+                         alt="generic" class="mana-symbol" />
+                }
+                @foreach (var (color, count) in State.RemainingPhyrexianCost)
+                {
+                    @for (int i = 0; i < count; i++)
+                    {
+                        var sym = ManaSymbols.FirstOrDefault(m => m.color == color).symbol ?? "C";
+                        <img src="https://svgs.scryfall.io/card-symbols/@(sym).svg"
+                             alt="@color" class="mana-symbol" /><span>/P</span>
+                    }
+                }
+            </MudText>
+            <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Warning"
+                       OnClick="CancelMidCast">CANCEL</MudButton>
+        </div>
+    }
+
     @* Row 6: Player hand *@
     <div class="player-hand">
         @foreach (var card in LocalPlayer.Hand.Cards)
         {
-            <CardDisplay Name="@card.Name" ImageUrl="@card.ImageUrl"
-                         CardSize="146"
-                         Selected="@(_selectedCard?.Id == card.Id)"
-                         Clickable="true"
-                         OnClick="async () => await HandleHandClick(card)"
-                         OnHoverStart="SetHoveredCard"
-                         OnHoverEnd="ClearHoveredCard" />
+            <div class="@(State.IsMidCast && State.PendingCastCard?.Id == card.Id ? "mid-cast-highlight" : "")">
+                <CardDisplay Name="@card.Name" ImageUrl="@card.ImageUrl"
+                             CardSize="146"
+                             Selected="@(_selectedCard?.Id == card.Id)"
+                             Clickable="true"
+                             OnClick="async () => await HandleHandClick(card)"
+                             OnHoverStart="SetHoveredCard"
+                             OnHoverEnd="ClearHoveredCard" />
+            </div>
         }
         @if (LocalPlayer.Hand.Cards.Count == 0)
         {
@@ -1114,6 +1171,23 @@
     }
 
     private void CancelPendingCast() => _pendingCastCard = null;
+
+    // --- Mid-cast payment (MTGO-style clickable mana pool / life) ---
+
+    private async Task PayManaFromPool(ManaColor color)
+    {
+        await OnAction.InvokeAsync(GameAction.PayManaFromPool(LocalPlayer.Id, color));
+    }
+
+    private async Task PayLifeForPhyrexian()
+    {
+        await OnAction.InvokeAsync(GameAction.PayLifeForPhyrexian(LocalPlayer.Id));
+    }
+
+    private async Task CancelMidCast()
+    {
+        await OnAction.InvokeAsync(GameAction.CancelCast(LocalPlayer.Id));
+    }
 
     // --- Card preview hover ---
 
