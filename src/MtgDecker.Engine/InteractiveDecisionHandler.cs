@@ -370,6 +370,8 @@ public class InteractiveDecisionHandler : IPlayerDecisionHandler, IManualManaPay
         _reorderTcs?.TrySetResult((ordered, shuffle));
     }
 
+
+
     // Reuses the discard UI state (DiscardOptions/DiscardCount/DiscardPrompt) since the
     // interaction is identical (select N cards, confirm). Safe because the engine processes
     // costs sequentially — discard and exile never overlap.

@@ -606,7 +606,7 @@
                     </MudText>
                     <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Error"
                                Disabled="@(_selectedDiscards.Count != Handler.DiscardCount)"
-                               OnClick="SubmitDiscard">Discard</MudButton>
+                               OnClick="SubmitDiscard">@(Handler.DiscardPrompt?.Contains("Exile") == true ? "Exile" : "Discard")</MudButton>
                 </div>
             </MudPaper>
         </div>
@@ -1266,9 +1266,7 @@
     private async Task HandlePlayAlternate()
     {
         if (_selectedCard == null) return;
-        var action = GameAction.CastSpell(LocalPlayer.Id, _selectedCard.Id);
-        action.UseAlternateCost = true;
-        await OnAction.InvokeAsync(action);
+        await OnAction.InvokeAsync(GameAction.CastSpell(LocalPlayer.Id, _selectedCard.Id, useAlternateCost: true));
         ClearSelection();
     }
 

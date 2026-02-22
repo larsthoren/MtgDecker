@@ -49,9 +49,7 @@ public class AlternateCostChoiceTests
         p1Handler.EnqueueTarget(new TargetInfo(targetSpell.Id, state.Player2.Id, ZoneType.Stack));
 
         // Cast with UseAlternateCost flag — should return Island, not pay mana
-        var action = GameAction.CastSpell(state.Player1.Id, daze.Id);
-        action.UseAlternateCost = true;
-        await engine.ExecuteAction(action);
+        await engine.ExecuteAction(GameAction.CastSpell(state.Player1.Id, daze.Id, useAlternateCost: true));
 
         // Island should be returned to hand (alternate cost)
         state.Player1.Battlefield.Cards.Should().NotContain(c => c.Id == island.Id);

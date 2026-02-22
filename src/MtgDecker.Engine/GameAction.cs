@@ -26,7 +26,7 @@ public class GameAction
     public ManaCost? ManaCostPaid { get; internal set; }
     public Dictionary<ManaColor, int>? ActualManaPaid { get; internal set; }
     public bool IsLandDrop { get; internal set; }
-    public bool UseAlternateCost { get; set; }
+    public bool UseAlternateCost { get; init; }
 
     public static GameAction Pass(Guid playerId) => new()
     {
@@ -57,12 +57,13 @@ public class GameAction
         CardId = cardId
     };
 
-    public static GameAction CastSpell(Guid playerId, Guid cardId) => new()
+    public static GameAction CastSpell(Guid playerId, Guid cardId, bool useAlternateCost = false) => new()
     {
         Type = ActionType.CastSpell,
         PlayerId = playerId,
         CardId = cardId,
-        SourceZone = ZoneType.Hand
+        SourceZone = ZoneType.Hand,
+        UseAlternateCost = useAlternateCost
     };
 
     public static GameAction ActivateFetch(Guid playerId, Guid cardId) => new()

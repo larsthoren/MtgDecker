@@ -47,7 +47,7 @@ public class PlayLandValidationTests
     [Fact]
     public async Task PlayLand_DuringCombat_IsRejected()
     {
-        var engine = CreateGame(out var state, out var p1Handler, out _);
+        var engine = CreateGame(out var state, out _, out _);
         await engine.StartGameAsync();
 
         state.CurrentPhase = Phase.Combat;
