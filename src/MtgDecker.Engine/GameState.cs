@@ -1,4 +1,5 @@
 using MtgDecker.Engine.Enums;
+using MtgDecker.Engine.Mana;
 
 namespace MtgDecker.Engine;
 
@@ -97,5 +98,62 @@ public class GameState
             _gameLog.Add(message);
         }
         OnStateChanged?.Invoke();
+    }
+
+    // Mid-cast state for MTGO-style manual payment
+    public GameCard? PendingCastCard { get; private set; }
+    public Guid? PendingCastPlayerId { get; private set; }
+    public int RemainingGenericCost { get; private set; }
+    public Dictionary<ManaColor, int> RemainingPhyrexianCost { get; private set; } = new();
+    public bool IsMidCast => PendingCastCard != null;
+    public bool IsFullyPaid => IsMidCast && RemainingGenericCost == 0 && TotalRemainingPhyrexian == 0;
+    public int TotalRemainingPhyrexian => RemainingPhyrexianCost.Values.Sum();
+
+    // Refunded mana tracking for cancel
+    internal Dictionary<ManaColor, int> MidCastAutoDeducted { get; set; } = new();
+    internal int MidCastLifePaid { get; set; }
+
+    public void BeginMidCast(Guid playerId, GameCard card, int genericCost, Dictionary<ManaColor, int> phyrexianCost)
+    {
+        PendingCastPlayerId = playerId;
+        PendingCastCard = card;
+        RemainingGenericCost = genericCost;
+        RemainingPhyrexianCost = new Dictionary<ManaColor, int>(phyrexianCost);
+        MidCastAutoDeducted = new Dictionary<ManaColor, int>();
+        MidCastLifePaid = 0;
+    }
+
+    public void ClearMidCast()
+    {
+        PendingCastCard = null;
+        PendingCastPlayerId = null;
+        RemainingGenericCost = 0;
+        RemainingPhyrexianCost.Clear();
+        MidCastAutoDeducted.Clear();
+        MidCastLifePaid = 0;
+    }
+
+    public void ApplyManaPayment(ManaColor color)
+    {
+        if (RemainingPhyrexianCost.TryGetValue(color, out var phyCount) && phyCount > 0)
+        {
+            RemainingPhyrexianCost[color] = phyCount - 1;
+            if (RemainingPhyrexianCost[color] == 0) RemainingPhyrexianCost.Remove(color);
+        }
+        else if (RemainingGenericCost > 0)
+        {
+            RemainingGenericCost--;
+        }
+    }
+
+    public bool ApplyLifePayment()
+    {
+        var first = RemainingPhyrexianCost.FirstOrDefault(kv => kv.Value > 0);
+        if (first.Value == 0 && !RemainingPhyrexianCost.ContainsKey(first.Key)) return false;
+
+        RemainingPhyrexianCost[first.Key] = first.Value - 1;
+        if (RemainingPhyrexianCost[first.Key] == 0) RemainingPhyrexianCost.Remove(first.Key);
+        MidCastLifePaid += 2;
+        return true;
     }
 }
