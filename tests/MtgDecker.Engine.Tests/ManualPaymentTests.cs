@@ -100,4 +100,95 @@ public class ManualPaymentTests
         state.IsMidCast.Should().BeFalse();
         state.StackCount.Should().BeGreaterThanOrEqualTo(1);
     }
+
+    [Fact]
+    public async Task PayLifeForPhyrexian_Pays2Life_ReducesPhyrexianCost()
+    {
+        var (engine, state, h1, _) = CreateSetup();
+        await engine.StartGameAsync();
+        state.CurrentPhase = Phase.MainPhase1;
+        state.ActivePlayer = state.Player1;
+
+        var card = new GameCard { Name = "Surgical", ManaCost = ManaCost.Parse("{B/P}"), CardTypes = CardType.Instant };
+        state.Player1.Hand.Add(card);
+
+        await engine.ExecuteAction(GameAction.CastSpell(state.Player1.Id, card.Id));
+        state.IsMidCast.Should().BeTrue();
+        var lifeBefore = state.Player1.Life;
+
+        await engine.ExecuteAction(GameAction.PayLifeForPhyrexian(state.Player1.Id));
+
+        state.Player1.Life.Should().Be(lifeBefore - 2);
+        state.IsMidCast.Should().BeFalse();
+        state.StackCount.Should().BeGreaterThanOrEqualTo(1);
+    }
+
+    [Fact]
+    public async Task PayLifeForPhyrexian_Fails_WhenNoPhyrexianRemaining()
+    {
+        var (engine, state, h1, _) = CreateSetup();
+        await engine.StartGameAsync();
+        state.CurrentPhase = Phase.MainPhase1;
+        state.ActivePlayer = state.Player1;
+
+        var card = new GameCard { Name = "TestSpell", ManaCost = ManaCost.Parse("{1}"), CardTypes = CardType.Instant };
+        state.Player1.Hand.Add(card);
+        state.Player1.ManaPool.Add(ManaColor.Red, 1);
+
+        await engine.ExecuteAction(GameAction.CastSpell(state.Player1.Id, card.Id));
+
+        var act = () => engine.ExecuteAction(GameAction.PayLifeForPhyrexian(state.Player1.Id));
+        await act.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    [Fact]
+    public async Task PayLifeForPhyrexian_Fails_WhenLifeTooLow()
+    {
+        var (engine, state, h1, _) = CreateSetup();
+        await engine.StartGameAsync();
+        state.CurrentPhase = Phase.MainPhase1;
+        state.ActivePlayer = state.Player1;
+
+        var card = new GameCard { Name = "Surgical", ManaCost = ManaCost.Parse("{B/P}"), CardTypes = CardType.Instant };
+        state.Player1.Hand.Add(card);
+        state.Player1.AdjustLife(-18); // Life = 2
+
+        await engine.ExecuteAction(GameAction.CastSpell(state.Player1.Id, card.Id));
+
+        var act = () => engine.ExecuteAction(GameAction.PayLifeForPhyrexian(state.Player1.Id));
+        await act.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    [Fact]
+    public async Task MixedPayment_ManaAndLife_ForDismember()
+    {
+        var (engine, state, h1, _) = CreateSetup();
+        await engine.StartGameAsync();
+        state.CurrentPhase = Phase.MainPhase1;
+        state.ActivePlayer = state.Player1;
+
+        // Add a target creature for Dismember
+        var target = new GameCard { Name = "Bear", CardTypes = CardType.Creature, Power = 2, Toughness = 2 };
+        state.Player2.Battlefield.Add(target);
+
+        // Dismember: {1}{B/P}{B/P}
+        var card = new GameCard { Name = "Dismember", ManaCost = ManaCost.Parse("{1}{B/P}{B/P}"), CardTypes = CardType.Instant };
+        state.Player1.Hand.Add(card);
+        state.Player1.ManaPool.Add(ManaColor.Black, 1);
+        state.Player1.ManaPool.Add(ManaColor.Red, 1);
+
+        var lifeBefore = state.Player1.Life;
+        await engine.ExecuteAction(GameAction.CastSpell(state.Player1.Id, card.Id));
+
+        // Pay 1 Black for first {B/P}
+        await engine.ExecuteAction(GameAction.PayManaFromPool(state.Player1.Id, ManaColor.Black));
+        // Pay life for second {B/P}
+        await engine.ExecuteAction(GameAction.PayLifeForPhyrexian(state.Player1.Id));
+        // Pay Red for generic {1}
+        await engine.ExecuteAction(GameAction.PayManaFromPool(state.Player1.Id, ManaColor.Red));
+
+        state.IsMidCast.Should().BeFalse();
+        state.Player1.Life.Should().Be(lifeBefore - 2);
+        state.StackCount.Should().BeGreaterThanOrEqualTo(1);
+    }
 }

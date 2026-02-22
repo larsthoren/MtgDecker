@@ -26,6 +26,7 @@ public class GameEngine
         _handlers[ActionType.CastSpell] = new CastSpellHandler();
         _handlers[ActionType.ActivateAbility] = new ActivateAbilityHandler();
         _handlers[ActionType.PayManaFromPool] = new PayManaFromPoolHandler();
+        _handlers[ActionType.PayLifeForPhyrexian] = new PayLifeForPhyrexianHandler();
     }
 
     public async Task StartGameAsync(CancellationToken ct = default)
