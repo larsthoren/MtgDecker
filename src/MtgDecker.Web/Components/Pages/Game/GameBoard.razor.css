@@ -303,12 +303,19 @@
     width: 90%;
 }
 
-/* Hand cards: hover zoom grows upward */
-.player-hand .card-display.clickable:hover {
-    transform-origin: bottom center;
+/* Card preview panel (bottom-right corner) */
+.card-preview-panel {
+    position: fixed;
+    bottom: 16px;
+    right: 16px;
+    z-index: 500;
+    pointer-events: none;
+    filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.6));
 }
 
-/* Opponent battlefield cards: hover zoom grows downward */
-.opponent-battlefield .card-display.clickable:hover {
-    transform-origin: top center;
+.card-preview-panel img {
+    width: 300px;
+    height: auto;
+    border-radius: 12px;
+    display: block;
 }

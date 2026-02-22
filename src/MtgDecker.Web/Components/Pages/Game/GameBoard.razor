@@ -67,7 +67,9 @@
                                          Clickable="@(IsTargetingMode)"
                                          EligibleTarget="@IsEligibleTarget(aura)"
                                          TargetingDimmed="@IsTargetingDimmed(aura)"
-                                         OnClick="async () => await HandleOpponentCardClick(aura)" />
+                                         OnClick="async () => await HandleOpponentCardClick(aura)"
+                                         OnHoverStart="SetHoveredCard"
+                                         OnHoverEnd="ClearHoveredCard" />
                         </div>
                     }
                     <div class="host-card">
@@ -84,7 +86,9 @@
                                      Toughness="@card.Toughness"
                                      DamageMarked="@card.DamageMarked"
                                      Counters="@(card.Counters.Count > 0 ? card.Counters : null)"
-                                     OnClick="async () => await HandleOpponentCardClick(card)" />
+                                     OnClick="async () => await HandleOpponentCardClick(card)"
+                                     OnHoverStart="SetHoveredCard"
+                                     OnHoverEnd="ClearHoveredCard" />
                     </div>
                 </div>
             }
@@ -104,7 +108,9 @@
                                          Clickable="@(IsTargetingMode)"
                                          EligibleTarget="@IsEligibleTarget(aura)"
                                          TargetingDimmed="@IsTargetingDimmed(aura)"
-                                         OnClick="async () => await HandleOpponentCardClick(aura)" />
+                                         OnClick="async () => await HandleOpponentCardClick(aura)"
+                                         OnHoverStart="SetHoveredCard"
+                                         OnHoverEnd="ClearHoveredCard" />
                         </div>
                     }
                     <div class="host-card">
@@ -122,7 +128,9 @@
                                      DamageMarked="@card.DamageMarked"
                                      SummoningSick="@(card.IsCreature && card.HasSummoningSickness(State.TurnNumber))"
                                      Counters="@(card.Counters.Count > 0 ? card.Counters : null)"
-                                     OnClick="async () => await HandleOpponentCardClick(card)" />
+                                     OnClick="async () => await HandleOpponentCardClick(card)"
+                                     OnHoverStart="SetHoveredCard"
+                                     OnHoverEnd="ClearHoveredCard" />
                     </div>
                 </div>
             }
@@ -183,7 +191,9 @@
                                          EligibleTarget="@IsEligibleTarget(aura)"
                                          TargetingDimmed="@IsTargetingDimmed(aura)"
                                          Clickable="true"
-                                         OnClick="async () => await HandleBattlefieldClick(aura, false, false)" />
+                                         OnClick="async () => await HandleBattlefieldClick(aura, false, false)"
+                                         OnHoverStart="SetHoveredCard"
+                                         OnHoverEnd="ClearHoveredCard" />
                         </div>
                     }
                     <div class="host-card">
@@ -199,7 +209,9 @@
                                      SummoningSick="@(card.IsCreature && card.HasSummoningSickness(State.TurnNumber))"
                                      Counters="@(card.Counters.Count > 0 ? card.Counters : null)"
                                      Clickable="true"
-                                     OnClick="async () => await HandleBattlefieldClick(card, isEligibleAttacker, isEligibleBlocker)" />
+                                     OnClick="async () => await HandleBattlefieldClick(card, isEligibleAttacker, isEligibleBlocker)"
+                                     OnHoverStart="SetHoveredCard"
+                                     OnHoverEnd="ClearHoveredCard" />
                     </div>
                 </div>
             }
@@ -223,7 +235,9 @@
                                          EligibleTarget="@IsEligibleTarget(aura)"
                                          TargetingDimmed="@IsTargetingDimmed(aura)"
                                          Clickable="true"
-                                         OnClick="async () => await HandleBattlefieldClick(aura, false, false)" />
+                                         OnClick="async () => await HandleBattlefieldClick(aura, false, false)"
+                                         OnHoverStart="SetHoveredCard"
+                                         OnHoverEnd="ClearHoveredCard" />
                         </div>
                     }
                     <div class="land-wrapper host-card">
@@ -233,7 +247,9 @@
                                      EligibleTarget="@IsEligibleTarget(card)"
                                      TargetingDimmed="@IsTargetingDimmed(card)"
                                      Clickable="true"
-                                     OnClick="async () => await HandleLandClick(card)" />
+                                     OnClick="async () => await HandleLandClick(card)"
+                                     OnHoverStart="SetHoveredCard"
+                                     OnHoverEnd="ClearHoveredCard" />
                         @if (isUndoCandidate)
                         {
                             <button class="untap-affordance" @onclick="HandleUntapLand"
@@ -291,7 +307,9 @@
                          CardSize="146"
                          Selected="@(_selectedCard?.Id == card.Id)"
                          Clickable="true"
-                         OnClick="async () => await HandleHandClick(card)" />
+                         OnClick="async () => await HandleHandClick(card)"
+                         OnHoverStart="SetHoveredCard"
+                         OnHoverEnd="ClearHoveredCard" />
         }
         @if (LocalPlayer.Hand.Cards.Count == 0)
         {
@@ -625,6 +643,14 @@
         </div>
     }
 
+    @* Card preview panel (bottom-right corner on hover) *@
+    @if (_hoveredImageUrl != null)
+    {
+        <div class="card-preview-panel">
+            <img src="@_hoveredImageUrl" alt="Card preview" />
+        </div>
+    }
+
     @* Log toggle button *@
     <MudButton StartIcon="@Icons.Material.Filled.Article" Size="Size.Small"
                Variant="Variant.Outlined" Class="log-toggle-btn" OnClick="ToggleLog" Title="Toggle Game Log">Log</MudButton>
@@ -687,6 +713,9 @@
 
     // Pending cast state (waiting for player to tap lands)
     private GameCard? _pendingCastCard;
+
+    // Card preview hover state
+    private string? _hoveredImageUrl;
 
     private Player LocalPlayer => PlayerSeat == 1 ? State.Player1 : State.Player2;
     private Player OpponentPlayer => PlayerSeat == 1 ? State.Player2 : State.Player1;
@@ -1105,6 +1134,11 @@
     }
 
     private void CancelPendingCast() => _pendingCastCard = null;
+
+    // --- Card preview hover ---
+
+    private void SetHoveredCard(string? imageUrl) => _hoveredImageUrl = imageUrl;
+    private void ClearHoveredCard() => _hoveredImageUrl = null;
 
     // --- Untap (pending mana) ---
 

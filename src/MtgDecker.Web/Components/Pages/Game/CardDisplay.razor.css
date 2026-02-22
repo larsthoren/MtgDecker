@@ -10,10 +10,9 @@
 }
 
 .card-display.clickable:hover {
+    outline: 2px solid rgba(255, 255, 255, 0.6);
+    border-radius: 8px;
     filter: brightness(1.1);
-    transform: scale(1.8);
-    z-index: 50;
-    position: relative;
 }
 
 .card-display.tapped {
@@ -22,7 +21,7 @@
 }
 
 .card-display.tapped.clickable:hover {
-    transform: rotate(90deg) scale(1.8);
+    transform: rotate(90deg);
 }
 
 .card-display.selected {
