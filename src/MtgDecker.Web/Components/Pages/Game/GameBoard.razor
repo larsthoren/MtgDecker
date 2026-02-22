@@ -25,7 +25,9 @@
         <MudText Typo="Typo.subtitle2">@OpponentPlayer.Name</MudText>
         <MudChip T="string" Size="Size.Small" Color="Color.Error">@OpponentPlayer.Life HP</MudChip>
         <MudChip T="string" Size="Size.Small" Color="Color.Default">Hand: @OpponentPlayer.Hand.Cards.Count</MudChip>
-        <MudChip T="string" Size="Size.Small" Color="Color.Default">Grave: @OpponentPlayer.Graveyard.Cards.Count</MudChip>
+        <MudChip T="string" Size="Size.Small" Color="Color.Default"
+                 OnClick="() => _showOpponentGraveyard = !_showOpponentGraveyard"
+                 Style="cursor: pointer;">Grave: @OpponentPlayer.Graveyard.Cards.Count</MudChip>
         <MudChip T="string" Size="Size.Small" Color="Color.Default">Exile: @OpponentPlayer.Exile.Cards.Count</MudChip>
         <MudChip T="string" Size="Size.Small" Color="Color.Default">Lib: @OpponentPlayer.Library.Count</MudChip>
         @if (OpponentPlayer.ManaPool?.Total > 0)
@@ -49,6 +51,26 @@
             <MudChip T="string" Size="Size.Small" Color="Color.Primary">Active</MudChip>
         }
     </div>
+
+    @if (_showOpponentGraveyard && OpponentPlayer.Graveyard.Cards.Count > 0)
+    {
+        <div class="graveyard-panel">
+            <div class="graveyard-header">
+                <MudText Typo="Typo.caption" Style="font-weight: 600;">Opponent Graveyard (@OpponentPlayer.Graveyard.Cards.Count)</MudText>
+                <MudIconButton Size="Size.Small" Icon="@Icons.Material.Filled.Close"
+                               OnClick="() => _showOpponentGraveyard = false" />
+            </div>
+            <div class="graveyard-cards">
+                @foreach (var card in OpponentPlayer.Graveyard.Cards)
+                {
+                    <CardDisplay Name="@card.Name" ImageUrl="@card.ImageUrl" CardSize="100"
+                                 Clickable="false"
+                                 OnHoverStart="SetHoveredCard"
+                                 OnHoverEnd="ClearHoveredCard" />
+                }
+            </div>
+        </div>
+    }
 
     @* Row 2: Opponent battlefield *@
     <div class="opponent-battlefield">
@@ -325,7 +347,9 @@
                 }
             </div>
         }
-        <MudChip T="string" Size="Size.Small" Color="Color.Default">Grave: @LocalPlayer.Graveyard.Cards.Count</MudChip>
+        <MudChip T="string" Size="Size.Small" Color="Color.Default"
+                 OnClick="() => _showPlayerGraveyard = !_showPlayerGraveyard"
+                 Style="cursor: pointer;">Grave: @LocalPlayer.Graveyard.Cards.Count</MudChip>
         <MudChip T="string" Size="Size.Small" Color="Color.Default">Exile: @LocalPlayer.Exile.Cards.Count</MudChip>
         <MudChip T="string" Size="Size.Small" Color="Color.Default">Lib: @LocalPlayer.Library.Count</MudChip>
     </div>
@@ -353,6 +377,26 @@
             </MudText>
             <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Warning"
                        OnClick="CancelMidCast">CANCEL</MudButton>
+        </div>
+    }
+
+    @if (_showPlayerGraveyard && LocalPlayer.Graveyard.Cards.Count > 0)
+    {
+        <div class="graveyard-panel">
+            <div class="graveyard-header">
+                <MudText Typo="Typo.caption" Style="font-weight: 600;">Your Graveyard (@LocalPlayer.Graveyard.Cards.Count)</MudText>
+                <MudIconButton Size="Size.Small" Icon="@Icons.Material.Filled.Close"
+                               OnClick="() => _showPlayerGraveyard = false" />
+            </div>
+            <div class="graveyard-cards">
+                @foreach (var card in LocalPlayer.Graveyard.Cards)
+                {
+                    <CardDisplay Name="@card.Name" ImageUrl="@card.ImageUrl" CardSize="100"
+                                 Clickable="false"
+                                 OnHoverStart="SetHoveredCard"
+                                 OnHoverEnd="ClearHoveredCard" />
+                }
+            </div>
         </div>
     }
 
@@ -755,6 +799,10 @@
 
     // Card preview hover state
     private string? _hoveredImageUrl;
+
+    // Graveyard viewer toggle state
+    private bool _showPlayerGraveyard;
+    private bool _showOpponentGraveyard;
 
     private Player LocalPlayer => PlayerSeat == 1 ? State.Player1 : State.Player2;
     private Player OpponentPlayer => PlayerSeat == 1 ? State.Player2 : State.Player1;
