@@ -1,4 +1,3 @@
-using MtgDecker.Engine.AI;
 using MtgDecker.Engine.Enums;
 using MtgDecker.Engine.Mana;
 
@@ -174,8 +173,9 @@ internal class CastSpellHandler : IActionHandler
                 castPlayer.PendingManaTaps.Clear();
                 state.Log($"{castPlayer.Name} begins casting {castCard.Name}...");
 
-                // Auto-resolve for AI players
-                if (castPlayer.DecisionHandler is AiBotDecisionHandler)
+                // Auto-resolve for non-manual-payment players (AI bots, test handlers)
+                // Only handlers implementing IManualManaPayment use MTGO-style payment
+                if (castPlayer.DecisionHandler is not IManualManaPayment)
                 {
                     await engine.AutoResolveMidCastForAi(state, castPlayer, ct);
                 }

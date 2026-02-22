@@ -25,6 +25,27 @@ public class CastSpellTests
         return (engine, state, h1);
     }
 
+    /// <summary>
+    /// Setup with ManualPaymentTestHandler for tests that verify mid-cast manual payment flow.
+    /// </summary>
+    private (GameEngine engine, GameState state, ManualPaymentTestHandler handler) CreateManualPaymentSetup()
+    {
+        var h1 = new ManualPaymentTestHandler();
+        var h2 = new ManualPaymentTestHandler();
+        var p1 = new Player(Guid.NewGuid(), "P1", h1);
+        var p2 = new Player(Guid.NewGuid(), "P2", h2);
+
+        for (int i = 0; i < 40; i++)
+        {
+            p1.Library.Add(new GameCard { Name = $"Card{i}" });
+            p2.Library.Add(new GameCard { Name = $"Card{i}" });
+        }
+
+        var state = new GameState(p1, p2);
+        var engine = new GameEngine(state);
+        return (engine, state, h1);
+    }
+
     // --- Part A: Land Drops ---
 
     [Fact]
@@ -182,7 +203,7 @@ public class CastSpellTests
     [Fact]
     public async Task CastSpell_Sorcery_GoesToGraveyard()
     {
-        var (engine, state, _) = CreateSetup();
+        var (engine, state, _) = CreateManualPaymentSetup();
         await engine.StartGameAsync();
         state.CurrentPhase = Phase.MainPhase1;
 
@@ -205,7 +226,7 @@ public class CastSpellTests
     [Fact]
     public async Task CastSpell_GenericCost_EntersMidCast_PayWithChosenColor()
     {
-        var (engine, state, handler) = CreateSetup();
+        var (engine, state, handler) = CreateManualPaymentSetup();
         await engine.StartGameAsync();
         state.CurrentPhase = Phase.MainPhase1;
 
@@ -232,7 +253,7 @@ public class CastSpellTests
     [Fact]
     public async Task CastSpell_GenericCost_EntersMidCast_PayWithSameColor()
     {
-        var (engine, state, _) = CreateSetup();
+        var (engine, state, _) = CreateManualPaymentSetup();
         await engine.StartGameAsync();
         state.CurrentPhase = Phase.MainPhase1;
 
@@ -295,7 +316,7 @@ public class CastSpellTests
     [Fact]
     public async Task CastSpell_MidCast_PayManaFromPool_RejectsEmptyPool()
     {
-        var (engine, state, handler) = CreateSetup();
+        var (engine, state, handler) = CreateManualPaymentSetup();
         await engine.StartGameAsync();
         state.CurrentPhase = Phase.MainPhase1;
 

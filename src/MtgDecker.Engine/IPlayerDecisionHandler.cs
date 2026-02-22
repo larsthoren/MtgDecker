@@ -35,3 +35,11 @@ public interface IPlayerDecisionHandler
         IReadOnlyList<GameCard> cards, string prompt, CancellationToken ct = default);
 
 }
+
+/// <summary>
+/// Marker interface indicating the decision handler uses MTGO-style manual mana payment.
+/// When a player's handler implements this, generic/Phyrexian costs enter mid-cast state
+/// requiring explicit PayManaFromPool/PayLifeForPhyrexian actions.
+/// Otherwise, remaining costs are auto-resolved after colored mana deduction.
+/// </summary>
+public interface IManualManaPayment { }

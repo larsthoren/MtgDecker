@@ -3,7 +3,7 @@ using MtgDecker.Engine.Mana;
 
 namespace MtgDecker.Engine;
 
-public class InteractiveDecisionHandler : IPlayerDecisionHandler
+public class InteractiveDecisionHandler : IPlayerDecisionHandler, IManualManaPayment
 {
     private TaskCompletionSource<GameAction>? _actionTcs;
     private TaskCompletionSource<MulliganDecision>? _mulliganTcs;

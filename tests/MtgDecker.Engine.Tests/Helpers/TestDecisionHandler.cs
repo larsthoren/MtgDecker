@@ -157,3 +157,10 @@ public class TestDecisionHandler : IPlayerDecisionHandler
     }
 
 }
+
+/// <summary>
+/// Test decision handler variant that uses MTGO-style manual mana payment.
+/// Generic/Phyrexian costs enter mid-cast state requiring explicit PayManaFromPool/PayLifeForPhyrexian actions.
+/// Used for tests that verify the manual payment flow.
+/// </summary>
+public class ManualPaymentTestHandler : TestDecisionHandler, IManualManaPayment { }

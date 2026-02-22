@@ -7,10 +7,10 @@ namespace MtgDecker.Engine.Tests;
 
 public class PhyrexianManaTests
 {
-    private (GameEngine engine, GameState state, TestDecisionHandler h1, TestDecisionHandler h2) CreateSetup()
+    private (GameEngine engine, GameState state, ManualPaymentTestHandler h1, ManualPaymentTestHandler h2) CreateSetup()
     {
-        var h1 = new TestDecisionHandler();
-        var h2 = new TestDecisionHandler();
+        var h1 = new ManualPaymentTestHandler();
+        var h2 = new ManualPaymentTestHandler();
         var p1 = new Player(Guid.NewGuid(), "P1", h1);
         var p2 = new Player(Guid.NewGuid(), "P2", h2);
         for (int i = 0; i < 40; i++)
