@@ -3,6 +3,8 @@ using MtgDecker.Engine.Enums;
 
 namespace MtgDecker.Engine;
 
+public record ChatMessage(string PlayerName, int PlayerSeat, string Text, DateTime Timestamp);
+
 public class GameSession : IDisposable
 {
     public string GameId { get; }
@@ -27,6 +29,12 @@ public class GameSession : IDisposable
     private CancellationTokenSource? _cts;
     private readonly object _joinLock = new();
     private readonly object _stateLock = new();
+    private readonly List<ChatMessage> _chatMessages = new();
+
+    public IReadOnlyList<ChatMessage> ChatMessages
+    {
+        get { lock (_stateLock) return _chatMessages.ToList(); }
+    }
 
     /// <summary>
     /// True while the game loop is actively executing engine operations and has
@@ -192,6 +200,20 @@ public class GameSession : IDisposable
 
     public InteractiveDecisionHandler? GetHandler(int playerSeat) =>
         playerSeat == 1 ? Player1Handler : Player2Handler;
+
+    public void AddChatMessage(int playerSeat, string text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return;
+        if (text.Length > 200) text = text[..200];
+        var name = playerSeat == 1 ? Player1Name : Player2Name;
+        if (name == null) return;
+
+        lock (_stateLock)
+        {
+            _chatMessages.Add(new ChatMessage(name, playerSeat, text, DateTime.UtcNow));
+        }
+        OnStateChanged?.Invoke();
+    }
 
     public void Dispose()
     {
