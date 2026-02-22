@@ -9,7 +9,6 @@ public interface IPlayerDecisionHandler
     Task<MulliganDecision> GetMulliganDecision(IReadOnlyList<GameCard> hand, int mulliganCount, CancellationToken ct = default);
     Task<IReadOnlyList<GameCard>> ChooseCardsToBottom(IReadOnlyList<GameCard> hand, int count, CancellationToken ct = default);
     Task<ManaColor> ChooseManaColor(IReadOnlyList<ManaColor> options, CancellationToken ct = default);
-    Task<Dictionary<ManaColor, int>> ChooseGenericPayment(int genericAmount, Dictionary<ManaColor, int> available, CancellationToken ct = default);
     Task<IReadOnlyList<Guid>> ChooseAttackers(IReadOnlyList<GameCard> eligibleAttackers, CancellationToken ct = default);
     Task<Dictionary<Guid, Guid?>> ChooseAttackerTargets(IReadOnlyList<GameCard> attackers, IReadOnlyList<GameCard> planeswalkers, CancellationToken ct = default);
     Task<Dictionary<Guid, Guid>> ChooseBlockers(IReadOnlyList<GameCard> eligibleBlockers, IReadOnlyList<GameCard> attackers, CancellationToken ct = default);
@@ -35,8 +34,12 @@ public interface IPlayerDecisionHandler
     Task<(IReadOnlyList<GameCard> ordered, bool shuffle)> ReorderCards(
         IReadOnlyList<GameCard> cards, string prompt, CancellationToken ct = default);
 
-    /// <summary>
-    /// Choose whether to pay a Phyrexian mana symbol with colored mana (true) or 2 life (false).
-    /// </summary>
-    Task<bool> ChoosePhyrexianPayment(ManaColor color, CancellationToken ct = default);
 }
+
+/// <summary>
+/// Marker interface indicating the decision handler uses MTGO-style manual mana payment.
+/// When a player's handler implements this, generic/Phyrexian costs enter mid-cast state
+/// requiring explicit PayManaFromPool/PayLifeForPhyrexian actions.
+/// Otherwise, remaining costs are auto-resolved after colored mana deduction.
+/// </summary>
+public interface IManualManaPayment { }

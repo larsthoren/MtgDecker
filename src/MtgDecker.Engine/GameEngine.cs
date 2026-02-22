@@ -1,3 +1,4 @@
+using MtgDecker.Engine.AI;
 using MtgDecker.Engine.Enums;
 using MtgDecker.Engine.Mana;
 using MtgDecker.Engine.Triggers;
@@ -25,6 +26,9 @@ public class GameEngine
         _handlers[ActionType.TapCard] = new TapCardHandler();
         _handlers[ActionType.CastSpell] = new CastSpellHandler();
         _handlers[ActionType.ActivateAbility] = new ActivateAbilityHandler();
+        _handlers[ActionType.PayManaFromPool] = new PayManaFromPoolHandler();
+        _handlers[ActionType.PayLifeForPhyrexian] = new PayLifeForPhyrexianHandler();
+        _handlers[ActionType.CancelCast] = new CancelCastHandler();
     }
 
     public async Task StartGameAsync(CancellationToken ct = default)
@@ -208,25 +212,16 @@ public class GameEngine
     }
 
     /// <summary>
-    /// Pays a mana cost from the player's mana pool, prompting for generic payment choices when ambiguous.
+    /// Pays a mana cost from the player's mana pool using auto-pay.
     /// Returns a dictionary of colors actually paid (for undo tracking).
+    /// Used by FlashbackHandler, NinjutsuHandler, CastAdventureHandler, and ActivateAbilityHandler.
+    /// Main spell casting uses the mid-cast flow instead.
     /// Assumes CanPay has already been checked.
     /// </summary>
-    internal async Task<Dictionary<ManaColor, int>> PayManaCostAsync(ManaCost cost, Player player, CancellationToken ct)
+    internal Task<Dictionary<ManaColor, int>> PayManaCostAsync(ManaCost cost, Player player, CancellationToken ct)
     {
         var pool = player.ManaPool;
         var manaPaid = new Dictionary<ManaColor, int>();
-
-        // Calculate remaining pool after colored requirements (for generic payment decisions)
-        var remaining = new Dictionary<ManaColor, int>();
-        foreach (var kvp in pool.Available)
-        {
-            var after = kvp.Value;
-            if (cost.ColorRequirements.TryGetValue(kvp.Key, out var needed))
-                after -= needed;
-            if (after > 0)
-                remaining[kvp.Key] = after;
-        }
 
         // Deduct colored requirements
         foreach (var (color, required) in cost.ColorRequirements)
@@ -235,111 +230,123 @@ public class GameEngine
             manaPaid[color] = required;
         }
 
-        // Handle Phyrexian mana requirements
-        if (cost.HasPhyrexianCost)
+        // Auto-pay generic cost from remaining pool
+        if (cost.GenericCost > 0)
         {
-            foreach (var (color, required) in cost.PhyrexianRequirements)
-            {
-                for (int i = 0; i < required; i++)
-                {
-                    bool hasMana = pool[color] > 0;
-                    bool hasLife = player.Life > 2;
-
-                    bool payWithMana;
-                    if (hasMana && hasLife)
-                    {
-                        payWithMana = await player.DecisionHandler.ChoosePhyrexianPayment(color, ct);
-                    }
-                    else if (hasMana)
-                    {
-                        payWithMana = true;
-                    }
-                    else
-                    {
-                        payWithMana = false;
-                    }
-
-                    if (payWithMana)
-                    {
-                        pool.Deduct(color, 1);
-                        manaPaid[color] = manaPaid.GetValueOrDefault(color) + 1;
-                        // Also update remaining for generic calculation
-                        if (remaining.ContainsKey(color))
-                        {
-                            remaining[color] -= 1;
-                            if (remaining[color] <= 0) remaining.Remove(color);
-                        }
-                        _state.Log($"{player.Name} pays {{{GetColorSymbol(color)}}} for Phyrexian mana.");
-                    }
-                    else
-                    {
-                        player.AdjustLife(-2);
-                        _state.Log($"{player.Name} pays 2 life for Phyrexian mana.");
-                    }
-                }
-            }
-
-            // Recalculate remaining after Phyrexian payment for generic cost handling
-            remaining.Clear();
+            var toPay = cost.GenericCost;
             foreach (var kvp in pool.Available)
             {
-                if (kvp.Value > 0)
-                    remaining[kvp.Key] = kvp.Value;
+                if (toPay == 0) break;
+                // Skip colors already fully used for colored requirements
+                var available = kvp.Value;
+                if (available <= 0) continue;
+                var take = Math.Min(available, toPay);
+                pool.Deduct(kvp.Key, take);
+                manaPaid[kvp.Key] = manaPaid.GetValueOrDefault(kvp.Key) + take;
+                toPay -= take;
             }
         }
 
-        // Handle generic cost
-        if (cost.GenericCost > 0)
+        return Task.FromResult(manaPaid);
+    }
+
+    internal async Task CompleteMidCastAsync(GameState state, Player player, CancellationToken ct)
+    {
+        var card = state.PendingCastCard!;
+        var targets = state.MidCastTargets ?? new List<TargetInfo>();
+        var action = state.MidCastAction;
+        var effectiveCost = state.MidCastEffectiveCost;
+        var fromExileAdventure = state.MidCastFromExileAdventure;
+
+        // Build manaPaid from auto-deducted colored mana
+        var manaPaid = new Dictionary<ManaColor, int>(state.MidCastAutoDeducted);
+
+        state.ClearMidCast();
+
+        // Remove card from source zone
+        if (fromExileAdventure)
         {
-            int distinctColors = remaining.Count(kv => kv.Value > 0);
-            int totalRemaining = remaining.Values.Sum();
-            bool useAutoPay = distinctColors <= 1 || totalRemaining == cost.GenericCost;
+            player.Exile.RemoveById(card.Id);
+            card.IsOnAdventure = false;
+        }
+        else
+        {
+            player.Hand.RemoveById(card.Id);
+        }
 
-            if (!useAutoPay)
+        var stackObj = new StackObject(card, player.Id, manaPaid, targets, state.StackCount);
+        state.StackPush(stackObj);
+
+        if (action != null)
+        {
+            action.ManaCostPaid = effectiveCost;
+            player.ActionHistory.Push(action);
+        }
+
+        state.Log($"{player.Name} casts {card.Name}.");
+
+        await QueueBoardTriggersOnStackAsync(GameEvent.SpellCast, card, ct);
+        await QueueSelfCastTriggersAsync(card, player, ct);
+    }
+
+    internal async Task AutoResolveMidCastForAi(GameState state, Player player, CancellationToken ct)
+    {
+        // AI heuristic: pay life for Phyrexian if life > 10, else pay mana
+        while (state.IsMidCast && !state.IsFullyPaid)
+        {
+            if (state.TotalRemainingPhyrexian > 0)
             {
-                // Ambiguous: prompt player for generic payment choices
-                var genericPayment = await player.DecisionHandler
-                    .ChooseGenericPayment(cost.GenericCost, remaining, ct);
-
-                // Validate payment: sum must equal generic cost, amounts must not exceed available
-                bool valid = genericPayment.Values.Sum() == cost.GenericCost
-                    && genericPayment.All(kv => remaining.TryGetValue(kv.Key, out var avail) && kv.Value <= avail);
-
-                if (valid)
+                if (player.Life > 10 && player.Life > 2)
                 {
-                    foreach (var (color, amount) in genericPayment)
-                    {
-                        pool.Deduct(color, amount);
-                        manaPaid[color] = manaPaid.GetValueOrDefault(color) + amount;
-                    }
+                    // Pay life
+                    state.ApplyLifePayment();
+                    player.AdjustLife(-2);
+                    state.Log($"{player.Name} pays 2 life for Phyrexian mana.");
                 }
                 else
                 {
-                    useAutoPay = true;
+                    // Pay mana — find matching color
+                    var phyColor = state.RemainingPhyrexianCost.First().Key;
+                    if (player.ManaPool[phyColor] > 0)
+                    {
+                        player.ManaPool.Deduct(phyColor, 1);
+                        state.ApplyManaPayment(phyColor);
+                        state.Log($"{player.Name} pays {{{GetColorSymbol(phyColor)}}} from pool.");
+                    }
+                    else
+                    {
+                        // Fallback: pay life anyway
+                        state.ApplyLifePayment();
+                        player.AdjustLife(-2);
+                        state.Log($"{player.Name} pays 2 life for Phyrexian mana.");
+                    }
                 }
             }
-
-            if (useAutoPay)
+            else if (state.RemainingGenericCost > 0)
             {
-                var toPay = cost.GenericCost;
-                foreach (var (color, amount) in remaining)
+                // Pay generic with any available mana
+                var available = player.ManaPool.Available.FirstOrDefault(kv => kv.Value > 0);
+                if (available.Value > 0)
                 {
-                    var take = Math.Min(amount, toPay);
-                    if (take > 0)
-                    {
-                        pool.Deduct(color, take);
-                        manaPaid[color] = manaPaid.GetValueOrDefault(color) + take;
-                        toPay -= take;
-                    }
-                    if (toPay == 0) break;
+                    player.ManaPool.Deduct(available.Key, 1);
+                    state.ApplyManaPayment(available.Key);
+                    state.Log($"{player.Name} pays {{{GetColorSymbol(available.Key)}}} from pool.");
+                }
+                else
+                {
+                    // No mana available — shouldn't happen if CanPay was checked
+                    break;
                 }
             }
         }
 
-        return manaPaid;
+        if (state.IsFullyPaid)
+        {
+            await CompleteMidCastAsync(state, player, ct);
+        }
     }
 
-    private static string GetColorSymbol(ManaColor color) => color switch
+    internal static string GetColorSymbol(ManaColor color) => color switch
     {
         ManaColor.White => "W",
         ManaColor.Blue => "U",

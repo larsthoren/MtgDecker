@@ -122,4 +122,23 @@ public class GameAction
         CardId = cardId,
         SourceZone = ZoneType.Hand,
     };
+
+    public static GameAction PayManaFromPool(Guid playerId, ManaColor color) => new()
+    {
+        Type = ActionType.PayManaFromPool,
+        PlayerId = playerId,
+        ManaProduced = color
+    };
+
+    public static GameAction PayLifeForPhyrexian(Guid playerId) => new()
+    {
+        Type = ActionType.PayLifeForPhyrexian,
+        PlayerId = playerId
+    };
+
+    public static GameAction CancelCast(Guid playerId) => new()
+    {
+        Type = ActionType.CancelCast,
+        PlayerId = playerId
+    };
 }

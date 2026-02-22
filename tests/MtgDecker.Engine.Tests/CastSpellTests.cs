@@ -25,6 +25,27 @@ public class CastSpellTests
         return (engine, state, h1);
     }
 
+    /// <summary>
+    /// Setup with ManualPaymentTestHandler for tests that verify mid-cast manual payment flow.
+    /// </summary>
+    private (GameEngine engine, GameState state, ManualPaymentTestHandler handler) CreateManualPaymentSetup()
+    {
+        var h1 = new ManualPaymentTestHandler();
+        var h2 = new ManualPaymentTestHandler();
+        var p1 = new Player(Guid.NewGuid(), "P1", h1);
+        var p2 = new Player(Guid.NewGuid(), "P2", h2);
+
+        for (int i = 0; i < 40; i++)
+        {
+            p1.Library.Add(new GameCard { Name = $"Card{i}" });
+            p2.Library.Add(new GameCard { Name = $"Card{i}" });
+        }
+
+        var state = new GameState(p1, p2);
+        var engine = new GameEngine(state);
+        return (engine, state, h1);
+    }
+
     // --- Part A: Land Drops ---
 
     [Fact]
@@ -182,7 +203,7 @@ public class CastSpellTests
     [Fact]
     public async Task CastSpell_Sorcery_GoesToGraveyard()
     {
-        var (engine, state, _) = CreateSetup();
+        var (engine, state, _) = CreateManualPaymentSetup();
         await engine.StartGameAsync();
         state.CurrentPhase = Phase.MainPhase1;
 
@@ -190,7 +211,12 @@ public class CastSpellTests
         state.Player1.Hand.Add(replenish);
         state.Player1.ManaPool.Add(ManaColor.White, 4); // {3}{W} — need 1W + 3 generic
 
+        // CastSpell auto-deducts {W}, enters mid-cast for {3} generic
         await engine.ExecuteAction(GameAction.CastSpell(state.Player1.Id, replenish.Id));
+        // Pay the 3 generic with remaining White mana
+        await engine.ExecuteAction(GameAction.PayManaFromPool(state.Player1.Id, ManaColor.White));
+        await engine.ExecuteAction(GameAction.PayManaFromPool(state.Player1.Id, ManaColor.White));
+        await engine.ExecuteAction(GameAction.PayManaFromPool(state.Player1.Id, ManaColor.White));
         await engine.ResolveAllTriggersAsync();
 
         state.Player1.Graveyard.Cards.Should().Contain(c => c.Id == replenish.Id);
@@ -198,9 +224,9 @@ public class CastSpellTests
     }
 
     [Fact]
-    public async Task CastSpell_AmbiguousGeneric_PromptsPlayer()
+    public async Task CastSpell_GenericCost_EntersMidCast_PayWithChosenColor()
     {
-        var (engine, state, handler) = CreateSetup();
+        var (engine, state, handler) = CreateManualPaymentSetup();
         await engine.StartGameAsync();
         state.CurrentPhase = Phase.MainPhase1;
 
@@ -209,33 +235,41 @@ public class CastSpellTests
         state.Player1.Hand.Add(piledriver);
         state.Player1.ManaPool.Add(ManaColor.Red, 2);
         state.Player1.ManaPool.Add(ManaColor.Green, 1);
-        // After paying {R}, pool has R=1 G=1 — ambiguous for generic {1}
 
-        handler.EnqueueGenericPayment(new Dictionary<ManaColor, int> { { ManaColor.Green, 1 } });
-
+        // CastSpell auto-deducts {R}, then enters mid-cast for generic {1}
         await engine.ExecuteAction(GameAction.CastSpell(state.Player1.Id, piledriver.Id));
+        state.IsMidCast.Should().BeTrue();
+
+        // Pay the generic cost with Green mana
+        await engine.ExecuteAction(GameAction.PayManaFromPool(state.Player1.Id, ManaColor.Green));
         await engine.ResolveAllTriggersAsync();
 
+        state.IsMidCast.Should().BeFalse();
         state.Player1.Battlefield.Cards.Should().Contain(c => c.Id == piledriver.Id);
         state.Player1.ManaPool[ManaColor.Red].Should().Be(1);
         state.Player1.ManaPool[ManaColor.Green].Should().Be(0);
     }
 
     [Fact]
-    public async Task CastSpell_UnambiguousGeneric_AutoPays()
+    public async Task CastSpell_GenericCost_EntersMidCast_PayWithSameColor()
     {
-        var (engine, state, _) = CreateSetup();
+        var (engine, state, _) = CreateManualPaymentSetup();
         await engine.StartGameAsync();
         state.CurrentPhase = Phase.MainPhase1;
 
-        // Goblin Piledriver: {1}{R} — give exactly {R}{R}: after color, only R=1 left
+        // Goblin Piledriver: {1}{R} — give exactly {R}{R}: after color auto-deduct, R=1 left
         var piledriver = GameCard.Create("Goblin Piledriver", "Creature — Goblin");
         state.Player1.Hand.Add(piledriver);
         state.Player1.ManaPool.Add(ManaColor.Red, 2);
 
         await engine.ExecuteAction(GameAction.CastSpell(state.Player1.Id, piledriver.Id));
+        state.IsMidCast.Should().BeTrue();
+
+        // Pay the generic cost with remaining Red mana
+        await engine.ExecuteAction(GameAction.PayManaFromPool(state.Player1.Id, ManaColor.Red));
         await engine.ResolveAllTriggersAsync();
 
+        state.IsMidCast.Should().BeFalse();
         state.Player1.Battlefield.Cards.Should().Contain(c => c.Id == piledriver.Id);
         state.Player1.ManaPool.Total.Should().Be(0);
     }
@@ -277,12 +311,12 @@ public class CastSpellTests
         state.GameLog.Should().Contain(l => l.Contains("no mana cost defined"));
     }
 
-    // === Task 3: Generic payment validation ===
+    // === Task 3: Mid-cast generic payment validation ===
 
     [Fact]
-    public async Task CastSpell_InvalidGenericPayment_FallsBackToAutoPay()
+    public async Task CastSpell_MidCast_PayManaFromPool_RejectsEmptyPool()
     {
-        var (engine, state, handler) = CreateSetup();
+        var (engine, state, handler) = CreateManualPaymentSetup();
         await engine.StartGameAsync();
         state.CurrentPhase = Phase.MainPhase1;
 
@@ -290,21 +324,23 @@ public class CastSpellTests
         var piledriver = GameCard.Create("Goblin Piledriver", "Creature — Goblin");
         state.Player1.Hand.Add(piledriver);
         state.Player1.ManaPool.Add(ManaColor.Red, 2);
-        state.Player1.ManaPool.Add(ManaColor.Green, 1);
 
-        // Enqueue an invalid payment: sum doesn't equal GenericCost (1)
-        handler.EnqueueGenericPayment(new Dictionary<ManaColor, int>
-        {
-            { ManaColor.Red, 2 },  // Paying 2 for generic cost of 1 — invalid
-            { ManaColor.Green, 1 } // Total 3 instead of 1
-        });
-
+        // CastSpell auto-deducts {R}, enters mid-cast for {1} generic
         await engine.ExecuteAction(GameAction.CastSpell(state.Player1.Id, piledriver.Id));
-        await engine.ResolveAllTriggersAsync();
+        state.IsMidCast.Should().BeTrue();
 
-        // Card should still be cast (auto-pay fallback)
+        // Try to pay with Green mana (which we don't have)
+        var act = () => engine.ExecuteAction(GameAction.PayManaFromPool(state.Player1.Id, ManaColor.Green));
+        await act.Should().ThrowAsync<InvalidOperationException>();
+
+        // Still in mid-cast
+        state.IsMidCast.Should().BeTrue();
+
+        // Pay correctly with Red
+        await engine.ExecuteAction(GameAction.PayManaFromPool(state.Player1.Id, ManaColor.Red));
+        await engine.ResolveAllTriggersAsync();
+        state.IsMidCast.Should().BeFalse();
         state.Player1.Battlefield.Cards.Should().Contain(c => c.Name == "Goblin Piledriver");
-        // Total mana should be correct: started with 3, spent {1}{R} = 2
-        state.Player1.ManaPool.Total.Should().Be(1);
+        state.Player1.ManaPool.Total.Should().Be(0);
     }
 }

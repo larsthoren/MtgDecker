@@ -7,6 +7,12 @@ internal class CastSpellHandler : IActionHandler
 {
     public async Task ExecuteAsync(GameAction action, GameEngine engine, GameState state, CancellationToken ct)
     {
+        if (state.IsMidCast)
+        {
+            state.Log("Cannot cast another spell while mid-cast.");
+            return;
+        }
+
         var castPlayer = state.GetPlayer(action.PlayerId);
         var castCard = castPlayer.Hand.Cards.FirstOrDefault(c => c.Id == action.CardId);
         bool castingFromExileAdventure = false;
@@ -91,36 +97,95 @@ internal class CastSpellHandler : IActionHandler
             targets = result;
         }
 
-        Dictionary<ManaColor, int> manaPaid;
         if (useAlternateCost)
         {
             await engine.PayAlternateCostAsync(def!.AlternateCost!, castPlayer, castCard, ct);
-            manaPaid = new Dictionary<ManaColor, int>();
+
+            // Alternate cost fully pays — go to stack immediately
+            if (castingFromExileAdventure)
+            {
+                castPlayer.Exile.RemoveById(castCard.Id);
+                castCard.IsOnAdventure = false;
+            }
+            else
+            {
+                castPlayer.Hand.RemoveById(castCard.Id);
+            }
+            var stackObj = new StackObject(castCard, castPlayer.Id, new Dictionary<ManaColor, int>(), targets, state.StackCount);
+            state.StackPush(stackObj);
+
+            action.ManaCostPaid = castEffectiveCost;
+            castPlayer.ActionHistory.Push(action);
+
+            state.Log($"{castPlayer.Name} casts {castCard.Name}.");
+
+            await engine.QueueBoardTriggersOnStackAsync(GameEvent.SpellCast, castCard, ct);
+            await engine.QueueSelfCastTriggersAsync(castCard, castPlayer, ct);
         }
         else
         {
-            manaPaid = await engine.PayManaCostAsync(castEffectiveCost, castPlayer, ct);
-            castPlayer.PendingManaTaps.Clear();
+            // Auto-deduct colored requirements
+            var pool = castPlayer.ManaPool;
+            var autoDeducted = new Dictionary<ManaColor, int>();
+            foreach (var (color, required) in castEffectiveCost.ColorRequirements)
+            {
+                if (required > 0)
+                {
+                    pool.Deduct(color, required);
+                    autoDeducted[color] = required;
+                }
+            }
+
+            int remainingGeneric = castEffectiveCost.GenericCost;
+            var remainingPhyrexian = new Dictionary<ManaColor, int>(castEffectiveCost.PhyrexianRequirements);
+
+            if (remainingGeneric == 0 && remainingPhyrexian.Count == 0)
+            {
+                // Fully paid by colored auto-deduct — go to stack immediately
+                castPlayer.PendingManaTaps.Clear();
+
+                if (castingFromExileAdventure)
+                {
+                    castPlayer.Exile.RemoveById(castCard.Id);
+                    castCard.IsOnAdventure = false;
+                }
+                else
+                {
+                    castPlayer.Hand.RemoveById(castCard.Id);
+                }
+                var stackObj = new StackObject(castCard, castPlayer.Id, autoDeducted, targets, state.StackCount);
+                state.StackPush(stackObj);
+
+                action.ManaCostPaid = castEffectiveCost;
+                castPlayer.ActionHistory.Push(action);
+
+                state.Log($"{castPlayer.Name} casts {castCard.Name}.");
+
+                await engine.QueueBoardTriggersOnStackAsync(GameEvent.SpellCast, castCard, ct);
+                await engine.QueueSelfCastTriggersAsync(castCard, castPlayer, ct);
+            }
+            else
+            {
+                // Enter mid-cast state — wait for manual payment
+                state.BeginMidCast(castPlayer.Id, castCard, remainingGeneric, remainingPhyrexian);
+                state.MidCastAutoDeducted = autoDeducted;
+
+                // Store targets and action info on the state for CompleteMidCastAsync to use
+                state.MidCastTargets = targets;
+                state.MidCastAction = action;
+                state.MidCastEffectiveCost = castEffectiveCost;
+                state.MidCastFromExileAdventure = castingFromExileAdventure;
+
+                castPlayer.PendingManaTaps.Clear();
+                state.Log($"{castPlayer.Name} begins casting {castCard.Name}...");
+
+                // Auto-resolve for non-manual-payment players (AI bots, test handlers)
+                // Only handlers implementing IManualManaPayment use MTGO-style payment
+                if (castPlayer.DecisionHandler is not IManualManaPayment)
+                {
+                    await engine.AutoResolveMidCastForAi(state, castPlayer, ct);
+                }
+            }
         }
-
-        if (castingFromExileAdventure)
-        {
-            castPlayer.Exile.RemoveById(castCard.Id);
-            castCard.IsOnAdventure = false;
-        }
-        else
-        {
-            castPlayer.Hand.RemoveById(castCard.Id);
-        }
-        var stackObj = new StackObject(castCard, castPlayer.Id, manaPaid, targets, state.StackCount);
-        state.StackPush(stackObj);
-
-        action.ManaCostPaid = castEffectiveCost;
-        castPlayer.ActionHistory.Push(action);
-
-        state.Log($"{castPlayer.Name} casts {castCard.Name}.");
-
-        await engine.QueueBoardTriggersOnStackAsync(GameEvent.SpellCast, castCard, ct);
-        await engine.QueueSelfCastTriggersAsync(castCard, castPlayer, ct);
     }
 }
