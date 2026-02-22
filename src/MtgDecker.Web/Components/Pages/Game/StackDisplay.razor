@@ -1,12 +1,17 @@
 @using MtgDecker.Engine
 @namespace MtgDecker.Web.Components.Pages.Game
+@inject IJSRuntime JS
 
 @if (Stack.Count > 0)
 {
-    <div class="stack-floating-box">
-        <div class="stack-header">
+    <div class="stack-floating-box" @ref="_stackRef"
+         style="@GetPositionStyle()">
+        <div class="stack-header"
+             @onmousedown="StartDrag"
+             @onmousedown:preventDefault>
             <MudIcon Icon="@Icons.Material.Filled.Layers" Size="Size.Small" />
             <span>The Stack (@Stack.Count)</span>
+            <span class="drag-hint">&#x2725;</span>
         </div>
         <div class="stack-cards">
             @for (int i = Stack.Count - 1; i >= 0; i--)
@@ -17,7 +22,9 @@
                 @if (item is StackObject spell)
                 {
                     <div class="stack-card-entry @(IsTargeting ? "stack-targetable" : "")"
-                         @onclick="() => HandleStackClick(spell.Card)">
+                         @onclick="() => HandleStackClick(spell.Card)"
+                         @onmouseenter="() => OnHoverStart.InvokeAsync(spell.Card.ImageUrl)"
+                         @onmouseleave="() => OnHoverEnd.InvokeAsync()">
                         <CardDisplay Name="@spell.Card.Name"
                                      ImageUrl="@spell.Card.ImageUrl"
                                      CardSize="100"
@@ -37,7 +44,9 @@
                 else if (item is TriggeredAbilityStackObject triggered)
                 {
                     <div class="stack-card-entry @(IsTargeting ? "stack-targetable" : "")"
-                         @onclick="() => HandleStackClick(triggered.Source)">
+                         @onclick="() => HandleStackClick(triggered.Source)"
+                         @onmouseenter="() => OnHoverStart.InvokeAsync(triggered.Source.ImageUrl)"
+                         @onmouseleave="() => OnHoverEnd.InvokeAsync()">
                         <CardDisplay Name="@triggered.Source.Name"
                                      ImageUrl="@triggered.Source.ImageUrl"
                                      CardSize="100"
@@ -58,10 +67,49 @@
     [Parameter] public List<IStackObject> Stack { get; set; } = new();
     [Parameter] public bool IsTargeting { get; set; }
     [Parameter] public EventCallback<GameCard> OnStackCardClicked { get; set; }
+    [Parameter] public EventCallback<string?> OnHoverStart { get; set; }
+    [Parameter] public EventCallback OnHoverEnd { get; set; }
+
+    private ElementReference _stackRef;
+    private double? _posX;
+    private double? _posY;
+    private DotNetObjectReference<StackDisplay>? _dotNetRef;
+
+    private string GetPositionStyle()
+    {
+        if (_posX.HasValue && _posY.HasValue)
+            return $"position: fixed; left: {_posX:F0}px; top: {_posY:F0}px; right: auto; transform: none;";
+        return "";
+    }
+
+    private async Task StartDrag(MouseEventArgs e)
+    {
+        _dotNetRef ??= DotNetObjectReference.Create(this);
+        await JS.InvokeVoidAsync("stackDrag.start", _stackRef, _dotNetRef, e.ClientX, e.ClientY);
+    }
+
+    [JSInvokable]
+    public void OnDragMove(double x, double y)
+    {
+        _posX = x;
+        _posY = y;
+        InvokeAsync(StateHasChanged);
+    }
+
+    [JSInvokable]
+    public void OnDragEnd()
+    {
+        InvokeAsync(StateHasChanged);
+    }
 
     private async Task HandleStackClick(GameCard card)
     {
         if (IsTargeting)
             await OnStackCardClicked.InvokeAsync(card);
+    }
+
+    public void Dispose()
+    {
+        _dotNetRef?.Dispose();
     }
 }

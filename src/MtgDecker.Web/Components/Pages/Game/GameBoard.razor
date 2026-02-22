@@ -169,7 +169,9 @@
     @* Floating stack display (fixed position, right side) *@
     <StackDisplay Stack="@State.Stack"
                   IsTargeting="@(Handler?.IsWaitingForTarget == true)"
-                  OnStackCardClicked="HandleStackCardTarget" />
+                  OnStackCardClicked="HandleStackCardTarget"
+                  OnHoverStart="SetHoveredCard"
+                  OnHoverEnd="ClearHoveredCard" />
 
     @* Row 4: Player battlefield *@
     <div class="player-battlefield">
