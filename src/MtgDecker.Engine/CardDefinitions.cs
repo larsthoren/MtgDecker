@@ -92,6 +92,7 @@ public static class CardDefinitions
                     new ContinuousEffect(Guid.Empty, ContinuousEffectType.ModifyPowerToughness,
                         (card, _) => card.IsCreature && card.Subtypes.Contains("Goblin"),
                         PowerMod: 1, ToughnessMod: 1,
+                        ExcludeSelf: true,
                         Layer: EffectLayer.Layer7c_ModifyPT),
                     new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
                         (card, _) => card.IsCreature && card.Subtypes.Contains("Goblin"),
@@ -114,7 +115,7 @@ public static class CardDefinitions
             ["Goblin Tinkerer"] = new(ManaCost.Parse("{1}{R}"), null, 1, 2, CardType.Creature)
             {
                 Subtypes = ["Goblin"],
-                ActivatedAbility = new(new ActivatedAbilityCost(SacrificeSelf: true, ManaCost: ManaCost.Parse("{R}")), new DestroyTargetEffect(), c => c.CardTypes.HasFlag(CardType.Artifact)),
+                ActivatedAbility = new(new ActivatedAbilityCost(TapSelf: true, ManaCost: ManaCost.Parse("{R}")), new DestroyTargetEffect(), c => c.CardTypes.HasFlag(CardType.Artifact)),
             },
             ["Skirk Prospector"] = new(ManaCost.Parse("{R}"), null, 1, 1, CardType.Creature)
             {
@@ -213,7 +214,7 @@ public static class CardDefinitions
                         ControllerOnly: true,
                         Layer: EffectLayer.Layer6_AbilityAddRemove),
                 ],
-                ActivatedAbility = new(new ActivatedAbilityCost(SacrificeSelf: true, ManaCost: ManaCost.Parse("{1}")), new SearchLibraryByTypeEffect(CardType.Enchantment)),
+                ActivatedAbility = new(new ActivatedAbilityCost(SacrificeSelf: true, ManaCost: ManaCost.Parse("{1}")), new SearchLibraryToTopEffect(CardType.Enchantment)),
             },
             ["Aura of Silence"] = new(ManaCost.Parse("{1}{W}{W}"), null, null, null, CardType.Enchantment)
             {
@@ -318,7 +319,7 @@ public static class CardDefinitions
             ["Counterspell"] = new(ManaCost.Parse("{U}{U}"), null, null, null, CardType.Instant,
                 TargetFilter.Spell(), new CounterSpellEffect()),
             ["Daze"] = new(ManaCost.Parse("{1}{U}"), null, null, null, CardType.Instant,
-                TargetFilter.Spell(), new CounterSpellEffect())
+                TargetFilter.Spell(), new ConditionalCounterEffect(1))
             {
                 AlternateCost = new AlternateCost(ReturnLandSubtype: "Island"),
             },
@@ -499,7 +500,7 @@ public static class CardDefinitions
                 TargetFilter.Player(), new DiscardEffect(1)),
             ["Bottomless Pit"] = new(ManaCost.Parse("{1}{B}{B}"), null, null, null, CardType.Enchantment)
             {
-                Triggers = [new Trigger(GameEvent.Upkeep, TriggerCondition.Upkeep, new EachPlayerDiscardsEffect(1))],
+                Triggers = [new Trigger(GameEvent.Upkeep, TriggerCondition.AnyUpkeep, new ActivePlayerDiscardsRandomEffect(1))],
             },
             ["The Rack"] = new(ManaCost.Parse("{1}"), null, null, null, CardType.Artifact)
             {
@@ -517,7 +518,7 @@ public static class CardDefinitions
             ["Dust Bowl"] = new(null, ManaAbility.Fixed(ManaColor.Colorless), null, null, CardType.Land)
             {
                 ActivatedAbility = new(
-                    new ActivatedAbilityCost(TapSelf: true, SacrificeSelf: true, ManaCost: ManaCost.Parse("{3}")),
+                    new ActivatedAbilityCost(TapSelf: true, SacrificeCardType: CardType.Land, ManaCost: ManaCost.Parse("{3}")),
                     new DestroyTargetEffect(),
                     TargetFilter: c => c.CardTypes.HasFlag(CardType.Land)
                         && c.Name != "Plains" && c.Name != "Island" && c.Name != "Swamp"
@@ -586,14 +587,10 @@ public static class CardDefinitions
                 [
                     new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
                         (card, _) => card.Name == "Knight of Stromgald",
-                        GrantedKeyword: Keyword.FirstStrike,
-                        Layer: EffectLayer.Layer6_AbilityAddRemove),
-                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
-                        (card, _) => card.Name == "Knight of Stromgald",
                         GrantedKeyword: Keyword.ProtectionFromWhite,
                         Layer: EffectLayer.Layer6_AbilityAddRemove),
                 ],
-                ActivatedAbility = new(new ActivatedAbilityCost(ManaCost: ManaCost.Parse("{B}")), new PumpSelfEffect(1, 0)),
+                ActivatedAbility = new(new ActivatedAbilityCost(ManaCost: ManaCost.Parse("{B}{B}")), new PumpSelfEffect(1, 0)),
             },
             ["Phyrexian Rager"] = new(ManaCost.Parse("{2}{B}"), null, 2, 2, CardType.Creature)
             {
@@ -607,7 +604,7 @@ public static class CardDefinitions
 
             // === Landstill deck ===
             ["Prohibit"] = new(ManaCost.Parse("{1}{U}"), null, null, null, CardType.Instant,
-                TargetFilter.Spell(), new ConditionalCounterEffect(2)),
+                TargetFilter.Spell(), new CmcCheckCounterEffect(2)),
             ["Standstill"] = new(ManaCost.Parse("{1}{U}"), null, null, null, CardType.Enchantment)
             {
                 Triggers = [new Trigger(GameEvent.SpellCast, TriggerCondition.AnyPlayerCastsSpell, new StandstillEffect())],
@@ -668,7 +665,7 @@ public static class CardDefinitions
                 Triggers = [new Trigger(GameEvent.Upkeep, TriggerCondition.AnyUpkeep, new OathOfDruidsEffect())],
             },
             ["Ray of Revelation"] = new(ManaCost.Parse("{1}{W}"), null, null, null, CardType.Instant,
-                TargetFilter.EnchantmentOrArtifact(), new NaturalizeEffect())
+                TargetFilter.Enchantment(), new NaturalizeEffect())
             {
                 FlashbackCost = new FlashbackCost(ManaCost.Parse("{G}")),
             },
@@ -678,7 +675,10 @@ public static class CardDefinitions
                 FlashbackCost = new FlashbackCost(ManaCost.Parse("{2}{R}")),
             },
             ["Volcanic Spray"] = new(ManaCost.Parse("{1}{R}"), null, null, null, CardType.Sorcery,
-                Effect: new DamageAllCreaturesEffect(1)),
+                Effect: new DamageNonflyingCreaturesAndPlayersEffect(1))
+            {
+                FlashbackCost = new FlashbackCost(ManaCost.Parse("{1}{R}")),
+            },
             ["Quiet Speculation"] = new(ManaCost.Parse("{1}{U}"), null, null, null, CardType.Sorcery,
                 Effect: new QuietSpeculationEffect()),
             ["Funeral Pyre"] = new(ManaCost.Parse("{W}"), null, null, null, CardType.Instant),
@@ -734,7 +734,9 @@ public static class CardDefinitions
                 Subtypes = ["Elf", "Druid"],
                 ActivatedAbility = new(new ActivatedAbilityCost(TapSelf: true),
                     new DynamicAddManaEffect(ManaColor.Green,
-                        p => p.Battlefield.Cards.Count(c => c.Subtypes.Contains("Elf", StringComparer.OrdinalIgnoreCase)))),
+                        state => state.Player1.Battlefield.Cards
+                            .Concat(state.Player2.Battlefield.Cards)
+                            .Count(c => c.Subtypes.Contains("Elf", StringComparer.OrdinalIgnoreCase)))),
             },
             ["Quirion Ranger"] = new(ManaCost.Parse("{G}"), null, 1, 1, CardType.Creature) { Subtypes = ["Elf", "Ranger"] },
             ["Wirewood Symbiote"] = new(ManaCost.Parse("{G}"), null, 1, 1, CardType.Creature) { Subtypes = ["Insect"] },
@@ -812,7 +814,8 @@ public static class CardDefinitions
             {
                 Subtypes = ["Elf"],
                 EchoCost = ManaCost.Parse("{2}{G}"),
-                Triggers = [new Trigger(GameEvent.EnterBattlefield, TriggerCondition.Self, new SearchLibraryEffect("Forest", optional: true))],
+                Triggers = [new Trigger(GameEvent.EnterBattlefield, TriggerCondition.Self,
+                    new SearchLandToBattlefieldEffect(c => c.IsBasicLand, entersTapped: true))],
             },
             ["Anger"] = new(ManaCost.Parse("{3}{R}"), null, 2, 2, CardType.Creature)
             {

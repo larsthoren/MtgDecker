@@ -10,20 +10,12 @@ public class PyromancerEffect : IEffect
             context.Source.Id,
             ContinuousEffectType.ModifyPowerToughness,
             (card, _) => card.IsCreature && card.Subtypes.Contains("Goblin"),
-            PowerMod: 2,
+            PowerMod: 3,
             ToughnessMod: 0,
             UntilEndOfTurn: true);
         context.State.ActiveEffects.Add(pump);
 
-        var mountainwalk = new ContinuousEffect(
-            context.Source.Id,
-            ContinuousEffectType.GrantKeyword,
-            (card, _) => card.IsCreature && card.Subtypes.Contains("Goblin"),
-            GrantedKeyword: Keyword.Mountainwalk,
-            UntilEndOfTurn: true);
-        context.State.ActiveEffects.Add(mountainwalk);
-
-        context.State.Log($"All Goblins get +2/+0 and mountainwalk until end of turn.");
+        context.State.Log($"All Goblins get +3/+0 until end of turn.");
 
         var delayed = new DelayedTrigger(
             GameEvent.EndStep,

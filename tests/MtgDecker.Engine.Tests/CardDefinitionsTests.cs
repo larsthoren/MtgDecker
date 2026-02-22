@@ -2,6 +2,7 @@ using FluentAssertions;
 using MtgDecker.Engine.Effects;
 using MtgDecker.Engine.Enums;
 using MtgDecker.Engine.Mana;
+using MtgDecker.Engine.Triggers;
 using MtgDecker.Engine.Triggers.Effects;
 
 // ReSharper disable InconsistentNaming
@@ -425,16 +426,14 @@ public class CardDefinitionsTests
 
     // === Card audit Phase 4: conditional counters + correct discard ===
 
-    [Theory]
-    [InlineData("Mana Leak", 3)]
-    [InlineData("Prohibit", 2)]
-    public void ConditionalCounter_HasCorrectCost(string cardName, int expectedCost)
+    [Fact]
+    public void ManaLeak_HasConditionalCounterEffect()
     {
-        CardDefinitions.TryGet(cardName, out var def);
+        CardDefinitions.TryGet("Mana Leak", out var def);
         var effect = def!.Effect as ConditionalCounterEffect;
         effect.Should().NotBeNull(
-            because: $"{cardName} should use ConditionalCounterEffect");
-        effect!.GenericCost.Should().Be(expectedCost);
+            because: "Mana Leak should use ConditionalCounterEffect");
+        effect!.GenericCost.Should().Be(3);
     }
 
     [Fact]
@@ -617,5 +616,150 @@ public class CardDefinitionsTests
         var effect = def!.ActivatedAbility!.Effect as BecomeCreatureEffect;
         effect.Should().NotBeNull();
         effect!.Keywords.Should().Contain(Keyword.Trample);
+    }
+
+    // === Card audit Batch 4a: simple data fixes ===
+
+    [Fact]
+    public void GoblinKing_PumpExcludesSelf()
+    {
+        CardDefinitions.TryGet("Goblin King", out var def);
+        var pumpEffect = def!.ContinuousEffects.First(e => e.Type == ContinuousEffectType.ModifyPowerToughness);
+        pumpEffect.ExcludeSelf.Should().BeTrue();
+    }
+
+    [Fact]
+    public void RayOfRevelation_TargetsEnchantmentOnly()
+    {
+        CardDefinitions.TryGet("Ray of Revelation", out var def);
+        def!.TargetFilter.Should().NotBeNull();
+        // Create a mock card that is an artifact but not enchantment — should NOT be legal
+        var artifactCard = GameCard.Create("Test Artifact", "Artifact", null, "{2}", null, null);
+        def.TargetFilter!.IsLegal(artifactCard, ZoneType.Battlefield).Should().BeFalse(
+            because: "Ray of Revelation should only target enchantments, not artifacts");
+        // Create a mock card that is an enchantment — should be legal
+        var enchantmentCard = GameCard.Create("Test Enchantment", "Enchantment", null, "{2}", null, null);
+        def.TargetFilter!.IsLegal(enchantmentCard, ZoneType.Battlefield).Should().BeTrue(
+            because: "Ray of Revelation should target enchantments");
+    }
+
+    [Fact]
+    public void GoblinTinkerer_UsesTapSelf()
+    {
+        CardDefinitions.TryGet("Goblin Tinkerer", out var def);
+        def!.ActivatedAbility!.Cost.TapSelf.Should().BeTrue();
+        def.ActivatedAbility.Cost.SacrificeSelf.Should().BeFalse();
+    }
+
+    [Fact]
+    public void KnightOfStromgald_NoStaticFirstStrike()
+    {
+        CardDefinitions.TryGet("Knight of Stromgald", out var def);
+        def!.ContinuousEffects.Should().NotContain(e =>
+            e.Type == ContinuousEffectType.GrantKeyword && e.GrantedKeyword == Keyword.FirstStrike);
+    }
+
+    [Fact]
+    public void KnightOfStromgald_PumpCostsBB()
+    {
+        CardDefinitions.TryGet("Knight of Stromgald", out var def);
+        def!.ActivatedAbility!.Cost.ManaCost!.ColorRequirements[ManaColor.Black].Should().Be(2);
+    }
+
+    [Fact]
+    public void Daze_IsSoftCounter()
+    {
+        CardDefinitions.TryGet("Daze", out var def);
+        def!.Effect.Should().BeOfType<ConditionalCounterEffect>();
+    }
+
+    // === Card audit Batch 4b: PyromancerEffect ===
+
+    [Fact]
+    public void GoblinPyromancer_HasPyromancerEffect()
+    {
+        CardDefinitions.TryGet("Goblin Pyromancer", out var def);
+        def!.Triggers.Should().Contain(t => t.Effect is PyromancerEffect);
+    }
+
+    // === Card audit Batch 4c: Sterling Grove search ===
+
+    [Fact]
+    public void SterlingGrove_SearchPutsOnTopOfLibrary()
+    {
+        CardDefinitions.TryGet("Sterling Grove", out var def);
+        def!.ActivatedAbility!.Effect.Should().BeOfType<SearchLibraryToTopEffect>();
+    }
+
+    // === Card audit Batch 4d: Yavimaya Granger ===
+
+    [Fact]
+    public void YavimayaGranger_SearchesBasicLandToBattlefield()
+    {
+        CardDefinitions.TryGet("Yavimaya Granger", out var def);
+        def!.Triggers.Should().ContainSingle();
+        def.Triggers[0].Effect.Should().BeOfType<SearchLandToBattlefieldEffect>();
+    }
+
+    // === Card audit Batch 4e: Gempalm Incinerator + Priest of Titania counting ===
+
+    [Fact]
+    public void GempalmIncinerator_HasCyclingTrigger()
+    {
+        CardDefinitions.TryGet("Gempalm Incinerator", out var def);
+        def!.CyclingTriggers.Should().ContainSingle();
+        def.CyclingTriggers[0].Effect.Should().BeOfType<GempalmIncineratorEffect>();
+    }
+
+    // === Card audit Batch 4f: Dust Bowl ===
+
+    [Fact]
+    public void DustBowl_SacrificesLandNotSelf()
+    {
+        CardDefinitions.TryGet("Dust Bowl", out var def);
+        def!.ActivatedAbility!.Cost.SacrificeSelf.Should().BeFalse();
+        def.ActivatedAbility.Cost.SacrificeCardType.Should().Be(CardType.Land);
+    }
+
+    // === Card audit Batch 4g: Volcanic Spray fixes ===
+
+    [Fact]
+    public void VolcanicSpray_HasFlashback()
+    {
+        CardDefinitions.TryGet("Volcanic Spray", out var def);
+        def!.FlashbackCost.Should().NotBeNull();
+    }
+
+    [Fact]
+    public void VolcanicSpray_UsesDamageNonflyingEffect()
+    {
+        CardDefinitions.TryGet("Volcanic Spray", out var def);
+        def!.Effect.Should().BeOfType<DamageNonflyingCreaturesAndPlayersEffect>();
+    }
+
+    // === Card audit Batch 4h: Bottomless Pit fixes ===
+
+    [Fact]
+    public void BottomlessPit_UsesAnyUpkeepTrigger()
+    {
+        CardDefinitions.TryGet("Bottomless Pit", out var def);
+        def!.Triggers[0].Condition.Should().Be(TriggerCondition.AnyUpkeep);
+    }
+
+    [Fact]
+    public void BottomlessPit_UsesActivePlayerDiscardsRandom()
+    {
+        CardDefinitions.TryGet("Bottomless Pit", out var def);
+        def!.Triggers[0].Effect.Should().BeOfType<ActivePlayerDiscardsRandomEffect>();
+    }
+
+    // === Card audit Batch 4i: Prohibit CMC check ===
+
+    [Fact]
+    public void Prohibit_UsesCmcCheckCounter()
+    {
+        CardDefinitions.TryGet("Prohibit", out var def);
+        def!.Effect.Should().BeOfType<CmcCheckCounterEffect>();
+        ((CmcCheckCounterEffect)def.Effect!).MaxCmc.Should().Be(2);
     }
 }

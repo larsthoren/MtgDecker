@@ -192,7 +192,7 @@ public class DelayedTriggerTests
         await engine.RunPriorityAsync();
 
         // After ETB: should see pump effect added and delayed trigger registered
-        state.GameLog.Should().Contain(l => l.Contains("Goblins get +2/+0"));
+        state.GameLog.Should().Contain(l => l.Contains("Goblins get +3/+0"));
         state.DelayedTriggers.Should().HaveCount(1);
         state.DelayedTriggers[0].FireOn.Should().Be(GameEvent.EndStep);
     }

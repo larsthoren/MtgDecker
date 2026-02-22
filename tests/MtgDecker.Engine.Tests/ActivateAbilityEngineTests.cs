@@ -269,10 +269,10 @@ public class ActivateAbilityEngineTests
         p2.Graveyard.Cards.Should().Contain(c => c.Id == targetLand.Id);
     }
 
-    // === Goblin Tinkerer: sacrifice self, destroy target artifact ===
+    // === Goblin Tinkerer: tap self, destroy target artifact ===
 
     [Fact]
-    public async Task GoblinTinkerer_SacrificeSelf_DestroysArtifact()
+    public async Task GoblinTinkerer_TapSelf_DestroysArtifact()
     {
         var (engine, state, p1, p2, h1, _) = CreateSetup();
         var tinkerer = GameCard.Create("Goblin Tinkerer");
@@ -288,7 +288,8 @@ public class ActivateAbilityEngineTests
         await engine.ExecuteAction(action);
         await engine.ResolveAllTriggersAsync();
 
-        p1.Battlefield.Cards.Should().NotContain(c => c.Id == tinkerer.Id);
+        tinkerer.IsTapped.Should().BeTrue("Goblin Tinkerer taps as part of its activation cost");
+        p1.Battlefield.Cards.Should().Contain(c => c.Id == tinkerer.Id, "Goblin Tinkerer is not sacrificed, just tapped");
         p2.Battlefield.Cards.Should().NotContain(c => c.Id == artifact.Id);
         p2.Graveyard.Cards.Should().Contain(c => c.Id == artifact.Id);
     }
@@ -314,7 +315,7 @@ public class ActivateAbilityEngineTests
         p2.Graveyard.Cards.Should().Contain(c => c.Id == enchantment.Id);
     }
 
-    // === Sterling Grove: sacrifice self + pay {1}, search library for enchantment ===
+    // === Sterling Grove: sacrifice self + pay {1}, search library for enchantment (to top of library) ===
 
     [Fact]
     public async Task SterlingGrove_SacrificeSelfAndPay_SearchesForEnchantment()
@@ -336,7 +337,11 @@ public class ActivateAbilityEngineTests
 
         p1.Battlefield.Cards.Should().NotContain(c => c.Id == grove.Id);
         p1.Graveyard.Cards.Should().Contain(c => c.Id == grove.Id);
-        p1.Hand.Cards.Should().Contain(c => c.Id == enchantmentInLib.Id);
+        // Sterling Grove puts the enchantment on top of library, not into hand
+        p1.Library.Cards.Should().Contain(c => c.Id == enchantmentInLib.Id);
+        var topCard = p1.Library.PeekTop(1);
+        topCard.Should().HaveCount(1);
+        topCard[0].Id.Should().Be(enchantmentInLib.Id);
     }
 
     // === Summoning sickness: creatures with TapSelf abilities ===

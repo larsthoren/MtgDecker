@@ -6,7 +6,8 @@ public class GempalmIncineratorEffect : IEffect
 {
     public async Task Execute(EffectContext context, CancellationToken ct = default)
     {
-        var goblinCount = context.Controller.Battlefield.Cards
+        var goblinCount = context.State.Player1.Battlefield.Cards
+            .Concat(context.State.Player2.Battlefield.Cards)
             .Count(c => c.IsCreature && c.Subtypes.Contains("Goblin", StringComparer.OrdinalIgnoreCase));
 
         if (goblinCount == 0)

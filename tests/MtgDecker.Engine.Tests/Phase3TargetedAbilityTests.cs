@@ -74,7 +74,8 @@ public class Phase3TargetedAbilityTests
 
         def!.ActivatedAbility.Should().NotBeNull();
         def.ActivatedAbility!.Cost.TapSelf.Should().BeTrue();
-        def.ActivatedAbility.Cost.SacrificeSelf.Should().BeTrue();
+        def.ActivatedAbility.Cost.SacrificeSelf.Should().BeFalse("Dust Bowl sacrifices a land, not itself");
+        def.ActivatedAbility.Cost.SacrificeCardType.Should().Be(CardType.Land);
         def.ActivatedAbility.Cost.ManaCost.Should().NotBeNull();
         def.ActivatedAbility.Cost.ManaCost!.GenericCost.Should().Be(3);
         def.ActivatedAbility.Effect.Should().BeOfType<DestroyTargetEffect>();

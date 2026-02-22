@@ -372,13 +372,10 @@ public class TriggeredAbilityEffectTests
 
         await effect.Execute(context);
 
-        state.ActiveEffects.Should().HaveCount(2);
-        state.ActiveEffects[0].PowerMod.Should().Be(2);
+        state.ActiveEffects.Should().HaveCount(1);
+        state.ActiveEffects[0].PowerMod.Should().Be(3);
         state.ActiveEffects[0].ToughnessMod.Should().Be(0);
         state.ActiveEffects[0].UntilEndOfTurn.Should().BeTrue();
-        state.ActiveEffects[1].Type.Should().Be(ContinuousEffectType.GrantKeyword);
-        state.ActiveEffects[1].GrantedKeyword.Should().Be(Keyword.Mountainwalk);
-        state.ActiveEffects[1].UntilEndOfTurn.Should().BeTrue();
 
         state.DelayedTriggers.Should().HaveCount(1);
         state.DelayedTriggers[0].FireOn.Should().Be(GameEvent.EndStep);
@@ -396,7 +393,7 @@ public class TriggeredAbilityEffectTests
 
         await effect.Execute(context);
 
-        state.GameLog.Should().Contain(l => l.Contains("Goblins get +2/+0 and mountainwalk"));
+        state.GameLog.Should().Contain(l => l.Contains("Goblins get +3/+0"));
     }
 
     // === RearrangeTopEffect ===
