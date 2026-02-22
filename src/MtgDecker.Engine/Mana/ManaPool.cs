@@ -83,7 +83,7 @@ public class ManaPool
             }
         }
 
-        if (playerLife <= lifeNeeded) return false;
+        if (playerLife < lifeNeeded) return false;
 
         // Check generic cost against remaining pool
         var totalRemaining = remainingPool.Values.Sum();

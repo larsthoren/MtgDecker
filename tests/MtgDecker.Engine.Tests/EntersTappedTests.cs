@@ -30,6 +30,7 @@ public class EntersTappedTests
     {
         var (engine, state, _) = CreateSetup();
         await engine.StartGameAsync();
+        state.CurrentPhase = Phase.MainPhase1;
 
         var tower = GameCard.Create("Coastal Tower", "Land");
         state.Player1.Hand.Add(tower);
@@ -45,6 +46,7 @@ public class EntersTappedTests
     {
         var (engine, state, _) = CreateSetup();
         await engine.StartGameAsync();
+        state.CurrentPhase = Phase.MainPhase1;
 
         var mountain = GameCard.Create("Mountain", "Basic Land — Mountain");
         state.Player1.Hand.Add(mountain);
@@ -59,6 +61,7 @@ public class EntersTappedTests
     {
         var (engine, state, _) = CreateSetup();
         await engine.StartGameAsync();
+        state.CurrentPhase = Phase.MainPhase1;
 
         var treetopVillage = GameCard.Create("Treetop Village", "Land");
         state.Player1.Hand.Add(treetopVillage);

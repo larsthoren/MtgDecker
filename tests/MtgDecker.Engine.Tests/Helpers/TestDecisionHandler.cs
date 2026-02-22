@@ -10,7 +10,6 @@ public class TestDecisionHandler : IPlayerDecisionHandler
     private readonly Queue<MulliganDecision> _mulliganDecisions = new();
     private readonly Queue<Func<IReadOnlyList<GameCard>, int, IReadOnlyList<GameCard>>> _bottomChoices = new();
     private readonly Queue<ManaColor> _manaColorChoices = new();
-    private readonly Queue<Dictionary<ManaColor, int>> _genericPaymentChoices = new();
     private readonly Queue<IReadOnlyList<Guid>> _attackerQueue = new();
     private readonly Queue<Dictionary<Guid, Guid?>> _attackerTargetQueue = new();
     private readonly Queue<Dictionary<Guid, Guid>> _blockerQueue = new();
@@ -21,7 +20,7 @@ public class TestDecisionHandler : IPlayerDecisionHandler
     private readonly Queue<Func<IReadOnlyList<GameCard>, IReadOnlyList<GameCard>>> _splitChoices = new();
     private readonly Queue<int> _pileChoices = new();
     private readonly Queue<(Func<IReadOnlyList<GameCard>, IReadOnlyList<GameCard>> orderer, bool shuffle)> _reorderQueue = new();
-    private readonly Queue<bool> _phyrexianPaymentQueue = new();
+    private readonly Queue<Func<IReadOnlyList<GameCard>, int, IReadOnlyList<GameCard>>> _exileChoices = new();
 
     public void EnqueueAction(GameAction action) => _actions.Enqueue(action);
 
@@ -31,8 +30,6 @@ public class TestDecisionHandler : IPlayerDecisionHandler
         _bottomChoices.Enqueue(chooser);
 
     public void EnqueueManaColor(ManaColor color) => _manaColorChoices.Enqueue(color);
-
-    public void EnqueueGenericPayment(Dictionary<ManaColor, int> payment) => _genericPaymentChoices.Enqueue(payment);
 
     public void EnqueueAttackers(IReadOnlyList<Guid> attackerIds) => _attackerQueue.Enqueue(attackerIds);
     public void EnqueueAttackerTargets(Dictionary<Guid, Guid?> targets) => _attackerTargetQueue.Enqueue(targets);
@@ -51,7 +48,8 @@ public class TestDecisionHandler : IPlayerDecisionHandler
     public void EnqueueReorder(Func<IReadOnlyList<GameCard>, IReadOnlyList<GameCard>> orderer, bool shuffle)
         => _reorderQueue.Enqueue((orderer, shuffle));
 
-    public void EnqueuePhyrexianPayment(bool payWithMana) => _phyrexianPaymentQueue.Enqueue(payWithMana);
+    public void EnqueueExileChoice(Func<IReadOnlyList<GameCard>, int, IReadOnlyList<GameCard>> chooser) =>
+        _exileChoices.Enqueue(chooser);
 
     public Action? OnBeforeAction { get; set; }
 
@@ -85,27 +83,6 @@ public class TestDecisionHandler : IPlayerDecisionHandler
         if (_manaColorChoices.Count == 0)
             return Task.FromResult(options[0]);
         return Task.FromResult(_manaColorChoices.Dequeue());
-    }
-
-    public Task<Dictionary<ManaColor, int>> ChooseGenericPayment(int genericAmount, Dictionary<ManaColor, int> available, CancellationToken ct = default)
-    {
-        if (_genericPaymentChoices.Count == 0)
-        {
-            var payment = new Dictionary<ManaColor, int>();
-            var remaining = genericAmount;
-            foreach (var (color, amount) in available)
-            {
-                if (remaining <= 0) break;
-                var take = Math.Min(amount, remaining);
-                if (take > 0)
-                {
-                    payment[color] = take;
-                    remaining -= take;
-                }
-            }
-            return Task.FromResult(payment);
-        }
-        return Task.FromResult(_genericPaymentChoices.Dequeue());
     }
 
     public Task<IReadOnlyList<Guid>> ChooseAttackers(IReadOnlyList<GameCard> eligibleAttackers, CancellationToken ct = default)
@@ -183,11 +160,19 @@ public class TestDecisionHandler : IPlayerDecisionHandler
         return Task.FromResult(((IReadOnlyList<GameCard>)cards.ToList(), false));
     }
 
-    public Task<bool> ChoosePhyrexianPayment(ManaColor color, CancellationToken ct = default)
+    public Task<IReadOnlyList<GameCard>> ChooseCardsToExile(
+        IReadOnlyList<GameCard> options, int maxCount, string prompt, CancellationToken ct = default)
     {
-        if (_phyrexianPaymentQueue.Count > 0)
-            return Task.FromResult(_phyrexianPaymentQueue.Dequeue());
-        // Default: pay with mana if not specified
-        return Task.FromResult(true);
+        if (_exileChoices.Count > 0)
+            return Task.FromResult(_exileChoices.Dequeue()(options, maxCount));
+        // Default: exile as many as possible (greedy)
+        return Task.FromResult<IReadOnlyList<GameCard>>(options.Take(maxCount).ToList());
     }
 }
+
+/// <summary>
+/// Test decision handler variant that uses MTGO-style manual mana payment.
+/// Generic/Phyrexian costs enter mid-cast state requiring explicit PayManaFromPool/PayLifeForPhyrexian actions.
+/// Used for tests that verify the manual payment flow.
+/// </summary>
+public class ManualPaymentTestHandler : TestDecisionHandler, IManualManaPayment { }

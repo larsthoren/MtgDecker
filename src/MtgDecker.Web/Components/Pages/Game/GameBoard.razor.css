@@ -319,3 +319,56 @@
     border-radius: 12px;
     display: block;
 }
+
+/* Mid-cast payment: clickable mana pool symbols */
+.clickable-mana {
+    cursor: pointer;
+    border-radius: 50%;
+    padding: 2px;
+}
+
+.clickable-mana:hover {
+    background-color: rgba(255, 215, 0, 0.3);
+    box-shadow: 0 0 4px gold;
+}
+
+/* Mid-cast status bar */
+.mid-cast-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 8px;
+    background-color: rgba(255, 215, 0, 0.15);
+    border: 1px solid gold;
+    border-radius: 4px;
+}
+
+/* Card being cast highlight */
+.mid-cast-highlight {
+    border: 2px solid gold;
+    box-shadow: 0 0 10px gold;
+    border-radius: 8px;
+}
+
+/* Graveyard viewer panel */
+.graveyard-panel {
+    background: rgba(20, 20, 20, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    padding: 8px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.graveyard-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+}
+
+.graveyard-cards {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}

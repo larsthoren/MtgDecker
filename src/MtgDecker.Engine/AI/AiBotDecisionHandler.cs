@@ -20,10 +20,6 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
     // Colors needed by spells in hand, cached by GetAction for ChooseManaColor to consult
     private HashSet<ManaColor> _neededColors = new();
 
-    // Cached from GetAction so ChoosePhyrexianPayment can check life total
-    private GameState? _lastState;
-    private Guid _lastPlayerId;
-
     private async Task DelayAsync(CancellationToken ct)
     {
         if (ActionDelayMs > 0)
@@ -39,9 +35,6 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
     /// </summary>
     public async Task<GameAction> GetAction(GameState gameState, Guid playerId, CancellationToken ct = default)
     {
-        _lastState = gameState;
-        _lastPlayerId = playerId;
-
         if (gameState.CurrentPhase != Phase.MainPhase1 && gameState.CurrentPhase != Phase.MainPhase2)
             return GameAction.Pass(playerId);
 
@@ -254,47 +247,6 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
     }
 
     /// <summary>
-    /// Pays generic mana costs using colorless first, then from the largest pools
-    /// to preserve color diversity.
-    /// </summary>
-    public Task<Dictionary<ManaColor, int>> ChooseGenericPayment(int genericAmount, Dictionary<ManaColor, int> available, CancellationToken ct = default)
-    {
-        var payment = new Dictionary<ManaColor, int>();
-        var remaining = genericAmount;
-        var pool = new Dictionary<ManaColor, int>(available);
-
-        // Pay with colorless first
-        if (pool.TryGetValue(ManaColor.Colorless, out var colorless) && colorless > 0)
-        {
-            var pay = Math.Min(colorless, remaining);
-            payment[ManaColor.Colorless] = pay;
-            pool[ManaColor.Colorless] -= pay;
-            remaining -= pay;
-        }
-
-        // Then pay from largest pools to preserve color diversity
-        while (remaining > 0)
-        {
-            var largest = pool
-                .Where(kvp => kvp.Value > 0 && kvp.Key != ManaColor.Colorless)
-                .OrderByDescending(kvp => kvp.Value)
-                .FirstOrDefault();
-
-            if (largest.Value == 0 && largest.Key == default)
-                break; // No more mana available
-
-            var color = largest.Key;
-            var pay = 1; // Pay one at a time from largest pool to spread evenly
-            payment.TryGetValue(color, out var current);
-            payment[color] = current + pay;
-            pool[color] -= pay;
-            remaining -= pay;
-        }
-
-        return Task.FromResult(payment);
-    }
-
-    /// <summary>
     /// Attacks with all eligible creatures. The engine already filters for
     /// summoning sickness, so every creature passed here is ready to attack.
     /// </summary>
@@ -479,19 +431,14 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
     }
 
     /// <summary>
-    /// Choose whether to pay a Phyrexian mana symbol with colored mana (true) or 2 life (false).
-    /// Heuristic: pay life if life is above 10, otherwise pay mana to preserve life total.
+    /// Chooses cards to exile for delve or similar effects.
+    /// AI: exile as many as possible to maximize cost reduction.
     /// </summary>
-    public Task<bool> ChoosePhyrexianPayment(ManaColor color, CancellationToken ct = default)
+    public Task<IReadOnlyList<GameCard>> ChooseCardsToExile(
+        IReadOnlyList<GameCard> options, int maxCount, string prompt, CancellationToken ct = default)
     {
-        if (_lastState != null)
-        {
-            var player = _lastState.GetPlayer(_lastPlayerId);
-            // Pay with mana (true) when life is low, pay with life (false) when life is comfortable
-            return Task.FromResult(player.Life <= 10);
-        }
-        // Fallback: pay with life (aggressive default for Phyrexian mana)
-        return Task.FromResult(false);
+        // AI: exile as many as possible to maximize cost reduction
+        return Task.FromResult<IReadOnlyList<GameCard>>(options.Take(maxCount).ToList());
     }
 
     /// <summary>

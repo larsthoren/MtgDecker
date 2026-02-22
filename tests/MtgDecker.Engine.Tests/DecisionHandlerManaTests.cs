@@ -35,41 +35,6 @@ public class DecisionHandlerManaTests
     }
 
     [Fact]
-    public async Task InteractiveHandler_ChooseGenericPayment_AutoPaysImmediately()
-    {
-        var handler = new InteractiveDecisionHandler();
-        var available = new Dictionary<ManaColor, int>
-        {
-            { ManaColor.Red, 2 },
-            { ManaColor.Green, 1 }
-        };
-
-        var task = handler.ChooseGenericPayment(2, available);
-
-        task.IsCompleted.Should().BeTrue();
-        handler.IsWaitingForGenericPayment.Should().BeFalse();
-
-        var result = await task;
-        result.Values.Sum().Should().Be(2);
-    }
-
-    [Fact]
-    public async Task InteractiveHandler_ChooseGenericPayment_PrefersLargestPool()
-    {
-        var handler = new InteractiveDecisionHandler();
-        var available = new Dictionary<ManaColor, int>
-        {
-            { ManaColor.Red, 2 },
-            { ManaColor.Green, 1 }
-        };
-
-        var result = await handler.ChooseGenericPayment(2, available);
-
-        result[ManaColor.Red].Should().Be(2);
-        result.Should().NotContainKey(ManaColor.Green);
-    }
-
-    [Fact]
     public async Task TestHandler_ChooseManaColor_ReturnsEnqueued()
     {
         var handler = new TestDecisionHandler();
@@ -90,25 +55,5 @@ public class DecisionHandlerManaTests
         var result = await handler.ChooseManaColor(options);
 
         result.Should().Be(ManaColor.Black);
-    }
-
-    [Fact]
-    public async Task TestHandler_ChooseGenericPayment_ReturnsEnqueued()
-    {
-        var handler = new TestDecisionHandler();
-        var payment = new Dictionary<ManaColor, int>
-        {
-            { ManaColor.Red, 2 }
-        };
-        handler.EnqueueGenericPayment(payment);
-        var available = new Dictionary<ManaColor, int>
-        {
-            { ManaColor.Red, 3 },
-            { ManaColor.Green, 1 }
-        };
-
-        var result = await handler.ChooseGenericPayment(2, available);
-
-        result.Should().BeEquivalentTo(payment);
     }
 }

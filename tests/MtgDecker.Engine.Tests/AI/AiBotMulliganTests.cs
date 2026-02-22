@@ -115,43 +115,6 @@ public class AiBotMulliganTests
     }
 
     [Fact]
-    public async Task ChooseGenericPayment_PaysCorrectAmount()
-    {
-        var available = new Dictionary<ManaColor, int> { [ManaColor.Red] = 3, [ManaColor.Green] = 2 };
-        var result = await _bot.ChooseGenericPayment(4, available);
-        result.Values.Sum().Should().Be(4);
-    }
-
-    [Fact]
-    public async Task ChooseGenericPayment_PaysColorlessFirst()
-    {
-        var available = new Dictionary<ManaColor, int>
-        {
-            [ManaColor.Colorless] = 2,
-            [ManaColor.Red] = 3
-        };
-        var result = await _bot.ChooseGenericPayment(3, available);
-        result.Values.Sum().Should().Be(3);
-        // Should use all colorless first
-        result.GetValueOrDefault(ManaColor.Colorless).Should().Be(2);
-        result.GetValueOrDefault(ManaColor.Red).Should().Be(1);
-    }
-
-    [Fact]
-    public async Task ChooseGenericPayment_SpreadEvenlyAmongColors()
-    {
-        var available = new Dictionary<ManaColor, int>
-        {
-            [ManaColor.Red] = 3,
-            [ManaColor.Green] = 3
-        };
-        var result = await _bot.ChooseGenericPayment(2, available);
-        result.Values.Sum().Should().Be(2);
-        // Should not use all from one color, prefer spreading
-        result.Values.Max().Should().BeLessThanOrEqualTo(2);
-    }
-
-    [Fact]
     public async Task RevealCards_AutoAcknowledges()
     {
         // Should complete without throwing

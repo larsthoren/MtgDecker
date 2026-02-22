@@ -26,6 +26,7 @@ public class GameAction
     public ManaCost? ManaCostPaid { get; internal set; }
     public Dictionary<ManaColor, int>? ActualManaPaid { get; internal set; }
     public bool IsLandDrop { get; internal set; }
+    public bool UseAlternateCost { get; init; }
 
     public static GameAction Pass(Guid playerId) => new()
     {
@@ -56,12 +57,13 @@ public class GameAction
         CardId = cardId
     };
 
-    public static GameAction CastSpell(Guid playerId, Guid cardId) => new()
+    public static GameAction CastSpell(Guid playerId, Guid cardId, bool useAlternateCost = false) => new()
     {
         Type = ActionType.CastSpell,
         PlayerId = playerId,
         CardId = cardId,
-        SourceZone = ZoneType.Hand
+        SourceZone = ZoneType.Hand,
+        UseAlternateCost = useAlternateCost
     };
 
     public static GameAction ActivateFetch(Guid playerId, Guid cardId) => new()
@@ -121,5 +123,24 @@ public class GameAction
         PlayerId = playerId,
         CardId = cardId,
         SourceZone = ZoneType.Hand,
+    };
+
+    public static GameAction PayManaFromPool(Guid playerId, ManaColor color) => new()
+    {
+        Type = ActionType.PayManaFromPool,
+        PlayerId = playerId,
+        ManaProduced = color
+    };
+
+    public static GameAction PayLifeForPhyrexian(Guid playerId) => new()
+    {
+        Type = ActionType.PayLifeForPhyrexian,
+        PlayerId = playerId
+    };
+
+    public static GameAction CancelCast(Guid playerId) => new()
+    {
+        Type = ActionType.CancelCast,
+        PlayerId = playerId
     };
 }

@@ -80,6 +80,9 @@ public class GameEngineIntegrationTests
 
         // Pick first land in hand to play (land drop — no mana needed)
         var cardToPlay = FindLandInHand(state.Player1);
+        // Pass through Upkeep and Draw priority before playing land in MainPhase1
+        p1Handler.EnqueueAction(GameAction.Pass(state.Player1.Id));
+        p1Handler.EnqueueAction(GameAction.Pass(state.Player1.Id));
         p1Handler.EnqueueAction(GameAction.PlayLand(state.Player1.Id, cardToPlay.Id));
 
         state.IsFirstTurn = true;
@@ -98,6 +101,9 @@ public class GameEngineIntegrationTests
 
         // P1 plays a land and taps it on turn 1
         var cardToPlay = FindLandInHand(state.Player1);
+        // Pass through Upkeep and Draw priority before playing land in MainPhase1
+        p1Handler.EnqueueAction(GameAction.Pass(state.Player1.Id));
+        p1Handler.EnqueueAction(GameAction.Pass(state.Player1.Id));
         p1Handler.EnqueueAction(GameAction.PlayLand(state.Player1.Id, cardToPlay.Id));
         p1Handler.EnqueueAction(GameAction.TapCard(state.Player1.Id, cardToPlay.Id));
 
@@ -144,6 +150,9 @@ public class GameEngineIntegrationTests
             // Skip test rather than fail flakily.
             return;
         }
+        // Pass through Upkeep and Draw priority before playing land in MainPhase1
+        p1Handler.EnqueueAction(GameAction.Pass(state.Player1.Id));
+        p1Handler.EnqueueAction(GameAction.Pass(state.Player1.Id));
         p1Handler.EnqueueAction(GameAction.PlayLand(state.Player1.Id, cardToPlay.Id));
 
         state.IsFirstTurn = true;
@@ -159,19 +168,23 @@ public class GameEngineIntegrationTests
         var engine = CreateGame(out var state, out var p1Handler, out var p2Handler);
         await engine.StartGameAsync();
 
-        // Both players play a land (land drops — no mana needed)
+        // P1 (active player) plays a land, P2 taps a card already on the battlefield
         var p1Card = FindLandInHand(state.Player1);
-        var p2Card = FindLandInHand(state.Player2);
+        var p2Land = GameCard.Create("Mountain", "Basic Land — Mountain");
+        state.Player2.Battlefield.Add(p2Land);
+
+        // Pass through Upkeep and Draw priority before playing land in MainPhase1
+        p1Handler.EnqueueAction(GameAction.Pass(state.Player1.Id));
+        p1Handler.EnqueueAction(GameAction.Pass(state.Player1.Id));
         p1Handler.EnqueueAction(GameAction.PlayLand(state.Player1.Id, p1Card.Id));
-        p2Handler.EnqueueAction(GameAction.PlayLand(state.Player2.Id, p2Card.Id));
+        p2Handler.EnqueueAction(GameAction.TapCard(state.Player2.Id, p2Land.Id));
 
         state.IsFirstTurn = true;
         await engine.RunTurnAsync();
 
         state.Player1.Battlefield.Count.Should().Be(1);
-        state.Player2.Battlefield.Count.Should().Be(1);
+        p2Land.IsTapped.Should().BeTrue();
         state.Player1.Hand.Count.Should().Be(6);
-        state.Player2.Hand.Count.Should().Be(6);
     }
 
     [Fact]
@@ -198,26 +211,34 @@ public class GameEngineIntegrationTests
         await engine.StartGameAsync();
         state.IsFirstTurn = true;
 
-        // Turn 1 (P1): play a land
+        // Turn 1 (P1): play a land (pass Upkeep + Draw first)
         var p1Card1 = FindLandInHand(state.Player1);
+        p1Handler.EnqueueAction(GameAction.Pass(state.Player1.Id));
+        p1Handler.EnqueueAction(GameAction.Pass(state.Player1.Id));
         p1Handler.EnqueueAction(GameAction.PlayLand(state.Player1.Id, p1Card1.Id));
         await engine.RunTurnAsync();
         state.Player1.Battlefield.Count.Should().Be(1);
 
-        // Turn 2 (P2): play a land
+        // Turn 2 (P2): play a land (pass Upkeep + Draw first)
         var p2Card1 = FindLandInHand(state.Player2);
+        p2Handler.EnqueueAction(GameAction.Pass(state.Player2.Id));
+        p2Handler.EnqueueAction(GameAction.Pass(state.Player2.Id));
         p2Handler.EnqueueAction(GameAction.PlayLand(state.Player2.Id, p2Card1.Id));
         await engine.RunTurnAsync();
         state.Player2.Battlefield.Count.Should().Be(1);
 
-        // Turn 3 (P1): play another land (drew one in draw step)
+        // Turn 3 (P1): play another land (drew one in draw step; pass Upkeep + Draw first)
         var p1Card2 = FindLandInHand(state.Player1);
+        p1Handler.EnqueueAction(GameAction.Pass(state.Player1.Id));
+        p1Handler.EnqueueAction(GameAction.Pass(state.Player1.Id));
         p1Handler.EnqueueAction(GameAction.PlayLand(state.Player1.Id, p1Card2.Id));
         await engine.RunTurnAsync();
         state.Player1.Battlefield.Count.Should().Be(2);
 
-        // Turn 4 (P2): play another land
+        // Turn 4 (P2): play another land (pass Upkeep + Draw first)
         var p2Card2 = FindLandInHand(state.Player2);
+        p2Handler.EnqueueAction(GameAction.Pass(state.Player2.Id));
+        p2Handler.EnqueueAction(GameAction.Pass(state.Player2.Id));
         p2Handler.EnqueueAction(GameAction.PlayLand(state.Player2.Id, p2Card2.Id));
         await engine.RunTurnAsync();
         state.Player2.Battlefield.Count.Should().Be(2);
@@ -230,21 +251,20 @@ public class GameEngineIntegrationTests
     }
 
     [Fact]
-    public async Task NonActivePlayer_ActsDuringOpponentsTurn()
+    public async Task NonActivePlayer_CannotPlayLandDuringOpponentsTurn()
     {
         var engine = CreateGame(out var state, out _, out var p2Handler);
         await engine.StartGameAsync();
 
-        // During P1's turn, P2 plays a land from hand
+        // During P1's turn, P2 tries to play a land — should be rejected
         var p2Card = FindLandInHand(state.Player2);
         p2Handler.EnqueueAction(GameAction.PlayLand(state.Player2.Id, p2Card.Id));
 
         state.IsFirstTurn = true;
         await engine.RunTurnAsync();
 
-        state.Player2.Battlefield.Count.Should().Be(1);
-        state.Player2.Battlefield.Cards[0].Should().BeSameAs(p2Card);
-        state.Player2.Hand.Count.Should().Be(6);
+        state.Player2.Battlefield.Count.Should().Be(0, "non-active player cannot play lands");
+        state.Player2.Hand.Cards.Should().Contain(p2Card, "rejected land should stay in hand");
     }
 
     [Fact]
@@ -254,6 +274,9 @@ public class GameEngineIntegrationTests
         await engine.StartGameAsync();
 
         var card = FindLandInHand(state.Player1);
+        // Pass through Upkeep and Draw priority before playing land in MainPhase1
+        p1Handler.EnqueueAction(GameAction.Pass(state.Player1.Id));
+        p1Handler.EnqueueAction(GameAction.Pass(state.Player1.Id));
         p1Handler.EnqueueAction(GameAction.PlayLand(state.Player1.Id, card.Id));
         p1Handler.EnqueueAction(GameAction.TapCard(state.Player1.Id, card.Id));
 
@@ -277,6 +300,9 @@ public class GameEngineIntegrationTests
         await engine.StartGameAsync();
 
         var card = FindLandInHand(state.Player1);
+        // Pass through Upkeep and Draw priority before playing land in MainPhase1
+        p1Handler.EnqueueAction(GameAction.Pass(state.Player1.Id));
+        p1Handler.EnqueueAction(GameAction.Pass(state.Player1.Id));
         p1Handler.EnqueueAction(GameAction.PlayLand(state.Player1.Id, card.Id));
 
         state.IsFirstTurn = true;
@@ -326,9 +352,11 @@ public class GameEngineIntegrationTests
         p1.Battlefield.Add(exploration);
         engine.RecalculateState(); // set MaxLandDrops = 2
 
-        // P1 plays two lands in the same turn
+        // P1 plays two lands in the same turn (pass Upkeep + Draw first)
         var card1 = p1.Hand.Cards[0];
         var card2 = p1.Hand.Cards[1];
+        p1Handler.EnqueueAction(GameAction.Pass(p1.Id));
+        p1Handler.EnqueueAction(GameAction.Pass(p1.Id));
         p1Handler.EnqueueAction(GameAction.PlayLand(p1.Id, card1.Id));
         p1Handler.EnqueueAction(GameAction.PlayLand(p1.Id, card2.Id));
 

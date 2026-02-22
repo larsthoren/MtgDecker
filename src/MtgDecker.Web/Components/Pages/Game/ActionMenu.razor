@@ -20,6 +20,14 @@
                            OnClick="() => OnPlay.InvokeAsync()">Play</MudButton>
             }
 
+            @if (IsOwnCard && CurrentZone == ZoneType.Hand && HasAlternateCost)
+            {
+                <MudButton Size="Size.Small" Variant="Variant.Text" FullWidth="true"
+                           StartIcon="@Icons.Material.Filled.SwapHoriz" Color="Color.Warning"
+                           Style="justify-content: flex-start;"
+                           OnClick="() => OnPlayAlternate.InvokeAsync()">Cast (alt cost)</MudButton>
+            }
+
             @if (IsOwnCard && CurrentZone == ZoneType.Battlefield && !IsTapped && HasTapAbility)
             {
                 <MudButton Size="Size.Small" Variant="Variant.Text" FullWidth="true"
@@ -53,7 +61,9 @@
     [Parameter] public bool IsTapped { get; set; }
     [Parameter] public bool HasTapAbility { get; set; }
     [Parameter] public bool HasActivatedAbility { get; set; }
+    [Parameter] public bool HasAlternateCost { get; set; }
     [Parameter] public EventCallback OnPlay { get; set; }
+    [Parameter] public EventCallback OnPlayAlternate { get; set; }
     [Parameter] public EventCallback OnTapToggle { get; set; }
     [Parameter] public EventCallback OnActivate { get; set; }
     [Parameter] public EventCallback OnClose { get; set; }
