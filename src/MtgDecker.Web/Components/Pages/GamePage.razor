@@ -37,7 +37,10 @@ else if (_session.State != null)
                OnBlockerOrderChosen="HandleBlockerOrderChosen"
                OnCardChosen="HandleCardChosen"
                OnRevealAcknowledged="HandleRevealAcknowledged"
-               OnReorderSubmitted="HandleReorderSubmitted" />
+               OnReorderSubmitted="HandleReorderSubmitted"
+               ChatMessages="@_session.ChatMessages"
+               OnChatSent="HandleChatSent"
+               LocalPlayerName="@(_playerSeat == 1 ? _session.Player1Name : _session.Player2Name)" />
 }
 
 @code {
@@ -247,6 +250,11 @@ else if (_session.State != null)
     private void HandleUndoTap()
     {
         _session?.Undo(_playerSeat);
+    }
+
+    private void HandleChatSent(string text)
+    {
+        _session?.AddChatMessage(_playerSeat, text);
     }
 
     private void HandleStateChanged()
