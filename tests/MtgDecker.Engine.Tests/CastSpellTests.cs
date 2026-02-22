@@ -53,6 +53,7 @@ public class CastSpellTests
     {
         var (engine, state, _) = CreateSetup();
         await engine.StartGameAsync();
+        state.CurrentPhase = Phase.MainPhase1;
 
         var forest = GameCard.Create("Forest", "Basic Land — Forest");
         state.Player1.Hand.Add(forest);
@@ -68,6 +69,7 @@ public class CastSpellTests
     {
         var (engine, state, _) = CreateSetup();
         await engine.StartGameAsync();
+        state.CurrentPhase = Phase.MainPhase1;
 
         var forest = GameCard.Create("Forest", "Basic Land — Forest");
         state.Player1.Hand.Add(forest);
@@ -82,6 +84,7 @@ public class CastSpellTests
     {
         var (engine, state, _) = CreateSetup();
         await engine.StartGameAsync();
+        state.CurrentPhase = Phase.MainPhase1;
 
         var forest1 = GameCard.Create("Forest", "Basic Land — Forest");
         var forest2 = GameCard.Create("Forest", "Basic Land — Forest");
@@ -100,6 +103,7 @@ public class CastSpellTests
     {
         var (engine, state, _) = CreateSetup();
         await engine.StartGameAsync();
+        state.CurrentPhase = Phase.MainPhase1;
 
         state.Player1.ManaPool.Add(ManaColor.Green, 3);
         var forest = GameCard.Create("Forest", "Basic Land — Forest");
@@ -115,6 +119,7 @@ public class CastSpellTests
     {
         var (engine, state, _) = CreateSetup();
         await engine.StartGameAsync();
+        state.CurrentPhase = Phase.MainPhase1;
 
         var forest = GameCard.Create("Forest", "Basic Land — Forest");
         state.Player1.Hand.Add(forest);

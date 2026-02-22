@@ -32,6 +32,7 @@ public class GameEnginePriorityTests
     public async Task RunPriorityAsync_ActivePlayerActsThenBothPass_PhaseEnds()
     {
         var engine = CreateEngine(out var state, out var p1Handler, out var p2Handler);
+        state.CurrentPhase = Phase.MainPhase1;
         var card = GameCard.Create("Forest", "Basic Land — Forest");
         state.Player1.Hand.Add(card);
 
@@ -47,39 +48,45 @@ public class GameEnginePriorityTests
     public async Task RunPriorityAsync_ActivePlayerPasses_OpponentGetsPriority()
     {
         var engine = CreateEngine(out var state, out var p1Handler, out var p2Handler);
-        // Use a land (land drops don't need mana)
+        state.CurrentPhase = Phase.MainPhase1;
+        // P2 taps a card already on battlefield (non-active players can tap lands for mana)
         var card = GameCard.Create("Mountain", "Basic Land — Mountain");
-        state.Player2.Hand.Add(card);
+        state.Player2.Battlefield.Add(card);
 
-        p2Handler.EnqueueAction(GameAction.PlayLand(state.Player2.Id, card.Id));
+        p2Handler.EnqueueAction(GameAction.TapCard(state.Player2.Id, card.Id));
 
         await engine.RunPriorityAsync();
 
-        state.Player2.Battlefield.Count.Should().Be(1);
+        card.IsTapped.Should().BeTrue();
     }
 
     [Fact]
     public async Task RunPriorityAsync_OpponentActs_ActivePlayerGetsPriorityAgain()
     {
         var engine = CreateEngine(out var state, out var p1Handler, out var p2Handler);
+        state.CurrentPhase = Phase.MainPhase1;
+        // P2 has a land on battlefield to tap (non-active player can tap for mana)
         var card1 = GameCard.Create("Forest", "Basic Land — Forest");
+        state.Player2.Battlefield.Add(card1);
+        // P1 has a land in hand to play (active player can play lands)
         var card2 = GameCard.Create("Mountain", "Basic Land — Mountain");
-        state.Player2.Hand.Add(card1);
         state.Player1.Hand.Add(card2);
 
-        p2Handler.EnqueueAction(GameAction.PlayLand(state.Player2.Id, card1.Id));
+        // P1 first passes priority, P2 taps forest, P1 gets priority back and plays land
+        p2Handler.EnqueueAction(GameAction.TapCard(state.Player2.Id, card1.Id));
         p1Handler.EnqueueAction(GameAction.PlayLand(state.Player1.Id, card2.Id));
 
         await engine.RunPriorityAsync();
 
         state.Player1.Battlefield.Count.Should().Be(1);
-        state.Player2.Battlefield.Count.Should().Be(1);
+        card1.IsTapped.Should().BeTrue();
     }
 
     [Fact]
     public async Task RunPriorityAsync_RejectedAction_PlayerRetainsPriority()
     {
         var engine = CreateEngine(out var state, out var p1Handler, out var p2Handler);
+        state.CurrentPhase = Phase.MainPhase1;
 
         // Set up: player has Wild Growth in hand but no mana (CastSpell will be rejected)
         var wildGrowth = GameCard.Create("Wild Growth", "Enchantment");
@@ -117,6 +124,7 @@ public class GameEnginePriorityTests
     public async Task RunPriorityAsync_ManaAbility_DoesNotPassPriority()
     {
         var engine = CreateEngine(out var state, out var p1Handler, out var p2Handler);
+        state.CurrentPhase = Phase.MainPhase1;
 
         // Put a Forest on P1's battlefield
         var forest = GameCard.Create("Forest", "Basic Land — Forest");
