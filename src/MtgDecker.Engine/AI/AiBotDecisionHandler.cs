@@ -431,6 +431,17 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
     }
 
     /// <summary>
+    /// Chooses cards to exile for delve or similar effects.
+    /// AI: exile as many as possible to maximize cost reduction.
+    /// </summary>
+    public Task<IReadOnlyList<GameCard>> ChooseCardsToExile(
+        IReadOnlyList<GameCard> options, int maxCount, string prompt, CancellationToken ct = default)
+    {
+        // AI: exile as many as possible to maximize cost reduction
+        return Task.FromResult<IReadOnlyList<GameCard>>(options.Take(maxCount).ToList());
+    }
+
+    /// <summary>
     /// Chooses a target for a spell. Picks the opponent's creature with highest power,
     /// falling back to the first eligible target.
     /// </summary>

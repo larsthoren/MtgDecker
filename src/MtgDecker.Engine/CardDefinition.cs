@@ -35,6 +35,7 @@ public record CardDefinition(
     public int? StartingLoyalty { get; init; }
     public IReadOnlyList<LoyaltyAbility>? LoyaltyAbilities { get; init; }
     public bool HasFlash { get; init; }
+    public bool HasDelve { get; init; }
     public bool ShuffleGraveyardOnDeath { get; init; }
     public ManaCost? NinjutsuCost { get; init; }
     public CardDefinition? TransformInto { get; init; }

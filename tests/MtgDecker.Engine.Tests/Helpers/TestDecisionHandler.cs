@@ -20,6 +20,7 @@ public class TestDecisionHandler : IPlayerDecisionHandler
     private readonly Queue<Func<IReadOnlyList<GameCard>, IReadOnlyList<GameCard>>> _splitChoices = new();
     private readonly Queue<int> _pileChoices = new();
     private readonly Queue<(Func<IReadOnlyList<GameCard>, IReadOnlyList<GameCard>> orderer, bool shuffle)> _reorderQueue = new();
+    private readonly Queue<Func<IReadOnlyList<GameCard>, int, IReadOnlyList<GameCard>>> _exileChoices = new();
 
     public void EnqueueAction(GameAction action) => _actions.Enqueue(action);
 
@@ -46,6 +47,9 @@ public class TestDecisionHandler : IPlayerDecisionHandler
 
     public void EnqueueReorder(Func<IReadOnlyList<GameCard>, IReadOnlyList<GameCard>> orderer, bool shuffle)
         => _reorderQueue.Enqueue((orderer, shuffle));
+
+    public void EnqueueExileChoice(Func<IReadOnlyList<GameCard>, int, IReadOnlyList<GameCard>> chooser) =>
+        _exileChoices.Enqueue(chooser);
 
     public Action? OnBeforeAction { get; set; }
 
@@ -156,6 +160,14 @@ public class TestDecisionHandler : IPlayerDecisionHandler
         return Task.FromResult(((IReadOnlyList<GameCard>)cards.ToList(), false));
     }
 
+    public Task<IReadOnlyList<GameCard>> ChooseCardsToExile(
+        IReadOnlyList<GameCard> options, int maxCount, string prompt, CancellationToken ct = default)
+    {
+        if (_exileChoices.Count > 0)
+            return Task.FromResult(_exileChoices.Dequeue()(options, maxCount));
+        // Default: exile as many as possible (greedy)
+        return Task.FromResult<IReadOnlyList<GameCard>>(options.Take(maxCount).ToList());
+    }
 }
 
 /// <summary>
