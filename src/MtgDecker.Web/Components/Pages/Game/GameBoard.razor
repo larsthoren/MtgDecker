@@ -389,7 +389,9 @@
                         IsTapped="@_selectedCard.IsTapped"
                         HasTapAbility="@(_selectedCard.IsLand || _selectedCard.ManaAbility != null)"
                         HasActivatedAbility="@HasActivatedAbility(_selectedCard)"
+                        HasAlternateCost="@HasAlternateCostForCard(_selectedCard)"
                         OnPlay="HandlePlay"
+                        OnPlayAlternate="HandlePlayAlternate"
                         OnTapToggle="HandleTapToggle"
                         OnActivate="HandleActivate"
                         OnClose="ClearSelection" />
@@ -989,14 +991,6 @@
         // Non-land: check if we can pay the mana cost
         if (_selectedCard.ManaCost != null && !LocalPlayer.ManaPool.CanPay(_selectedCard.ManaCost))
         {
-            // Check for alternate cost — let engine handle the choice
-            if (CardDefinitions.TryGet(_selectedCard.Name, out var altDef) && altDef.AlternateCost != null)
-            {
-                await OnAction.InvokeAsync(GameAction.CastSpell(LocalPlayer.Id, _selectedCard.Id));
-                ClearSelection();
-                return;
-            }
-
             // Check for Phyrexian mana cost — let engine handle payment prompts
             if (_selectedCard.ManaCost.HasPhyrexianCost)
             {
@@ -1210,6 +1204,23 @@
     {
         if (_selectedCard == null) return;
         await OnAction.InvokeAsync(GameAction.ActivateAbility(LocalPlayer.Id, _selectedCard.Id));
+        ClearSelection();
+    }
+
+    // --- Alternate cost ---
+
+    private bool HasAlternateCostForCard(GameCard? card)
+    {
+        if (card == null) return false;
+        return CardDefinitions.TryGet(card.Name, out var def) && def.AlternateCost != null;
+    }
+
+    private async Task HandlePlayAlternate()
+    {
+        if (_selectedCard == null) return;
+        var action = GameAction.CastSpell(LocalPlayer.Id, _selectedCard.Id);
+        action.UseAlternateCost = true;
+        await OnAction.InvokeAsync(action);
         ClearSelection();
     }
 
