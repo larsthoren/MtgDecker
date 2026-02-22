@@ -1,5 +1,6 @@
 using FluentAssertions;
 using MtgDecker.Engine;
+using MtgDecker.Engine.AI;
 using MtgDecker.Engine.Enums;
 using MtgDecker.Engine.Mana;
 using MtgDecker.Engine.Tests.Helpers;
@@ -275,6 +276,72 @@ public class ManualPaymentTests
 
         state.IsMidCast.Should().BeFalse();
         state.Player1.Life.Should().Be(lifeBefore - 2);
+        state.StackCount.Should().BeGreaterThanOrEqualTo(1);
+    }
+
+    [Fact]
+    public async Task AiBot_AutoResolvesPhyrexianPayment()
+    {
+        var h1 = new AiBotDecisionHandler { ActionDelayMs = 0 };
+        var h2 = new AiBotDecisionHandler { ActionDelayMs = 0 };
+        var p1 = new Player(Guid.NewGuid(), "Bot1", h1);
+        var p2 = new Player(Guid.NewGuid(), "Bot2", h2);
+        for (int i = 0; i < 40; i++)
+        {
+            p1.Library.Add(new GameCard { Name = $"Card{i}" });
+            p2.Library.Add(new GameCard { Name = $"Card{i}" });
+        }
+        var state = new GameState(p1, p2);
+        var engine = new GameEngine(state);
+        await engine.StartGameAsync();
+        state.CurrentPhase = Phase.MainPhase1;
+        state.ActivePlayer = state.Player1;
+
+        var card = new GameCard { Name = "Dismember", ManaCost = ManaCost.Parse("{1}{B/P}{B/P}"), CardTypes = CardType.Instant };
+        state.Player1.Hand.Add(card);
+        state.Player1.ManaPool.Add(ManaColor.Black, 1);
+        state.Player1.ManaPool.Add(ManaColor.Red, 1);
+
+        // Add a target creature for Dismember
+        var target = new GameCard { Name = "Bear", ManaCost = ManaCost.Parse("{1}{G}"), CardTypes = CardType.Creature, Power = 2, Toughness = 2 };
+        state.Player2.Battlefield.Add(target);
+
+        // AI should auto-resolve: pay life for Phyrexian (life > 10), use mana for generic
+        await engine.ExecuteAction(GameAction.CastSpell(state.Player1.Id, card.Id));
+
+        // After AI auto-resolves, spell should be on stack, not stuck in mid-cast
+        state.IsMidCast.Should().BeFalse();
+        state.StackCount.Should().BeGreaterThanOrEqualTo(1);
+    }
+
+    [Fact]
+    public async Task AiBot_AutoResolvesGenericPayment()
+    {
+        var h1 = new AiBotDecisionHandler { ActionDelayMs = 0 };
+        var h2 = new AiBotDecisionHandler { ActionDelayMs = 0 };
+        var p1 = new Player(Guid.NewGuid(), "Bot1", h1);
+        var p2 = new Player(Guid.NewGuid(), "Bot2", h2);
+        for (int i = 0; i < 40; i++)
+        {
+            p1.Library.Add(new GameCard { Name = $"Card{i}" });
+            p2.Library.Add(new GameCard { Name = $"Card{i}" });
+        }
+        var state = new GameState(p1, p2);
+        var engine = new GameEngine(state);
+        await engine.StartGameAsync();
+        state.CurrentPhase = Phase.MainPhase1;
+        state.ActivePlayer = state.Player1;
+
+        // {2}{R} - R auto-deducted, {2} generic manual
+        var card = new GameCard { Name = "TestSpell", ManaCost = ManaCost.Parse("{2}{R}"), CardTypes = CardType.Instant };
+        state.Player1.Hand.Add(card);
+        state.Player1.ManaPool.Add(ManaColor.Red, 1);
+        state.Player1.ManaPool.Add(ManaColor.Blue, 2);
+
+        await engine.ExecuteAction(GameAction.CastSpell(state.Player1.Id, card.Id));
+
+        // AI should auto-pay generic without getting stuck
+        state.IsMidCast.Should().BeFalse();
         state.StackCount.Should().BeGreaterThanOrEqualTo(1);
     }
 }

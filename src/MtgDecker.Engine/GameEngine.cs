@@ -1,3 +1,4 @@
+using MtgDecker.Engine.AI;
 using MtgDecker.Engine.Enums;
 using MtgDecker.Engine.Mana;
 using MtgDecker.Engine.Triggers;
@@ -379,6 +380,63 @@ public class GameEngine
 
         await QueueBoardTriggersOnStackAsync(GameEvent.SpellCast, card, ct);
         await QueueSelfCastTriggersAsync(card, player, ct);
+    }
+
+    internal async Task AutoResolveMidCastForAi(GameState state, Player player, CancellationToken ct)
+    {
+        // AI heuristic: pay life for Phyrexian if life > 10, else pay mana
+        while (state.IsMidCast && !state.IsFullyPaid)
+        {
+            if (state.TotalRemainingPhyrexian > 0)
+            {
+                if (player.Life > 10 && player.Life > 2)
+                {
+                    // Pay life
+                    state.ApplyLifePayment();
+                    player.AdjustLife(-2);
+                    state.Log($"{player.Name} pays 2 life for Phyrexian mana.");
+                }
+                else
+                {
+                    // Pay mana — find matching color
+                    var phyColor = state.RemainingPhyrexianCost.First().Key;
+                    if (player.ManaPool[phyColor] > 0)
+                    {
+                        player.ManaPool.Deduct(phyColor, 1);
+                        state.ApplyManaPayment(phyColor);
+                        state.Log($"{player.Name} pays {{{GetColorSymbol(phyColor)}}} from pool.");
+                    }
+                    else
+                    {
+                        // Fallback: pay life anyway
+                        state.ApplyLifePayment();
+                        player.AdjustLife(-2);
+                        state.Log($"{player.Name} pays 2 life for Phyrexian mana.");
+                    }
+                }
+            }
+            else if (state.RemainingGenericCost > 0)
+            {
+                // Pay generic with any available mana
+                var available = player.ManaPool.Available.FirstOrDefault(kv => kv.Value > 0);
+                if (available.Value > 0)
+                {
+                    player.ManaPool.Deduct(available.Key, 1);
+                    state.ApplyManaPayment(available.Key);
+                    state.Log($"{player.Name} pays {{{GetColorSymbol(available.Key)}}} from pool.");
+                }
+                else
+                {
+                    // No mana available — shouldn't happen if CanPay was checked
+                    break;
+                }
+            }
+        }
+
+        if (state.IsFullyPaid)
+        {
+            await CompleteMidCastAsync(state, player, ct);
+        }
     }
 
     internal static string GetColorSymbol(ManaColor color) => color switch
