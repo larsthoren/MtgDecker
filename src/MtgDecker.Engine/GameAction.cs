@@ -26,6 +26,7 @@ public class GameAction
     public ManaCost? ManaCostPaid { get; internal set; }
     public Dictionary<ManaColor, int>? ActualManaPaid { get; internal set; }
     public bool IsLandDrop { get; internal set; }
+    public bool UseAlternateCost { get; set; }
 
     public static GameAction Pass(Guid playerId) => new()
     {

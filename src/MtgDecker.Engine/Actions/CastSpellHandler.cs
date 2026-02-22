@@ -56,23 +56,31 @@ internal class CastSpellHandler : IActionHandler
             ? castPlayer.ManaPool.CanPayWithPhyrexian(castEffectiveCost, castPlayer.Life)
             : castPlayer.ManaPool.CanPay(castEffectiveCost);
         bool canPayAlternate = def?.AlternateCost != null && engine.CanPayAlternateCost(def.AlternateCost, castPlayer, castCard);
-        bool useAlternateCost = false;
+        bool useAlternateCost = action.UseAlternateCost;
 
-        if (!canPayMana && !canPayAlternate)
+        if (!useAlternateCost)
         {
-            state.Log($"Not enough mana to cast {castCard.Name}.");
+            if (!canPayMana && !canPayAlternate)
+            {
+                state.Log($"Not enough mana to cast {castCard.Name}.");
+                return;
+            }
+
+            if (canPayAlternate && !canPayMana)
+            {
+                useAlternateCost = true;
+            }
+            else if (canPayAlternate && canPayMana)
+            {
+                var choice = await castPlayer.DecisionHandler.ChooseCard(
+                    [castCard], $"Pay mana for {castCard.Name}? (skip to use alternate cost)", optional: true, ct);
+                useAlternateCost = !choice.HasValue;
+            }
+        }
+        else if (!canPayAlternate)
+        {
+            state.Log($"Cannot pay alternate cost for {castCard.Name}.");
             return;
-        }
-
-        if (canPayAlternate && !canPayMana)
-        {
-            useAlternateCost = true;
-        }
-        else if (canPayAlternate && canPayMana)
-        {
-            var choice = await castPlayer.DecisionHandler.ChooseCard(
-                [castCard], $"Pay mana for {castCard.Name}? (skip to use alternate cost)", optional: true, ct);
-            useAlternateCost = !choice.HasValue;
         }
 
         // Use shared targeting helper
