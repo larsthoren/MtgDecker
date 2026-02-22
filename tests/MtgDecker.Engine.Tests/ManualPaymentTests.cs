@@ -143,8 +143,9 @@ public class ManualPaymentTests
     }
 
     [Fact]
-    public async Task PayLifeForPhyrexian_Fails_WhenLifeTooLow()
+    public async Task PayLifeForPhyrexian_AllowedAtLowLife_MtgRules()
     {
+        // MTG rules: you can pay Phyrexian life costs even if it kills you (SBA handles death)
         var (engine, state, h1, _) = CreateSetup();
         await engine.StartGameAsync();
         state.CurrentPhase = Phase.MainPhase1;
@@ -153,6 +154,27 @@ public class ManualPaymentTests
         var card = new GameCard { Name = "Surgical", ManaCost = ManaCost.Parse("{B/P}"), CardTypes = CardType.Instant };
         state.Player1.Hand.Add(card);
         state.Player1.AdjustLife(-18); // Life = 2
+
+        await engine.ExecuteAction(GameAction.CastSpell(state.Player1.Id, card.Id));
+        var lifeBefore = state.Player1.Life;
+
+        await engine.ExecuteAction(GameAction.PayLifeForPhyrexian(state.Player1.Id));
+
+        state.Player1.Life.Should().Be(lifeBefore - 2); // Life = 0
+        state.IsMidCast.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task PayLifeForPhyrexian_Fails_WhenLifeIsZero()
+    {
+        var (engine, state, h1, _) = CreateSetup();
+        await engine.StartGameAsync();
+        state.CurrentPhase = Phase.MainPhase1;
+        state.ActivePlayer = state.Player1;
+
+        var card = new GameCard { Name = "Surgical", ManaCost = ManaCost.Parse("{B/P}"), CardTypes = CardType.Instant };
+        state.Player1.Hand.Add(card);
+        state.Player1.AdjustLife(-20); // Life = 0
 
         await engine.ExecuteAction(GameAction.CastSpell(state.Player1.Id, card.Id));
 

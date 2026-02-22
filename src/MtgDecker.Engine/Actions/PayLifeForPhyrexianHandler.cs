@@ -12,7 +12,7 @@ internal class PayLifeForPhyrexianHandler : IActionHandler
 
         var player = state.GetPlayer(action.PlayerId);
 
-        if (player.Life <= 2)
+        if (player.Life < 1)
             throw new InvalidOperationException("Not enough life to pay Phyrexian cost.");
 
         if (!state.ApplyLifePayment())

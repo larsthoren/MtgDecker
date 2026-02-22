@@ -184,12 +184,12 @@ public class PhyrexianManaTests
     }
 
     [Fact]
-    public void CanPayWithPhyrexian_SinglePhyrexian_LifeExactlyEqual_ReturnsFalse()
+    public void CanPayWithPhyrexian_SinglePhyrexian_LifeExactlyEqual_ReturnsTrue()
     {
         var pool = new ManaPool();
         var cost = ManaCost.Parse("{B/P}");
-        // Life exactly equal to cost (2) — strict inequality means can't pay
-        pool.CanPayWithPhyrexian(cost, 2).Should().BeFalse();
+        // MTG rules: you can pay 2 life even at exactly 2 life (SBA handles death)
+        pool.CanPayWithPhyrexian(cost, 2).Should().BeTrue();
     }
 
     // --- Integration tests: CastSpell with Phyrexian mana (mid-cast flow) ---

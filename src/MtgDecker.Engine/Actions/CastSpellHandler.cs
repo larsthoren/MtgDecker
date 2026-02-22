@@ -7,6 +7,12 @@ internal class CastSpellHandler : IActionHandler
 {
     public async Task ExecuteAsync(GameAction action, GameEngine engine, GameState state, CancellationToken ct)
     {
+        if (state.IsMidCast)
+        {
+            state.Log("Cannot cast another spell while mid-cast.");
+            return;
+        }
+
         var castPlayer = state.GetPlayer(action.PlayerId);
         var castCard = castPlayer.Hand.Cards.FirstOrDefault(c => c.Id == action.CardId);
         bool castingFromExileAdventure = false;

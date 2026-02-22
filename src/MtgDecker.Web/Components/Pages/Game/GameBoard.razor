@@ -278,7 +278,7 @@
             bool canPayLife = State.IsMidCast
                 && State.PendingCastPlayerId == LocalPlayer.Id
                 && State.TotalRemainingPhyrexian > 0
-                && LocalPlayer.Life > 2;
+                && LocalPlayer.Life >= 1;
         }
         @if (canPayLife)
         {
