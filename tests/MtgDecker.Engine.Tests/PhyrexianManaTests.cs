@@ -192,7 +192,7 @@ public class PhyrexianManaTests
         pool.CanPayWithPhyrexian(cost, 2).Should().BeFalse();
     }
 
-    // --- Integration tests: CastSpell with Phyrexian mana ---
+    // --- Integration tests: CastSpell with Phyrexian mana (mid-cast flow) ---
 
     [Fact]
     public async Task PhyrexianCost_PayAllMana_NoLifeLost()
@@ -208,16 +208,22 @@ public class PhyrexianManaTests
         state.Player1.ManaPool.Add(ManaColor.Black, 2);
         state.Player1.ManaPool.Add(ManaColor.Colorless, 1);
 
-        // Pay both Phyrexian with mana
-        h1.EnqueuePhyrexianPayment(true);  // 1st {B/P} = pay mana
-        h1.EnqueuePhyrexianPayment(true);  // 2nd {B/P} = pay mana
-
         var startLife = state.Player1.Life;
+
+        // CastSpell enters mid-cast (generic=1, phyrexian=2 black)
         await engine.ExecuteAction(GameAction.CastSpell(state.Player1.Id, card.Id));
+        state.IsMidCast.Should().BeTrue();
+
+        // Pay both Phyrexian with mana (Black)
+        await engine.ExecuteAction(GameAction.PayManaFromPool(state.Player1.Id, ManaColor.Black));
+        await engine.ExecuteAction(GameAction.PayManaFromPool(state.Player1.Id, ManaColor.Black));
+
+        // Pay generic with colorless
+        await engine.ExecuteAction(GameAction.PayManaFromPool(state.Player1.Id, ManaColor.Colorless));
 
         state.Player1.Life.Should().Be(startLife);
         state.StackCount.Should().BeGreaterThanOrEqualTo(1);
-        state.Player1.ManaPool.Total.Should().Be(0); // All mana used
+        state.Player1.ManaPool.Total.Should().Be(0);
     }
 
     [Fact]
@@ -232,9 +238,18 @@ public class PhyrexianManaTests
         state.Player1.Hand.Add(card);
         state.Player1.ManaPool.Add(ManaColor.Colorless, 1); // Only generic mana, no black
 
-        // No black mana — should auto-pay life without prompting
         var startLife = state.Player1.Life;
+
+        // CastSpell enters mid-cast (generic=1, phyrexian=2 black)
         await engine.ExecuteAction(GameAction.CastSpell(state.Player1.Id, card.Id));
+        state.IsMidCast.Should().BeTrue();
+
+        // Pay both Phyrexian with life
+        await engine.ExecuteAction(GameAction.PayLifeForPhyrexian(state.Player1.Id));
+        await engine.ExecuteAction(GameAction.PayLifeForPhyrexian(state.Player1.Id));
+
+        // Pay generic with colorless
+        await engine.ExecuteAction(GameAction.PayManaFromPool(state.Player1.Id, ManaColor.Colorless));
 
         state.Player1.Life.Should().Be(startLife - 4);
         state.StackCount.Should().BeGreaterThanOrEqualTo(1);
@@ -253,11 +268,18 @@ public class PhyrexianManaTests
         state.Player1.ManaPool.Add(ManaColor.Black, 1);
         state.Player1.ManaPool.Add(ManaColor.Colorless, 1);
 
-        h1.EnqueuePhyrexianPayment(true);   // 1st {B/P} = pay mana
-        h1.EnqueuePhyrexianPayment(false);  // 2nd {B/P} = pay life
-
         var startLife = state.Player1.Life;
+
+        // CastSpell enters mid-cast (generic=1, phyrexian=2 black)
         await engine.ExecuteAction(GameAction.CastSpell(state.Player1.Id, card.Id));
+        state.IsMidCast.Should().BeTrue();
+
+        // 1st Phyrexian: pay with Black mana
+        await engine.ExecuteAction(GameAction.PayManaFromPool(state.Player1.Id, ManaColor.Black));
+        // 2nd Phyrexian: pay with life
+        await engine.ExecuteAction(GameAction.PayLifeForPhyrexian(state.Player1.Id));
+        // Generic: pay with Colorless
+        await engine.ExecuteAction(GameAction.PayManaFromPool(state.Player1.Id, ManaColor.Colorless));
 
         state.Player1.Life.Should().Be(startLife - 2);
         state.StackCount.Should().BeGreaterThanOrEqualTo(1);
@@ -276,7 +298,13 @@ public class PhyrexianManaTests
         // No mana at all
 
         var startLife = state.Player1.Life;
+
+        // CastSpell enters mid-cast (phyrexian=1 black)
         await engine.ExecuteAction(GameAction.CastSpell(state.Player1.Id, card.Id));
+        state.IsMidCast.Should().BeTrue();
+
+        // Pay Phyrexian with life
+        await engine.ExecuteAction(GameAction.PayLifeForPhyrexian(state.Player1.Id));
 
         state.Player1.Life.Should().Be(startLife - 2);
         state.StackCount.Should().BeGreaterThanOrEqualTo(1);

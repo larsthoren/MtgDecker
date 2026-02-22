@@ -212,25 +212,16 @@ public class GameEngine
     }
 
     /// <summary>
-    /// Pays a mana cost from the player's mana pool, prompting for generic payment choices when ambiguous.
+    /// Pays a mana cost from the player's mana pool using auto-pay.
     /// Returns a dictionary of colors actually paid (for undo tracking).
+    /// Used by FlashbackHandler, NinjutsuHandler, CastAdventureHandler, and ActivateAbilityHandler.
+    /// Main spell casting uses the mid-cast flow instead.
     /// Assumes CanPay has already been checked.
     /// </summary>
-    internal async Task<Dictionary<ManaColor, int>> PayManaCostAsync(ManaCost cost, Player player, CancellationToken ct)
+    internal Task<Dictionary<ManaColor, int>> PayManaCostAsync(ManaCost cost, Player player, CancellationToken ct)
     {
         var pool = player.ManaPool;
         var manaPaid = new Dictionary<ManaColor, int>();
-
-        // Calculate remaining pool after colored requirements (for generic payment decisions)
-        var remaining = new Dictionary<ManaColor, int>();
-        foreach (var kvp in pool.Available)
-        {
-            var after = kvp.Value;
-            if (cost.ColorRequirements.TryGetValue(kvp.Key, out var needed))
-                after -= needed;
-            if (after > 0)
-                remaining[kvp.Key] = after;
-        }
 
         // Deduct colored requirements
         foreach (var (color, required) in cost.ColorRequirements)
@@ -239,108 +230,24 @@ public class GameEngine
             manaPaid[color] = required;
         }
 
-        // Handle Phyrexian mana requirements
-        if (cost.HasPhyrexianCost)
-        {
-            foreach (var (color, required) in cost.PhyrexianRequirements)
-            {
-                for (int i = 0; i < required; i++)
-                {
-                    bool hasMana = pool[color] > 0;
-                    bool hasLife = player.Life > 2;
-
-                    bool payWithMana;
-                    if (hasMana && hasLife)
-                    {
-                        payWithMana = await player.DecisionHandler.ChoosePhyrexianPayment(color, ct);
-                    }
-                    else if (hasMana)
-                    {
-                        payWithMana = true;
-                    }
-                    else
-                    {
-                        payWithMana = false;
-                    }
-
-                    if (payWithMana)
-                    {
-                        pool.Deduct(color, 1);
-                        manaPaid[color] = manaPaid.GetValueOrDefault(color) + 1;
-                        // Also update remaining for generic calculation
-                        if (remaining.ContainsKey(color))
-                        {
-                            remaining[color] -= 1;
-                            if (remaining[color] <= 0) remaining.Remove(color);
-                        }
-                        _state.Log($"{player.Name} pays {{{GetColorSymbol(color)}}} for Phyrexian mana.");
-                    }
-                    else
-                    {
-                        player.AdjustLife(-2);
-                        _state.Log($"{player.Name} pays 2 life for Phyrexian mana.");
-                    }
-                }
-            }
-
-            // Recalculate remaining after Phyrexian payment for generic cost handling
-            remaining.Clear();
-            foreach (var kvp in pool.Available)
-            {
-                if (kvp.Value > 0)
-                    remaining[kvp.Key] = kvp.Value;
-            }
-        }
-
-        // Handle generic cost
+        // Auto-pay generic cost from remaining pool
         if (cost.GenericCost > 0)
         {
-            int distinctColors = remaining.Count(kv => kv.Value > 0);
-            int totalRemaining = remaining.Values.Sum();
-            bool useAutoPay = distinctColors <= 1 || totalRemaining == cost.GenericCost;
-
-            if (!useAutoPay)
+            var toPay = cost.GenericCost;
+            foreach (var kvp in pool.Available)
             {
-                // Ambiguous: prompt player for generic payment choices
-                var genericPayment = await player.DecisionHandler
-                    .ChooseGenericPayment(cost.GenericCost, remaining, ct);
-
-                // Validate payment: sum must equal generic cost, amounts must not exceed available
-                bool valid = genericPayment.Values.Sum() == cost.GenericCost
-                    && genericPayment.All(kv => remaining.TryGetValue(kv.Key, out var avail) && kv.Value <= avail);
-
-                if (valid)
-                {
-                    foreach (var (color, amount) in genericPayment)
-                    {
-                        pool.Deduct(color, amount);
-                        manaPaid[color] = manaPaid.GetValueOrDefault(color) + amount;
-                    }
-                }
-                else
-                {
-                    useAutoPay = true;
-                }
-            }
-
-            if (useAutoPay)
-            {
-                var toPay = cost.GenericCost;
-                foreach (var (color, amount) in remaining)
-                {
-                    var take = Math.Min(amount, toPay);
-                    if (take > 0)
-                    {
-                        pool.Deduct(color, take);
-                        manaPaid[color] = manaPaid.GetValueOrDefault(color) + take;
-                        toPay -= take;
-                    }
-                    if (toPay == 0) break;
-                }
+                if (toPay == 0) break;
+                // Skip colors already fully used for colored requirements
+                var available = kvp.Value;
+                if (available <= 0) continue;
+                var take = Math.Min(available, toPay);
+                pool.Deduct(kvp.Key, take);
+                manaPaid[kvp.Key] = manaPaid.GetValueOrDefault(kvp.Key) + take;
+                toPay -= take;
             }
         }
 
-        return manaPaid;
+        return Task.FromResult(manaPaid);
     }
 
     internal async Task CompleteMidCastAsync(GameState state, Player player, CancellationToken ct)
