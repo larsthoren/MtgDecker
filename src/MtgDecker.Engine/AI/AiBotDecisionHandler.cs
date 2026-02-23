@@ -20,6 +20,10 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
     // Colors needed by spells in hand, cached by GetAction for ChooseManaColor to consult
     private HashSet<ManaColor> _neededColors = new();
 
+    // Pre-planned action queue: when the bot decides to cast a spell, it enqueues
+    // the tap actions first, then the cast action. Subsequent GetAction calls drain the queue.
+    private readonly Queue<GameAction> _plannedActions = new();
+
     private async Task DelayAsync(CancellationToken ct)
     {
         if (ActionDelayMs > 0)
@@ -27,18 +31,24 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
     }
 
     /// <summary>
-    /// Selects an action using a land-first, fetch, tap-lands, greedy-cast heuristic.
-    /// Only acts during main phases. Prioritizes playing a land (if available
-    /// and land drop unused), then activates fetch lands if spells are in hand,
-    /// then taps untapped lands with mana abilities, then casts the most expensive
-    /// affordable spell.
+    /// Selects an action using a planned-queue, land-first, fetch, tap-lands, greedy-cast heuristic.
+    /// Drains pre-planned actions first (tap sequence + cast). Only acts during main phases.
+    /// Prioritizes playing a land, then fetches, then activated abilities, then plans and
+    /// enqueues a tap+cast sequence for the best proactive spell.
     /// </summary>
     public async Task<GameAction> GetAction(GameState gameState, Guid playerId, CancellationToken ct = default)
     {
+        // Drain the planned action queue first
+        if (_plannedActions.Count > 0)
+        {
+            await DelayAsync(ct);
+            return _plannedActions.Dequeue();
+        }
+
         if (gameState.CurrentPhase != Phase.MainPhase1 && gameState.CurrentPhase != Phase.MainPhase2)
             return GameAction.Pass(playerId);
 
-        // Non-active player passes priority (this bot doesn't play instants)
+        // Non-active player passes priority (reactive plays added in Task 5)
         if (gameState.ActivePlayer.Id != playerId)
             return GameAction.Pass(playerId);
 
@@ -87,57 +97,49 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
         if (hand.Count == 0)
             return GameAction.Pass(playerId);
 
-        // Priority 3: Tap an untapped land with a mana ability to build up mana pool
-        // Only tap if the total available mana (pool + all untapped lands) can afford a spell
-        // AND the producible colors can satisfy at least one spell's color requirements.
-        var untappedLands = player.Battlefield.Cards
-            .Where(c => c.IsLand && !c.IsTapped && c.ManaAbility != null)
-            .ToList();
-
-        if (untappedLands.Count > 0)
-        {
-            var potentialMana = player.ManaPool.Total + untappedLands.Count;
-
-            if (CanAffordAnySpell(hand, untappedLands, player, gameState, potentialMana))
-            {
-                // Cache needed colors so ChooseManaColor picks the right color
-                _neededColors.Clear();
-                foreach (var spell in hand.Where(c => !c.IsLand && c.ManaCost != null))
-                    foreach (var color in spell.ManaCost!.ColorRequirements.Keys)
-                        _neededColors.Add(color);
-
-                await DelayAsync(ct);
-                return GameAction.TapCard(playerId, untappedLands[0].Id);
-            }
-        }
-
-        // Priority 4: Cast most expensive affordable spell (accounting for cost modification)
-        // Only attempt sorcery-speed casts when the stack is empty (matches engine's CanCastSorcery check)
+        // Priority 3: Only attempt sorcery-speed casts when the stack is empty
         if (gameState.StackCount > 0)
             return GameAction.Pass(playerId);
 
-        var castable = hand
-            .Where(c => !c.IsLand && c.ManaCost != null)
-            .Select(c =>
-            {
-                var cost = c.ManaCost!;
-                var reduction = ComputeCostModification(gameState, c, player);
-                if (reduction != 0)
-                    cost = cost.WithGenericReduction(-reduction);
-                return (Card: c, EffectiveCost: cost);
-            })
-            .Where(x => player.ManaPool.CanPay(x.EffectiveCost))
-            .OrderByDescending(x => x.Card.ManaCost!.ConvertedManaCost)
-            .Select(x => x.Card)
-            .FirstOrDefault();
+        // Priority 3: Plan tap sequence + cast for the best proactive spell
+        var untappedLands = player.Battlefield.Cards
+            .Where(c => c.IsLand && !c.IsTapped && GetLandManaAbility(c) != null)
+            .ToList();
 
-        if (castable != null)
+        var bestSpell = ChooseBestProactiveSpell(hand, player, gameState, untappedLands);
+        if (bestSpell != null)
         {
-            await DelayAsync(ct);
-            return GameAction.CastSpell(playerId, castable.Id);
+            var effectiveCost = GetEffectiveCost(bestSpell, gameState, player);
+
+            // Check if pool already has enough mana
+            if (player.ManaPool.CanPay(effectiveCost))
+            {
+                // No taps needed, cast directly
+                await DelayAsync(ct);
+                return GameAction.CastSpell(playerId, bestSpell.Id);
+            }
+
+            // Plan the tap sequence for the remaining cost after pool contribution
+            var tapIds = PlanTapSequence(untappedLands, effectiveCost);
+            if (tapIds.Count > 0)
+            {
+                // Cache needed colors so ChooseManaColor picks the right color
+                _neededColors.Clear();
+                foreach (var color in effectiveCost.ColorRequirements.Keys)
+                    _neededColors.Add(color);
+
+                // Enqueue remaining taps (after the first) and the cast
+                for (int i = 1; i < tapIds.Count; i++)
+                    _plannedActions.Enqueue(GameAction.TapCard(playerId, tapIds[i]));
+                _plannedActions.Enqueue(GameAction.CastSpell(playerId, bestSpell.Id));
+
+                // Return the first tap action immediately
+                await DelayAsync(ct);
+                return GameAction.TapCard(playerId, tapIds[0]);
+            }
         }
 
-        // Priority 5: Cycling — if a card can be cycled but not cast, cycle it
+        // Priority 4: Cycling — if a card can be cycled but not cast, cycle it
         foreach (var card in hand)
         {
             if (CardDefinitions.TryGet(card.Name, out var cycleDef) && cycleDef.CyclingCost != null)
@@ -155,6 +157,189 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
         }
 
         return GameAction.Pass(playerId);
+    }
+
+    /// <summary>
+    /// Plans the optimal set of lands to tap for a given mana cost.
+    /// Prefers fixed-color lands for colored requirements (saving choice lands for flexibility),
+    /// and uses least-flexible lands first for generic costs.
+    /// Returns empty list if the cost cannot be met.
+    /// </summary>
+    internal static List<Guid> PlanTapSequence(IReadOnlyList<GameCard> untappedLands, ManaCost cost)
+    {
+        if (cost.ConvertedManaCost == 0)
+            return [];
+
+        var availableLands = untappedLands.ToList();
+        var selectedIds = new List<Guid>();
+
+        // Step 1: Satisfy colored requirements, preferring fixed-color lands
+        foreach (var (color, required) in cost.ColorRequirements)
+        {
+            for (int i = 0; i < required; i++)
+            {
+                // First: find a fixed-color land that produces this color
+                var fixedLand = availableLands.FirstOrDefault(land =>
+                {
+                    var ability = GetLandManaAbility(land);
+                    return ability?.FixedColor == color;
+                });
+
+                if (fixedLand != null)
+                {
+                    selectedIds.Add(fixedLand.Id);
+                    availableLands.Remove(fixedLand);
+                    continue;
+                }
+
+                // Second: find a choice land that can produce this color
+                var choiceLand = availableLands
+                    .Where(land =>
+                    {
+                        var ability = GetLandManaAbility(land);
+                        return ability?.ChoiceColors?.Contains(color) == true
+                            || ability?.DynamicColor == color;
+                    })
+                    // Prefer lands with fewer choices (less flexible)
+                    .OrderBy(land => GetLandManaAbility(land)?.ChoiceColors?.Count ?? 1)
+                    .FirstOrDefault();
+
+                if (choiceLand != null)
+                {
+                    selectedIds.Add(choiceLand.Id);
+                    availableLands.Remove(choiceLand);
+                    continue;
+                }
+
+                // Cannot satisfy this color requirement
+                return [];
+            }
+        }
+
+        // Step 2: Satisfy generic cost with least-flexible lands first
+        var genericRemaining = cost.GenericCost;
+        if (genericRemaining > 0)
+        {
+            // Sort by flexibility: fixed-color (1) < dynamic (1) < fewer choices < more choices
+            var sortedByFlexibility = availableLands
+                .OrderBy(land =>
+                {
+                    var ability = GetLandManaAbility(land);
+                    if (ability?.FixedColor != null) return 1;
+                    if (ability?.DynamicColor != null) return 2;
+                    return ability?.ChoiceColors?.Count ?? 0;
+                })
+                .ToList();
+
+            foreach (var land in sortedByFlexibility)
+            {
+                if (genericRemaining <= 0) break;
+                selectedIds.Add(land.Id);
+                genericRemaining--;
+            }
+
+            if (genericRemaining > 0)
+                return []; // Not enough lands
+        }
+
+        return selectedIds;
+    }
+
+    /// <summary>
+    /// Looks up the ManaAbility for a land, checking CardDefinitions first, then falling back
+    /// to the land's own ManaAbility property.
+    /// </summary>
+    private static ManaAbility? GetLandManaAbility(GameCard land)
+    {
+        if (CardDefinitions.TryGet(land.Name, out var def) && def.ManaAbility != null)
+            return def.ManaAbility;
+        return land.ManaAbility;
+    }
+
+    /// <summary>
+    /// Finds the best proactive spell to cast from hand. Filters to Proactive-only spells,
+    /// checks affordability against pool + untapped lands, returns the highest CMC option.
+    /// </summary>
+    private static GameCard? ChooseBestProactiveSpell(IReadOnlyList<GameCard> hand, Player player,
+        GameState gameState, List<GameCard> untappedLands)
+    {
+        var producibleColors = GetProducibleColors(player, untappedLands);
+        var potentialMana = player.ManaPool.Total + untappedLands.Count;
+
+        return hand
+            .Where(c => !c.IsLand && c.ManaCost != null)
+            .Where(c =>
+            {
+                // Only cast proactive spells during main phase
+                if (CardDefinitions.TryGet(c.Name, out var def))
+                {
+                    if (def.SpellRole != SpellRole.Proactive)
+                        return false;
+                }
+                else
+                {
+                    // Unknown cards: only cast if they're not instants (assume proactive)
+                    if (c.CardTypes.HasFlag(CardType.Instant))
+                        return false;
+                }
+                return true;
+            })
+            .Select(c =>
+            {
+                var effectiveCost = GetEffectiveCost(c, gameState, player);
+                return (Card: c, EffectiveCost: effectiveCost);
+            })
+            .Where(x =>
+            {
+                // Check total mana affordability
+                if (x.EffectiveCost.ConvertedManaCost > potentialMana)
+                    return false;
+
+                // Check all color requirements can be produced
+                return x.EffectiveCost.ColorRequirements.All(kvp =>
+                    producibleColors.Contains(kvp.Key));
+            })
+            .OrderByDescending(x => x.Card.ManaCost!.ConvertedManaCost)
+            .Select(x => x.Card)
+            .FirstOrDefault();
+    }
+
+    /// <summary>
+    /// Computes the effective cost of a card after applying cost modifications (e.g., Goblin Warchief).
+    /// </summary>
+    private static ManaCost GetEffectiveCost(GameCard card, GameState gameState, Player player)
+    {
+        var cost = card.ManaCost!;
+        var reduction = ComputeCostModification(gameState, card, player);
+        if (reduction != 0)
+            cost = cost.WithGenericReduction(-reduction);
+        return cost;
+    }
+
+    /// <summary>
+    /// Collects all mana colors producible from the player's current mana pool
+    /// and all untapped lands' mana abilities.
+    /// </summary>
+    private static HashSet<ManaColor> GetProducibleColors(Player player, List<GameCard> untappedLands)
+    {
+        var producibleColors = new HashSet<ManaColor>();
+        foreach (var (color, _) in player.ManaPool.Available)
+            producibleColors.Add(color);
+
+        foreach (var land in untappedLands)
+        {
+            var ability = GetLandManaAbility(land);
+            if (ability == null) continue;
+            if (ability.FixedColor.HasValue)
+                producibleColors.Add(ability.FixedColor.Value);
+            if (ability.ChoiceColors != null)
+                foreach (var c in ability.ChoiceColors)
+                    producibleColors.Add(c);
+            if (ability.DynamicColor.HasValue)
+                producibleColors.Add(ability.DynamicColor.Value);
+        }
+
+        return producibleColors;
     }
 
     /// <summary>
@@ -621,50 +806,6 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
         }
 
         return null;
-    }
-
-    /// <summary>
-    /// Checks whether at least one spell in hand can be cast given the producible colors
-    /// from the mana pool and all untapped lands' mana abilities.
-    /// </summary>
-    private static bool CanAffordAnySpell(IReadOnlyList<GameCard> hand, List<GameCard> untappedLands,
-        Player player, GameState gameState, int potentialMana)
-    {
-        // Collect all producible colors from pool + untapped land abilities
-        var producibleColors = new HashSet<ManaColor>();
-        foreach (var (color, _) in player.ManaPool.Available)
-        {
-            producibleColors.Add(color);
-        }
-        foreach (var land in untappedLands)
-        {
-            if (land.ManaAbility == null) continue;
-            if (land.ManaAbility.FixedColor.HasValue)
-                producibleColors.Add(land.ManaAbility.FixedColor.Value);
-            if (land.ManaAbility.ChoiceColors != null)
-                foreach (var c in land.ManaAbility.ChoiceColors)
-                    producibleColors.Add(c);
-            if (land.ManaAbility.DynamicColor.HasValue)
-                producibleColors.Add(land.ManaAbility.DynamicColor.Value);
-        }
-
-        return hand
-            .Where(c => !c.IsLand && c.ManaCost != null)
-            .Any(c =>
-            {
-                var cost = c.ManaCost!;
-                var reduction = ComputeCostModification(gameState, c, player);
-                if (reduction != 0)
-                    cost = cost.WithGenericReduction(-reduction);
-
-                // Check CMC affordability
-                if (cost.ConvertedManaCost > potentialMana)
-                    return false;
-
-                // Check all color requirements can be produced
-                return cost.ColorRequirements.All(kvp =>
-                    producibleColors.Contains(kvp.Key));
-            });
     }
 
     private static int ComputeCostModification(GameState gameState, GameCard card, Player caster)
