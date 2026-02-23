@@ -4,7 +4,7 @@
     top: 50%;
     right: 16px;
     transform: translateY(-50%);
-    z-index: 300;
+    z-index: 400;
     border: 2px solid #cc3333;
     border-radius: 8px;
     background: rgba(20, 10, 10, 0.95);
