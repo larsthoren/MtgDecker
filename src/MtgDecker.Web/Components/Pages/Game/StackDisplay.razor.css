@@ -120,3 +120,15 @@
     0%, 100% { opacity: 1; }
     50% { opacity: 0.6; }
 }
+
+/* Highlighted as a target from another stack item hover */
+.stack-card-entry.stack-target-highlighted {
+    box-shadow: 0 0 12px 4px rgba(255, 136, 0, 0.8);
+    border-radius: 6px;
+    animation: stack-target-pulse 1s ease-in-out infinite;
+}
+
+@keyframes stack-target-pulse {
+    0%, 100% { box-shadow: 0 0 12px 4px rgba(255, 136, 0, 0.8); }
+    50% { box-shadow: 0 0 18px 6px rgba(255, 136, 0, 1); }
+}
