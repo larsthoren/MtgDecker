@@ -862,28 +862,25 @@
 
     // Stack target hover state
     private StackTargetHoverInfo? _stackTargetHover;
-
-    private HashSet<Guid> HighlightedBattlefieldCardIds =>
-        _stackTargetHover?.Targets
-            .Where(t => t.Zone == TargetZone.Battlefield)
-            .Select(t => t.CardId)
-            .ToHashSet() ?? new();
-
-    private HashSet<Guid> HighlightedStackItemIds =>
-        _stackTargetHover?.Targets
-            .Where(t => t.Zone == TargetZone.Stack)
-            .Select(t => t.CardId)
-            .ToHashSet() ?? new();
-
-    private HashSet<Guid> HighlightedPlayerIds =>
-        _stackTargetHover?.Targets
-            .Where(t => t.Zone == TargetZone.Player)
-            .Select(t => t.PlayerId)
-            .ToHashSet() ?? new();
+    private HashSet<Guid> HighlightedBattlefieldCardIds = new();
+    private HashSet<Guid> HighlightedStackItemIds = new();
+    private HashSet<Guid> HighlightedPlayerIds = new();
 
     private void HandleStackTargetHover(StackTargetHoverInfo? info)
     {
         _stackTargetHover = info;
+        if (info?.Targets is { Count: > 0 } targets)
+        {
+            HighlightedBattlefieldCardIds = targets.Where(t => t.Zone == TargetZone.Battlefield).Select(t => t.CardId).ToHashSet();
+            HighlightedStackItemIds = targets.Where(t => t.Zone == TargetZone.Stack).Select(t => t.CardId).ToHashSet();
+            HighlightedPlayerIds = targets.Where(t => t.Zone == TargetZone.Player).Select(t => t.PlayerId).ToHashSet();
+        }
+        else
+        {
+            HighlightedBattlefieldCardIds = new();
+            HighlightedStackItemIds = new();
+            HighlightedPlayerIds = new();
+        }
     }
 
     // Graveyard viewer toggle state

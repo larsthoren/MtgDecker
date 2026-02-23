@@ -101,7 +101,7 @@
             cy = my + (dx / len) * 30;
         }
 
-        return $"M {sx:F0} {sy:F0} Q {cx:F0} {cy:F0} {tx:F0} {ty:F0}";
+        return FormattableString.Invariant($"M {sx:F0} {sy:F0} Q {cx:F0} {cy:F0} {tx:F0} {ty:F0}");
     }
 
     public void Dispose()
