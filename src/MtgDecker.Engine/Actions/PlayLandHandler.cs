@@ -43,6 +43,12 @@ internal class PlayLandHandler : IActionHandler
         player.Battlefield.Add(playCard);
         playCard.TurnEnteredBattlefield = state.TurnNumber;
         if (playCard.EntersTapped) playCard.IsTapped = true;
+        // Check conditional enters-tapped (e.g. Mystic Sanctuary)
+        if (!playCard.IsTapped && CardDefinitions.TryGet(playCard.Name, out var landDef) && landDef.ConditionalEntersTapped != null)
+        {
+            if (landDef.ConditionalEntersTapped(player))
+                playCard.IsTapped = true;
+        }
         player.LandsPlayedThisTurn++;
         action.IsLandDrop = true;
         action.DestinationZone = ZoneType.Battlefield;

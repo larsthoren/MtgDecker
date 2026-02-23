@@ -20,7 +20,7 @@ public class Phase3TargetedAbilityTests
         def!.ActivatedAbility.Should().NotBeNull();
         def.ActivatedAbility!.Cost.ManaCost.Should().NotBeNull();
         def.ActivatedAbility.Cost.ManaCost!.GenericCost.Should().Be(1);
-        def.ActivatedAbility.Effect.Should().BeOfType<ExileFromOpponentGraveyardEffect>();
+        def.ActivatedAbility.Effect.Should().BeOfType<ExileFromAnyGraveyardEffect>();
     }
 
     [Fact]

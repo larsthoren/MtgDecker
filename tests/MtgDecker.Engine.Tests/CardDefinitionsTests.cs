@@ -762,4 +762,115 @@ public class CardDefinitionsTests
         def!.Effect.Should().BeOfType<CmcCheckCounterEffect>();
         ((CmcCheckCounterEffect)def.Effect!).MaxCmc.Should().Be(2);
     }
+
+    // === Card audit Batch 5a: Grim Lavamancer graveyard exile cost ===
+
+    [Fact]
+    public void GrimLavamancer_RequiresGraveyardExile()
+    {
+        CardDefinitions.TryGet("Grim Lavamancer", out var def);
+        def!.ActivatedAbility!.Cost.ExileFromGraveyardCount.Should().Be(2);
+    }
+
+    // === Card audit Batch 5b: Barbarian Ring + Cabal Pit self-damage on mana tap ===
+
+    [Fact]
+    public void BarbarianRing_ManaAbilityDealsSelfDamage()
+    {
+        CardDefinitions.TryGet("Barbarian Ring", out var def);
+        def!.ManaAbility!.SelfDamage.Should().Be(1);
+    }
+
+    [Fact]
+    public void CabalPit_ManaAbilityDealsSelfDamage()
+    {
+        CardDefinitions.TryGet("Cabal Pit", out var def);
+        def!.ManaAbility!.SelfDamage.Should().Be(1);
+    }
+
+    // === Card audit Batch 5c: Goblin Sharpshooter DoesNotUntap ===
+
+    [Fact]
+    public void GoblinSharpshooter_HasDoesNotUntap()
+    {
+        CardDefinitions.TryGet("Goblin Sharpshooter", out var def);
+        def!.ContinuousEffects.Should().Contain(e =>
+            e.Type == ContinuousEffectType.GrantKeyword && e.GrantedKeyword == Keyword.DoesNotUntap);
+    }
+
+    // === Card audit Batch 5d: Sulfuric Vortex life-gain prevention ===
+
+    [Fact]
+    public void SulfuricVortex_PreventsLifeGain()
+    {
+        CardDefinitions.TryGet("Sulfuric Vortex", out var def);
+        def!.ContinuousEffects.Should().Contain(e =>
+            e.Type == ContinuousEffectType.PreventLifeGain);
+    }
+
+    // === Card audit Batch 5e: Parallax Wave fading upkeep ===
+
+    [Fact]
+    public void ParallaxWave_HasFadingUpkeepTrigger()
+    {
+        CardDefinitions.TryGet("Parallax Wave", out var def);
+        def!.Triggers.Should().Contain(t => t.Event == GameEvent.Upkeep);
+    }
+
+    [Fact]
+    public void ParallaxWave_StillHasLeavesBattlefieldTrigger()
+    {
+        CardDefinitions.TryGet("Parallax Wave", out var def);
+        def!.Triggers.Should().Contain(t => t.Event == GameEvent.LeavesBattlefield);
+    }
+
+    // === Card audit Batch 5f: Mother of Runes targets own creatures only ===
+
+    [Fact]
+    public void MotherOfRunes_TargetsOwnCreaturesOnly()
+    {
+        CardDefinitions.TryGet("Mother of Runes", out var def);
+        def!.ActivatedAbility!.TargetOwnOnly.Should().BeTrue();
+    }
+
+    // === Card audit Batch 5g: Withered Wretch exiles from any graveyard ===
+
+    [Fact]
+    public void WitheredWretch_ExilesFromAnyGraveyard()
+    {
+        CardDefinitions.TryGet("Withered Wretch", out var def);
+        def!.ActivatedAbility!.Effect.Should().BeOfType<ExileFromAnyGraveyardEffect>();
+    }
+
+    // === Card audit Batch 5h: Searing Blood delayed death trigger ===
+
+    [Fact]
+    public void SearingBlood_HasSearingBloodEffect()
+    {
+        CardDefinitions.TryGet("Searing Blood", out var def);
+        def!.Effect.Should().BeOfType<SearingBloodEffect>();
+    }
+
+    // === Card audit Batch 5i: Mystic Sanctuary conditional enters-tapped + ETB ===
+
+    [Fact]
+    public void MysticSanctuary_HasConditionalEntersTapped()
+    {
+        CardDefinitions.TryGet("Mystic Sanctuary", out var def);
+        def!.ConditionalEntersTapped.Should().NotBeNull();
+    }
+
+    [Fact]
+    public void MysticSanctuary_HasETBTrigger()
+    {
+        CardDefinitions.TryGet("Mystic Sanctuary", out var def);
+        def!.Triggers.Should().NotBeEmpty();
+    }
+
+    [Fact]
+    public void MysticSanctuary_HasIslandSubtype()
+    {
+        CardDefinitions.TryGet("Mystic Sanctuary", out var def);
+        def!.Subtypes.Should().Contain("Island");
+    }
 }

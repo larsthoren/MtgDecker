@@ -453,4 +453,136 @@ public class ActivateAbilityEngineTests
         sharpshooter.IsTapped.Should().BeTrue();
         p2.Life.Should().Be(19);
     }
+
+    // === Grim Lavamancer: exile 2 cards from graveyard as part of cost ===
+
+    [Fact]
+    public async Task GrimLavamancer_ExilesTwoCardsFromGraveyard()
+    {
+        var (engine, state, p1, p2, h1, _) = CreateSetup();
+        var lavamancer = GameCard.Create("Grim Lavamancer");
+        p1.Battlefield.Add(lavamancer);
+
+        // Add mana for the {R} cost
+        p1.ManaPool.Add(ManaColor.Red, 1);
+
+        // Add 2 cards to graveyard for the exile cost
+        var card1 = new GameCard { Name = "Lightning Bolt" };
+        var card2 = new GameCard { Name = "Mountain" };
+        p1.Graveyard.Add(card1);
+        p1.Graveyard.Add(card2);
+
+        // Enqueue the 2 exile choices
+        h1.EnqueueCardChoice(card1.Id);
+        h1.EnqueueCardChoice(card2.Id);
+
+        var action = GameAction.ActivateAbility(p1.Id, lavamancer.Id, targetPlayerId: p2.Id);
+        await engine.ExecuteAction(action);
+        await engine.ResolveAllTriggersAsync();
+
+        // Both cards should be exiled from graveyard
+        p1.Graveyard.Cards.Should().NotContain(c => c.Id == card1.Id);
+        p1.Graveyard.Cards.Should().NotContain(c => c.Id == card2.Id);
+        p1.Exile.Cards.Should().Contain(c => c.Id == card1.Id);
+        p1.Exile.Cards.Should().Contain(c => c.Id == card2.Id);
+
+        // Should deal 2 damage
+        p2.Life.Should().Be(18);
+        lavamancer.IsTapped.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task GrimLavamancer_NotEnoughGraveyardCards_CannotActivate()
+    {
+        var (engine, state, p1, p2, h1, _) = CreateSetup();
+        var lavamancer = GameCard.Create("Grim Lavamancer");
+        p1.Battlefield.Add(lavamancer);
+
+        p1.ManaPool.Add(ManaColor.Red, 1);
+
+        // Only 1 card in graveyard, need 2
+        var card1 = new GameCard { Name = "Lightning Bolt" };
+        p1.Graveyard.Add(card1);
+
+        var action = GameAction.ActivateAbility(p1.Id, lavamancer.Id, targetPlayerId: p2.Id);
+        await engine.ExecuteAction(action);
+
+        // Should not have activated
+        p2.Life.Should().Be(20);
+        lavamancer.IsTapped.Should().BeFalse();
+        p1.Graveyard.Cards.Should().Contain(c => c.Id == card1.Id);
+        state.GameLog.Should().Contain(l => l.Contains("not enough cards in graveyard"));
+    }
+
+    // === Goblin Sharpshooter: DoesNotUntap during untap step ===
+
+    [Fact]
+    public void GoblinSharpshooter_DoesNotUntapDuringUntapStep()
+    {
+        var (engine, state, p1, _, _, _) = CreateSetup();
+        var sharpshooter = GameCard.Create("Goblin Sharpshooter");
+        sharpshooter.IsTapped = true;
+        sharpshooter.ActiveKeywords.Add(Keyword.DoesNotUntap);
+        p1.Battlefield.Add(sharpshooter);
+
+        // Simulate untap step
+        state.ActivePlayer = p1;
+        engine.ExecuteTurnBasedAction(Phase.Untap);
+
+        sharpshooter.IsTapped.Should().BeTrue("Goblin Sharpshooter has DoesNotUntap keyword");
+        state.GameLog.Should().Contain(l => l.Contains("doesn't untap"));
+    }
+
+    [Fact]
+    public void NormalCreature_UntapsDuringUntapStep()
+    {
+        var (engine, state, p1, _, _, _) = CreateSetup();
+        var bear = new GameCard { Name = "Bear", CardTypes = CardType.Creature, BasePower = 2, BaseToughness = 2 };
+        bear.IsTapped = true;
+        p1.Battlefield.Add(bear);
+
+        state.ActivePlayer = p1;
+        engine.ExecuteTurnBasedAction(Phase.Untap);
+
+        bear.IsTapped.Should().BeFalse("normal creatures untap during untap step");
+    }
+
+    // === Sulfuric Vortex: life gain prevention ===
+
+    [Fact]
+    public void SulfuricVortex_PreventsLifeGain_WhenActiveEffectPresent()
+    {
+        var (_, state, p1, _, _, _) = CreateSetup();
+
+        // Add PreventLifeGain effect to simulate Sulfuric Vortex on battlefield
+        state.ActiveEffects.Add(new ContinuousEffect(
+            Guid.NewGuid(), ContinuousEffectType.PreventLifeGain,
+            (_, _) => true));
+
+        p1.AdjustLife(5, state);
+        p1.Life.Should().Be(20, "life gain should be prevented by Sulfuric Vortex");
+    }
+
+    [Fact]
+    public void SulfuricVortex_DoesNotPreventLifeLoss()
+    {
+        var (_, state, p1, _, _, _) = CreateSetup();
+
+        state.ActiveEffects.Add(new ContinuousEffect(
+            Guid.NewGuid(), ContinuousEffectType.PreventLifeGain,
+            (_, _) => true));
+
+        p1.AdjustLife(-3, state);
+        p1.Life.Should().Be(17, "life loss should not be prevented");
+    }
+
+    [Fact]
+    public void AdjustLife_WithoutState_StillAllowsLifeGain()
+    {
+        var (_, _, p1, _, _, _) = CreateSetup();
+
+        // Without passing state, life gain should work normally (backward compatible)
+        p1.AdjustLife(5);
+        p1.Life.Should().Be(25, "life gain should work when no state is passed");
+    }
 }

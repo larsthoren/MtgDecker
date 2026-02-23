@@ -109,6 +109,13 @@ public static class CardDefinitions
             ["Goblin Sharpshooter"] = new(ManaCost.Parse("{2}{R}"), null, 1, 1, CardType.Creature)
             {
                 Subtypes = ["Goblin"],
+                ContinuousEffects =
+                [
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
+                        (card, _) => card.Name == "Goblin Sharpshooter",
+                        GrantedKeyword: Keyword.DoesNotUntap,
+                        Layer: EffectLayer.Layer6_AbilityAddRemove),
+                ],
                 ActivatedAbility = new(new ActivatedAbilityCost(TapSelf: true), new DealDamageEffect(1), c => c.IsCreature, CanTargetPlayer: true),
                 Triggers = [new Trigger(GameEvent.Dies, TriggerCondition.AnyCreatureDies, new UntapSelfEffect())],
             },
@@ -196,6 +203,7 @@ public static class CardDefinitions
                 EntersWithCounters = new() { [CounterType.Fade] = 5 },
                 Triggers =
                 [
+                    new Trigger(GameEvent.Upkeep, TriggerCondition.Upkeep, new FadingUpkeepEffect()),
                     new Trigger(GameEvent.LeavesBattlefield, TriggerCondition.SelfLeavesBattlefield, new ReturnExiledCardsEffect()),
                 ],
                 ActivatedAbility = new(
@@ -305,7 +313,7 @@ public static class CardDefinitions
                     TriggerCondition.AnySpellCastCmc3OrLess, new DealDamageEffect(2))],
             },
             ["Searing Blood"] = new(ManaCost.Parse("{R}{R}"), null, null, null, CardType.Instant,
-                TargetFilter.Creature(), new DamageEffect(2, canTargetPlayer: false)),
+                TargetFilter.Creature(), new SearingBloodEffect()),
             ["Flame Rift"] = new(ManaCost.Parse("{1}{R}"), null, null, null, CardType.Sorcery,
                 Effect: new DamageAllPlayersEffect(4)),
 
@@ -347,7 +355,13 @@ public static class CardDefinitions
             ["Island"] = new(null, ManaAbility.Fixed(ManaColor.Blue), null, null, CardType.Land) { Subtypes = ["Island"] },
             ["Volcanic Island"] = new(null, ManaAbility.Choice(ManaColor.Blue, ManaColor.Red), null, null, CardType.Land) { Subtypes = ["Island", "Mountain"] },
             ["Scalding Tarn"] = new(null, null, null, null, CardType.Land) { FetchAbility = new FetchAbility(["Island", "Mountain"]) },
-            ["Mystic Sanctuary"] = new(null, ManaAbility.Fixed(ManaColor.Blue), null, null, CardType.Land),
+            ["Mystic Sanctuary"] = new(null, ManaAbility.Fixed(ManaColor.Blue), null, null, CardType.Land)
+            {
+                Subtypes = ["Island"],
+                ConditionalEntersTapped = p => p.Battlefield.Cards.Count(c =>
+                    c.Subtypes.Contains("Island", StringComparer.OrdinalIgnoreCase)) < 3,
+                Triggers = [new Trigger(GameEvent.EnterBattlefield, TriggerCondition.Self, new ReturnSpellToTopEffect())],
+            },
 
             // === Shared Premodern cards ===
 
@@ -358,7 +372,7 @@ public static class CardDefinitions
             ["Caves of Koilos"] = new(null, ManaAbility.PainChoice([ManaColor.Colorless, ManaColor.White, ManaColor.Black], [ManaColor.White, ManaColor.Black]), null, null, CardType.Land),
             ["Llanowar Wastes"] = new(null, ManaAbility.PainChoice([ManaColor.Colorless, ManaColor.Black, ManaColor.Green], [ManaColor.Black, ManaColor.Green]), null, null, CardType.Land),
             ["Battlefield Forge"] = new(null, ManaAbility.PainChoice([ManaColor.Colorless, ManaColor.Red, ManaColor.White], [ManaColor.Red, ManaColor.White]), null, null, CardType.Land),
-            ["Tainted Field"] = new(null, ManaAbility.Choice(ManaColor.White, ManaColor.Black), null, null, CardType.Land),
+            ["Tainted Field"] = new(null, ManaAbility.Choice(ManaColor.Colorless, ManaColor.White, ManaColor.Black), null, null, CardType.Land),
             ["Coastal Tower"] = new(null, ManaAbility.Choice(ManaColor.White, ManaColor.Blue), null, null, CardType.Land) { EntersTapped = true },
             ["Skycloud Expanse"] = new(null, ManaAbility.Filter(ManaCost.Parse("{1}"), ManaColor.White, ManaColor.Blue), null, null, CardType.Land),
             ["Adarkar Wastes"] = new(null, ManaAbility.PainChoice([ManaColor.Colorless, ManaColor.White, ManaColor.Blue], [ManaColor.White, ManaColor.Blue]), null, null, CardType.Land),
@@ -369,8 +383,14 @@ public static class CardDefinitions
             ["City of Brass"] = new(null, ManaAbility.PainChoice(
                 [ManaColor.White, ManaColor.Blue, ManaColor.Black, ManaColor.Red, ManaColor.Green],
                 [ManaColor.White, ManaColor.Blue, ManaColor.Black, ManaColor.Red, ManaColor.Green]), null, null, CardType.Land),
-            ["Darigaaz's Caldera"] = new(null, ManaAbility.Choice(ManaColor.Black, ManaColor.Red, ManaColor.Green), null, null, CardType.Land) { EntersTapped = true },
-            ["Treva's Ruins"] = new(null, ManaAbility.Choice(ManaColor.White, ManaColor.Blue, ManaColor.Green), null, null, CardType.Land) { EntersTapped = true },
+            ["Darigaaz's Caldera"] = new(null, ManaAbility.Choice(ManaColor.Black, ManaColor.Red, ManaColor.Green), null, null, CardType.Land)
+            {
+                Triggers = [new Trigger(GameEvent.EnterBattlefield, TriggerCondition.Self, new BounceLandETBEffect())],
+            },
+            ["Treva's Ruins"] = new(null, ManaAbility.Choice(ManaColor.White, ManaColor.Blue, ManaColor.Green), null, null, CardType.Land)
+            {
+                Triggers = [new Trigger(GameEvent.EnterBattlefield, TriggerCondition.Self, new BounceLandETBEffect())],
+            },
 
             // Fetch lands
             ["Flooded Strand"] = new(null, null, null, null, CardType.Land) { FetchAbility = new FetchAbility(["Plains", "Island"]) },
@@ -452,7 +472,7 @@ public static class CardDefinitions
             ["Grim Lavamancer"] = new(ManaCost.Parse("{R}"), null, 1, 1, CardType.Creature)
             {
                 Subtypes = ["Human", "Wizard"],
-                ActivatedAbility = new(new ActivatedAbilityCost(TapSelf: true, ManaCost: ManaCost.Parse("{R}")), new DealDamageEffect(2), c => c.IsCreature, CanTargetPlayer: true),
+                ActivatedAbility = new(new ActivatedAbilityCost(TapSelf: true, ManaCost: ManaCost.Parse("{R}"), ExileFromGraveyardCount: 2), new DealDamageEffect(2), c => c.IsCreature, CanTargetPlayer: true),
             },
             ["Jackal Pup"] = new(ManaCost.Parse("{R}"), null, 2, 1, CardType.Creature) { Subtypes = ["Jackal"] },
             ["Incinerate"] = new(ManaCost.Parse("{1}{R}"), null, null, null, CardType.Instant,
@@ -462,12 +482,17 @@ public static class CardDefinitions
             ["Sulfuric Vortex"] = new(ManaCost.Parse("{1}{R}{R}"), null, null, null, CardType.Enchantment)
             {
                 Triggers = [new Trigger(GameEvent.Upkeep, TriggerCondition.Upkeep, new DamageAllPlayersTriggerEffect(2))],
+                ContinuousEffects =
+                [
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.PreventLifeGain,
+                        (_, _) => true),
+                ],
             },
             ["Cursed Scroll"] = new(ManaCost.Parse("{1}"), null, null, null, CardType.Artifact)
             {
                 ActivatedAbility = new(new ActivatedAbilityCost(TapSelf: true, ManaCost: ManaCost.Parse("{3}")), new DealDamageEffect(2), c => c.IsCreature, CanTargetPlayer: true),
             },
-            ["Barbarian Ring"] = new(null, ManaAbility.Fixed(ManaColor.Red), null, null, CardType.Land)
+            ["Barbarian Ring"] = new(null, ManaAbility.Fixed(ManaColor.Red, selfDamage: 1), null, null, CardType.Land)
             {
                 ActivatedAbility = new(
                     new ActivatedAbilityCost(TapSelf: true, SacrificeSelf: true, ManaCost: ManaCost.Parse("{R}")),
@@ -494,7 +519,7 @@ public static class CardDefinitions
             {
                 Subtypes = ["Zombie", "Cleric"],
                 ActivatedAbility = new(new ActivatedAbilityCost(ManaCost: ManaCost.Parse("{1}")),
-                    new ExileFromOpponentGraveyardEffect()),
+                    new ExileFromAnyGraveyardEffect()),
             },
             ["Funeral Charm"] = new(ManaCost.Parse("{B}"), null, null, null, CardType.Instant,
                 TargetFilter.Player(), new DiscardEffect(1)),
@@ -506,8 +531,14 @@ public static class CardDefinitions
             {
                 Triggers = [new Trigger(GameEvent.Upkeep, TriggerCondition.Upkeep, new RackDamageEffect())],
             },
-            ["Powder Keg"] = new(ManaCost.Parse("{2}"), null, null, null, CardType.Artifact),
-            ["Cabal Pit"] = new(null, ManaAbility.Fixed(ManaColor.Black), null, null, CardType.Land)
+            ["Powder Keg"] = new(ManaCost.Parse("{2}"), null, null, null, CardType.Artifact)
+            {
+                Triggers = [new Trigger(GameEvent.Upkeep, TriggerCondition.Upkeep, new PowderKegUpkeepEffect())],
+                ActivatedAbility = new(
+                    new ActivatedAbilityCost(TapSelf: true, SacrificeSelf: true),
+                    new PowderKegDestroyEffect()),
+            },
+            ["Cabal Pit"] = new(null, ManaAbility.Fixed(ManaColor.Black, selfDamage: 1), null, null, CardType.Land)
             {
                 ActivatedAbility = new(
                     new ActivatedAbilityCost(TapSelf: true, SacrificeSelf: true, ManaCost: ManaCost.Parse("{B}")),
@@ -628,7 +659,12 @@ public static class CardDefinitions
                 CyclingCost = ManaCost.Parse("{2}{W}"),
                 CyclingTriggers = [new Trigger(GameEvent.Cycle, TriggerCondition.Self, new DecreeOfJusticeCyclingEffect())],
             },
-            ["Phyrexian Furnace"] = new(ManaCost.Parse("{1}"), null, null, null, CardType.Artifact),
+            ["Phyrexian Furnace"] = new(ManaCost.Parse("{1}"), null, null, null, CardType.Artifact)
+            {
+                ActivatedAbility = new(
+                    new ActivatedAbilityCost(SacrificeSelf: true, ManaCost: ManaCost.Parse("{1}")),
+                    new PhyrexianFurnaceEffect()),
+            },
             ["Faerie Conclave"] = new(null, ManaAbility.Fixed(ManaColor.Blue), null, null, CardType.Land)
             {
                 EntersTapped = true,
@@ -681,7 +717,8 @@ public static class CardDefinitions
             },
             ["Quiet Speculation"] = new(ManaCost.Parse("{1}{U}"), null, null, null, CardType.Sorcery,
                 Effect: new QuietSpeculationEffect()),
-            ["Funeral Pyre"] = new(ManaCost.Parse("{W}"), null, null, null, CardType.Instant),
+            ["Funeral Pyre"] = new(ManaCost.Parse("{W}"), null, null, null, CardType.Instant,
+                Effect: new FuneralPyreEffect()),
             ["Treetop Village"] = new(null, ManaAbility.Fixed(ManaColor.Green), null, null, CardType.Land)
             {
                 EntersTapped = true,
@@ -695,7 +732,8 @@ public static class CardDefinitions
                 ActivatedAbility = new(
                     new ActivatedAbilityCost(TapSelf: true),
                     new GrantProtectionEffect(),
-                    TargetFilter: c => c.IsCreature),
+                    TargetFilter: c => c.IsCreature,
+                    TargetOwnOnly: true),
             },
             ["Nimble Mongoose"] = new(ManaCost.Parse("{G}"), null, 1, 1, CardType.Creature)
             {
@@ -979,12 +1017,20 @@ public static class CardDefinitions
             ["Pyroblast"] = new(ManaCost.Parse("{R}"), null, null, null, CardType.Instant,
                 TargetFilter.Spell(), new PyroblastEffect()),
 
-            ["Surgical Extraction"] = new(ManaCost.Parse("{B/P}"), null, null, null, CardType.Instant),
+            ["Surgical Extraction"] = new(ManaCost.Parse("{B/P}"), null, null, null, CardType.Instant,
+                Effect: new SurgicalExtractionEffect()),
 
             ["Dismember"] = new(ManaCost.Parse("{1}{B/P}{B/P}"), null, null, null, CardType.Instant,
                 TargetFilter.Creature(), new PumpTargetEffect(-5, -5)),
 
-            ["Grafdigger's Cage"] = new(ManaCost.Parse("{1}"), null, null, null, CardType.Artifact),
+            ["Grafdigger's Cage"] = new(ManaCost.Parse("{1}"), null, null, null, CardType.Artifact)
+            {
+                ContinuousEffects =
+                [
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.PreventCastFromGraveyard,
+                        (_, _) => true),
+                ],
+            },
 
             ["Wipe Away"] = new(ManaCost.Parse("{1}{U}{U}"), null, null, null, CardType.Instant,
                 TargetFilter.AnyPermanent(), new BounceTargetEffect()),
@@ -1081,6 +1127,7 @@ public static class CardDefinitions
                 null, null, CardType.Land)
             {
                 Name = "Undercity Sewers",
+                Subtypes = ["Island", "Swamp"],
                 EntersTapped = true,
                 Triggers = [new Trigger(GameEvent.EnterBattlefield, TriggerCondition.Self, new SurveilEffect(1))],
             },

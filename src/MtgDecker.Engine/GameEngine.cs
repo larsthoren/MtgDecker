@@ -168,7 +168,14 @@ public class GameEngine
                     }
                     else if (card.IsTapped)
                     {
-                        card.IsTapped = false;
+                        if (card.ActiveKeywords.Contains(Keyword.DoesNotUntap))
+                        {
+                            _state.Log($"{card.Name} doesn't untap during untap step.");
+                        }
+                        else
+                        {
+                            card.IsTapped = false;
+                        }
                     }
                 }
                 _state.ActivePlayer.PendingManaTaps.Clear();
@@ -860,6 +867,7 @@ public class GameEngine
         foreach (var deadCard in deadFromAttacker.Concat(deadFromDefender))
         {
             await QueueBoardTriggersOnStackAsync(GameEvent.Dies, deadCard, ct);
+            await QueueDelayedTriggersOnStackAsync(GameEvent.Dies, deadCard.Id, ct);
         }
 
         // Priority round after dies triggers
@@ -1479,7 +1487,10 @@ public class GameEngine
                 anyActionTaken = true;
                 // Fire Dies triggers for each creature that died from lethal damage
                 foreach (var deadCard in lethalDamageDeaths)
+                {
                     await QueueBoardTriggersOnStackAsync(GameEvent.Dies, deadCard, ct);
+                    await QueueDelayedTriggersOnStackAsync(GameEvent.Dies, deadCard.Id, ct);
+                }
             }
 
             // Aura detachment (MTG 704.5m) — aura goes to graveyard if enchanted permanent is gone
@@ -1817,8 +1828,14 @@ public class GameEngine
 
     /// <summary>Queues delayed triggers onto the stack and removes them.</summary>
     internal Task QueueDelayedTriggersOnStackAsync(GameEvent evt, CancellationToken ct = default)
+        => QueueDelayedTriggersOnStackAsync(evt, relevantCardId: null, ct);
+
+    /// <summary>Queues delayed triggers onto the stack and removes them, optionally filtering by card ID.</summary>
+    internal Task QueueDelayedTriggersOnStackAsync(GameEvent evt, Guid? relevantCardId, CancellationToken ct = default)
     {
-        var toFire = _state.DelayedTriggers.Where(d => d.FireOn == evt).ToList();
+        var toFire = _state.DelayedTriggers
+            .Where(d => d.FireOn == evt && (d.TargetCardId == null || d.TargetCardId == relevantCardId))
+            .ToList();
         foreach (var delayed in toFire)
         {
             var controller = delayed.ControllerId == _state.Player1.Id ? _state.Player1 : _state.Player2;
@@ -2129,6 +2146,12 @@ public class GameEngine
                 {
                     spell.Card.TurnEnteredBattlefield = _state.TurnNumber;
                     if (spell.Card.EntersTapped) spell.Card.IsTapped = true;
+                    // Check conditional enters-tapped (e.g. Mystic Sanctuary)
+                    if (!spell.Card.IsTapped && CardDefinitions.TryGet(spell.Card.Name, out var spellEntryDef) && spellEntryDef.ConditionalEntersTapped != null)
+                    {
+                        if (spellEntryDef.ConditionalEntersTapped(controller))
+                            spell.Card.IsTapped = true;
+                    }
                     controller.Battlefield.Add(spell.Card);
 
                     // Aura attachment on stack resolution
