@@ -13,4 +13,6 @@ public enum SpellRole
     InstantRemoval,
     /// <summary>Instant-speed utility — card draw, mana, etc. Cast at end of opponent's turn.</summary>
     InstantUtility,
+    /// <summary>Mana-generating instant — cast during main phase when it enables a spell.</summary>
+    Ramp,
 }

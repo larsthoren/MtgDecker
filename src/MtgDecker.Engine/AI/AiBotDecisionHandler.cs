@@ -124,6 +124,14 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
             .Where(c => c.IsLand && !c.IsTapped && GetLandManaAbility(c) != null)
             .ToList();
 
+        // Priority 3.5: Cast ramp spell if it enables an otherwise unaffordable spell
+        var rampAction = EvaluateRampSpell(hand, player, gameState, playerId, untappedLands);
+        if (rampAction != null)
+        {
+            await DelayAsync(ct);
+            return rampAction;
+        }
+
         var bestSpell = ChooseBestProactiveSpell(hand, player, gameState, untappedLands);
         if (bestSpell != null)
         {
@@ -870,6 +878,13 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
             if (removalAction != null) return removalAction;
         }
 
+        // InstantUtility: cast during opponent's end step with empty stack
+        if (gameState.StackCount == 0 && gameState.CurrentPhase == Phase.End)
+        {
+            var utilityAction = EvaluateInstantUtility(player, playerId);
+            if (utilityAction != null) return utilityAction;
+        }
+
         return null;
     }
 
@@ -906,6 +921,98 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
 
             // Target the biggest creature
             return GameAction.CastSpell(playerId, card.Id);
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Evaluates whether to cast an instant-speed utility spell (Brainstorm, Impulse, etc.)
+    /// during opponent's end step. Cast if mana is available in pool.
+    /// </summary>
+    private static GameAction? EvaluateInstantUtility(Player player, Guid playerId)
+    {
+        foreach (var card in player.Hand.Cards)
+        {
+            if (!CardDefinitions.TryGet(card.Name, out var def)) continue;
+            if (def.SpellRole != SpellRole.InstantUtility) continue;
+            if (def.ManaCost == null) continue;
+
+            if (player.ManaPool.CanPay(def.ManaCost))
+                return GameAction.CastSpell(playerId, card.Id);
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Checks if casting a ramp spell (e.g., Dark Ritual) would enable casting a proactive spell
+    /// that the bot currently cannot afford. Returns the ramp spell cast action if so.
+    /// </summary>
+    private GameAction? EvaluateRampSpell(IReadOnlyList<GameCard> hand, Player player,
+        GameState gameState, Guid playerId, List<GameCard> untappedLands)
+    {
+        var potentialMana = player.ManaPool.Total + untappedLands.Count;
+
+        foreach (var card in hand)
+        {
+            if (!CardDefinitions.TryGet(card.Name, out var def)) continue;
+            if (def.SpellRole != SpellRole.Ramp) continue;
+            if (def.ManaCost == null) continue;
+
+            // Check if we can afford to cast the ramp spell itself
+            var canPayFromPool = player.ManaPool.CanPay(def.ManaCost);
+            List<Guid> rampTapIds = [];
+            if (!canPayFromPool)
+            {
+                rampTapIds = PlanTapSequence(untappedLands, def.ManaCost);
+                if (rampTapIds.Count == 0) continue;
+            }
+
+            // Calculate mana gain from ramp spell
+            var rampManaGain = 0;
+            if (def.Effect is AddManaSpellEffect addMana)
+                rampManaGain = addMana.Amount;
+
+            if (rampManaGain == 0) continue;
+
+            var potentialManaAfterRamp = potentialMana + rampManaGain - def.ManaCost.ConvertedManaCost;
+
+            // Check if any proactive spell in hand becomes affordable with the extra mana
+            var hasUnaffordableSpellThatBecomesAffordable = hand.Any(spell =>
+            {
+                if (spell.Id == card.Id) return false;
+                if (spell.IsLand) return false;
+                if (spell.ManaCost == null) return false;
+
+                if (CardDefinitions.TryGet(spell.Name, out var spellDef))
+                {
+                    if (spellDef.SpellRole != SpellRole.Proactive)
+                        return false;
+                }
+                else if (spell.CardTypes.HasFlag(CardType.Instant)) return false;
+
+                var effectiveCost = GetEffectiveCost(spell, gameState, player);
+
+                // Currently unaffordable
+                if (effectiveCost.ConvertedManaCost <= potentialMana) return false;
+
+                // Affordable after ramp
+                return effectiveCost.ConvertedManaCost <= potentialManaAfterRamp;
+            });
+
+            if (hasUnaffordableSpellThatBecomesAffordable)
+            {
+                if (!canPayFromPool)
+                {
+                    // Need to tap lands first, then cast ramp spell
+                    for (int i = 1; i < rampTapIds.Count; i++)
+                        _plannedActions.Enqueue(GameAction.TapCard(playerId, rampTapIds[i]));
+                    _plannedActions.Enqueue(GameAction.CastSpell(playerId, card.Id));
+                    return GameAction.TapCard(playerId, rampTapIds[0]);
+                }
+                return GameAction.CastSpell(playerId, card.Id);
+            }
         }
 
         return null;

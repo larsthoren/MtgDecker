@@ -54,7 +54,7 @@ public class SpellRoleTests
     [InlineData("Brainstorm", SpellRole.InstantUtility)]
     [InlineData("Fact or Fiction", SpellRole.InstantUtility)]
     [InlineData("Impulse", SpellRole.InstantUtility)]
-    [InlineData("Dark Ritual", SpellRole.InstantUtility)]
+    [InlineData("Dark Ritual", SpellRole.Ramp)]
     [InlineData("Skeletal Scrying", SpellRole.InstantUtility)]
     [InlineData("Funeral Charm", SpellRole.InstantUtility)]
     [InlineData("Funeral Pyre", SpellRole.InstantUtility)]

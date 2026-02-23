@@ -388,7 +388,7 @@ public static class CardDefinitions
             ["Dark Ritual"] = new(ManaCost.Parse("{B}"), null, null, null, CardType.Instant,
                 Effect: new AddManaSpellEffect(ManaColor.Black, 3))
             {
-                SpellRole = SpellRole.InstantUtility,
+                SpellRole = SpellRole.Ramp,
             },
             ["Mox Diamond"] = new(ManaCost.Parse("{0}"), ManaAbility.Choice(ManaColor.White, ManaColor.Blue, ManaColor.Black, ManaColor.Red, ManaColor.Green), null, null, CardType.Artifact)
             {
