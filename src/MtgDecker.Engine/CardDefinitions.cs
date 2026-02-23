@@ -122,7 +122,10 @@ public static class CardDefinitions
                 ActivatedAbility = new(new ActivatedAbilityCost(SacrificeSubtype: "Goblin"), new AddManaEffect(ManaColor.Red)),
             },
             ["Naturalize"] = new(ManaCost.Parse("{1}{G}"), null, null, null, CardType.Instant,
-                TargetFilter.EnchantmentOrArtifact(), new NaturalizeEffect()),
+                TargetFilter.EnchantmentOrArtifact(), new NaturalizeEffect())
+            {
+                SpellRole = SpellRole.InstantRemoval,
+            },
 
             // === Goblins lands ===
             ["Mountain"] = new(null, ManaAbility.Fixed(ManaColor.Red), null, null, CardType.Land) { Subtypes = ["Mountain"] },
@@ -154,7 +157,10 @@ public static class CardDefinitions
                 ],
             },
             ["Swords to Plowshares"] = new(ManaCost.Parse("{W}"), null, null, null, CardType.Instant,
-                TargetFilter.Creature(), new SwordsToPlowsharesEffect()),
+                TargetFilter.Creature(), new SwordsToPlowsharesEffect())
+            {
+                SpellRole = SpellRole.InstantRemoval,
+            },
             ["Replenish"] = new(ManaCost.Parse("{3}{W}"), null, null, null, CardType.Sorcery,
                 null, new ReplenishEffect()),
             ["Enchantress's Presence"] = new(ManaCost.Parse("{2}{G}"), null, null, null, CardType.Enchantment)
@@ -259,7 +265,10 @@ public static class CardDefinitions
 
             // === Burn deck ===
             ["Lightning Bolt"] = new(ManaCost.Parse("{R}"), null, null, null, CardType.Instant,
-                TargetFilter.CreatureOrPlayer(), new DamageEffect(3)),
+                TargetFilter.CreatureOrPlayer(), new DamageEffect(3))
+            {
+                SpellRole = SpellRole.InstantRemoval,
+            },
             ["Chain Lightning"] = new(ManaCost.Parse("{R}"), null, null, null, CardType.Sorcery,
                 TargetFilter.CreatureOrPlayer(), new DamageEffect(3)),
             ["Lava Spike"] = new(ManaCost.Parse("{R}"), null, null, null, CardType.Sorcery,
@@ -304,28 +313,39 @@ public static class CardDefinitions
                     TriggerCondition.AnySpellCastCmc3OrLess, new DealDamageEffect(2))],
             },
             ["Searing Blood"] = new(ManaCost.Parse("{R}{R}"), null, null, null, CardType.Instant,
-                TargetFilter.Creature(), new DamageEffect(2, canTargetPlayer: false)),
+                TargetFilter.Creature(), new DamageEffect(2, canTargetPlayer: false))
+            {
+                SpellRole = SpellRole.InstantRemoval,
+            },
             ["Flame Rift"] = new(ManaCost.Parse("{1}{R}"), null, null, null, CardType.Sorcery,
                 Effect: new DamageAllPlayersEffect(4)),
 
             // === UR Delver deck ===
             ["Brainstorm"] = new(ManaCost.Parse("{U}"), null, null, null, CardType.Instant,
-                Effect: new BrainstormEffect()),
+                Effect: new BrainstormEffect())
+            {
+                SpellRole = SpellRole.InstantUtility,
+            },
             ["Ponder"] = new(ManaCost.Parse("{U}"), null, null, null, CardType.Sorcery,
                 Effect: new PonderEffect()),
             ["Preordain"] = new(ManaCost.Parse("{U}"), null, null, null, CardType.Sorcery,
                 Effect: new PreordainEffect()),
             ["Counterspell"] = new(ManaCost.Parse("{U}{U}"), null, null, null, CardType.Instant,
-                TargetFilter.Spell(), new CounterSpellEffect()),
+                TargetFilter.Spell(), new CounterSpellEffect())
+            {
+                SpellRole = SpellRole.Counterspell,
+            },
             ["Daze"] = new(ManaCost.Parse("{1}{U}"), null, null, null, CardType.Instant,
                 TargetFilter.Spell(), new CounterSpellEffect())
             {
                 AlternateCost = new AlternateCost(ReturnLandSubtype: "Island"),
+                SpellRole = SpellRole.Counterspell,
             },
             ["Force of Will"] = new(ManaCost.Parse("{3}{U}{U}"), null, null, null, CardType.Instant,
                 TargetFilter.Spell(), new CounterSpellEffect())
             {
                 AlternateCost = new AlternateCost(LifeCost: 1, ExileCardColor: ManaColor.Blue),
+                SpellRole = SpellRole.Counterspell,
             },
             ["Delver of Secrets"] = new(ManaCost.Parse("{U}"), null, 1, 1, CardType.Creature) { Subtypes = ["Human", "Wizard"] },
             ["Murktide Regent"] = new(ManaCost.Parse("{5}{U}{U}"), null, 3, 3, CardType.Creature) { Subtypes = ["Dragon"], HasDelve = true },
@@ -366,7 +386,10 @@ public static class CardDefinitions
 
             // Mana
             ["Dark Ritual"] = new(ManaCost.Parse("{B}"), null, null, null, CardType.Instant,
-                Effect: new AddManaSpellEffect(ManaColor.Black, 3)),
+                Effect: new AddManaSpellEffect(ManaColor.Black, 3))
+            {
+                SpellRole = SpellRole.InstantUtility,
+            },
             ["Mox Diamond"] = new(ManaCost.Parse("{0}"), ManaAbility.Choice(ManaColor.White, ManaColor.Blue, ManaColor.Black, ManaColor.Red, ManaColor.Green), null, null, CardType.Artifact)
             {
                 Triggers = [new Trigger(GameEvent.EnterBattlefield, TriggerCondition.Self, new MoxDiamondETBEffect())],
@@ -374,18 +397,28 @@ public static class CardDefinitions
 
             // Common removal
             ["Disenchant"] = new(ManaCost.Parse("{1}{W}"), null, null, null, CardType.Instant,
-                TargetFilter.EnchantmentOrArtifact(), new NaturalizeEffect()),
+                TargetFilter.EnchantmentOrArtifact(), new NaturalizeEffect())
+            {
+                SpellRole = SpellRole.InstantRemoval,
+            },
             ["Vindicate"] = new(ManaCost.Parse("{1}{W}{B}"), null, null, null, CardType.Sorcery,
                 TargetFilter.AnyPermanent(), new DestroyPermanentEffect()),
             ["Smother"] = new(ManaCost.Parse("{1}{B}"), null, null, null, CardType.Instant,
-                TargetFilter.CreatureWithCMCAtMost(3), new DestroyCreatureEffect()),
+                TargetFilter.CreatureWithCMCAtMost(3), new DestroyCreatureEffect())
+            {
+                SpellRole = SpellRole.InstantRemoval,
+            },
             ["Snuff Out"] = new(ManaCost.Parse("{3}{B}"), null, null, null, CardType.Instant,
                 TargetFilter.NonBlackCreature(), new DestroyCreatureEffect())
             {
                 AlternateCost = new AlternateCost(LifeCost: 4, RequiresControlSubtype: "Swamp"),
+                SpellRole = SpellRole.InstantRemoval,
             },
             ["Diabolic Edict"] = new(ManaCost.Parse("{1}{B}"), null, null, null, CardType.Instant,
-                TargetFilter.Player(), new EdictEffect()),
+                TargetFilter.Player(), new EdictEffect())
+            {
+                SpellRole = SpellRole.InstantRemoval,
+            },
             ["Wrath of God"] = new(ManaCost.Parse("{2}{W}{W}"), null, null, null, CardType.Sorcery,
                 Effect: new DestroyAllCreaturesEffect()),
             ["Armageddon"] = new(ManaCost.Parse("{3}{W}"), null, null, null, CardType.Sorcery,
@@ -404,15 +437,27 @@ public static class CardDefinitions
 
             // Common counterspells
             ["Mana Leak"] = new(ManaCost.Parse("{1}{U}"), null, null, null, CardType.Instant,
-                TargetFilter.Spell(), new ConditionalCounterEffect(3)),
+                TargetFilter.Spell(), new ConditionalCounterEffect(3))
+            {
+                SpellRole = SpellRole.Counterspell,
+            },
             ["Absorb"] = new(ManaCost.Parse("{W}{U}{U}"), null, null, null, CardType.Instant,
-                TargetFilter.Spell(), new CounterAndGainLifeEffect(3)),
+                TargetFilter.Spell(), new CounterAndGainLifeEffect(3))
+            {
+                SpellRole = SpellRole.Counterspell,
+            },
 
             // Common utility
             ["Fact or Fiction"] = new(ManaCost.Parse("{3}{U}"), null, null, null, CardType.Instant,
-                Effect: new FactOrFictionEffect()),
+                Effect: new FactOrFictionEffect())
+            {
+                SpellRole = SpellRole.InstantUtility,
+            },
             ["Impulse"] = new(ManaCost.Parse("{1}{U}"), null, null, null, CardType.Instant,
-                Effect: new ImpulseEffect()),
+                Effect: new ImpulseEffect())
+            {
+                SpellRole = SpellRole.InstantUtility,
+            },
             ["Deep Analysis"] = new(ManaCost.Parse("{3}{U}"), null, null, null, CardType.Sorcery,
                 Effect: new DrawCardsEffect(2))
             {
@@ -444,9 +489,15 @@ public static class CardDefinitions
             },
             ["Jackal Pup"] = new(ManaCost.Parse("{R}"), null, 2, 1, CardType.Creature) { Subtypes = ["Hound"] },
             ["Incinerate"] = new(ManaCost.Parse("{1}{R}"), null, null, null, CardType.Instant,
-                TargetFilter.CreatureOrPlayer(), new DamageEffect(3)),
+                TargetFilter.CreatureOrPlayer(), new DamageEffect(3))
+            {
+                SpellRole = SpellRole.InstantRemoval,
+            },
             ["Shock"] = new(ManaCost.Parse("{R}"), null, null, null, CardType.Instant,
-                TargetFilter.CreatureOrPlayer(), new DamageEffect(2)),
+                TargetFilter.CreatureOrPlayer(), new DamageEffect(2))
+            {
+                SpellRole = SpellRole.InstantRemoval,
+            },
             ["Sulfuric Vortex"] = new(ManaCost.Parse("{1}{R}{R}"), null, null, null, CardType.Enchantment)
             {
                 Triggers = [new Trigger(GameEvent.Upkeep, TriggerCondition.Upkeep, new DamageAllPlayersTriggerEffect(2))],
@@ -485,7 +536,10 @@ public static class CardDefinitions
                     new ExileFromOpponentGraveyardEffect()),
             },
             ["Funeral Charm"] = new(ManaCost.Parse("{B}"), null, null, null, CardType.Instant,
-                TargetFilter.Player(), new DiscardEffect(1)),
+                TargetFilter.Player(), new DiscardEffect(1))
+            {
+                SpellRole = SpellRole.InstantUtility,
+            },
             ["Bottomless Pit"] = new(ManaCost.Parse("{1}{B}{B}"), null, null, null, CardType.Enchantment)
             {
                 Triggers = [new Trigger(GameEvent.Upkeep, TriggerCondition.Upkeep, new EachPlayerDiscardsEffect(1))],
@@ -550,7 +604,10 @@ public static class CardDefinitions
                 ActivatedAbility = new(new ActivatedAbilityCost(ManaCost: ManaCost.Parse("{1}{B}")), new BecomeCreatureEffect(1, 1, "Skeleton")),
             },
             ["Skeletal Scrying"] = new(ManaCost.Parse("{1}{B}"), null, null, null, CardType.Instant,
-                Effect: new SkeletalScryingEffect()),
+                Effect: new SkeletalScryingEffect())
+            {
+                SpellRole = SpellRole.InstantUtility,
+            },
 
             // === Deadguy Ale deck ===
             ["Exalted Angel"] = new(ManaCost.Parse("{4}{W}{W}"), null, 4, 5, CardType.Creature)
@@ -596,7 +653,10 @@ public static class CardDefinitions
 
             // === Landstill deck ===
             ["Prohibit"] = new(ManaCost.Parse("{1}{U}"), null, null, null, CardType.Instant,
-                TargetFilter.Spell(), new ConditionalCounterEffect(2)),
+                TargetFilter.Spell(), new ConditionalCounterEffect(2))
+            {
+                SpellRole = SpellRole.Counterspell,
+            },
             ["Standstill"] = new(ManaCost.Parse("{1}{U}"), null, null, null, CardType.Enchantment)
             {
                 Triggers = [new Trigger(GameEvent.SpellCast, TriggerCondition.AnyPlayerCastsSpell, new StandstillEffect())],
@@ -653,6 +713,7 @@ public static class CardDefinitions
                 TargetFilter.EnchantmentOrArtifact(), new NaturalizeEffect())
             {
                 FlashbackCost = new FlashbackCost(ManaCost.Parse("{G}")),
+                SpellRole = SpellRole.InstantRemoval,
             },
             ["Reckless Charge"] = new(ManaCost.Parse("{R}"), null, null, null, CardType.Sorcery,
                 TargetFilter.Creature(), new RecklessChargeEffect())
@@ -663,7 +724,10 @@ public static class CardDefinitions
                 Effect: new DamageAllCreaturesEffect(1)),
             ["Quiet Speculation"] = new(ManaCost.Parse("{1}{U}"), null, null, null, CardType.Sorcery,
                 Effect: new QuietSpeculationEffect()),
-            ["Funeral Pyre"] = new(ManaCost.Parse("{W}"), null, null, null, CardType.Instant),
+            ["Funeral Pyre"] = new(ManaCost.Parse("{W}"), null, null, null, CardType.Instant)
+            {
+                SpellRole = SpellRole.InstantUtility,
+            },
             ["Treetop Village"] = new(null, ManaAbility.Fixed(ManaColor.Green), null, null, CardType.Land)
             {
                 EntersTapped = true,
@@ -900,7 +964,10 @@ public static class CardDefinitions
             },
 
             ["Spell Pierce"] = new(ManaCost.Parse("{U}"), null, null, null, CardType.Instant,
-                TargetFilter.NoncreatureSpell(), new ConditionalCounterEffect(2)),
+                TargetFilter.NoncreatureSpell(), new ConditionalCounterEffect(2))
+            {
+                SpellRole = SpellRole.Counterspell,
+            },
 
             ["Ancient Tomb"] = new(null, ManaAbility.FixedMultiple(ManaColor.Colorless, 2, selfDamage: 2),
                 null, null, CardType.Land),
@@ -934,20 +1001,35 @@ public static class CardDefinitions
                 Effect: new DamageAllCreaturesEffect(2)),
 
             ["Flusterstorm"] = new(ManaCost.Parse("{U}"), null, null, null, CardType.Instant,
-                TargetFilter.InstantOrSorcerySpell(), new ConditionalCounterEffect(1)),
+                TargetFilter.InstantOrSorcerySpell(), new ConditionalCounterEffect(1))
+            {
+                SpellRole = SpellRole.Counterspell,
+            },
 
             ["Pyroblast"] = new(ManaCost.Parse("{R}"), null, null, null, CardType.Instant,
-                TargetFilter.Spell(), new PyroblastEffect()),
+                TargetFilter.Spell(), new PyroblastEffect())
+            {
+                SpellRole = SpellRole.Counterspell,
+            },
 
-            ["Surgical Extraction"] = new(ManaCost.Parse("{B/P}"), null, null, null, CardType.Instant),
+            ["Surgical Extraction"] = new(ManaCost.Parse("{B/P}"), null, null, null, CardType.Instant)
+            {
+                SpellRole = SpellRole.InstantUtility,
+            },
 
             ["Dismember"] = new(ManaCost.Parse("{1}{B/P}{B/P}"), null, null, null, CardType.Instant,
-                TargetFilter.Creature(), new PumpTargetEffect(-5, -5)),
+                TargetFilter.Creature(), new PumpTargetEffect(-5, -5))
+            {
+                SpellRole = SpellRole.InstantRemoval,
+            },
 
             ["Grafdigger's Cage"] = new(ManaCost.Parse("{1}"), null, null, null, CardType.Artifact),
 
             ["Wipe Away"] = new(ManaCost.Parse("{1}{U}{U}"), null, null, null, CardType.Instant,
-                TargetFilter.AnyPermanent(), new BounceTargetEffect()),
+                TargetFilter.AnyPermanent(), new BounceTargetEffect())
+            {
+                SpellRole = SpellRole.InstantRemoval,
+            },
 
             // ─── Planeswalkers ──────────────────────────────────────────────────
 
@@ -1051,7 +1133,10 @@ public static class CardDefinitions
 
             ["Fatal Push"] = new(ManaCost.Parse("{B}"), null, null, null, CardType.Instant,
                 TargetFilter.Creature(), new FatalPushEffect())
-            { Name = "Fatal Push" },
+            {
+                Name = "Fatal Push",
+                SpellRole = SpellRole.InstantRemoval,
+            },
 
             ["Brazen Borrower"] = new(ManaCost.Parse("{1}{U}{U}"), null, 3, 1, CardType.Creature)
             {
