@@ -1,4 +1,6 @@
 @inherits LayoutComponentBase
+@implements IDisposable
+@inject NavigationManager NavigationManager
 
 <MudThemeProvider @bind-IsDarkMode="_isDarkMode" Theme="_theme" />
 <MudPopoverProvider />
@@ -54,6 +56,8 @@
 
 @code {
     private bool _drawerOpen = true;
+    private bool _drawerStateBeforeGame = true;
+    private bool _isGamePage;
     private bool _isDarkMode = true;
     private ErrorBoundary? _errorBoundary;
 
@@ -76,6 +80,34 @@
         }
     };
 
+    protected override void OnInitialized()
+    {
+        NavigationManager.LocationChanged += OnLocationChanged;
+        CheckGamePage(NavigationManager.Uri);
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        CheckGamePage(e.Location);
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void CheckGamePage(string uri)
+    {
+        var wasGamePage = _isGamePage;
+        _isGamePage = uri.Contains("/game/", StringComparison.OrdinalIgnoreCase);
+
+        if (_isGamePage && !wasGamePage)
+        {
+            _drawerStateBeforeGame = _drawerOpen;
+            _drawerOpen = false;
+        }
+        else if (!_isGamePage && wasGamePage)
+        {
+            _drawerOpen = _drawerStateBeforeGame;
+        }
+    }
+
     private void ToggleDrawer()
     {
         _drawerOpen = !_drawerOpen;
@@ -84,5 +116,10 @@
     private void RecoverFromError()
     {
         _errorBoundary?.Recover();
+    }
+
+    public void Dispose()
+    {
+        NavigationManager.LocationChanged -= OnLocationChanged;
     }
 }
