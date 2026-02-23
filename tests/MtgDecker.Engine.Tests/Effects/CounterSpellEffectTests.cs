@@ -173,4 +173,50 @@ public class CounterSpellEffectTests
         p1.Graveyard.Cards.Should().Contain(c => c.Id == sorceryCard.Id);
         p2.Graveyard.Cards.Should().BeEmpty();
     }
+
+    [Fact]
+    public void CounterSpellEffect_CannotBeCountered_StaysOnStack()
+    {
+        // Arrange: Emrakul has CannotBeCountered = true
+        var (state, p1, p2) = CreateGameState();
+        var emrakul = GameCard.Create("Emrakul, the Aeons Torn");
+        var emrakulSpell = new StackObject(emrakul, p2.Id,
+            new Dictionary<ManaColor, int>(), new List<TargetInfo>(), 0);
+        state.StackPush(emrakulSpell);
+
+        var target = new TargetInfo(emrakul.Id, p2.Id, ZoneType.Stack);
+        var counterSpell = CreateSpell("Counterspell", p1.Id, new List<TargetInfo> { target });
+
+        var effect = new CounterSpellEffect();
+
+        // Act
+        effect.Resolve(state, counterSpell);
+
+        // Assert: Emrakul stays on the stack, NOT in graveyard
+        state.Stack.OfType<StackObject>().Should().Contain(s => s.Card.Id == emrakul.Id);
+        p2.Graveyard.Cards.Should().NotContain(c => c.Id == emrakul.Id);
+    }
+
+    [Fact]
+    public void CounterSpellEffect_CannotBeCountered_LogsMessage()
+    {
+        // Arrange
+        var (state, p1, p2) = CreateGameState();
+        var emrakul = GameCard.Create("Emrakul, the Aeons Torn");
+        var emrakulSpell = new StackObject(emrakul, p2.Id,
+            new Dictionary<ManaColor, int>(), new List<TargetInfo>(), 0);
+        state.StackPush(emrakulSpell);
+
+        var target = new TargetInfo(emrakul.Id, p2.Id, ZoneType.Stack);
+        var counterSpell = CreateSpell("Counterspell", p1.Id, new List<TargetInfo> { target });
+
+        var effect = new CounterSpellEffect();
+
+        // Act
+        effect.Resolve(state, counterSpell);
+
+        // Assert: log says it can't be countered
+        state.GameLog.Should().ContainSingle()
+            .Which.Should().Contain("can't be countered");
+    }
 }

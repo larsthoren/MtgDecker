@@ -20,7 +20,10 @@
       "Bash(git worktree remove:*)",
       "Bash(git branch:*)",
       "Bash(curl:*)",
-      "Bash(tasklist:*)"
+      "Bash(tasklist:*)",
+      "Bash(cd /c/Users/larst/MtgDecker/.claude/worktrees/mtgo-mana-payment && git add src/MtgDecker.Engine/CardDefinitions.cs && git rebase --continue 2>&1)",
+      "Bash(cd /c/Users/larst/MtgDecker/.claude/worktrees/mtgo-mana-payment && GIT_EDITOR=true git rebase --continue 2>&1)",
+      "Bash(cd /c/Users/larst/MtgDecker/.claude/worktrees/mtgo-mana-payment && git add -A && git rebase --continue 2>&1)"
     ]
   }
 }

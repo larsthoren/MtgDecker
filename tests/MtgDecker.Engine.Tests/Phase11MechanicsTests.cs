@@ -197,14 +197,15 @@ public class Phase11MechanicsTests
     // ========== Knight of Stromgald Tests ==========
 
     [Fact]
-    public void KnightOfStromgald_HasFirstStrike()
+    public void KnightOfStromgald_NoStaticFirstStrike()
     {
         CardDefinitions.TryGet("Knight of Stromgald", out var def);
 
         def.Should().NotBeNull();
-        def!.ContinuousEffects.Should().Contain(e =>
+        def!.ContinuousEffects.Should().NotContain(e =>
             e.Type == ContinuousEffectType.GrantKeyword
-            && e.GrantedKeyword == Keyword.FirstStrike);
+            && e.GrantedKeyword == Keyword.FirstStrike,
+            because: "Knight of Stromgald gains first strike via activated ability, not statically");
     }
 
     [Fact]
@@ -226,7 +227,7 @@ public class Phase11MechanicsTests
         def.Should().NotBeNull();
         def!.ActivatedAbility.Should().NotBeNull();
         def!.ActivatedAbility!.Cost.ManaCost.Should().NotBeNull();
-        def!.ActivatedAbility!.Cost.ManaCost!.ToString().Should().Be("{B}");
+        def!.ActivatedAbility!.Cost.ManaCost!.ToString().Should().Be("{B}{B}");
         def!.ActivatedAbility!.Effect.Should().BeOfType<PumpSelfEffect>();
     }
 

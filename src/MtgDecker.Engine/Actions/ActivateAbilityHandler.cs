@@ -148,6 +148,35 @@ internal class ActivateAbilityHandler : IActionHandler
             }
         }
 
+        List<GameCard>? exileTargets = null;
+        if (cost.ExileFromGraveyardCount > 0)
+        {
+            if (player.Graveyard.Count < cost.ExileFromGraveyardCount)
+            {
+                state.Log($"Cannot activate {abilitySource.Name} — not enough cards in graveyard (need {cost.ExileFromGraveyardCount}, have {player.Graveyard.Count}).");
+                return;
+            }
+
+            exileTargets = [];
+            for (int i = 0; i < cost.ExileFromGraveyardCount; i++)
+            {
+                var eligible = player.Graveyard.Cards.Where(c => !exileTargets.Contains(c)).ToList();
+                var chosenId = await player.DecisionHandler.ChooseCard(
+                    eligible, $"Choose a card to exile from graveyard ({i + 1}/{cost.ExileFromGraveyardCount})", optional: false, ct);
+                if (chosenId.HasValue)
+                {
+                    var card = eligible.FirstOrDefault(c => c.Id == chosenId.Value);
+                    if (card != null) exileTargets.Add(card);
+                }
+            }
+
+            if (exileTargets.Count < cost.ExileFromGraveyardCount)
+            {
+                state.Log($"Cannot activate {abilitySource.Name} — not enough exile targets chosen.");
+                return;
+            }
+        }
+
         if (cost.ManaCost != null)
         {
             await engine.PayManaCostAsync(cost.ManaCost, player, ct);
@@ -197,6 +226,16 @@ internal class ActivateAbilityHandler : IActionHandler
             state.Log($"{player.Name} pays {cost.PayLife} life.");
         }
 
+        if (exileTargets != null)
+        {
+            foreach (var card in exileTargets)
+            {
+                player.Graveyard.RemoveById(card.Id);
+                player.Exile.Add(card);
+                state.Log($"{card.Name} is exiled from {player.Name}'s graveyard.");
+            }
+        }
+
         GameCard? effectTarget = null;
         if (action.TargetCardId.HasValue)
         {
@@ -206,8 +245,10 @@ internal class ActivateAbilityHandler : IActionHandler
         else if (ability.TargetFilter != null && !action.TargetPlayerId.HasValue)
         {
             var opponent = state.GetOpponent(player);
-            var eligible = player.Battlefield.Cards
-                .Concat(opponent.Battlefield.Cards)
+            IEnumerable<GameCard> searchPool = ability.TargetOwnOnly
+                ? player.Battlefield.Cards
+                : player.Battlefield.Cards.Concat(opponent.Battlefield.Cards);
+            var eligible = searchPool
                 .Where(c => ability.TargetFilter(c) && !engine.CannotBeTargetedBy(c, player))
                 .ToList();
 

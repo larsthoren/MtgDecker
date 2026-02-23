@@ -95,8 +95,6 @@ public class EntersTappedTests
     [InlineData("Treetop Village")]
     [InlineData("Faerie Conclave")]
     [InlineData("Spawning Pool")]
-    [InlineData("Darigaaz's Caldera")]
-    [InlineData("Treva's Ruins")]
     public void CardDefinition_EntersTapped_IsSet(string cardName)
     {
         CardDefinitions.TryGet(cardName, out var def).Should().BeTrue();

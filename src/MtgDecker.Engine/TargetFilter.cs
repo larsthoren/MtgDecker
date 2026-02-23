@@ -21,6 +21,9 @@ public class TargetFilter
         zone == ZoneType.Battlefield &&
         (card.CardTypes.HasFlag(CardType.Enchantment) || card.CardTypes.HasFlag(CardType.Artifact)));
 
+    public static TargetFilter Enchantment() => new((card, zone) =>
+        zone == ZoneType.Battlefield && card.CardTypes.HasFlag(CardType.Enchantment));
+
     public static TargetFilter CreatureOrPlayer() => new((card, zone) =>
         (zone == ZoneType.Battlefield && card.IsCreature) || zone == ZoneType.None);
 

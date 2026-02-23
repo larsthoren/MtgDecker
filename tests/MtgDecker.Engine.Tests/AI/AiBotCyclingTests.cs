@@ -45,11 +45,11 @@ public class AiBotCyclingTests
     {
         var (bot, state, player) = CreateGameWithBot();
 
-        // With exactly {1}{R} — bot can cast or cycle (same cost). Should prefer casting.
+        // With exactly {2}{R} — bot can afford both cast ({2}{R}) and cycle ({1}{R}). Should prefer casting.
         var gempalm = GameCard.Create("Gempalm Incinerator");
         player.Hand.Add(gempalm);
         player.ManaPool.Add(ManaColor.Red, 1);
-        player.ManaPool.Add(ManaColor.Colorless, 1);
+        player.ManaPool.Add(ManaColor.Colorless, 2);
         player.LandsPlayedThisTurn = 1;
 
         var action = await bot.GetAction(state, player.Id);

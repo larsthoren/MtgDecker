@@ -20,7 +20,8 @@
     }
 
     @* Row 1: Opponent info bar *@
-    <div class="opponent-info-bar @(IsPlayerTargetable ? "targetable" : "")"
+    <div class="opponent-info-bar @(IsPlayerTargetable ? "targetable" : "") @(HighlightedPlayerIds.Contains(OpponentPlayer.Id) ? "stack-target-highlighted-bar" : "")"
+         id="player-info-@OpponentPlayer.Id"
          @onclick="HandleOpponentInfoBarClick">
         <MudText Typo="Typo.subtitle2">@OpponentPlayer.Name</MudText>
         <MudChip T="string" Size="Size.Small" Color="Color.Error">@OpponentPlayer.Life HP</MudChip>
@@ -81,7 +82,7 @@
                 <div class="permanent-stack">
                     @foreach (var aura in attachments)
                     {
-                        <div class="attached-aura attached-aura-sm">
+                        <div class="attached-aura attached-aura-sm" id="bf-card-@aura.Id">
                             <CardDisplay Name="@aura.Name"
                                          ImageUrl="@aura.ImageUrl"
                                          Tapped="@aura.IsTapped"
@@ -89,12 +90,13 @@
                                          Clickable="@(IsTargetingMode)"
                                          EligibleTarget="@IsEligibleTarget(aura)"
                                          TargetingDimmed="@IsTargetingDimmed(aura)"
+                                         IsTargetHighlighted="@(HighlightedBattlefieldCardIds.Contains(aura.Id))"
                                          OnClick="async () => await HandleOpponentCardClick(aura)"
                                          OnHoverStart="SetHoveredCard"
                                          OnHoverEnd="ClearHoveredCard" />
                         </div>
                     }
-                    <div class="host-card">
+                    <div class="host-card" id="bf-card-@card.Id">
                         <CardDisplay Name="@card.Name"
                                      ImageUrl="@card.ImageUrl"
                                      Tapped="@card.IsTapped"
@@ -102,6 +104,7 @@
                                      Clickable="@(IsTargetingMode)"
                                      EligibleTarget="@IsEligibleTarget(card)"
                                      TargetingDimmed="@IsTargetingDimmed(card)"
+                                     IsTargetHighlighted="@(HighlightedBattlefieldCardIds.Contains(card.Id))"
                                      IsAttacking="@(State.Combat?.Attackers.Contains(card.Id) == true)"
                                      IsBlocking="@IsCardBlockingAnywhere(card.Id)"
                                      Power="@card.Power"
@@ -122,7 +125,7 @@
                 <div class="permanent-stack">
                     @foreach (var aura in attachments)
                     {
-                        <div class="attached-aura attached-aura-sm">
+                        <div class="attached-aura attached-aura-sm" id="bf-card-@aura.Id">
                             <CardDisplay Name="@aura.Name"
                                          ImageUrl="@aura.ImageUrl"
                                          Tapped="@aura.IsTapped"
@@ -130,12 +133,13 @@
                                          Clickable="@(IsTargetingMode)"
                                          EligibleTarget="@IsEligibleTarget(aura)"
                                          TargetingDimmed="@IsTargetingDimmed(aura)"
+                                         IsTargetHighlighted="@(HighlightedBattlefieldCardIds.Contains(aura.Id))"
                                          OnClick="async () => await HandleOpponentCardClick(aura)"
                                          OnHoverStart="SetHoveredCard"
                                          OnHoverEnd="ClearHoveredCard" />
                         </div>
                     }
-                    <div class="host-card">
+                    <div class="host-card" id="bf-card-@card.Id">
                         <CardDisplay Name="@card.Name"
                                      ImageUrl="@card.ImageUrl"
                                      Tapped="@card.IsTapped"
@@ -143,6 +147,7 @@
                                      Clickable="@(IsTargetingMode)"
                                      EligibleTarget="@IsEligibleTarget(card)"
                                      TargetingDimmed="@IsTargetingDimmed(card)"
+                                     IsTargetHighlighted="@(HighlightedBattlefieldCardIds.Contains(card.Id))"
                                      IsAttacking="@(State.Combat?.Attackers.Contains(card.Id) == true)"
                                      IsBlocking="@IsCardBlockingAnywhere(card.Id)"
                                      Power="@card.Power"
@@ -193,7 +198,12 @@
                   IsTargeting="@(Handler?.IsWaitingForTarget == true)"
                   OnStackCardClicked="HandleStackCardTarget"
                   OnHoverStart="SetHoveredCard"
-                  OnHoverEnd="ClearHoveredCard" />
+                  OnHoverEnd="ClearHoveredCard"
+                  OnTargetHover="HandleStackTargetHover"
+                  HighlightedStackItemIds="@HighlightedStackItemIds" />
+
+    @* Target arrows overlay (stack hover) *@
+    <TargetArrows HoverInfo="@_stackTargetHover" />
 
     @* Row 4: Player battlefield *@
     <div class="player-battlefield">
@@ -208,19 +218,20 @@
                 <div class="permanent-stack">
                     @foreach (var aura in attachments)
                     {
-                        <div class="attached-aura">
+                        <div class="attached-aura" id="bf-card-@aura.Id">
                             <CardDisplay Name="@aura.Name" ImageUrl="@aura.ImageUrl" Tapped="@aura.IsTapped"
                                          CardSize="146"
                                          Selected="@(_selectedCard?.Id == aura.Id)"
                                          EligibleTarget="@IsEligibleTarget(aura)"
                                          TargetingDimmed="@IsTargetingDimmed(aura)"
+                                         IsTargetHighlighted="@(HighlightedBattlefieldCardIds.Contains(aura.Id))"
                                          Clickable="true"
                                          OnClick="async () => await HandleBattlefieldClick(aura, false, false)"
                                          OnHoverStart="SetHoveredCard"
                                          OnHoverEnd="ClearHoveredCard" />
                         </div>
                     }
-                    <div class="host-card">
+                    <div class="host-card" id="bf-card-@card.Id">
                         <CardDisplay Name="@card.Name" ImageUrl="@card.ImageUrl" Tapped="@card.IsTapped"
                                      Power="@card.Power" Toughness="@card.Toughness" DamageMarked="@card.DamageMarked"
                                      CardSize="146"
@@ -230,6 +241,7 @@
                                      Eligible="@(isEligibleAttacker || isEligibleBlocker)"
                                      EligibleTarget="@IsEligibleTarget(card)"
                                      TargetingDimmed="@IsTargetingDimmed(card)"
+                                     IsTargetHighlighted="@(HighlightedBattlefieldCardIds.Contains(card.Id))"
                                      SummoningSick="@(card.IsCreature && card.HasSummoningSickness(State.TurnNumber))"
                                      Counters="@(card.Counters.Count > 0 ? card.Counters : null)"
                                      Clickable="true"
@@ -252,24 +264,26 @@
                 <div class="permanent-stack">
                     @foreach (var aura in attachments)
                     {
-                        <div class="attached-aura">
+                        <div class="attached-aura" id="bf-card-@aura.Id">
                             <CardDisplay Name="@aura.Name" ImageUrl="@aura.ImageUrl" Tapped="@aura.IsTapped"
                                          CardSize="146"
                                          Selected="@(_selectedCard?.Id == aura.Id)"
                                          EligibleTarget="@IsEligibleTarget(aura)"
                                          TargetingDimmed="@IsTargetingDimmed(aura)"
+                                         IsTargetHighlighted="@(HighlightedBattlefieldCardIds.Contains(aura.Id))"
                                          Clickable="true"
                                          OnClick="async () => await HandleBattlefieldClick(aura, false, false)"
                                          OnHoverStart="SetHoveredCard"
                                          OnHoverEnd="ClearHoveredCard" />
                         </div>
                     }
-                    <div class="land-wrapper host-card">
+                    <div class="land-wrapper host-card" id="bf-card-@card.Id">
                         <CardDisplay Name="@card.Name" ImageUrl="@card.ImageUrl" Tapped="@card.IsTapped"
                                      CardSize="146"
                                      Selected="@(_selectedCard?.Id == card.Id)"
                                      EligibleTarget="@IsEligibleTarget(card)"
                                      TargetingDimmed="@IsTargetingDimmed(card)"
+                                     IsTargetHighlighted="@(HighlightedBattlefieldCardIds.Contains(card.Id))"
                                      Clickable="true"
                                      OnClick="async () => await HandleLandClick(card)"
                                      OnHoverStart="SetHoveredCard"
@@ -293,7 +307,8 @@
     </div>
 
     @* Row 5: Player info bar *@
-    <div class="player-info-bar @(IsPlayerTargetable ? "targetable" : "")"
+    <div class="player-info-bar @(IsPlayerTargetable ? "targetable" : "") @(HighlightedPlayerIds.Contains(LocalPlayer.Id) ? "stack-target-highlighted-bar" : "")"
+         id="player-info-@LocalPlayer.Id"
          @onclick="HandlePlayerInfoBarClick">
         <MudText Typo="Typo.subtitle2">@LocalPlayer.Name</MudText>
         @{
@@ -844,6 +859,29 @@
 
     // Card preview hover state
     private string? _hoveredImageUrl;
+
+    // Stack target hover state
+    private StackTargetHoverInfo? _stackTargetHover;
+    private HashSet<Guid> HighlightedBattlefieldCardIds = new();
+    private HashSet<Guid> HighlightedStackItemIds = new();
+    private HashSet<Guid> HighlightedPlayerIds = new();
+
+    private void HandleStackTargetHover(StackTargetHoverInfo? info)
+    {
+        _stackTargetHover = info;
+        if (info?.Targets is { Count: > 0 } targets)
+        {
+            HighlightedBattlefieldCardIds = targets.Where(t => t.Zone == TargetZone.Battlefield).Select(t => t.CardId).ToHashSet();
+            HighlightedStackItemIds = targets.Where(t => t.Zone == TargetZone.Stack).Select(t => t.CardId).ToHashSet();
+            HighlightedPlayerIds = targets.Where(t => t.Zone == TargetZone.Player).Select(t => t.PlayerId).ToHashSet();
+        }
+        else
+        {
+            HighlightedBattlefieldCardIds = new();
+            HighlightedStackItemIds = new();
+            HighlightedPlayerIds = new();
+        }
+    }
 
     // Graveyard viewer toggle state
     private bool _showPlayerGraveyard;
