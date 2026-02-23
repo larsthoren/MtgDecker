@@ -4,7 +4,7 @@
         auto          /* opponent info bar */
         1fr           /* opponent battlefield */
         auto          /* phase bar + stack */
-        2fr           /* player battlefield */
+        1fr           /* player battlefield */
         auto          /* player info bar */
         auto;         /* player hand */
     height: calc(100vh - 64px);
