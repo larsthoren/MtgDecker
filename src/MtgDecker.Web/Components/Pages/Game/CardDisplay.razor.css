@@ -144,3 +144,15 @@
     background: rgba(68, 136, 255, 0.9);
     color: white;
 }
+
+/* Stack target highlight: pulsing orange glow when hovered on stack */
+.card-display.stack-target-highlighted {
+    box-shadow: 0 0 12px 4px rgba(255, 136, 0, 0.8);
+    animation: stack-target-pulse 1s ease-in-out infinite;
+    z-index: 10;
+}
+
+@keyframes stack-target-pulse {
+    0%, 100% { box-shadow: 0 0 12px 4px rgba(255, 136, 0, 0.8); }
+    50% { box-shadow: 0 0 18px 6px rgba(255, 136, 0, 1); }
+}
