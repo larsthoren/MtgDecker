@@ -61,7 +61,8 @@ public class ActivatedAbilityCardRegistrationTests
         CardDefinitions.TryGet("Goblin Tinkerer", out var def).Should().BeTrue();
         def!.ActivatedAbility.Should().NotBeNull();
         def.ActivatedAbility!.Effect.Should().BeOfType<DestroyTargetEffect>();
-        def.ActivatedAbility.Cost.SacrificeSelf.Should().BeTrue();
+        def.ActivatedAbility.Cost.TapSelf.Should().BeTrue();
+        def.ActivatedAbility.Cost.SacrificeSelf.Should().BeFalse();
         def.ActivatedAbility.TargetFilter.Should().NotBeNull();
         // Verify target filter accepts artifacts
         var artifact = new GameCard { Name = "Sol Ring", CardTypes = CardType.Artifact };
@@ -91,7 +92,7 @@ public class ActivatedAbilityCardRegistrationTests
     {
         CardDefinitions.TryGet("Sterling Grove", out var def).Should().BeTrue();
         def!.ActivatedAbility.Should().NotBeNull();
-        def.ActivatedAbility!.Effect.Should().BeOfType<SearchLibraryByTypeEffect>();
+        def.ActivatedAbility!.Effect.Should().BeOfType<SearchLibraryToTopEffect>();
         def.ActivatedAbility.Cost.SacrificeSelf.Should().BeTrue();
         def.ActivatedAbility.Cost.ManaCost.Should().NotBeNull();
         def.ActivatedAbility.Cost.ManaCost!.GenericCost.Should().Be(1);

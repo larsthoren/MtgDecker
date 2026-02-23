@@ -21,4 +21,5 @@ public enum Keyword
     ProtectionFromColoredSpells,
     Hexproof,
     CantBlockNonFlying,
+    DoesNotUntap,
 }

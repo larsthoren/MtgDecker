@@ -28,8 +28,14 @@ public class Player
     public bool PermanentLeftBattlefieldThisTurn { get; set; }
     public List<Emblem> Emblems { get; } = [];
 
-    public void AdjustLife(int delta)
+    public void AdjustLife(int delta, GameState? state = null)
     {
+        if (delta > 0 && state != null)
+        {
+            var prevented = state.ActiveEffects.Any(e => e.Type == ContinuousEffectType.PreventLifeGain);
+            if (prevented)
+                return;
+        }
         Life += delta;
         if (delta < 0)
             LifeLostThisTurn += -delta;

@@ -16,6 +16,8 @@ public enum ContinuousEffectType
     SetBasePowerToughness,
     RemoveAbilities,
     OverrideLandType,
+    PreventLifeGain,
+    PreventCastFromGraveyard,
 }
 
 public record ContinuousEffect(

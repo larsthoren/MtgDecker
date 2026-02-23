@@ -12,11 +12,13 @@ public record ActivatedAbilityCost(
     CounterType? RemoveCounterType = null,
     CardType? SacrificeCardType = null,
     CardType? DiscardCardType = null,
-    int PayLife = 0);
+    int PayLife = 0,
+    int ExileFromGraveyardCount = 0);
 
 public record ActivatedAbility(
     ActivatedAbilityCost Cost,
     IEffect Effect,
     Func<GameCard, bool>? TargetFilter = null,
     bool CanTargetPlayer = false,
-    Func<Player, bool>? Condition = null);
+    Func<Player, bool>? Condition = null,
+    bool TargetOwnOnly = false);

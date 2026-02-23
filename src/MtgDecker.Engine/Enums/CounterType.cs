@@ -7,4 +7,5 @@ public enum CounterType
     PlusOnePlusOne,
     Loyalty,
     Stun,
+    Fuse,
 }

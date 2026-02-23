@@ -35,8 +35,8 @@ public class ManaAbility
         ProducedColors = producedColors;
     }
 
-    public static ManaAbility Fixed(ManaColor color) =>
-        new(ManaAbilityType.Fixed, color, null, produceCount: 1);
+    public static ManaAbility Fixed(ManaColor color, int selfDamage = 0) =>
+        new(ManaAbilityType.Fixed, color, null, selfDamage: selfDamage, produceCount: 1);
 
     public static ManaAbility FixedMultiple(ManaColor color, int count, int selfDamage = 0) =>
         new(ManaAbilityType.Fixed, color, null, selfDamage: selfDamage, produceCount: count);
