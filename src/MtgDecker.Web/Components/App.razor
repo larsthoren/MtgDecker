@@ -41,6 +41,14 @@
                 document.addEventListener('mouseup', onUp);
             }
         };
+        window.getElementCenters = function(elementIds) {
+            return elementIds.map(function(id) {
+                var el = document.getElementById(id);
+                if (!el) return null;
+                var rect = el.getBoundingClientRect();
+                return { id: id, x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+            });
+        };
     </script>
 </body>
 
