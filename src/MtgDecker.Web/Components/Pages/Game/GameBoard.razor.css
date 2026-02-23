@@ -427,3 +427,16 @@
 .chat-input {
     flex: 1;
 }
+
+/* Player info bar highlighted as stack target */
+.opponent-info-bar.stack-target-highlighted-bar,
+.player-info-bar.stack-target-highlighted-bar {
+    box-shadow: 0 0 12px 4px rgba(255, 136, 0, 0.8);
+    border-radius: 4px;
+    animation: stack-target-pulse-bar 1s ease-in-out infinite;
+}
+
+@keyframes stack-target-pulse-bar {
+    0%, 100% { box-shadow: 0 0 12px 4px rgba(255, 136, 0, 0.8); }
+    50% { box-shadow: 0 0 18px 6px rgba(255, 136, 0, 1); }
+}

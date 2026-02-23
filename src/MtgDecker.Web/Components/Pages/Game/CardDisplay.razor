@@ -1,6 +1,6 @@
 @namespace MtgDecker.Web.Components.Pages.Game
 
-<div class="card-display @(Tapped ? "tapped" : "") @(Selected ? "selected" : "") @(Clickable ? "clickable" : "") @(IsAttacking ? "attacking" : "") @(IsBlocking ? "blocking" : "") @(Eligible ? "eligible" : "") @(EligibleTarget ? "eligible-target" : "") @(SummoningSick ? "summoning-sick" : "") @(TargetingDimmed ? "targeting-dimmed" : "")"
+<div class="card-display @(Tapped ? "tapped" : "") @(Selected ? "selected" : "") @(Clickable ? "clickable" : "") @(IsAttacking ? "attacking" : "") @(IsBlocking ? "blocking" : "") @(Eligible ? "eligible" : "") @(EligibleTarget ? "eligible-target" : "") @(SummoningSick ? "summoning-sick" : "") @(TargetingDimmed ? "targeting-dimmed" : "") @(IsTargetHighlighted ? "stack-target-highlighted" : "")"
      style="width: @(CardSize)px; min-height: @(CardSize * 1.4)px;"
      @onclick="HandleClick"
      @onmouseenter="() => OnHoverStart.InvokeAsync(ImageUrl)"
@@ -65,6 +65,7 @@
     [Parameter] public bool EligibleTarget { get; set; }
     [Parameter] public bool TargetingDimmed { get; set; }
     [Parameter] public bool SummoningSick { get; set; }
+    [Parameter] public bool IsTargetHighlighted { get; set; }
     [Parameter] public Dictionary<MtgDecker.Engine.Enums.CounterType, int>? Counters { get; set; }
     [Parameter] public EventCallback<string?> OnHoverStart { get; set; }
     [Parameter] public EventCallback OnHoverEnd { get; set; }
