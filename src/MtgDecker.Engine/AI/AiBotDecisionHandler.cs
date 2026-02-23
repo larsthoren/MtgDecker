@@ -1,3 +1,4 @@
+using MtgDecker.Engine.Effects;
 using MtgDecker.Engine.Enums;
 using MtgDecker.Engine.Mana;
 using MtgDecker.Engine.Triggers.Effects;
@@ -45,15 +46,24 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
             return _plannedActions.Dequeue();
         }
 
+        var player = gameState.Player1.Id == playerId ? gameState.Player1 : gameState.Player2;
+        var opponent = gameState.Player1.Id == playerId ? gameState.Player2 : gameState.Player1;
+        var hand = player.Hand.Cards;
+
+        // Non-active player: evaluate reactive plays (works in any phase)
+        if (gameState.ActivePlayer.Id != playerId)
+        {
+            var reaction = EvaluateReaction(player, opponent, gameState, playerId);
+            if (reaction != null)
+            {
+                await DelayAsync(ct);
+                return reaction;
+            }
+            return GameAction.Pass(playerId);
+        }
+
         if (gameState.CurrentPhase != Phase.MainPhase1 && gameState.CurrentPhase != Phase.MainPhase2)
             return GameAction.Pass(playerId);
-
-        // Non-active player passes priority (reactive plays added in Task 5)
-        if (gameState.ActivePlayer.Id != playerId)
-            return GameAction.Pass(playerId);
-
-        var player = gameState.Player1.Id == playerId ? gameState.Player1 : gameState.Player2;
-        var hand = player.Hand.Cards;
 
         // Priority 1: Play a land
         if (hand.Count > 0 && player.LandsPlayedThisTurn == 0)
@@ -86,7 +96,6 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
         }
 
         // Priority 2.5: Activate abilities on permanents (e.g., Mogg Fanatic, Skirk Prospector)
-        var opponent = gameState.Player1.Id == playerId ? gameState.Player2 : gameState.Player1;
         var abilityAction = EvaluateActivatedAbilities(player, opponent, gameState);
         if (abilityAction != null)
         {
@@ -705,6 +714,108 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
         5 => (1, 4),
         _ => (0, handSize) // Always keep at 4 or fewer (handled before this)
     };
+
+    /// <summary>
+    /// Evaluates whether to play a reactive spell (counterspell, removal).
+    /// Returns null if no reactive play is warranted.
+    /// </summary>
+    private static GameAction? EvaluateReaction(Player player, Player opponent, GameState gameState, Guid playerId)
+    {
+        // Check for counterspells when opponent has spell on stack
+        if (gameState.StackCount > 0)
+        {
+            var topOfStack = gameState.StackPeekTop();
+            if (topOfStack != null && topOfStack.ControllerId != playerId)
+            {
+                var counterAction = EvaluateCounterspell(player, opponent, gameState, playerId, topOfStack);
+                if (counterAction != null) return counterAction;
+            }
+        }
+
+        // TODO Task 6: instant removal during combat
+
+        return null;
+    }
+
+    /// <summary>
+    /// Evaluates whether to counter an opponent's spell on the stack.
+    /// Checks hand for counterspells and applies heuristics per counter type.
+    /// </summary>
+    private static GameAction? EvaluateCounterspell(Player player, Player opponent, GameState gameState, Guid playerId, IStackObject targetSpell)
+    {
+        var hand = player.Hand.Cards;
+        var opponentUntappedLands = opponent.Battlefield.Cards.Count(c => c.IsLand && !c.IsTapped);
+
+        // Get the spell's CMC from the stack object
+        var spellCmc = 0;
+        if (targetSpell is StackObject so)
+            spellCmc = so.Card.ManaCost?.ConvertedManaCost ?? 0;
+
+        foreach (var card in hand)
+        {
+            if (!CardDefinitions.TryGet(card.Name, out var def)) continue;
+            if (def.SpellRole != SpellRole.Counterspell) continue;
+
+            // --- Hard counters (Counterspell, Absorb) ---
+            if (def.Effect is CounterSpellEffect or CounterAndGainLifeEffect)
+            {
+                if (def.AlternateCost == null && def.ManaCost != null && player.ManaPool.CanPay(def.ManaCost))
+                {
+                    if (spellCmc >= 3)
+                        return GameAction.CastSpell(playerId, card.Id);
+                }
+            }
+
+            // --- Daze (soft counter — return Island to hand) ---
+            if (card.Name == "Daze")
+            {
+                if (opponentUntappedLands == 0)
+                {
+                    var hasIsland = player.Battlefield.Cards.Any(c => c.Subtypes.Contains("Island"));
+                    if (hasIsland)
+                        return GameAction.CastSpell(playerId, card.Id, useAlternateCost: true);
+                }
+                continue;
+            }
+
+            // --- Conditional counters (Mana Leak, Spell Pierce, Flusterstorm, Prohibit) ---
+            if (def.Effect is ConditionalCounterEffect conditional)
+            {
+                if (def.ManaCost != null && player.ManaPool.CanPay(def.ManaCost))
+                {
+                    if (opponentUntappedLands < conditional.GenericCost)
+                        return GameAction.CastSpell(playerId, card.Id);
+                }
+                continue;
+            }
+
+            // --- Force of Will (exile blue card, pay 1 life) ---
+            if (card.Name == "Force of Will")
+            {
+                if (spellCmc >= 4)
+                {
+                    var hasBlueCardToExile = hand.Any(c => c.Id != card.Id
+                        && c.ManaCost != null && c.ManaCost.ColorRequirements.ContainsKey(ManaColor.Blue));
+                    if (hasBlueCardToExile && player.Life > 1)
+                        return GameAction.CastSpell(playerId, card.Id, useAlternateCost: true);
+                }
+                continue;
+            }
+
+            // --- Pyroblast (counter blue spells) ---
+            if (card.Name == "Pyroblast")
+            {
+                if (targetSpell is StackObject pyrTarget && pyrTarget.Card.ManaCost?.ColorRequirements.ContainsKey(ManaColor.Blue) == true)
+                {
+                    if (def.ManaCost != null && player.ManaPool.CanPay(def.ManaCost))
+                        return GameAction.CastSpell(playerId, card.Id);
+                }
+                continue;
+            }
+        }
+
+        return null;
+    }
 
     /// <summary>
     /// Evaluates activated abilities on permanents and returns an action if one is worth activating.
