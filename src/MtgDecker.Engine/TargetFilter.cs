@@ -50,4 +50,11 @@ public class TargetFilter
 
     public static TargetFilter NonlandPermanent() => new((card, zone) =>
         zone == ZoneType.Battlefield && !card.IsLand);
+
+    public static TargetFilter Artifact() => new((card, zone) =>
+        zone == ZoneType.Battlefield && card.CardTypes.HasFlag(CardType.Artifact));
+
+    public static TargetFilter ArtifactOrEnchantmentSpell() => new((card, zone) =>
+        zone == ZoneType.Stack &&
+        (card.CardTypes.HasFlag(CardType.Artifact) || card.CardTypes.HasFlag(CardType.Enchantment)));
 }

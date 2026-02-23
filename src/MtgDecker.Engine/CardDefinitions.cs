@@ -1160,6 +1160,41 @@ public static class CardDefinitions
                     Filter: TargetFilter.NonlandPermanent(),
                     Effect: new PettyTheftEffect()),
             },
+
+            // ─── Premodern Missing Cards ─────────────────────────────────────────
+
+            // Lands
+            ["Yavimaya Coast"] = new(null, ManaAbility.PainChoice(
+                [ManaColor.Colorless, ManaColor.Green, ManaColor.Blue],
+                [ManaColor.Green, ManaColor.Blue]), null, null, CardType.Land),
+
+            // Vanilla creatures
+            ["Savannah Lions"] = new(ManaCost.Parse("{W}"), null, 2, 1, CardType.Creature)
+            {
+                Subtypes = ["Cat"],
+            },
+
+            // Removal spells
+            ["Red Elemental Blast"] = new(ManaCost.Parse("{R}"), null, null, null, CardType.Instant,
+                TargetFilter.Spell(), new PyroblastEffect()),
+            ["Blue Elemental Blast"] = new(ManaCost.Parse("{U}"), null, null, null, CardType.Instant,
+                TargetFilter.Spell(), new BlueElementalBlastEffect()),
+            ["Hydroblast"] = new(ManaCost.Parse("{U}"), null, null, null, CardType.Instant,
+                TargetFilter.Spell(), new BlueElementalBlastEffect()),
+            ["Annul"] = new(ManaCost.Parse("{U}"), null, null, null, CardType.Instant,
+                TargetFilter.ArtifactOrEnchantmentSpell(), new CounterSpellEffect()),
+            ["Erase"] = new(ManaCost.Parse("{W}"), null, null, null, CardType.Instant,
+                TargetFilter.Enchantment(), new ExileEnchantmentEffect()),
+            ["Perish"] = new(ManaCost.Parse("{2}{B}"), null, null, null, CardType.Sorcery,
+                Effect: new DestroyAllByColorEffect(ManaColor.Green, CardType.Creature)),
+            ["Anarchy"] = new(ManaCost.Parse("{2}{R}{R}"), null, null, null, CardType.Sorcery,
+                Effect: new DestroyAllByColorEffect(ManaColor.White)),
+            ["Simoon"] = new(ManaCost.Parse("{R}{G}"), null, null, null, CardType.Instant,
+                Effect: new DamageOpponentCreaturesEffect(1)),
+            ["Crumble"] = new(ManaCost.Parse("{G}"), null, null, null, CardType.Instant,
+                TargetFilter.Artifact(), new CrumbleEffect()),
+            ["Tranquil Domain"] = new(ManaCost.Parse("{1}{G}"), null, null, null, CardType.Instant,
+                Effect: new DestroyAllNonAuraEnchantmentsEffect()),
         };
 
         Registry = cards.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
