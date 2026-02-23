@@ -119,6 +119,109 @@ public class AiBotCombatTests
         result.Should().BeEmpty();
     }
 
+    // =====================================================================
+    // Smart combat evaluation tests (static overloads with opponent info)
+    // =====================================================================
+
+    [Fact]
+    public void ChooseAttackers_AttacksAll_WhenOpponentHasNoCreatures()
+    {
+        var attacker1 = MakeCreature("Bear", 2, 2);
+        var attacker2 = MakeCreature("Goblin", 1, 1);
+        var eligible = new List<GameCard> { attacker1, attacker2 };
+
+        var result = AiBotDecisionHandler.ChooseAttackers(eligible, opponentCreatures: [], opponentLife: 20);
+
+        result.Should().HaveCount(2);
+        result.Should().Contain(attacker1.Id);
+        result.Should().Contain(attacker2.Id);
+    }
+
+    [Fact]
+    public void ChooseAttackers_DoesNotAttack_WhenWouldDieToBlocker()
+    {
+        var attacker = MakeCreature("Goblin", 1, 1);
+        var opponentBlocker = MakeCreature("Huge Beast", 4, 5);
+
+        var result = AiBotDecisionHandler.ChooseAttackers(
+            [attacker], opponentCreatures: [opponentBlocker], opponentLife: 20);
+
+        result.Should().BeEmpty("1/1 would die to 4/5 blocker without killing it");
+    }
+
+    [Fact]
+    public void ChooseAttackers_AttacksWithEvasion_EvenWithBlockers()
+    {
+        var flyer = MakeCreature("Flying Drake", 3, 2);
+        flyer.ActiveKeywords.Add(Keyword.Flying);
+        var groundBlocker = MakeCreature("Ground Beast", 4, 5);
+
+        var result = AiBotDecisionHandler.ChooseAttackers(
+            [flyer], opponentCreatures: [groundBlocker], opponentLife: 20);
+
+        result.Should().ContainSingle().Which.Should().Be(flyer.Id,
+            "flying creature can't be blocked by ground creature");
+    }
+
+    [Fact]
+    public void ChooseAttackers_AttacksAll_WhenLethal()
+    {
+        var attacker1 = MakeCreature("Bear", 2, 2);
+        var attacker2 = MakeCreature("Dragon", 4, 4);
+        var opponentBlocker = MakeCreature("Wall", 0, 5);
+
+        // Opponent at 5 life, total power = 2+4 = 6 >= 5
+        var result = AiBotDecisionHandler.ChooseAttackers(
+            [attacker1, attacker2], opponentCreatures: [opponentBlocker], opponentLife: 5);
+
+        result.Should().HaveCount(2, "total power is lethal so attack with everything");
+    }
+
+    [Fact]
+    public void ChooseAttackers_AttacksWithFavorableTrade()
+    {
+        var attacker = MakeCreature("Big Bear", 3, 3);
+        var opponentBlocker = MakeCreature("Small Guy", 2, 2);
+
+        var result = AiBotDecisionHandler.ChooseAttackers(
+            [attacker], opponentCreatures: [opponentBlocker], opponentLife: 20);
+
+        result.Should().ContainSingle().Which.Should().Be(attacker.Id,
+            "3/3 survives blocking by 2/2");
+    }
+
+    [Fact]
+    public void ChooseBlockers_BlocksWhenLethal()
+    {
+        var attacker = MakeCreature("Big Dragon", 5, 5);
+        var blocker = MakeCreature("Goblin", 1, 1);
+
+        // At 5 life, 5 damage is lethal — must chump block
+        var result = AiBotDecisionHandler.ChooseBlockers(
+            [blocker], attackers: [attacker], playerLife: 5);
+
+        result.Should().ContainKey(blocker.Id);
+        result[blocker.Id].Should().Be(attacker.Id,
+            "must chump-block when damage is lethal");
+    }
+
+    [Fact]
+    public void ChooseBlockers_DoesNotChumpBlock_WhenNotLethal()
+    {
+        var attacker = MakeCreature("Big Dragon", 5, 5);
+        var blocker = MakeCreature("Goblin", 1, 1);
+
+        // At 20 life, 5 damage is not lethal — don't chump
+        var result = AiBotDecisionHandler.ChooseBlockers(
+            [blocker], attackers: [attacker], playerLife: 20);
+
+        result.Should().BeEmpty("1/1 can't kill 5/5 and damage isn't lethal, so don't chump");
+    }
+
+    // =====================================================================
+    // OrderBlockers tests (unchanged)
+    // =====================================================================
+
     [Fact]
     public async Task OrderBlockers_OrdersByToughnessAscending()
     {

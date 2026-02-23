@@ -137,6 +137,77 @@ public class AiBotReactivePlayTests
     }
 
     [Fact]
+    public async Task GetAction_CastsInstantRemoval_DuringOpponentCombat()
+    {
+        var (state, bot, opponent, handler) = CreateReactiveScenario();
+
+        // Bot has Lightning Bolt in hand + R in mana pool
+        var bolt = GameCard.Create("Lightning Bolt", "Instant");
+        bot.Hand.Add(bolt);
+        bot.ManaPool.Add(ManaColor.Red);
+
+        // Opponent has a creature on battlefield
+        var creature = GameCard.Create("Goblin Lackey", "Creature — Goblin");
+        opponent.Battlefield.Add(creature);
+
+        // Phase is Combat with DeclareAttackers, stack is empty
+        state.CurrentPhase = Phase.Combat;
+        state.CombatStep = CombatStep.DeclareAttackers;
+
+        var action = await handler.GetAction(state, bot.Id);
+
+        action.Type.Should().Be(ActionType.CastSpell);
+        action.CardId.Should().Be(bolt.Id);
+        action.UseAlternateCost.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task GetAction_DoesNotCastRemoval_InMainPhase_AsNonActivePlayer()
+    {
+        var (state, bot, opponent, handler) = CreateReactiveScenario();
+
+        // Bot has Lightning Bolt in hand + R in mana pool
+        var bolt = GameCard.Create("Lightning Bolt", "Instant");
+        bot.Hand.Add(bolt);
+        bot.ManaPool.Add(ManaColor.Red);
+
+        // Opponent has a creature on battlefield
+        var creature = GameCard.Create("Goblin Lackey", "Creature — Goblin");
+        opponent.Battlefield.Add(creature);
+
+        // Phase is MainPhase1 (default from helper), stack is empty
+        // Bot should wait for combat or end step, not cast now
+
+        var action = await handler.GetAction(state, bot.Id);
+
+        action.Type.Should().Be(ActionType.PassPriority);
+    }
+
+    [Fact]
+    public async Task GetAction_CastsRemoval_DuringEndStep()
+    {
+        var (state, bot, opponent, handler) = CreateReactiveScenario();
+
+        // Bot has Swords to Plowshares in hand + W in mana pool
+        var swords = GameCard.Create("Swords to Plowshares", "Instant");
+        bot.Hand.Add(swords);
+        bot.ManaPool.Add(ManaColor.White);
+
+        // Opponent has a creature on battlefield
+        var creature = GameCard.Create("Siege-Gang Commander", "Creature — Goblin");
+        opponent.Battlefield.Add(creature);
+
+        // Phase is End, stack is empty
+        state.CurrentPhase = Phase.End;
+
+        var action = await handler.GetAction(state, bot.Id);
+
+        action.Type.Should().Be(ActionType.CastSpell);
+        action.CardId.Should().Be(swords.Id);
+        action.UseAlternateCost.Should().BeFalse();
+    }
+
+    [Fact]
     public async Task GetAction_PassesPriority_WhenNoReactiveSpells()
     {
         var (state, bot, opponent, handler) = CreateReactiveScenario();

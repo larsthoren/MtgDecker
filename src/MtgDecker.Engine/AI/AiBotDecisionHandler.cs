@@ -25,6 +25,11 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
     // the tap actions first, then the cast action. Subsequent GetAction calls drain the queue.
     private readonly Queue<GameAction> _plannedActions = new();
 
+    // Cached opponent/self info for combat decisions (populated in GetAction,
+    // consumed by ChooseAttackers/ChooseBlockers interface methods)
+    private Player? _lastOpponent;
+    private int _lastSelfLife = 20;
+
     private async Task DelayAsync(CancellationToken ct)
     {
         if (ActionDelayMs > 0)
@@ -49,6 +54,10 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
         var player = gameState.Player1.Id == playerId ? gameState.Player1 : gameState.Player2;
         var opponent = gameState.Player1.Id == playerId ? gameState.Player2 : gameState.Player1;
         var hand = player.Hand.Cards;
+
+        // Cache opponent/self info for combat decisions
+        _lastOpponent = opponent;
+        _lastSelfLife = player.Life;
 
         // Non-active player: evaluate reactive plays (works in any phase)
         if (gameState.ActivePlayer.Id != playerId)
@@ -269,7 +278,7 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
     /// Finds the best proactive spell to cast from hand. Filters to Proactive-only spells,
     /// checks affordability against pool + untapped lands, returns the highest CMC option.
     /// </summary>
-    private static GameCard? ChooseBestProactiveSpell(IReadOnlyList<GameCard> hand, Player player,
+    internal static GameCard? ChooseBestProactiveSpell(IReadOnlyList<GameCard> hand, Player player,
         GameState gameState, List<GameCard> untappedLands)
     {
         var producibleColors = GetProducibleColors(player, untappedLands);
@@ -447,15 +456,94 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
     }
 
     /// <summary>
-    /// Attacks with all eligible creatures. The engine already filters for
-    /// summoning sickness, so every creature passed here is ready to attack.
+    /// Selects attackers using smart evaluation: considers opponent blockers, evasion,
+    /// lethal damage, and favorable trades. Delegates to the testable static overload.
     /// </summary>
     public async Task<IReadOnlyList<Guid>> ChooseAttackers(IReadOnlyList<GameCard> eligibleAttackers,
         CancellationToken ct = default)
     {
         await DelayAsync(ct);
-        var attackerIds = eligibleAttackers.Select(c => c.Id).ToList();
+        var opponentCreatures = _lastOpponent?.Battlefield.Cards
+            .Where(c => c.IsCreature).ToList()
+            ?? [];
+        var opponentLife = _lastOpponent?.Life ?? 20;
+        return ChooseAttackers(eligibleAttackers, opponentCreatures, opponentLife);
+    }
+
+    /// <summary>
+    /// Testable static overload for attacker selection with full opponent context.
+    /// Logic:
+    /// 1. If total power >= opponentLife, attack with all (lethal).
+    /// 2. If opponent has no creatures, attack with all.
+    /// 3. Per attacker: attack if evasion, can't die to any blocker, or favorable trade.
+    /// </summary>
+    internal static IReadOnlyList<Guid> ChooseAttackers(IReadOnlyList<GameCard> eligibleAttackers,
+        IReadOnlyList<GameCard> opponentCreatures, int opponentLife)
+    {
+        if (eligibleAttackers.Count == 0)
+            return [];
+
+        // Lethal check: if total power >= opponent life, attack with everything
+        var totalPower = eligibleAttackers.Sum(a => a.Power ?? 0);
+        if (totalPower >= opponentLife)
+            return eligibleAttackers.Select(a => a.Id).ToList();
+
+        // No opponent creatures: attack with everything
+        if (opponentCreatures.Count == 0)
+            return eligibleAttackers.Select(a => a.Id).ToList();
+
+        var attackerIds = new List<Guid>();
+        foreach (var attacker in eligibleAttackers)
+        {
+            var attackerPower = attacker.Power ?? 0;
+            var attackerToughness = attacker.Toughness ?? 0;
+
+            // Evasion: flying attacker with no opponent creatures that can block it
+            if (attacker.ActiveKeywords.Contains(Keyword.Flying)
+                && !opponentCreatures.Any(b => CanBlock(b, attacker)))
+            {
+                attackerIds.Add(attacker.Id);
+                continue;
+            }
+
+            // Check if any opponent creature can profitably block this attacker
+            var canDieToBlocker = opponentCreatures
+                .Where(b => CanBlock(b, attacker))
+                .Any(b => (b.Power ?? 0) >= attackerToughness);
+
+            if (!canDieToBlocker)
+            {
+                // Attacker wouldn't die to any blocker — safe to attack
+                attackerIds.Add(attacker.Id);
+                continue;
+            }
+
+            // Attacker would die, but check if it's a favorable trade (can kill a blocker back)
+            var canKillABlocker = opponentCreatures
+                .Where(b => CanBlock(b, attacker))
+                .Any(b => attackerPower >= (b.Toughness ?? 0));
+
+            if (canKillABlocker)
+            {
+                attackerIds.Add(attacker.Id);
+                continue;
+            }
+
+            // Would die without killing anything — don't attack
+        }
+
         return attackerIds;
+    }
+
+    /// <summary>
+    /// Determines whether a blocker can legally block an attacker.
+    /// Flying attackers can only be blocked by creatures with Flying.
+    /// </summary>
+    private static bool CanBlock(GameCard blocker, GameCard attacker)
+    {
+        if (attacker.ActiveKeywords.Contains(Keyword.Flying))
+            return blocker.ActiveKeywords.Contains(Keyword.Flying);
+        return true;
     }
 
     /// <summary>
@@ -498,29 +586,69 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
     }
 
     /// <summary>
-    /// Blocks when a creature can kill the attacker (power >= attacker toughness).
-    /// Uses the smallest sufficient blocker. Prioritizes blocking the biggest
-    /// attacker first to maximize value. Each blocker is only assigned once.
+    /// Selects blockers using smart evaluation: favorable trades, and chump-blocking
+    /// only when damage would be lethal. Delegates to the testable static overload.
     /// </summary>
     public async Task<Dictionary<Guid, Guid>> ChooseBlockers(IReadOnlyList<GameCard> eligibleBlockers,
         IReadOnlyList<GameCard> attackers, CancellationToken ct = default)
     {
         await DelayAsync(ct);
+        return ChooseBlockers(eligibleBlockers, attackers, playerLife: _lastSelfLife);
+    }
+
+    /// <summary>
+    /// Testable static overload for blocker selection with player life context.
+    /// Logic:
+    /// 1. Calculate total unblocked damage.
+    /// 2. For each attacker (biggest first): favorable block with smallest sufficient blocker.
+    /// 3. If no favorable block and damage is lethal: chump-block with smallest creature.
+    /// </summary>
+    internal static Dictionary<Guid, Guid> ChooseBlockers(IReadOnlyList<GameCard> eligibleBlockers,
+        IReadOnlyList<GameCard> attackers, int playerLife)
+    {
         var assignments = new Dictionary<Guid, Guid>();
         var usedBlockers = new HashSet<Guid>();
 
+        // Calculate total unblocked attack damage
+        var remainingDamage = attackers.Sum(a => a.Power ?? 0);
+        var mustBlockForSurvival = remainingDamage >= playerLife;
+
         foreach (var attacker in attackers.OrderByDescending(a => a.Power ?? 0))
         {
-            var bestBlocker = eligibleBlockers
+            var attackerToughness = attacker.Toughness ?? 0;
+            var attackerPower = attacker.Power ?? 0;
+
+            // Look for favorable block: blocker that can kill the attacker, smallest first
+            var favorableBlocker = eligibleBlockers
                 .Where(b => !usedBlockers.Contains(b.Id))
-                .Where(b => (b.Power ?? 0) >= (attacker.Toughness ?? 0))
+                .Where(b => (b.Power ?? 0) >= attackerToughness)
                 .OrderBy(b => b.Power ?? 0)
                 .FirstOrDefault();
 
-            if (bestBlocker != null)
+            if (favorableBlocker != null)
             {
-                assignments[bestBlocker.Id] = attacker.Id;
-                usedBlockers.Add(bestBlocker.Id);
+                assignments[favorableBlocker.Id] = attacker.Id;
+                usedBlockers.Add(favorableBlocker.Id);
+                remainingDamage -= attackerPower;
+                mustBlockForSurvival = remainingDamage >= playerLife;
+                continue;
+            }
+
+            // No favorable block — chump only if damage would be lethal
+            if (mustBlockForSurvival)
+            {
+                var chumpBlocker = eligibleBlockers
+                    .Where(b => !usedBlockers.Contains(b.Id))
+                    .OrderBy(b => b.Power ?? 0)
+                    .FirstOrDefault();
+
+                if (chumpBlocker != null)
+                {
+                    assignments[chumpBlocker.Id] = attacker.Id;
+                    usedBlockers.Add(chumpBlocker.Id);
+                    remainingDamage -= attackerPower;
+                    mustBlockForSurvival = remainingDamage >= playerLife;
+                }
             }
         }
 
@@ -732,7 +860,51 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
             }
         }
 
-        // TODO Task 6: instant removal during combat
+        // Instant removal: during combat or end step, when stack is empty
+        if (gameState.StackCount == 0
+            && (gameState.CurrentPhase == Phase.Combat || gameState.CurrentPhase == Phase.End))
+        {
+            var removalAction = EvaluateInstantRemoval(player, opponent, playerId);
+            if (removalAction != null) return removalAction;
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Evaluates whether to cast instant-speed removal on opponent creatures.
+    /// Targets the biggest creature by power.
+    /// </summary>
+    private static GameAction? EvaluateInstantRemoval(Player player, Player opponent, Guid playerId)
+    {
+        var opponentCreatures = opponent.Battlefield.Cards
+            .Where(c => c.IsCreature)
+            .OrderByDescending(c => c.Power ?? 0)
+            .ToList();
+
+        if (opponentCreatures.Count == 0) return null;
+
+        foreach (var card in player.Hand.Cards)
+        {
+            if (!CardDefinitions.TryGet(card.Name, out var def)) continue;
+            if (def.SpellRole != SpellRole.InstantRemoval) continue;
+            if (def.ManaCost == null) continue;
+
+            // Check if we can pay the mana cost
+            if (!player.ManaPool.CanPay(def.ManaCost))
+            {
+                // Check alternate cost (Snuff Out: 4 life)
+                if (def.AlternateCost != null && def.AlternateCost.LifeCost > 0
+                    && player.Life > def.AlternateCost.LifeCost + 5)
+                {
+                    return GameAction.CastSpell(playerId, card.Id, useAlternateCost: true);
+                }
+                continue;
+            }
+
+            // Target the biggest creature
+            return GameAction.CastSpell(playerId, card.Id);
+        }
 
         return null;
     }
