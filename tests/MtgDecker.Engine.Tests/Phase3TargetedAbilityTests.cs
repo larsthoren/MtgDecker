@@ -17,10 +17,10 @@ public class Phase3TargetedAbilityTests
     {
         CardDefinitions.TryGet("Withered Wretch", out var def);
 
-        def!.ActivatedAbility.Should().NotBeNull();
-        def.ActivatedAbility!.Cost.ManaCost.Should().NotBeNull();
-        def.ActivatedAbility.Cost.ManaCost!.GenericCost.Should().Be(1);
-        def.ActivatedAbility.Effect.Should().BeOfType<ExileFromAnyGraveyardEffect>();
+        def!.ActivatedAbilities.Should().NotBeEmpty();
+        def.ActivatedAbilities[0].Cost.ManaCost.Should().NotBeNull();
+        def.ActivatedAbilities[0].Cost.ManaCost!.GenericCost.Should().Be(1);
+        def.ActivatedAbilities[0].Effect.Should().BeOfType<ExileFromAnyGraveyardEffect>();
     }
 
     [Fact]
@@ -72,21 +72,21 @@ public class Phase3TargetedAbilityTests
     {
         CardDefinitions.TryGet("Dust Bowl", out var def);
 
-        def!.ActivatedAbility.Should().NotBeNull();
-        def.ActivatedAbility!.Cost.TapSelf.Should().BeTrue();
-        def.ActivatedAbility.Cost.SacrificeSelf.Should().BeFalse("Dust Bowl sacrifices a land, not itself");
-        def.ActivatedAbility.Cost.SacrificeCardType.Should().Be(CardType.Land);
-        def.ActivatedAbility.Cost.ManaCost.Should().NotBeNull();
-        def.ActivatedAbility.Cost.ManaCost!.GenericCost.Should().Be(3);
-        def.ActivatedAbility.Effect.Should().BeOfType<DestroyTargetEffect>();
-        def.ActivatedAbility.TargetFilter.Should().NotBeNull();
+        def!.ActivatedAbilities.Should().NotBeEmpty();
+        def.ActivatedAbilities[0].Cost.TapSelf.Should().BeTrue();
+        def.ActivatedAbilities[0].Cost.SacrificeSelf.Should().BeFalse("Dust Bowl sacrifices a land, not itself");
+        def.ActivatedAbilities[0].Cost.SacrificeCardType.Should().Be(CardType.Land);
+        def.ActivatedAbilities[0].Cost.ManaCost.Should().NotBeNull();
+        def.ActivatedAbilities[0].Cost.ManaCost!.GenericCost.Should().Be(3);
+        def.ActivatedAbilities[0].Effect.Should().BeOfType<DestroyTargetEffect>();
+        def.ActivatedAbilities[0].TargetFilter.Should().NotBeNull();
     }
 
     [Fact]
     public void DustBowl_TargetFilter_MatchesNonbasicLands()
     {
         CardDefinitions.TryGet("Dust Bowl", out var def);
-        var filter = def!.ActivatedAbility!.TargetFilter!;
+        var filter = def!.ActivatedAbilities[0].TargetFilter!;
 
         var nonbasic = new GameCard { Name = "Rishadan Port", CardTypes = CardType.Land };
         var basic = new GameCard { Name = "Mountain", CardTypes = CardType.Land };
@@ -101,7 +101,7 @@ public class Phase3TargetedAbilityTests
     public void DustBowl_TargetFilter_RejectsAllFiveBasicLands()
     {
         CardDefinitions.TryGet("Dust Bowl", out var def);
-        var filter = def!.ActivatedAbility!.TargetFilter!;
+        var filter = def!.ActivatedAbilities[0].TargetFilter!;
 
         foreach (var name in new[] { "Plains", "Island", "Swamp", "Mountain", "Forest" })
         {

@@ -38,8 +38,8 @@ public class SneakShowCardRegistrationTests
     public void Griselbrand_HasPayLifeAbility()
     {
         CardDefinitions.TryGet("Griselbrand", out var def).Should().BeTrue();
-        def!.ActivatedAbility.Should().NotBeNull();
-        def.ActivatedAbility!.Cost.PayLife.Should().Be(7);
+        def!.ActivatedAbilities.Should().NotBeEmpty();
+        def.ActivatedAbilities[0].Cost.PayLife.Should().Be(7);
     }
 
     [Fact]
@@ -63,7 +63,7 @@ public class SneakShowCardRegistrationTests
     public void SneakAttack_HasActivatedAbility()
     {
         CardDefinitions.TryGet("Sneak Attack", out var def).Should().BeTrue();
-        def!.ActivatedAbility.Should().NotBeNull();
+        def!.ActivatedAbilities.Should().NotBeEmpty();
     }
 
     [Fact]

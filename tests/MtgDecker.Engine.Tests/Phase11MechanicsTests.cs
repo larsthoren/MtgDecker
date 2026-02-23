@@ -225,10 +225,10 @@ public class Phase11MechanicsTests
         CardDefinitions.TryGet("Knight of Stromgald", out var def);
 
         def.Should().NotBeNull();
-        def!.ActivatedAbility.Should().NotBeNull();
-        def!.ActivatedAbility!.Cost.ManaCost.Should().NotBeNull();
-        def!.ActivatedAbility!.Cost.ManaCost!.ToString().Should().Be("{B}{B}");
-        def!.ActivatedAbility!.Effect.Should().BeOfType<PumpSelfEffect>();
+        def!.ActivatedAbilities.Should().NotBeEmpty();
+        def!.ActivatedAbilities[0].Cost.ManaCost.Should().NotBeNull();
+        def!.ActivatedAbilities[0].Cost.ManaCost!.ToString().Should().Be("{B}{B}");
+        def!.ActivatedAbilities[0].Effect.Should().BeOfType<PumpSelfEffect>();
     }
 
     [Fact]

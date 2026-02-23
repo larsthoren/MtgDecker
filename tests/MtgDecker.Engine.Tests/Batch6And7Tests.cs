@@ -190,9 +190,9 @@ public class Batch6And7Tests
     {
         CardDefinitions.TryGet("Powder Keg", out var def).Should().BeTrue();
         def!.Triggers.Should().ContainSingle(t => t.Event == GameEvent.Upkeep);
-        def.ActivatedAbility.Should().NotBeNull();
-        def.ActivatedAbility!.Cost.TapSelf.Should().BeTrue();
-        def.ActivatedAbility.Cost.SacrificeSelf.Should().BeTrue();
+        def.ActivatedAbilities.Should().NotBeEmpty();
+        def.ActivatedAbilities[0].Cost.TapSelf.Should().BeTrue();
+        def.ActivatedAbilities[0].Cost.SacrificeSelf.Should().BeTrue();
     }
 
     [Fact]
@@ -293,9 +293,9 @@ public class Batch6And7Tests
     public void PhyrexianFurnace_HasActivatedAbility()
     {
         CardDefinitions.TryGet("Phyrexian Furnace", out var def).Should().BeTrue();
-        def!.ActivatedAbility.Should().NotBeNull();
-        def.ActivatedAbility!.Cost.SacrificeSelf.Should().BeTrue();
-        def.ActivatedAbility.Cost.ManaCost.Should().NotBeNull();
+        def!.ActivatedAbilities.Should().NotBeEmpty();
+        def.ActivatedAbilities[0].Cost.SacrificeSelf.Should().BeTrue();
+        def.ActivatedAbilities[0].Cost.ManaCost.Should().NotBeNull();
     }
 
     [Fact]

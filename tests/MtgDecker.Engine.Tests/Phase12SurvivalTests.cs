@@ -13,11 +13,11 @@ public class Phase12SurvivalTests
     public void SurvivalOfTheFittest_HasActivatedAbility()
     {
         CardDefinitions.TryGet("Survival of the Fittest", out var def).Should().BeTrue();
-        def!.ActivatedAbility.Should().NotBeNull();
-        def.ActivatedAbility!.Cost.ManaCost.Should().NotBeNull();
-        def.ActivatedAbility.Cost.ManaCost!.ToString().Should().Be("{G}");
-        def.ActivatedAbility.Cost.DiscardCardType.Should().Be(CardType.Creature);
-        def.ActivatedAbility.Effect.Should().BeOfType<SearchLibraryByTypeEffect>();
+        def!.ActivatedAbilities.Should().NotBeEmpty();
+        def.ActivatedAbilities[0].Cost.ManaCost.Should().NotBeNull();
+        def.ActivatedAbilities[0].Cost.ManaCost!.ToString().Should().Be("{G}");
+        def.ActivatedAbilities[0].Cost.DiscardCardType.Should().Be(CardType.Creature);
+        def.ActivatedAbilities[0].Effect.Should().BeOfType<SearchLibraryByTypeEffect>();
     }
 
     [Fact]

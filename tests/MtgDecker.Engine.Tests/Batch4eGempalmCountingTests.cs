@@ -117,7 +117,7 @@ public class GempalmIncineratorCountingTests
     public void PriestOfTitania_CardDef_UsesStateCountFunc()
     {
         CardDefinitions.TryGet("Priest of Titania", out var def);
-        var effect = def!.ActivatedAbility!.Effect as DynamicAddManaEffect;
+        var effect = def!.ActivatedAbilities[0].Effect as DynamicAddManaEffect;
         effect.Should().NotBeNull();
         effect!.StateCountFunc.Should().NotBeNull(
             "Priest of Titania should use the state-aware counting function to count all Elves");

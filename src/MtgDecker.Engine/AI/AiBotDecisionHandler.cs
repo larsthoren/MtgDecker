@@ -478,92 +478,95 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
     {
         foreach (var permanent in player.Battlefield.Cards.ToList())
         {
-            if (!CardDefinitions.TryGet(permanent.Name, out var def) || def.ActivatedAbility == null)
+            if (!CardDefinitions.TryGet(permanent.Name, out var def) || def.ActivatedAbilities.Count == 0)
                 continue;
 
-            var ability = def.ActivatedAbility;
-            var cost = ability.Cost;
-
-            // Skip if tap cost and already tapped
-            if (cost.TapSelf && permanent.IsTapped)
-                continue;
-
-            // Skip if mana cost can't be paid
-            if (cost.ManaCost != null && !player.ManaPool.CanPay(cost.ManaCost))
-                continue;
-
-            // Skip if sacrifice subtype needed but none available
-            if (cost.SacrificeSubtype != null)
+            for (int abilityIdx = 0; abilityIdx < def.ActivatedAbilities.Count; abilityIdx++)
             {
-                var hasSacTarget = player.Battlefield.Cards
-                    .Any(c => c.IsCreature && c.Subtypes.Contains(cost.SacrificeSubtype, StringComparer.OrdinalIgnoreCase));
-                if (!hasSacTarget)
-                    continue;
-            }
+                var ability = def.ActivatedAbilities[abilityIdx];
+                var cost = ability.Cost;
 
-            // DealDamageEffect heuristic: activate if it can kill an opponent creature
-            if (ability.Effect is DealDamageEffect dealDamage)
-            {
-                var damageAmount = dealDamage.Amount;
-                var killableTarget = opponent.Battlefield.Cards
-                    .Where(c => c.IsCreature
-                        && !c.ActiveKeywords.Contains(Enums.Keyword.Shroud)
-                        && !c.ActiveKeywords.Contains(Enums.Keyword.Hexproof))
-                    .FirstOrDefault(c => (c.Toughness ?? 0) - c.DamageMarked <= damageAmount);
-
-                if (killableTarget != null)
-                    return GameAction.ActivateAbility(player.Id, permanent.Id, targetId: killableTarget.Id);
-
-                // Don't activate DealDamage without a good target
-                continue;
-            }
-
-            // ExileCreatureEffect heuristic: exile the biggest opponent threat
-            if (ability.Effect is ExileCreatureEffect)
-            {
-                // Check counter availability
-                if (cost.RemoveCounterType.HasValue
-                    && permanent.GetCounters(cost.RemoveCounterType.Value) <= 0)
+                // Skip if tap cost and already tapped
+                if (cost.TapSelf && permanent.IsTapped)
                     continue;
 
-                var biggestThreat = opponent.Battlefield.Cards
-                    .Where(c => c.IsCreature
-                        && !c.ActiveKeywords.Contains(Enums.Keyword.Shroud)
-                        && !c.ActiveKeywords.Contains(Enums.Keyword.Hexproof))
-                    .OrderByDescending(c => c.Power ?? 0)
-                    .FirstOrDefault();
+                // Skip if mana cost can't be paid
+                if (cost.ManaCost != null && !player.ManaPool.CanPay(cost.ManaCost))
+                    continue;
 
-                if (biggestThreat != null)
-                    return GameAction.ActivateAbility(player.Id, permanent.Id, targetId: biggestThreat.Id);
+                // Skip if sacrifice subtype needed but none available
+                if (cost.SacrificeSubtype != null)
+                {
+                    var hasSacTarget = player.Battlefield.Cards
+                        .Any(c => c.IsCreature && c.Subtypes.Contains(cost.SacrificeSubtype, StringComparer.OrdinalIgnoreCase));
+                    if (!hasSacTarget)
+                        continue;
+                }
 
-                continue;
-            }
+                // DealDamageEffect heuristic: activate if it can kill an opponent creature
+                if (ability.Effect is DealDamageEffect dealDamage)
+                {
+                    var damageAmount = dealDamage.Amount;
+                    var killableTarget = opponent.Battlefield.Cards
+                        .Where(c => c.IsCreature
+                            && !c.ActiveKeywords.Contains(Enums.Keyword.Shroud)
+                            && !c.ActiveKeywords.Contains(Enums.Keyword.Hexproof))
+                        .FirstOrDefault(c => (c.Toughness ?? 0) - c.DamageMarked <= damageAmount);
 
-            // AddManaEffect heuristic: activate if sacrificing enables casting a spell
-            if (ability.Effect is AddManaEffect)
-            {
-                // Check if there's a spell in hand that needs exactly 1 more mana
-                var currentManaTotal = player.ManaPool.Total;
-                var hasSpellNeedingOneMana = player.Hand.Cards
-                    .Where(c => !c.IsLand && c.ManaCost != null)
-                    .Any(c =>
-                    {
-                        var spellCost = c.ManaCost!;
-                        // Apply cost modification
-                        var reduction = ComputeCostModification(gameState, c, player);
-                        if (reduction != 0)
-                            spellCost = spellCost.WithGenericReduction(-reduction);
+                    if (killableTarget != null)
+                        return GameAction.ActivateAbility(player.Id, permanent.Id, targetId: killableTarget.Id, abilityIndex: abilityIdx);
 
-                        // Check if we need exactly 1 more mana to cast
-                        return spellCost.ConvertedManaCost == currentManaTotal + 1
-                            && player.ManaPool.CanPay(spellCost) == false;
-                    });
+                    // Don't activate DealDamage without a good target
+                    continue;
+                }
 
-                if (hasSpellNeedingOneMana)
-                    return GameAction.ActivateAbility(player.Id, permanent.Id);
+                // ExileCreatureEffect heuristic: exile the biggest opponent threat
+                if (ability.Effect is ExileCreatureEffect)
+                {
+                    // Check counter availability
+                    if (cost.RemoveCounterType.HasValue
+                        && permanent.GetCounters(cost.RemoveCounterType.Value) <= 0)
+                        continue;
 
-                // Don't sacrifice creatures for mana without good reason
-                continue;
+                    var biggestThreat = opponent.Battlefield.Cards
+                        .Where(c => c.IsCreature
+                            && !c.ActiveKeywords.Contains(Enums.Keyword.Shroud)
+                            && !c.ActiveKeywords.Contains(Enums.Keyword.Hexproof))
+                        .OrderByDescending(c => c.Power ?? 0)
+                        .FirstOrDefault();
+
+                    if (biggestThreat != null)
+                        return GameAction.ActivateAbility(player.Id, permanent.Id, targetId: biggestThreat.Id, abilityIndex: abilityIdx);
+
+                    continue;
+                }
+
+                // AddManaEffect heuristic: activate if sacrificing enables casting a spell
+                if (ability.Effect is AddManaEffect)
+                {
+                    // Check if there's a spell in hand that needs exactly 1 more mana
+                    var currentManaTotal = player.ManaPool.Total;
+                    var hasSpellNeedingOneMana = player.Hand.Cards
+                        .Where(c => !c.IsLand && c.ManaCost != null)
+                        .Any(c =>
+                        {
+                            var spellCost = c.ManaCost!;
+                            // Apply cost modification
+                            var reduction = ComputeCostModification(gameState, c, player);
+                            if (reduction != 0)
+                                spellCost = spellCost.WithGenericReduction(-reduction);
+
+                            // Check if we need exactly 1 more mana to cast
+                            return spellCost.ConvertedManaCost == currentManaTotal + 1
+                                && player.ManaPool.CanPay(spellCost) == false;
+                        });
+
+                    if (hasSpellNeedingOneMana)
+                        return GameAction.ActivateAbility(player.Id, permanent.Id, abilityIndex: abilityIdx);
+
+                    // Don't sacrifice creatures for mana without good reason
+                    continue;
+                }
             }
         }
 

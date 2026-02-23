@@ -333,8 +333,8 @@ public class CardDefinitionsTests
     {
         CardDefinitions.TryGet("Grim Lavamancer", out var def);
 
-        def!.ActivatedAbility.Should().NotBeNull();
-        var effect = def.ActivatedAbility!.Effect as DealDamageEffect;
+        def!.ActivatedAbilities.Should().NotBeEmpty();
+        var effect = def.ActivatedAbilities[0].Effect as DealDamageEffect;
         effect.Should().NotBeNull();
         effect!.Amount.Should().Be(2,
             because: "Grim Lavamancer deals 2 damage, not 1");
@@ -345,10 +345,10 @@ public class CardDefinitionsTests
     {
         CardDefinitions.TryGet("Grim Lavamancer", out var def);
 
-        def!.ActivatedAbility.Should().NotBeNull();
-        def.ActivatedAbility!.Cost.ManaCost.Should().NotBeNull(
+        def!.ActivatedAbilities.Should().NotBeEmpty();
+        def.ActivatedAbilities[0].Cost.ManaCost.Should().NotBeNull(
             because: "Grim Lavamancer costs {R} to activate");
-        def.ActivatedAbility.Cost.ManaCost!.ColorRequirements.Should()
+        def.ActivatedAbilities[0].Cost.ManaCost!.ColorRequirements.Should()
             .ContainKey(ManaColor.Red);
     }
 
@@ -359,10 +359,10 @@ public class CardDefinitionsTests
     {
         CardDefinitions.TryGet("Goblin Tinkerer", out var def);
 
-        def!.ActivatedAbility.Should().NotBeNull();
-        def.ActivatedAbility!.Cost.ManaCost.Should().NotBeNull(
+        def!.ActivatedAbilities.Should().NotBeEmpty();
+        def.ActivatedAbilities[0].Cost.ManaCost.Should().NotBeNull(
             because: "Goblin Tinkerer costs {R} to activate");
-        def.ActivatedAbility.Cost.ManaCost!.ColorRequirements.Should()
+        def.ActivatedAbilities[0].Cost.ManaCost!.ColorRequirements.Should()
             .ContainKey(ManaColor.Red);
     }
 
@@ -420,7 +420,7 @@ public class CardDefinitionsTests
     public void Phase3Card_HasActivatedAbility(string cardName)
     {
         CardDefinitions.TryGet(cardName, out var def);
-        def!.ActivatedAbility.Should().NotBeNull(
+        def!.ActivatedAbilities.Should().NotBeEmpty(
             because: $"{cardName} should have an activated ability");
     }
 
@@ -604,7 +604,7 @@ public class CardDefinitionsTests
     public void FaerieConclave_BecomeCreatureHasFlying()
     {
         CardDefinitions.TryGet("Faerie Conclave", out var def);
-        var effect = def!.ActivatedAbility!.Effect as BecomeCreatureEffect;
+        var effect = def!.ActivatedAbilities[0].Effect as BecomeCreatureEffect;
         effect.Should().NotBeNull();
         effect!.Keywords.Should().Contain(Keyword.Flying);
     }
@@ -613,7 +613,7 @@ public class CardDefinitionsTests
     public void TreetopVillage_BecomeCreatureHasTrample()
     {
         CardDefinitions.TryGet("Treetop Village", out var def);
-        var effect = def!.ActivatedAbility!.Effect as BecomeCreatureEffect;
+        var effect = def!.ActivatedAbilities[0].Effect as BecomeCreatureEffect;
         effect.Should().NotBeNull();
         effect!.Keywords.Should().Contain(Keyword.Trample);
     }
@@ -647,8 +647,8 @@ public class CardDefinitionsTests
     public void GoblinTinkerer_UsesTapSelf()
     {
         CardDefinitions.TryGet("Goblin Tinkerer", out var def);
-        def!.ActivatedAbility!.Cost.TapSelf.Should().BeTrue();
-        def.ActivatedAbility.Cost.SacrificeSelf.Should().BeFalse();
+        def!.ActivatedAbilities[0].Cost.TapSelf.Should().BeTrue();
+        def.ActivatedAbilities[0].Cost.SacrificeSelf.Should().BeFalse();
     }
 
     [Fact]
@@ -663,7 +663,7 @@ public class CardDefinitionsTests
     public void KnightOfStromgald_PumpCostsBB()
     {
         CardDefinitions.TryGet("Knight of Stromgald", out var def);
-        def!.ActivatedAbility!.Cost.ManaCost!.ColorRequirements[ManaColor.Black].Should().Be(2);
+        def!.ActivatedAbilities[0].Cost.ManaCost!.ColorRequirements[ManaColor.Black].Should().Be(2);
     }
 
     [Fact]
@@ -688,7 +688,7 @@ public class CardDefinitionsTests
     public void SterlingGrove_SearchPutsOnTopOfLibrary()
     {
         CardDefinitions.TryGet("Sterling Grove", out var def);
-        def!.ActivatedAbility!.Effect.Should().BeOfType<SearchLibraryToTopEffect>();
+        def!.ActivatedAbilities[0].Effect.Should().BeOfType<SearchLibraryToTopEffect>();
     }
 
     // === Card audit Batch 4d: Yavimaya Granger ===
@@ -717,8 +717,8 @@ public class CardDefinitionsTests
     public void DustBowl_SacrificesLandNotSelf()
     {
         CardDefinitions.TryGet("Dust Bowl", out var def);
-        def!.ActivatedAbility!.Cost.SacrificeSelf.Should().BeFalse();
-        def.ActivatedAbility.Cost.SacrificeCardType.Should().Be(CardType.Land);
+        def!.ActivatedAbilities[0].Cost.SacrificeSelf.Should().BeFalse();
+        def.ActivatedAbilities[0].Cost.SacrificeCardType.Should().Be(CardType.Land);
     }
 
     // === Card audit Batch 4g: Volcanic Spray fixes ===
@@ -769,7 +769,7 @@ public class CardDefinitionsTests
     public void GrimLavamancer_RequiresGraveyardExile()
     {
         CardDefinitions.TryGet("Grim Lavamancer", out var def);
-        def!.ActivatedAbility!.Cost.ExileFromGraveyardCount.Should().Be(2);
+        def!.ActivatedAbilities[0].Cost.ExileFromGraveyardCount.Should().Be(2);
     }
 
     // === Card audit Batch 5b: Barbarian Ring + Cabal Pit self-damage on mana tap ===
@@ -830,7 +830,7 @@ public class CardDefinitionsTests
     public void MotherOfRunes_TargetsOwnCreaturesOnly()
     {
         CardDefinitions.TryGet("Mother of Runes", out var def);
-        def!.ActivatedAbility!.TargetOwnOnly.Should().BeTrue();
+        def!.ActivatedAbilities[0].TargetOwnOnly.Should().BeTrue();
     }
 
     // === Card audit Batch 5g: Withered Wretch exiles from any graveyard ===
@@ -839,7 +839,7 @@ public class CardDefinitionsTests
     public void WitheredWretch_ExilesFromAnyGraveyard()
     {
         CardDefinitions.TryGet("Withered Wretch", out var def);
-        def!.ActivatedAbility!.Effect.Should().BeOfType<ExileFromAnyGraveyardEffect>();
+        def!.ActivatedAbilities[0].Effect.Should().BeOfType<ExileFromAnyGraveyardEffect>();
     }
 
     // === Card audit Batch 5h: Searing Blood delayed death trigger ===

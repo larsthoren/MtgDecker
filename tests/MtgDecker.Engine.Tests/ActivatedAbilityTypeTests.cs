@@ -215,15 +215,15 @@ public class ActivatedAbilityTypeTests
     // --- CardDefinition has ActivatedAbility ---
 
     [Fact]
-    public void CardDefinition_HasActivatedAbility_DefaultsToNull()
+    public void CardDefinition_HasActivatedAbilities_DefaultsToEmpty()
     {
         var def = new CardDefinition(null, null, null, null, CardType.Creature);
 
-        def.ActivatedAbility.Should().BeNull();
+        def.ActivatedAbilities.Should().BeEmpty();
     }
 
     [Fact]
-    public void CardDefinition_WithActivatedAbility_SetsCorrectly()
+    public void CardDefinition_WithActivatedAbilities_SetsCorrectly()
     {
         var cost = new ActivatedAbilityCost(TapSelf: true);
         var effect = new DummyEffect();
@@ -231,11 +231,11 @@ public class ActivatedAbilityTypeTests
 
         var def = new CardDefinition(null, null, null, null, CardType.Creature)
         {
-            ActivatedAbility = ability
+            ActivatedAbilities = [ability]
         };
 
-        def.ActivatedAbility.Should().Be(ability);
-        def.ActivatedAbility!.Cost.TapSelf.Should().BeTrue();
+        def.ActivatedAbilities.Should().ContainSingle();
+        def.ActivatedAbilities[0].Cost.TapSelf.Should().BeTrue();
     }
 
     // --- Dummy effect for testing ---

@@ -74,13 +74,14 @@ public class GameAction
     };
 
     public static GameAction ActivateAbility(Guid playerId, Guid cardId,
-        Guid? targetId = null, Guid? targetPlayerId = null) => new()
+        Guid? targetId = null, Guid? targetPlayerId = null, int? abilityIndex = null) => new()
     {
         Type = ActionType.ActivateAbility,
         PlayerId = playerId,
         CardId = cardId,
         TargetCardId = targetId,
         TargetPlayerId = targetPlayerId,
+        AbilityIndex = abilityIndex,
     };
 
     public static GameAction Cycle(Guid playerId, Guid cardId) => new()

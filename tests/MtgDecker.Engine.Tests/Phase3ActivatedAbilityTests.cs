@@ -15,11 +15,11 @@ public class Phase3ActivatedAbilityTests
     {
         CardDefinitions.TryGet("Nantuko Shade", out var def);
 
-        def!.ActivatedAbility.Should().NotBeNull();
-        def.ActivatedAbility!.Cost.ManaCost.Should().NotBeNull();
-        def.ActivatedAbility.Cost.ManaCost!.ColorRequirements
+        def!.ActivatedAbilities.Should().NotBeEmpty();
+        def.ActivatedAbilities[0].Cost.ManaCost.Should().NotBeNull();
+        def.ActivatedAbilities[0].Cost.ManaCost!.ColorRequirements
             .Should().ContainKey(ManaColor.Black);
-        def.ActivatedAbility.Effect.Should().BeOfType<PumpSelfEffect>();
+        def.ActivatedAbilities[0].Effect.Should().BeOfType<PumpSelfEffect>();
     }
 
     // === Ravenous Baloth ===
@@ -29,10 +29,10 @@ public class Phase3ActivatedAbilityTests
     {
         CardDefinitions.TryGet("Ravenous Baloth", out var def);
 
-        def!.ActivatedAbility.Should().NotBeNull();
-        def.ActivatedAbility!.Cost.SacrificeSubtype.Should().Be("Beast");
-        def.ActivatedAbility.Effect.Should().BeOfType<GainLifeEffect>();
-        ((GainLifeEffect)def.ActivatedAbility.Effect).Amount.Should().Be(4);
+        def!.ActivatedAbilities.Should().NotBeEmpty();
+        def.ActivatedAbilities[0].Cost.SacrificeSubtype.Should().Be("Beast");
+        def.ActivatedAbilities[0].Effect.Should().BeOfType<GainLifeEffect>();
+        ((GainLifeEffect)def.ActivatedAbilities[0].Effect).Amount.Should().Be(4);
     }
 
     // === Zuran Orb ===
@@ -42,9 +42,9 @@ public class Phase3ActivatedAbilityTests
     {
         CardDefinitions.TryGet("Zuran Orb", out var def);
 
-        def!.ActivatedAbility.Should().NotBeNull();
-        def.ActivatedAbility!.Cost.SacrificeCardType.Should().Be(CardType.Land);
-        def.ActivatedAbility.Effect.Should().BeOfType<GainLifeEffect>();
-        ((GainLifeEffect)def.ActivatedAbility.Effect).Amount.Should().Be(2);
+        def!.ActivatedAbilities.Should().NotBeEmpty();
+        def.ActivatedAbilities[0].Cost.SacrificeCardType.Should().Be(CardType.Land);
+        def.ActivatedAbilities[0].Effect.Should().BeOfType<GainLifeEffect>();
+        ((GainLifeEffect)def.ActivatedAbilities[0].Effect).Amount.Should().Be(2);
     }
 }

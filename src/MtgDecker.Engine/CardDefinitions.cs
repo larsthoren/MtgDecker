@@ -70,7 +70,7 @@ public static class CardDefinitions
             ["Mogg Fanatic"] = new(ManaCost.Parse("{R}"), null, 1, 1, CardType.Creature)
             {
                 Subtypes = ["Goblin"],
-                ActivatedAbility = new(new ActivatedAbilityCost(SacrificeSelf: true), new DealDamageEffect(1), c => c.IsCreature, CanTargetPlayer: true),
+                ActivatedAbilities = [new(new ActivatedAbilityCost(SacrificeSelf: true), new DealDamageEffect(1), c => c.IsCreature, CanTargetPlayer: true)],
             },
             ["Gempalm Incinerator"] = new(ManaCost.Parse("{2}{R}"), null, 2, 1, CardType.Creature)
             {
@@ -82,7 +82,7 @@ public static class CardDefinitions
             {
                 Subtypes = ["Goblin"],
                 Triggers = [new Trigger(GameEvent.EnterBattlefield, TriggerCondition.Self, new CreateTokensEffect("Goblin", 1, 1, CardType.Creature, ["Goblin"], count: 3))],
-                ActivatedAbility = new(new ActivatedAbilityCost(SacrificeSubtype: "Goblin", ManaCost: ManaCost.Parse("{1}{R}")), new DealDamageEffect(2), c => c.IsCreature, CanTargetPlayer: true),
+                ActivatedAbilities = [new(new ActivatedAbilityCost(SacrificeSubtype: "Goblin", ManaCost: ManaCost.Parse("{1}{R}")), new DealDamageEffect(2), c => c.IsCreature, CanTargetPlayer: true)],
             },
             ["Goblin King"] = new(ManaCost.Parse("{1}{R}{R}"), null, 2, 2, CardType.Creature)
             {
@@ -116,18 +116,18 @@ public static class CardDefinitions
                         GrantedKeyword: Keyword.DoesNotUntap,
                         Layer: EffectLayer.Layer6_AbilityAddRemove),
                 ],
-                ActivatedAbility = new(new ActivatedAbilityCost(TapSelf: true), new DealDamageEffect(1), c => c.IsCreature, CanTargetPlayer: true),
+                ActivatedAbilities = [new(new ActivatedAbilityCost(TapSelf: true), new DealDamageEffect(1), c => c.IsCreature, CanTargetPlayer: true)],
                 Triggers = [new Trigger(GameEvent.Dies, TriggerCondition.AnyCreatureDies, new UntapSelfEffect())],
             },
             ["Goblin Tinkerer"] = new(ManaCost.Parse("{1}{R}"), null, 1, 2, CardType.Creature)
             {
                 Subtypes = ["Goblin"],
-                ActivatedAbility = new(new ActivatedAbilityCost(TapSelf: true, ManaCost: ManaCost.Parse("{R}")), new DestroyTargetEffect(), c => c.CardTypes.HasFlag(CardType.Artifact)),
+                ActivatedAbilities = [new(new ActivatedAbilityCost(TapSelf: true, ManaCost: ManaCost.Parse("{R}")), new DestroyTargetEffect(), c => c.CardTypes.HasFlag(CardType.Artifact))],
             },
             ["Skirk Prospector"] = new(ManaCost.Parse("{R}"), null, 1, 1, CardType.Creature)
             {
                 Subtypes = ["Goblin"],
-                ActivatedAbility = new(new ActivatedAbilityCost(SacrificeSubtype: "Goblin"), new AddManaEffect(ManaColor.Red)),
+                ActivatedAbilities = [new(new ActivatedAbilityCost(SacrificeSubtype: "Goblin"), new AddManaEffect(ManaColor.Red))],
             },
             ["Naturalize"] = new(ManaCost.Parse("{1}{G}"), null, null, null, CardType.Instant,
                 TargetFilter.EnchantmentOrArtifact(), new NaturalizeEffect()),
@@ -141,11 +141,11 @@ public static class CardDefinitions
             ["Wooded Foothills"] = new(null, null, null, null, CardType.Land) { FetchAbility = new FetchAbility(["Mountain", "Forest"]) },
             ["Rishadan Port"] = new(null, ManaAbility.Fixed(ManaColor.Colorless), null, null, CardType.Land)
             {
-                ActivatedAbility = new(new ActivatedAbilityCost(TapSelf: true, ManaCost: ManaCost.Parse("{1}")), new TapTargetEffect(), c => c.IsLand),
+                ActivatedAbilities = [new(new ActivatedAbilityCost(TapSelf: true, ManaCost: ManaCost.Parse("{1}")), new TapTargetEffect(), c => c.IsLand)],
             },
             ["Wasteland"] = new(null, ManaAbility.Fixed(ManaColor.Colorless), null, null, CardType.Land)
             {
-                ActivatedAbility = new(new ActivatedAbilityCost(TapSelf: true, SacrificeSelf: true), new DestroyTargetEffect(), c => c.IsLand && !c.IsBasicLand),
+                ActivatedAbilities = [new(new ActivatedAbilityCost(TapSelf: true, SacrificeSelf: true), new DestroyTargetEffect(), c => c.IsLand && !c.IsBasicLand)],
             },
 
             // === Enchantress deck ===
@@ -206,10 +206,10 @@ public static class CardDefinitions
                     new Trigger(GameEvent.Upkeep, TriggerCondition.Upkeep, new FadingUpkeepEffect()),
                     new Trigger(GameEvent.LeavesBattlefield, TriggerCondition.SelfLeavesBattlefield, new ReturnExiledCardsEffect()),
                 ],
-                ActivatedAbility = new(
+                ActivatedAbilities = [new(
                     new ActivatedAbilityCost(RemoveCounterType: CounterType.Fade),
                     new ExileCreatureEffect(),
-                    c => c.IsCreature),
+                    c => c.IsCreature)],
             },
             ["Sterling Grove"] = new(ManaCost.Parse("{G}{W}"), null, null, null, CardType.Enchantment)
             {
@@ -222,7 +222,7 @@ public static class CardDefinitions
                         ControllerOnly: true,
                         Layer: EffectLayer.Layer6_AbilityAddRemove),
                 ],
-                ActivatedAbility = new(new ActivatedAbilityCost(SacrificeSelf: true, ManaCost: ManaCost.Parse("{1}")), new SearchLibraryToTopEffect(CardType.Enchantment)),
+                ActivatedAbilities = [new(new ActivatedAbilityCost(SacrificeSelf: true, ManaCost: ManaCost.Parse("{1}")), new SearchLibraryToTopEffect(CardType.Enchantment))],
             },
             ["Aura of Silence"] = new(ManaCost.Parse("{1}{W}{W}"), null, null, null, CardType.Enchantment)
             {
@@ -233,13 +233,13 @@ public static class CardDefinitions
                         CostApplies: c => c.CardTypes.HasFlag(CardType.Artifact) || c.CardTypes.HasFlag(CardType.Enchantment),
                         CostAppliesToOpponent: true),
                 ],
-                ActivatedAbility = new(new ActivatedAbilityCost(SacrificeSelf: true),
+                ActivatedAbilities = [new(new ActivatedAbilityCost(SacrificeSelf: true),
                     new DestroyTargetEffect(),
-                    c => c.CardTypes.HasFlag(CardType.Artifact) || c.CardTypes.HasFlag(CardType.Enchantment)),
+                    c => c.CardTypes.HasFlag(CardType.Artifact) || c.CardTypes.HasFlag(CardType.Enchantment))],
             },
             ["Seal of Cleansing"] = new(ManaCost.Parse("{1}{W}"), null, null, null, CardType.Enchantment)
             {
-                ActivatedAbility = new(new ActivatedAbilityCost(SacrificeSelf: true), new DestroyTargetEffect(), c => c.CardTypes.HasFlag(CardType.Enchantment) || c.CardTypes.HasFlag(CardType.Artifact)),
+                ActivatedAbilities = [new(new ActivatedAbilityCost(SacrificeSelf: true), new DestroyTargetEffect(), c => c.CardTypes.HasFlag(CardType.Enchantment) || c.CardTypes.HasFlag(CardType.Artifact))],
             },
             ["Solitary Confinement"] = new(ManaCost.Parse("{2}{W}"), null, null, null, CardType.Enchantment)
             {
@@ -472,7 +472,7 @@ public static class CardDefinitions
             ["Grim Lavamancer"] = new(ManaCost.Parse("{R}"), null, 1, 1, CardType.Creature)
             {
                 Subtypes = ["Human", "Wizard"],
-                ActivatedAbility = new(new ActivatedAbilityCost(TapSelf: true, ManaCost: ManaCost.Parse("{R}"), ExileFromGraveyardCount: 2), new DealDamageEffect(2), c => c.IsCreature, CanTargetPlayer: true),
+                ActivatedAbilities = [new(new ActivatedAbilityCost(TapSelf: true, ManaCost: ManaCost.Parse("{R}"), ExileFromGraveyardCount: 2), new DealDamageEffect(2), c => c.IsCreature, CanTargetPlayer: true)],
             },
             ["Jackal Pup"] = new(ManaCost.Parse("{R}"), null, 2, 1, CardType.Creature) { Subtypes = ["Jackal"] },
             ["Incinerate"] = new(ManaCost.Parse("{1}{R}"), null, null, null, CardType.Instant,
@@ -490,16 +490,16 @@ public static class CardDefinitions
             },
             ["Cursed Scroll"] = new(ManaCost.Parse("{1}"), null, null, null, CardType.Artifact)
             {
-                ActivatedAbility = new(new ActivatedAbilityCost(TapSelf: true, ManaCost: ManaCost.Parse("{3}")), new DealDamageEffect(2), c => c.IsCreature, CanTargetPlayer: true),
+                ActivatedAbilities = [new(new ActivatedAbilityCost(TapSelf: true, ManaCost: ManaCost.Parse("{3}")), new DealDamageEffect(2), c => c.IsCreature, CanTargetPlayer: true)],
             },
             ["Barbarian Ring"] = new(null, ManaAbility.Fixed(ManaColor.Red, selfDamage: 1), null, null, CardType.Land)
             {
-                ActivatedAbility = new(
+                ActivatedAbilities = [new(
                     new ActivatedAbilityCost(TapSelf: true, SacrificeSelf: true, ManaCost: ManaCost.Parse("{R}")),
                     new DealDamageEffect(2),
                     TargetFilter: c => c.IsCreature,
                     CanTargetPlayer: true,
-                    Condition: p => p.Graveyard.Count >= 7),
+                    Condition: p => p.Graveyard.Count >= 7)],
             },
 
             // === Mono Black Control deck ===
@@ -518,8 +518,8 @@ public static class CardDefinitions
             ["Withered Wretch"] = new(ManaCost.Parse("{B}{B}"), null, 2, 2, CardType.Creature)
             {
                 Subtypes = ["Zombie", "Cleric"],
-                ActivatedAbility = new(new ActivatedAbilityCost(ManaCost: ManaCost.Parse("{1}")),
-                    new ExileFromAnyGraveyardEffect()),
+                ActivatedAbilities = [new(new ActivatedAbilityCost(ManaCost: ManaCost.Parse("{1}")),
+                    new ExileFromAnyGraveyardEffect())],
             },
             ["Funeral Charm"] = new(ManaCost.Parse("{B}"), null, null, null, CardType.Instant,
                 TargetFilter.Player(), new DiscardEffect(1)),
@@ -534,26 +534,26 @@ public static class CardDefinitions
             ["Powder Keg"] = new(ManaCost.Parse("{2}"), null, null, null, CardType.Artifact)
             {
                 Triggers = [new Trigger(GameEvent.Upkeep, TriggerCondition.Upkeep, new PowderKegUpkeepEffect())],
-                ActivatedAbility = new(
+                ActivatedAbilities = [new(
                     new ActivatedAbilityCost(TapSelf: true, SacrificeSelf: true),
-                    new PowderKegDestroyEffect()),
+                    new PowderKegDestroyEffect())],
             },
             ["Cabal Pit"] = new(null, ManaAbility.Fixed(ManaColor.Black, selfDamage: 1), null, null, CardType.Land)
             {
-                ActivatedAbility = new(
+                ActivatedAbilities = [new(
                     new ActivatedAbilityCost(TapSelf: true, SacrificeSelf: true, ManaCost: ManaCost.Parse("{B}")),
                     new WeakenTargetEffect(-2, -2),
                     TargetFilter: c => c.IsCreature,
-                    Condition: p => p.Graveyard.Count >= 7),
+                    Condition: p => p.Graveyard.Count >= 7)],
             },
             ["Dust Bowl"] = new(null, ManaAbility.Fixed(ManaColor.Colorless), null, null, CardType.Land)
             {
-                ActivatedAbility = new(
+                ActivatedAbilities = [new(
                     new ActivatedAbilityCost(TapSelf: true, SacrificeCardType: CardType.Land, ManaCost: ManaCost.Parse("{3}")),
                     new DestroyTargetEffect(),
                     TargetFilter: c => c.CardTypes.HasFlag(CardType.Land)
                         && c.Name != "Plains" && c.Name != "Island" && c.Name != "Swamp"
-                        && c.Name != "Mountain" && c.Name != "Forest"),
+                        && c.Name != "Mountain" && c.Name != "Forest")],
             },
 
             // === Mono Black Aggro deck ===
@@ -572,8 +572,8 @@ public static class CardDefinitions
             ["Nantuko Shade"] = new(ManaCost.Parse("{B}{B}"), null, 2, 1, CardType.Creature)
             {
                 Subtypes = ["Insect", "Shade"],
-                ActivatedAbility = new(new ActivatedAbilityCost(ManaCost: ManaCost.Parse("{B}")),
-                    new PumpSelfEffect(1, 1)),
+                ActivatedAbilities = [new(new ActivatedAbilityCost(ManaCost: ManaCost.Parse("{B}")),
+                    new PumpSelfEffect(1, 1))],
             },
             ["Ravenous Rats"] = new(ManaCost.Parse("{1}{B}"), null, 1, 1, CardType.Creature)
             {
@@ -590,7 +590,7 @@ public static class CardDefinitions
             ["Spawning Pool"] = new(null, ManaAbility.Fixed(ManaColor.Black), null, null, CardType.Land)
             {
                 EntersTapped = true,
-                ActivatedAbility = new(new ActivatedAbilityCost(ManaCost: ManaCost.Parse("{1}{B}")), new BecomeCreatureEffect(1, 1, "Skeleton")),
+                ActivatedAbilities = [new(new ActivatedAbilityCost(ManaCost: ManaCost.Parse("{1}{B}")), new BecomeCreatureEffect(1, 1, "Skeleton"))],
             },
             ["Skeletal Scrying"] = new(ManaCost.Parse("{0}{B}"), null, null, null, CardType.Instant,
                 Effect: new SkeletalScryingEffect()),
@@ -621,7 +621,7 @@ public static class CardDefinitions
                         GrantedKeyword: Keyword.ProtectionFromWhite,
                         Layer: EffectLayer.Layer6_AbilityAddRemove),
                 ],
-                ActivatedAbility = new(new ActivatedAbilityCost(ManaCost: ManaCost.Parse("{B}{B}")), new PumpSelfEffect(1, 0)),
+                ActivatedAbilities = [new(new ActivatedAbilityCost(ManaCost: ManaCost.Parse("{B}{B}")), new PumpSelfEffect(1, 0))],
             },
             ["Phyrexian Rager"] = new(ManaCost.Parse("{2}{B}"), null, 2, 2, CardType.Creature)
             {
@@ -661,18 +661,18 @@ public static class CardDefinitions
             },
             ["Phyrexian Furnace"] = new(ManaCost.Parse("{1}"), null, null, null, CardType.Artifact)
             {
-                ActivatedAbility = new(
+                ActivatedAbilities = [new(
                     new ActivatedAbilityCost(SacrificeSelf: true, ManaCost: ManaCost.Parse("{1}")),
-                    new PhyrexianFurnaceEffect()),
+                    new PhyrexianFurnaceEffect())],
             },
             ["Faerie Conclave"] = new(null, ManaAbility.Fixed(ManaColor.Blue), null, null, CardType.Land)
             {
                 EntersTapped = true,
-                ActivatedAbility = new(new ActivatedAbilityCost(ManaCost: ManaCost.Parse("{1}{U}")), new BecomeCreatureEffect(2, 1, [Keyword.Flying], "Faerie")),
+                ActivatedAbilities = [new(new ActivatedAbilityCost(ManaCost: ManaCost.Parse("{1}{U}")), new BecomeCreatureEffect(2, 1, [Keyword.Flying], "Faerie"))],
             },
             ["Mishra's Factory"] = new(null, ManaAbility.Fixed(ManaColor.Colorless), null, null, CardType.Land)
             {
-                ActivatedAbility = new(new ActivatedAbilityCost(ManaCost: ManaCost.Parse("{1}")), new BecomeCreatureEffect(2, 2, "Assembly-Worker")),
+                ActivatedAbilities = [new(new ActivatedAbilityCost(ManaCost: ManaCost.Parse("{1}")), new BecomeCreatureEffect(2, 2, "Assembly-Worker"))],
             },
 
             // === Oath of Druids deck ===
@@ -722,18 +722,18 @@ public static class CardDefinitions
             ["Treetop Village"] = new(null, ManaAbility.Fixed(ManaColor.Green), null, null, CardType.Land)
             {
                 EntersTapped = true,
-                ActivatedAbility = new(new ActivatedAbilityCost(ManaCost: ManaCost.Parse("{1}{G}")), new BecomeCreatureEffect(3, 3, [Keyword.Trample], "Ape")),
+                ActivatedAbilities = [new(new ActivatedAbilityCost(ManaCost: ManaCost.Parse("{1}{G}")), new BecomeCreatureEffect(3, 3, [Keyword.Trample], "Ape"))],
             },
 
             // === Terrageddon deck ===
             ["Mother of Runes"] = new(ManaCost.Parse("{W}"), null, 1, 1, CardType.Creature)
             {
                 Subtypes = ["Human", "Cleric"],
-                ActivatedAbility = new(
+                ActivatedAbilities = [new(
                     new ActivatedAbilityCost(TapSelf: true),
                     new GrantProtectionEffect(),
                     TargetFilter: c => c.IsCreature,
-                    TargetOwnOnly: true),
+                    TargetOwnOnly: true)],
             },
             ["Nimble Mongoose"] = new(ManaCost.Parse("{G}"), null, 1, 1, CardType.Creature)
             {
@@ -752,29 +752,29 @@ public static class CardDefinitions
             },
             ["Zuran Orb"] = new(ManaCost.Parse("{0}"), null, null, null, CardType.Artifact)
             {
-                ActivatedAbility = new(new ActivatedAbilityCost(SacrificeCardType: CardType.Land),
-                    new Triggers.Effects.GainLifeEffect(2)),
+                ActivatedAbilities = [new(new ActivatedAbilityCost(SacrificeCardType: CardType.Land),
+                    new Triggers.Effects.GainLifeEffect(2))],
             },
 
             // === Elves deck ===
             ["Llanowar Elves"] = new(ManaCost.Parse("{G}"), null, 1, 1, CardType.Creature)
             {
                 Subtypes = ["Elf", "Druid"],
-                ActivatedAbility = new(new ActivatedAbilityCost(TapSelf: true), new AddManaEffect(ManaColor.Green)),
+                ActivatedAbilities = [new(new ActivatedAbilityCost(TapSelf: true), new AddManaEffect(ManaColor.Green))],
             },
             ["Fyndhorn Elves"] = new(ManaCost.Parse("{G}"), null, 1, 1, CardType.Creature)
             {
                 Subtypes = ["Elf", "Druid"],
-                ActivatedAbility = new(new ActivatedAbilityCost(TapSelf: true), new AddManaEffect(ManaColor.Green)),
+                ActivatedAbilities = [new(new ActivatedAbilityCost(TapSelf: true), new AddManaEffect(ManaColor.Green))],
             },
             ["Priest of Titania"] = new(ManaCost.Parse("{1}{G}"), null, 1, 1, CardType.Creature)
             {
                 Subtypes = ["Elf", "Druid"],
-                ActivatedAbility = new(new ActivatedAbilityCost(TapSelf: true),
+                ActivatedAbilities = [new(new ActivatedAbilityCost(TapSelf: true),
                     new DynamicAddManaEffect(ManaColor.Green,
                         state => state.Player1.Battlefield.Cards
                             .Concat(state.Player2.Battlefield.Cards)
-                            .Count(c => c.Subtypes.Contains("Elf", StringComparer.OrdinalIgnoreCase)))),
+                            .Count(c => c.Subtypes.Contains("Elf", StringComparer.OrdinalIgnoreCase))))],
             },
             ["Quirion Ranger"] = new(ManaCost.Parse("{G}"), null, 1, 1, CardType.Creature) { Subtypes = ["Elf", "Ranger"] },
             ["Wirewood Symbiote"] = new(ManaCost.Parse("{G}"), null, 1, 1, CardType.Creature) { Subtypes = ["Insect"] },
@@ -823,8 +823,8 @@ public static class CardDefinitions
             ["Ravenous Baloth"] = new(ManaCost.Parse("{2}{G}{G}"), null, 4, 4, CardType.Creature)
             {
                 Subtypes = ["Beast"],
-                ActivatedAbility = new(new ActivatedAbilityCost(SacrificeSubtype: "Beast"),
-                    new Triggers.Effects.GainLifeEffect(4)),
+                ActivatedAbilities = [new(new ActivatedAbilityCost(SacrificeSubtype: "Beast"),
+                    new Triggers.Effects.GainLifeEffect(4))],
             },
             ["Caller of the Claw"] = new(ManaCost.Parse("{2}{G}"), null, 2, 2, CardType.Creature)
             {
@@ -842,10 +842,10 @@ public static class CardDefinitions
             {
                 Subtypes = ["Masticore"],
                 Triggers = [new Trigger(GameEvent.Upkeep, TriggerCondition.Upkeep, new MasticoreUpkeepEffect())],
-                ActivatedAbility = new(
+                ActivatedAbilities = [new(
                     new ActivatedAbilityCost(ManaCost: ManaCost.Parse("{2}")),
                     new DealDamageEffect(1),
-                    TargetFilter: c => c.IsCreature),
+                    TargetFilter: c => c.IsCreature)],
             },
             ["Nantuko Vigilante"] = new(ManaCost.Parse("{3}{G}"), null, 3, 2, CardType.Creature) { Subtypes = ["Insect", "Druid", "Mutant"] },
             ["Yavimaya Granger"] = new(ManaCost.Parse("{2}{G}"), null, 2, 2, CardType.Creature)
@@ -886,9 +886,9 @@ public static class CardDefinitions
             },
             ["Survival of the Fittest"] = new(ManaCost.Parse("{1}{G}"), null, null, null, CardType.Enchantment)
             {
-                ActivatedAbility = new(
+                ActivatedAbilities = [new(
                     new ActivatedAbilityCost(ManaCost: ManaCost.Parse("{G}"), DiscardCardType: CardType.Creature),
-                    new SearchLibraryByTypeEffect(CardType.Creature)),
+                    new SearchLibraryByTypeEffect(CardType.Creature))],
             },
             ["Gaea's Cradle"] = new(null, ManaAbility.Dynamic(ManaColor.Green,
                 p => p.Battlefield.Cards.Count(c => c.IsCreature)),
@@ -921,9 +921,9 @@ public static class CardDefinitions
 
             ["Sneak Attack"] = new(ManaCost.Parse("{3}{R}"), null, null, null, CardType.Enchantment)
             {
-                ActivatedAbility = new(
+                ActivatedAbilities = [new(
                     new ActivatedAbilityCost(ManaCost: ManaCost.Parse("{R}")),
-                    new SneakAttackPutEffect()),
+                    new SneakAttackPutEffect())],
             },
 
             ["Emrakul, the Aeons Torn"] = new(ManaCost.Parse("{15}"), null, 15, 15, CardType.Creature)
@@ -965,16 +965,16 @@ public static class CardDefinitions
                         GrantedKeyword: Keyword.Lifelink,
                         Layer: EffectLayer.Layer6_AbilityAddRemove),
                 ],
-                ActivatedAbility = new(
+                ActivatedAbilities = [new(
                     new ActivatedAbilityCost(PayLife: 7),
-                    new DrawCardsActivatedEffect(7)),
+                    new DrawCardsActivatedEffect(7))],
             },
 
             ["Lotus Petal"] = new(ManaCost.Parse("{0}"), null, null, null, CardType.Artifact)
             {
-                ActivatedAbility = new(
+                ActivatedAbilities = [new(
                     new ActivatedAbilityCost(TapSelf: true, SacrificeSelf: true),
-                    new AddAnyManaEffect()),
+                    new AddAnyManaEffect())],
             },
 
             ["Spell Pierce"] = new(ManaCost.Parse("{U}"), null, null, null, CardType.Instant,

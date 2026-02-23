@@ -20,8 +20,12 @@ internal class ActivateAbilityHandler : IActionHandler
         ActivatedAbility? ability = abilitySource.TokenActivatedAbility;
         if (ability == null)
         {
-            if (CardDefinitions.TryGet(abilitySource.Name, out var abilityDef))
-                ability = abilityDef.ActivatedAbility;
+            if (CardDefinitions.TryGet(abilitySource.Name, out var abilityDef) && abilityDef.ActivatedAbilities.Count > 0)
+            {
+                var index = action.AbilityIndex ?? 0;
+                if (index >= 0 && index < abilityDef.ActivatedAbilities.Count)
+                    ability = abilityDef.ActivatedAbilities[index];
+            }
         }
 
         if (ability == null)

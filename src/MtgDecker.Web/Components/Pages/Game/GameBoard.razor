@@ -1296,7 +1296,7 @@
     // --- Activated abilities ---
 
     private bool HasActivatedAbility(GameCard card) =>
-        CardDefinitions.TryGet(card.Name, out var def) && def.ActivatedAbility != null;
+        CardDefinitions.TryGet(card.Name, out var def) && def.ActivatedAbilities.Count > 0;
 
     private async Task HandleActivate()
     {
