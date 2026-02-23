@@ -73,10 +73,6 @@
     [Parameter] public EventCallback<string?> OnHoverStart { get; set; }
     [Parameter] public EventCallback OnHoverEnd { get; set; }
 
-    public record TargetHighlight(Guid CardId, Guid PlayerId, TargetZone Zone);
-    public enum TargetZone { Battlefield, Stack, Player }
-    public record StackTargetHoverInfo(string SourceElementId, List<TargetHighlight> Targets);
-
     [Parameter] public EventCallback<StackTargetHoverInfo?> OnTargetHover { get; set; }
     [Parameter] public HashSet<Guid>? HighlightedStackItemIds { get; set; }
 
