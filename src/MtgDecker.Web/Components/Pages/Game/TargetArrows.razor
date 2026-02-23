@@ -52,7 +52,7 @@
             }
 
             var positions = await JS.InvokeAsync<ElementPosition?[]>(
-                "getElementCenters", _cts.Token, elementIds.ToArray());
+                "getElementCenters", _cts.Token, (object)elementIds.ToArray());
 
             if (_cts.Token.IsCancellationRequested) return;
 
