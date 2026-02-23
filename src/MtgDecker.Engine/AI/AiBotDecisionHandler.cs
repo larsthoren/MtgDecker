@@ -1,3 +1,4 @@
+using MtgDecker.Engine.Effects;
 using MtgDecker.Engine.Enums;
 using MtgDecker.Engine.Mana;
 using MtgDecker.Engine.Triggers.Effects;
@@ -20,6 +21,15 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
     // Colors needed by spells in hand, cached by GetAction for ChooseManaColor to consult
     private HashSet<ManaColor> _neededColors = new();
 
+    // Pre-planned action queue: when the bot decides to cast a spell, it enqueues
+    // the tap actions first, then the cast action. Subsequent GetAction calls drain the queue.
+    private readonly Queue<GameAction> _plannedActions = new();
+
+    // Cached opponent/self info for combat decisions (populated in GetAction,
+    // consumed by ChooseAttackers/ChooseBlockers interface methods)
+    private Player? _lastOpponent;
+    private int _lastSelfLife = 20;
+
     private async Task DelayAsync(CancellationToken ct)
     {
         if (ActionDelayMs > 0)
@@ -27,28 +37,53 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
     }
 
     /// <summary>
-    /// Selects an action using a land-first, fetch, tap-lands, greedy-cast heuristic.
-    /// Only acts during main phases. Prioritizes playing a land (if available
-    /// and land drop unused), then activates fetch lands if spells are in hand,
-    /// then taps untapped lands with mana abilities, then casts the most expensive
-    /// affordable spell.
+    /// Selects an action using a planned-queue, land-first, fetch, tap-lands, greedy-cast heuristic.
+    /// Drains pre-planned actions first (tap sequence + cast). Only acts during main phases.
+    /// Prioritizes playing a land, then fetches, then activated abilities, then plans and
+    /// enqueues a tap+cast sequence for the best proactive spell.
     /// </summary>
     public async Task<GameAction> GetAction(GameState gameState, Guid playerId, CancellationToken ct = default)
     {
-        if (gameState.CurrentPhase != Phase.MainPhase1 && gameState.CurrentPhase != Phase.MainPhase2)
-            return GameAction.Pass(playerId);
-
-        // Non-active player passes priority (this bot doesn't play instants)
-        if (gameState.ActivePlayer.Id != playerId)
-            return GameAction.Pass(playerId);
+        // Drain the planned action queue first
+        if (_plannedActions.Count > 0)
+        {
+            await DelayAsync(ct);
+            return _plannedActions.Dequeue();
+        }
 
         var player = gameState.Player1.Id == playerId ? gameState.Player1 : gameState.Player2;
+        var opponent = gameState.Player1.Id == playerId ? gameState.Player2 : gameState.Player1;
         var hand = player.Hand.Cards;
+
+        // Cache opponent/self info for combat decisions
+        _lastOpponent = opponent;
+        _lastSelfLife = player.Life;
+
+        // Non-active player: evaluate reactive plays (works in any phase)
+        if (gameState.ActivePlayer.Id != playerId)
+        {
+            var reaction = EvaluateReaction(player, opponent, gameState, playerId);
+            if (reaction != null)
+            {
+                await DelayAsync(ct);
+                return reaction;
+            }
+            return GameAction.Pass(playerId);
+        }
+
+        if (gameState.CurrentPhase != Phase.MainPhase1 && gameState.CurrentPhase != Phase.MainPhase2)
+            return GameAction.Pass(playerId);
 
         // Priority 1: Play a land
         if (hand.Count > 0 && player.LandsPlayedThisTurn == 0)
         {
-            var land = hand.FirstOrDefault(c => c.IsLand);
+            // Compute needed colors from spells in hand
+            var neededColorsForLand = new HashSet<ManaColor>();
+            foreach (var spell in hand.Where(c => !c.IsLand && c.ManaCost != null))
+                foreach (var color in spell.ManaCost!.ColorRequirements.Keys)
+                    neededColorsForLand.Add(color);
+
+            var land = ChooseLandToPlay(hand, neededColorsForLand);
             if (land != null)
             {
                 await DelayAsync(ct);
@@ -70,7 +105,6 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
         }
 
         // Priority 2.5: Activate abilities on permanents (e.g., Mogg Fanatic, Skirk Prospector)
-        var opponent = gameState.Player1.Id == playerId ? gameState.Player2 : gameState.Player1;
         var abilityAction = EvaluateActivatedAbilities(player, opponent, gameState);
         if (abilityAction != null)
         {
@@ -81,57 +115,57 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
         if (hand.Count == 0)
             return GameAction.Pass(playerId);
 
-        // Priority 3: Tap an untapped land with a mana ability to build up mana pool
-        // Only tap if the total available mana (pool + all untapped lands) can afford a spell
-        // AND the producible colors can satisfy at least one spell's color requirements.
-        var untappedLands = player.Battlefield.Cards
-            .Where(c => c.IsLand && !c.IsTapped && c.ManaAbility != null)
-            .ToList();
-
-        if (untappedLands.Count > 0)
-        {
-            var potentialMana = player.ManaPool.Total + untappedLands.Count;
-
-            if (CanAffordAnySpell(hand, untappedLands, player, gameState, potentialMana))
-            {
-                // Cache needed colors so ChooseManaColor picks the right color
-                _neededColors.Clear();
-                foreach (var spell in hand.Where(c => !c.IsLand && c.ManaCost != null))
-                    foreach (var color in spell.ManaCost!.ColorRequirements.Keys)
-                        _neededColors.Add(color);
-
-                await DelayAsync(ct);
-                return GameAction.TapCard(playerId, untappedLands[0].Id);
-            }
-        }
-
-        // Priority 4: Cast most expensive affordable spell (accounting for cost modification)
-        // Only attempt sorcery-speed casts when the stack is empty (matches engine's CanCastSorcery check)
+        // Priority 3: Only attempt sorcery-speed casts when the stack is empty
         if (gameState.StackCount > 0)
             return GameAction.Pass(playerId);
 
-        var castable = hand
-            .Where(c => !c.IsLand && c.ManaCost != null)
-            .Select(c =>
-            {
-                var cost = c.ManaCost!;
-                var reduction = ComputeCostModification(gameState, c, player);
-                if (reduction != 0)
-                    cost = cost.WithGenericReduction(-reduction);
-                return (Card: c, EffectiveCost: cost);
-            })
-            .Where(x => player.ManaPool.CanPay(x.EffectiveCost))
-            .OrderByDescending(x => x.Card.ManaCost!.ConvertedManaCost)
-            .Select(x => x.Card)
-            .FirstOrDefault();
+        // Priority 3: Plan tap sequence + cast for the best proactive spell
+        var untappedLands = player.Battlefield.Cards
+            .Where(c => c.IsLand && !c.IsTapped && GetLandManaAbility(c) != null)
+            .ToList();
 
-        if (castable != null)
+        // Priority 3.5: Cast ramp spell if it enables an otherwise unaffordable spell
+        var rampAction = EvaluateRampSpell(hand, player, gameState, playerId, untappedLands);
+        if (rampAction != null)
         {
             await DelayAsync(ct);
-            return GameAction.CastSpell(playerId, castable.Id);
+            return rampAction;
         }
 
-        // Priority 5: Cycling — if a card can be cycled but not cast, cycle it
+        var bestSpell = ChooseBestProactiveSpell(hand, player, gameState, untappedLands);
+        if (bestSpell != null)
+        {
+            var effectiveCost = GetEffectiveCost(bestSpell, gameState, player);
+
+            // Check if pool already has enough mana
+            if (player.ManaPool.CanPay(effectiveCost))
+            {
+                // No taps needed, cast directly
+                await DelayAsync(ct);
+                return GameAction.CastSpell(playerId, bestSpell.Id);
+            }
+
+            // Plan the tap sequence for the remaining cost after pool contribution
+            var tapIds = PlanTapSequence(untappedLands, effectiveCost);
+            if (tapIds.Count > 0)
+            {
+                // Cache needed colors so ChooseManaColor picks the right color
+                _neededColors.Clear();
+                foreach (var color in effectiveCost.ColorRequirements.Keys)
+                    _neededColors.Add(color);
+
+                // Enqueue remaining taps (after the first) and the cast
+                for (int i = 1; i < tapIds.Count; i++)
+                    _plannedActions.Enqueue(GameAction.TapCard(playerId, tapIds[i]));
+                _plannedActions.Enqueue(GameAction.CastSpell(playerId, bestSpell.Id));
+
+                // Return the first tap action immediately
+                await DelayAsync(ct);
+                return GameAction.TapCard(playerId, tapIds[0]);
+            }
+        }
+
+        // Priority 4: Cycling — if a card can be cycled but not cast, cycle it
         foreach (var card in hand)
         {
             if (CardDefinitions.TryGet(card.Name, out var cycleDef) && cycleDef.CyclingCost != null)
@@ -149,6 +183,189 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
         }
 
         return GameAction.Pass(playerId);
+    }
+
+    /// <summary>
+    /// Plans the optimal set of lands to tap for a given mana cost.
+    /// Prefers fixed-color lands for colored requirements (saving choice lands for flexibility),
+    /// and uses least-flexible lands first for generic costs.
+    /// Returns empty list if the cost cannot be met.
+    /// </summary>
+    internal static List<Guid> PlanTapSequence(IReadOnlyList<GameCard> untappedLands, ManaCost cost)
+    {
+        if (cost.ConvertedManaCost == 0)
+            return [];
+
+        var availableLands = untappedLands.ToList();
+        var selectedIds = new List<Guid>();
+
+        // Step 1: Satisfy colored requirements, preferring fixed-color lands
+        foreach (var (color, required) in cost.ColorRequirements)
+        {
+            for (int i = 0; i < required; i++)
+            {
+                // First: find a fixed-color land that produces this color
+                var fixedLand = availableLands.FirstOrDefault(land =>
+                {
+                    var ability = GetLandManaAbility(land);
+                    return ability?.FixedColor == color;
+                });
+
+                if (fixedLand != null)
+                {
+                    selectedIds.Add(fixedLand.Id);
+                    availableLands.Remove(fixedLand);
+                    continue;
+                }
+
+                // Second: find a choice land that can produce this color
+                var choiceLand = availableLands
+                    .Where(land =>
+                    {
+                        var ability = GetLandManaAbility(land);
+                        return ability?.ChoiceColors?.Contains(color) == true
+                            || ability?.DynamicColor == color;
+                    })
+                    // Prefer lands with fewer choices (less flexible)
+                    .OrderBy(land => GetLandManaAbility(land)?.ChoiceColors?.Count ?? 1)
+                    .FirstOrDefault();
+
+                if (choiceLand != null)
+                {
+                    selectedIds.Add(choiceLand.Id);
+                    availableLands.Remove(choiceLand);
+                    continue;
+                }
+
+                // Cannot satisfy this color requirement
+                return [];
+            }
+        }
+
+        // Step 2: Satisfy generic cost with least-flexible lands first
+        var genericRemaining = cost.GenericCost;
+        if (genericRemaining > 0)
+        {
+            // Sort by flexibility: fixed-color (1) < dynamic (1) < fewer choices < more choices
+            var sortedByFlexibility = availableLands
+                .OrderBy(land =>
+                {
+                    var ability = GetLandManaAbility(land);
+                    if (ability?.FixedColor != null) return 1;
+                    if (ability?.DynamicColor != null) return 2;
+                    return ability?.ChoiceColors?.Count ?? 0;
+                })
+                .ToList();
+
+            foreach (var land in sortedByFlexibility)
+            {
+                if (genericRemaining <= 0) break;
+                selectedIds.Add(land.Id);
+                genericRemaining--;
+            }
+
+            if (genericRemaining > 0)
+                return []; // Not enough lands
+        }
+
+        return selectedIds;
+    }
+
+    /// <summary>
+    /// Looks up the ManaAbility for a land, checking CardDefinitions first, then falling back
+    /// to the land's own ManaAbility property.
+    /// </summary>
+    private static ManaAbility? GetLandManaAbility(GameCard land)
+    {
+        if (CardDefinitions.TryGet(land.Name, out var def) && def.ManaAbility != null)
+            return def.ManaAbility;
+        return land.ManaAbility;
+    }
+
+    /// <summary>
+    /// Finds the best proactive spell to cast from hand. Filters to Proactive-only spells,
+    /// checks affordability against pool + untapped lands, returns the highest CMC option.
+    /// </summary>
+    internal static GameCard? ChooseBestProactiveSpell(IReadOnlyList<GameCard> hand, Player player,
+        GameState gameState, List<GameCard> untappedLands)
+    {
+        var producibleColors = GetProducibleColors(player, untappedLands);
+        var potentialMana = player.ManaPool.Total + untappedLands.Count;
+
+        return hand
+            .Where(c => !c.IsLand && c.ManaCost != null)
+            .Where(c =>
+            {
+                // Only cast proactive spells during main phase
+                if (CardDefinitions.TryGet(c.Name, out var def))
+                {
+                    if (def.SpellRole != SpellRole.Proactive)
+                        return false;
+                }
+                else
+                {
+                    // Unknown cards: only cast if they're not instants (assume proactive)
+                    if (c.CardTypes.HasFlag(CardType.Instant))
+                        return false;
+                }
+                return true;
+            })
+            .Select(c =>
+            {
+                var effectiveCost = GetEffectiveCost(c, gameState, player);
+                return (Card: c, EffectiveCost: effectiveCost);
+            })
+            .Where(x =>
+            {
+                // Check total mana affordability
+                if (x.EffectiveCost.ConvertedManaCost > potentialMana)
+                    return false;
+
+                // Check all color requirements can be produced
+                return x.EffectiveCost.ColorRequirements.All(kvp =>
+                    producibleColors.Contains(kvp.Key));
+            })
+            .OrderByDescending(x => x.Card.ManaCost!.ConvertedManaCost)
+            .Select(x => x.Card)
+            .FirstOrDefault();
+    }
+
+    /// <summary>
+    /// Computes the effective cost of a card after applying cost modifications (e.g., Goblin Warchief).
+    /// </summary>
+    private static ManaCost GetEffectiveCost(GameCard card, GameState gameState, Player player)
+    {
+        var cost = card.ManaCost!;
+        var reduction = ComputeCostModification(gameState, card, player);
+        if (reduction != 0)
+            cost = cost.WithGenericReduction(-reduction);
+        return cost;
+    }
+
+    /// <summary>
+    /// Collects all mana colors producible from the player's current mana pool
+    /// and all untapped lands' mana abilities.
+    /// </summary>
+    private static HashSet<ManaColor> GetProducibleColors(Player player, List<GameCard> untappedLands)
+    {
+        var producibleColors = new HashSet<ManaColor>();
+        foreach (var (color, _) in player.ManaPool.Available)
+            producibleColors.Add(color);
+
+        foreach (var land in untappedLands)
+        {
+            var ability = GetLandManaAbility(land);
+            if (ability == null) continue;
+            if (ability.FixedColor.HasValue)
+                producibleColors.Add(ability.FixedColor.Value);
+            if (ability.ChoiceColors != null)
+                foreach (var c in ability.ChoiceColors)
+                    producibleColors.Add(c);
+            if (ability.DynamicColor.HasValue)
+                producibleColors.Add(ability.DynamicColor.Value);
+        }
+
+        return producibleColors;
     }
 
     /// <summary>
@@ -247,15 +464,94 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
     }
 
     /// <summary>
-    /// Attacks with all eligible creatures. The engine already filters for
-    /// summoning sickness, so every creature passed here is ready to attack.
+    /// Selects attackers using smart evaluation: considers opponent blockers, evasion,
+    /// lethal damage, and favorable trades. Delegates to the testable static overload.
     /// </summary>
     public async Task<IReadOnlyList<Guid>> ChooseAttackers(IReadOnlyList<GameCard> eligibleAttackers,
         CancellationToken ct = default)
     {
         await DelayAsync(ct);
-        var attackerIds = eligibleAttackers.Select(c => c.Id).ToList();
+        var opponentCreatures = _lastOpponent?.Battlefield.Cards
+            .Where(c => c.IsCreature).ToList()
+            ?? [];
+        var opponentLife = _lastOpponent?.Life ?? 20;
+        return ChooseAttackers(eligibleAttackers, opponentCreatures, opponentLife);
+    }
+
+    /// <summary>
+    /// Testable static overload for attacker selection with full opponent context.
+    /// Logic:
+    /// 1. If total power >= opponentLife, attack with all (lethal).
+    /// 2. If opponent has no creatures, attack with all.
+    /// 3. Per attacker: attack if evasion, can't die to any blocker, or favorable trade.
+    /// </summary>
+    internal static IReadOnlyList<Guid> ChooseAttackers(IReadOnlyList<GameCard> eligibleAttackers,
+        IReadOnlyList<GameCard> opponentCreatures, int opponentLife)
+    {
+        if (eligibleAttackers.Count == 0)
+            return [];
+
+        // Lethal check: if total power >= opponent life, attack with everything
+        var totalPower = eligibleAttackers.Sum(a => a.Power ?? 0);
+        if (totalPower >= opponentLife)
+            return eligibleAttackers.Select(a => a.Id).ToList();
+
+        // No opponent creatures: attack with everything
+        if (opponentCreatures.Count == 0)
+            return eligibleAttackers.Select(a => a.Id).ToList();
+
+        var attackerIds = new List<Guid>();
+        foreach (var attacker in eligibleAttackers)
+        {
+            var attackerPower = attacker.Power ?? 0;
+            var attackerToughness = attacker.Toughness ?? 0;
+
+            // Evasion: flying attacker with no opponent creatures that can block it
+            if (attacker.ActiveKeywords.Contains(Keyword.Flying)
+                && !opponentCreatures.Any(b => CanBlock(b, attacker)))
+            {
+                attackerIds.Add(attacker.Id);
+                continue;
+            }
+
+            // Check if any opponent creature can profitably block this attacker
+            var canDieToBlocker = opponentCreatures
+                .Where(b => CanBlock(b, attacker))
+                .Any(b => (b.Power ?? 0) >= attackerToughness);
+
+            if (!canDieToBlocker)
+            {
+                // Attacker wouldn't die to any blocker — safe to attack
+                attackerIds.Add(attacker.Id);
+                continue;
+            }
+
+            // Attacker would die, but check if it's a favorable trade (can kill a blocker back)
+            var canKillABlocker = opponentCreatures
+                .Where(b => CanBlock(b, attacker))
+                .Any(b => attackerPower >= (b.Toughness ?? 0));
+
+            if (canKillABlocker)
+            {
+                attackerIds.Add(attacker.Id);
+                continue;
+            }
+
+            // Would die without killing anything — don't attack
+        }
+
         return attackerIds;
+    }
+
+    /// <summary>
+    /// Determines whether a blocker can legally block an attacker.
+    /// Flying attackers can only be blocked by creatures with Flying.
+    /// </summary>
+    private static bool CanBlock(GameCard blocker, GameCard attacker)
+    {
+        if (attacker.ActiveKeywords.Contains(Keyword.Flying))
+            return blocker.ActiveKeywords.Contains(Keyword.Flying);
+        return true;
     }
 
     /// <summary>
@@ -298,29 +594,71 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
     }
 
     /// <summary>
-    /// Blocks when a creature can kill the attacker (power >= attacker toughness).
-    /// Uses the smallest sufficient blocker. Prioritizes blocking the biggest
-    /// attacker first to maximize value. Each blocker is only assigned once.
+    /// Selects blockers using smart evaluation: favorable trades, and chump-blocking
+    /// only when damage would be lethal. Delegates to the testable static overload.
     /// </summary>
     public async Task<Dictionary<Guid, Guid>> ChooseBlockers(IReadOnlyList<GameCard> eligibleBlockers,
         IReadOnlyList<GameCard> attackers, CancellationToken ct = default)
     {
         await DelayAsync(ct);
+        return ChooseBlockers(eligibleBlockers, attackers, playerLife: _lastSelfLife);
+    }
+
+    /// <summary>
+    /// Testable static overload for blocker selection with player life context.
+    /// Logic:
+    /// 1. Calculate total unblocked damage.
+    /// 2. For each attacker (biggest first): favorable block with smallest sufficient blocker.
+    /// 3. If no favorable block and damage is lethal: chump-block with smallest creature.
+    /// </summary>
+    internal static Dictionary<Guid, Guid> ChooseBlockers(IReadOnlyList<GameCard> eligibleBlockers,
+        IReadOnlyList<GameCard> attackers, int playerLife)
+    {
         var assignments = new Dictionary<Guid, Guid>();
         var usedBlockers = new HashSet<Guid>();
 
+        // Calculate total unblocked attack damage
+        var remainingDamage = attackers.Sum(a => a.Power ?? 0);
+        var mustBlockForSurvival = remainingDamage >= playerLife;
+
         foreach (var attacker in attackers.OrderByDescending(a => a.Power ?? 0))
         {
-            var bestBlocker = eligibleBlockers
+            var attackerToughness = attacker.Toughness ?? 0;
+            var attackerPower = attacker.Power ?? 0;
+
+            // Look for favorable block: blocker that can kill the attacker, smallest first
+            var favorableBlocker = eligibleBlockers
                 .Where(b => !usedBlockers.Contains(b.Id))
-                .Where(b => (b.Power ?? 0) >= (attacker.Toughness ?? 0))
+                .Where(b => CanBlock(b, attacker))
+                .Where(b => (b.Power ?? 0) >= attackerToughness)
                 .OrderBy(b => b.Power ?? 0)
                 .FirstOrDefault();
 
-            if (bestBlocker != null)
+            if (favorableBlocker != null)
             {
-                assignments[bestBlocker.Id] = attacker.Id;
-                usedBlockers.Add(bestBlocker.Id);
+                assignments[favorableBlocker.Id] = attacker.Id;
+                usedBlockers.Add(favorableBlocker.Id);
+                remainingDamage -= attackerPower;
+                mustBlockForSurvival = remainingDamage >= playerLife;
+                continue;
+            }
+
+            // No favorable block — chump only if damage would be lethal
+            if (mustBlockForSurvival)
+            {
+                var chumpBlocker = eligibleBlockers
+                    .Where(b => !usedBlockers.Contains(b.Id))
+                    .Where(b => CanBlock(b, attacker))
+                    .OrderBy(b => b.Power ?? 0)
+                    .FirstOrDefault();
+
+                if (chumpBlocker != null)
+                {
+                    assignments[chumpBlocker.Id] = attacker.Id;
+                    usedBlockers.Add(chumpBlocker.Id);
+                    remainingDamage -= attackerPower;
+                    mustBlockForSurvival = remainingDamage >= playerLife;
+                }
             }
         }
 
@@ -457,6 +795,53 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
     }
 
     /// <summary>
+    /// Ranks lands in hand and returns the best one to play.
+    /// Priority: color-matching basic > color-matching dual > non-matching basic > utility > City of Traitors/Ancient Tomb.
+    /// </summary>
+    internal static GameCard? ChooseLandToPlay(IReadOnlyList<GameCard> hand, HashSet<ManaColor> neededColors)
+    {
+        var lands = hand.Where(c => c.IsLand).ToList();
+        if (lands.Count == 0) return null;
+
+        return lands
+            .OrderByDescending(land => ScoreLand(land, neededColors))
+            .First();
+    }
+
+    private static int ScoreLand(GameCard land, HashSet<ManaColor> neededColors)
+    {
+        var score = 0;
+        var producesNeededColor = false;
+
+        if (CardDefinitions.TryGet(land.Name, out var def) && def.ManaAbility != null)
+        {
+            var ability = def.ManaAbility;
+            if (ability.FixedColor.HasValue && neededColors.Contains(ability.FixedColor.Value))
+                producesNeededColor = true;
+            if (ability.ChoiceColors != null && ability.ChoiceColors.Any(c => neededColors.Contains(c)))
+                producesNeededColor = true;
+            if (ability.DynamicColor.HasValue && neededColors.Contains(ability.DynamicColor.Value))
+                producesNeededColor = true;
+        }
+
+        // Basic lands that produce needed colors are best
+        if (land.IsBasicLand && producesNeededColor) score += 100;
+        // Non-basic that produces needed colors (duals, pain lands)
+        else if (producesNeededColor) score += 80;
+        // Basic land not matching needed color (still fine for generic mana)
+        else if (land.IsBasicLand) score += 60;
+
+        // Penalize self-damage lands (Ancient Tomb)
+        if (CardDefinitions.TryGet(land.Name, out var dmgDef) && dmgDef.ManaAbility?.SelfDamage > 0)
+            score -= 30;
+
+        // Heavily penalize City of Traitors (sacrifices when you play another land)
+        if (land.Name == "City of Traitors") score -= 50;
+
+        return score;
+    }
+
+    /// <summary>
     /// Returns the acceptable land range for a given hand size.
     /// 7 cards: 2-5 lands, 6 cards: 2-4, 5 cards: 1-4.
     /// </summary>
@@ -467,6 +852,251 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
         5 => (1, 4),
         _ => (0, handSize) // Always keep at 4 or fewer (handled before this)
     };
+
+    /// <summary>
+    /// Evaluates whether to play a reactive spell (counterspell, removal).
+    /// Returns null if no reactive play is warranted.
+    /// </summary>
+    private static GameAction? EvaluateReaction(Player player, Player opponent, GameState gameState, Guid playerId)
+    {
+        // Check for counterspells when opponent has spell on stack
+        if (gameState.StackCount > 0)
+        {
+            var topOfStack = gameState.StackPeekTop();
+            if (topOfStack != null && topOfStack.ControllerId != playerId)
+            {
+                var counterAction = EvaluateCounterspell(player, opponent, gameState, playerId, topOfStack);
+                if (counterAction != null) return counterAction;
+            }
+        }
+
+        // Instant removal: during combat or end step, when stack is empty
+        if (gameState.StackCount == 0
+            && (gameState.CurrentPhase == Phase.Combat || gameState.CurrentPhase == Phase.End))
+        {
+            var removalAction = EvaluateInstantRemoval(player, opponent, playerId);
+            if (removalAction != null) return removalAction;
+        }
+
+        // InstantUtility: cast during opponent's end step with empty stack
+        if (gameState.StackCount == 0 && gameState.CurrentPhase == Phase.End)
+        {
+            var utilityAction = EvaluateInstantUtility(player, playerId);
+            if (utilityAction != null) return utilityAction;
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Evaluates whether to cast instant-speed removal on opponent creatures.
+    /// Targets the biggest creature by power.
+    /// </summary>
+    private static GameAction? EvaluateInstantRemoval(Player player, Player opponent, Guid playerId)
+    {
+        var opponentCreatures = opponent.Battlefield.Cards
+            .Where(c => c.IsCreature)
+            .OrderByDescending(c => c.Power ?? 0)
+            .ToList();
+
+        if (opponentCreatures.Count == 0) return null;
+
+        foreach (var card in player.Hand.Cards)
+        {
+            if (!CardDefinitions.TryGet(card.Name, out var def)) continue;
+            if (def.SpellRole != SpellRole.InstantRemoval) continue;
+            if (def.ManaCost == null) continue;
+
+            // Check if we can pay the mana cost
+            if (!player.ManaPool.CanPay(def.ManaCost))
+            {
+                // Check alternate cost (Snuff Out: 4 life)
+                if (def.AlternateCost != null && def.AlternateCost.LifeCost > 0
+                    && player.Life > def.AlternateCost.LifeCost + 5)
+                {
+                    return GameAction.CastSpell(playerId, card.Id, useAlternateCost: true);
+                }
+                continue;
+            }
+
+            // Target the biggest creature
+            return GameAction.CastSpell(playerId, card.Id);
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Evaluates whether to cast an instant-speed utility spell (Brainstorm, Impulse, etc.)
+    /// during opponent's end step. Cast if mana is available in pool.
+    /// </summary>
+    private static GameAction? EvaluateInstantUtility(Player player, Guid playerId)
+    {
+        foreach (var card in player.Hand.Cards)
+        {
+            if (!CardDefinitions.TryGet(card.Name, out var def)) continue;
+            if (def.SpellRole != SpellRole.InstantUtility) continue;
+            if (def.ManaCost == null) continue;
+
+            if (player.ManaPool.CanPay(def.ManaCost))
+                return GameAction.CastSpell(playerId, card.Id);
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Checks if casting a ramp spell (e.g., Dark Ritual) would enable casting a proactive spell
+    /// that the bot currently cannot afford. Returns the ramp spell cast action if so.
+    /// </summary>
+    private GameAction? EvaluateRampSpell(IReadOnlyList<GameCard> hand, Player player,
+        GameState gameState, Guid playerId, List<GameCard> untappedLands)
+    {
+        var potentialMana = player.ManaPool.Total + untappedLands.Count;
+
+        foreach (var card in hand)
+        {
+            if (!CardDefinitions.TryGet(card.Name, out var def)) continue;
+            if (def.SpellRole != SpellRole.Ramp) continue;
+            if (def.ManaCost == null) continue;
+
+            // Check if we can afford to cast the ramp spell itself
+            var canPayFromPool = player.ManaPool.CanPay(def.ManaCost);
+            List<Guid> rampTapIds = [];
+            if (!canPayFromPool)
+            {
+                rampTapIds = PlanTapSequence(untappedLands, def.ManaCost);
+                if (rampTapIds.Count == 0) continue;
+            }
+
+            // Calculate mana gain from ramp spell
+            var rampManaGain = 0;
+            if (def.Effect is AddManaSpellEffect addMana)
+                rampManaGain = addMana.Amount;
+
+            if (rampManaGain == 0) continue;
+
+            var potentialManaAfterRamp = potentialMana + rampManaGain - def.ManaCost.ConvertedManaCost;
+
+            // Check if any proactive spell in hand becomes affordable with the extra mana
+            var hasUnaffordableSpellThatBecomesAffordable = hand.Any(spell =>
+            {
+                if (spell.Id == card.Id) return false;
+                if (spell.IsLand) return false;
+                if (spell.ManaCost == null) return false;
+
+                if (CardDefinitions.TryGet(spell.Name, out var spellDef))
+                {
+                    if (spellDef.SpellRole != SpellRole.Proactive)
+                        return false;
+                }
+                else if (spell.CardTypes.HasFlag(CardType.Instant)) return false;
+
+                var effectiveCost = GetEffectiveCost(spell, gameState, player);
+
+                // Currently unaffordable
+                if (effectiveCost.ConvertedManaCost <= potentialMana) return false;
+
+                // Affordable after ramp
+                return effectiveCost.ConvertedManaCost <= potentialManaAfterRamp;
+            });
+
+            if (hasUnaffordableSpellThatBecomesAffordable)
+            {
+                if (!canPayFromPool)
+                {
+                    // Need to tap lands first, then cast ramp spell
+                    for (int i = 1; i < rampTapIds.Count; i++)
+                        _plannedActions.Enqueue(GameAction.TapCard(playerId, rampTapIds[i]));
+                    _plannedActions.Enqueue(GameAction.CastSpell(playerId, card.Id));
+                    return GameAction.TapCard(playerId, rampTapIds[0]);
+                }
+                return GameAction.CastSpell(playerId, card.Id);
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Evaluates whether to counter an opponent's spell on the stack.
+    /// Checks hand for counterspells and applies heuristics per counter type.
+    /// </summary>
+    private static GameAction? EvaluateCounterspell(Player player, Player opponent, GameState gameState, Guid playerId, IStackObject targetSpell)
+    {
+        var hand = player.Hand.Cards;
+        var opponentUntappedLands = opponent.Battlefield.Cards.Count(c => c.IsLand && !c.IsTapped);
+
+        // Get the spell's CMC from the stack object
+        var spellCmc = 0;
+        if (targetSpell is StackObject so)
+            spellCmc = so.Card.ManaCost?.ConvertedManaCost ?? 0;
+
+        foreach (var card in hand)
+        {
+            if (!CardDefinitions.TryGet(card.Name, out var def)) continue;
+            if (def.SpellRole != SpellRole.Counterspell) continue;
+
+            // --- Hard counters (Counterspell, Absorb) ---
+            if (def.Effect is CounterSpellEffect or CounterAndGainLifeEffect)
+            {
+                if (def.AlternateCost == null && def.ManaCost != null && player.ManaPool.CanPay(def.ManaCost))
+                {
+                    if (spellCmc >= 3)
+                        return GameAction.CastSpell(playerId, card.Id);
+                }
+            }
+
+            // --- Daze (soft counter — return Island to hand) ---
+            if (card.Name == "Daze")
+            {
+                if (opponentUntappedLands == 0)
+                {
+                    var hasIsland = player.Battlefield.Cards.Any(c => c.Subtypes.Contains("Island"));
+                    if (hasIsland)
+                        return GameAction.CastSpell(playerId, card.Id, useAlternateCost: true);
+                }
+                continue;
+            }
+
+            // --- Conditional counters (Mana Leak, Spell Pierce, Flusterstorm, Prohibit) ---
+            if (def.Effect is ConditionalCounterEffect conditional)
+            {
+                if (def.ManaCost != null && player.ManaPool.CanPay(def.ManaCost))
+                {
+                    if (opponentUntappedLands < conditional.GenericCost)
+                        return GameAction.CastSpell(playerId, card.Id);
+                }
+                continue;
+            }
+
+            // --- Force of Will (exile blue card, pay 1 life) ---
+            if (card.Name == "Force of Will")
+            {
+                if (spellCmc >= 4)
+                {
+                    var hasBlueCardToExile = hand.Any(c => c.Id != card.Id
+                        && c.ManaCost != null && c.ManaCost.ColorRequirements.ContainsKey(ManaColor.Blue));
+                    if (hasBlueCardToExile && player.Life > 1)
+                        return GameAction.CastSpell(playerId, card.Id, useAlternateCost: true);
+                }
+                continue;
+            }
+
+            // --- Pyroblast (counter blue spells) ---
+            if (card.Name == "Pyroblast")
+            {
+                if (targetSpell is StackObject pyrTarget && pyrTarget.Card.ManaCost?.ColorRequirements.ContainsKey(ManaColor.Blue) == true)
+                {
+                    if (def.ManaCost != null && player.ManaPool.CanPay(def.ManaCost))
+                        return GameAction.CastSpell(playerId, card.Id);
+                }
+                continue;
+            }
+        }
+
+        return null;
+    }
 
     /// <summary>
     /// Evaluates activated abilities on permanents and returns an action if one is worth activating.
@@ -568,50 +1198,6 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
         }
 
         return null;
-    }
-
-    /// <summary>
-    /// Checks whether at least one spell in hand can be cast given the producible colors
-    /// from the mana pool and all untapped lands' mana abilities.
-    /// </summary>
-    private static bool CanAffordAnySpell(IReadOnlyList<GameCard> hand, List<GameCard> untappedLands,
-        Player player, GameState gameState, int potentialMana)
-    {
-        // Collect all producible colors from pool + untapped land abilities
-        var producibleColors = new HashSet<ManaColor>();
-        foreach (var (color, _) in player.ManaPool.Available)
-        {
-            producibleColors.Add(color);
-        }
-        foreach (var land in untappedLands)
-        {
-            if (land.ManaAbility == null) continue;
-            if (land.ManaAbility.FixedColor.HasValue)
-                producibleColors.Add(land.ManaAbility.FixedColor.Value);
-            if (land.ManaAbility.ChoiceColors != null)
-                foreach (var c in land.ManaAbility.ChoiceColors)
-                    producibleColors.Add(c);
-            if (land.ManaAbility.DynamicColor.HasValue)
-                producibleColors.Add(land.ManaAbility.DynamicColor.Value);
-        }
-
-        return hand
-            .Where(c => !c.IsLand && c.ManaCost != null)
-            .Any(c =>
-            {
-                var cost = c.ManaCost!;
-                var reduction = ComputeCostModification(gameState, c, player);
-                if (reduction != 0)
-                    cost = cost.WithGenericReduction(-reduction);
-
-                // Check CMC affordability
-                if (cost.ConvertedManaCost > potentialMana)
-                    return false;
-
-                // Check all color requirements can be produced
-                return cost.ColorRequirements.All(kvp =>
-                    producibleColors.Contains(kvp.Key));
-            });
     }
 
     private static int ComputeCostModification(GameState gameState, GameCard card, Player caster)

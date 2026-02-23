@@ -41,5 +41,6 @@ public record CardDefinition(
     public ManaCost? NinjutsuCost { get; init; }
     public CardDefinition? TransformInto { get; init; }
     public AdventurePart? Adventure { get; init; }
+    public SpellRole SpellRole { get; init; } = SpellRole.Proactive;
     public bool CannotBeCountered { get; init; }
 }
