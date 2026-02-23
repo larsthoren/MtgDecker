@@ -48,7 +48,13 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
         // Priority 1: Play a land
         if (hand.Count > 0 && player.LandsPlayedThisTurn == 0)
         {
-            var land = hand.FirstOrDefault(c => c.IsLand);
+            // Compute needed colors from spells in hand
+            var neededColorsForLand = new HashSet<ManaColor>();
+            foreach (var spell in hand.Where(c => !c.IsLand && c.ManaCost != null))
+                foreach (var color in spell.ManaCost!.ColorRequirements.Keys)
+                    neededColorsForLand.Add(color);
+
+            var land = ChooseLandToPlay(hand, neededColorsForLand);
             if (land != null)
             {
                 await DelayAsync(ct);
@@ -454,6 +460,53 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
             .First();
 
         return new TargetInfo(best.Id, defaultOwnerId, Enums.ZoneType.Battlefield);
+    }
+
+    /// <summary>
+    /// Ranks lands in hand and returns the best one to play.
+    /// Priority: color-matching basic > color-matching dual > non-matching basic > utility > City of Traitors/Ancient Tomb.
+    /// </summary>
+    internal static GameCard? ChooseLandToPlay(IReadOnlyList<GameCard> hand, HashSet<ManaColor> neededColors)
+    {
+        var lands = hand.Where(c => c.IsLand).ToList();
+        if (lands.Count == 0) return null;
+
+        return lands
+            .OrderByDescending(land => ScoreLand(land, neededColors))
+            .First();
+    }
+
+    private static int ScoreLand(GameCard land, HashSet<ManaColor> neededColors)
+    {
+        var score = 0;
+        var producesNeededColor = false;
+
+        if (CardDefinitions.TryGet(land.Name, out var def) && def.ManaAbility != null)
+        {
+            var ability = def.ManaAbility;
+            if (ability.FixedColor.HasValue && neededColors.Contains(ability.FixedColor.Value))
+                producesNeededColor = true;
+            if (ability.ChoiceColors != null && ability.ChoiceColors.Any(c => neededColors.Contains(c)))
+                producesNeededColor = true;
+            if (ability.DynamicColor.HasValue && neededColors.Contains(ability.DynamicColor.Value))
+                producesNeededColor = true;
+        }
+
+        // Basic lands that produce needed colors are best
+        if (land.IsBasicLand && producesNeededColor) score += 100;
+        // Non-basic that produces needed colors (duals, pain lands)
+        else if (producesNeededColor) score += 80;
+        // Basic land not matching needed color (still fine for generic mana)
+        else if (land.IsBasicLand) score += 60;
+
+        // Penalize self-damage lands (Ancient Tomb)
+        if (CardDefinitions.TryGet(land.Name, out var dmgDef) && dmgDef.ManaAbility?.SelfDamage > 0)
+            score -= 30;
+
+        // Heavily penalize City of Traitors (sacrifices when you play another land)
+        if (land.Name == "City of Traitors") score -= 50;
+
+        return score;
     }
 
     /// <summary>
