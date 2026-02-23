@@ -621,6 +621,7 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
             // Look for favorable block: blocker that can kill the attacker, smallest first
             var favorableBlocker = eligibleBlockers
                 .Where(b => !usedBlockers.Contains(b.Id))
+                .Where(b => CanBlock(b, attacker))
                 .Where(b => (b.Power ?? 0) >= attackerToughness)
                 .OrderBy(b => b.Power ?? 0)
                 .FirstOrDefault();
@@ -639,6 +640,7 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
             {
                 var chumpBlocker = eligibleBlockers
                     .Where(b => !usedBlockers.Contains(b.Id))
+                    .Where(b => CanBlock(b, attacker))
                     .OrderBy(b => b.Power ?? 0)
                     .FirstOrDefault();
 
