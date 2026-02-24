@@ -449,10 +449,12 @@
                         HasTapAbility="@(_selectedCard.IsLand || _selectedCard.ManaAbility != null)"
                         HasActivatedAbility="@HasActivatedAbility(_selectedCard)"
                         HasAlternateCost="@HasAlternateCostForCard(_selectedCard)"
+                        HasNinjutsuCost="@HasNinjutsuAvailable(_selectedCard)"
                         OnPlay="HandlePlay"
                         OnPlayAlternate="HandlePlayAlternate"
                         OnTapToggle="HandleTapToggle"
                         OnActivate="HandleActivate"
+                        OnNinjutsu="HandleNinjutsu"
                         OnClose="ClearSelection" />
         </div>
     }
