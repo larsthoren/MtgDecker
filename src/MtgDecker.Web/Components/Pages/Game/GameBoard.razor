@@ -1366,6 +1366,23 @@
 
     // --- Ninjutsu ---
 
+    private void HandleNinjutsu()
+    {
+        if (_selectedCard == null) return;
+        _ninjutsuCard = _selectedCard;
+        ClearSelection();
+    }
+
+    private async Task HandleNinjutsuTargetClick(GameCard card)
+    {
+        if (_ninjutsuCard == null) return;
+        await OnAction.InvokeAsync(
+            GameAction.Ninjutsu(LocalPlayer.Id, _ninjutsuCard.Id, card.Id));
+        _ninjutsuCard = null;
+    }
+
+    private void CancelNinjutsu() => _ninjutsuCard = null;
+
     private bool HasNinjutsuAvailable(GameCard? card)
     {
         if (card == null) return false;
