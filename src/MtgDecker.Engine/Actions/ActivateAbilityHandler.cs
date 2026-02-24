@@ -160,6 +160,28 @@ internal class ActivateAbilityHandler : IActionHandler
                 return;
             }
         }
+        else if (cost.DiscardAny)
+        {
+            var eligible = player.Hand.Cards.ToList();
+
+            if (eligible.Count == 0)
+            {
+                state.Log($"Cannot activate {abilitySource.Name} — no cards in hand to discard.");
+                return;
+            }
+
+            var chosenId = await player.DecisionHandler.ChooseCard(
+                eligible, "Choose a card to discard", optional: false, ct);
+
+            if (chosenId.HasValue)
+                discardTarget = eligible.FirstOrDefault(c => c.Id == chosenId.Value);
+
+            if (discardTarget == null)
+            {
+                state.Log($"Cannot activate {abilitySource.Name} — no discard target chosen.");
+                return;
+            }
+        }
 
         List<GameCard>? exileTargets = null;
         if (cost.ExileFromGraveyardCount > 0)

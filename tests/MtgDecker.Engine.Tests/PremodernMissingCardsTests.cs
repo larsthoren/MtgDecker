@@ -3,6 +3,7 @@ using MtgDecker.Engine.Effects;
 using MtgDecker.Engine.Enums;
 using MtgDecker.Engine.Mana;
 using MtgDecker.Engine.Tests.Helpers;
+using TriggerEffects = MtgDecker.Engine.Triggers.Effects;
 
 // ReSharper disable InconsistentNaming
 
@@ -906,6 +907,691 @@ public class PremodernMissingCardsTests
         card.Toughness.Should().Be(1);
         card.IsCreature.Should().BeTrue();
         card.Subtypes.Should().Contain("Cat");
+    }
+
+    #endregion
+
+    // ─── Task 5: Creatures with Activated Abilities ─────────────────────
+
+    private (GameEngine engine, GameState state, Player p1, Player p2, TestDecisionHandler h1, TestDecisionHandler h2) CreateEngineSetup()
+    {
+        var h1 = new TestDecisionHandler();
+        var h2 = new TestDecisionHandler();
+        var p1 = new Player(Guid.NewGuid(), "P1", h1);
+        var p2 = new Player(Guid.NewGuid(), "P2", h2);
+
+        // Add library cards to prevent deck-out
+        for (int i = 0; i < 20; i++)
+        {
+            p1.Library.Add(new GameCard { Name = $"Card{i}" });
+            p2.Library.Add(new GameCard { Name = $"Card{i}" });
+        }
+
+        var state = new GameState(p1, p2);
+        var engine = new GameEngine(state);
+        return (engine, state, p1, p2, h1, h2);
+    }
+
+    #region True Believer
+
+    [Fact]
+    public void TrueBeliever_IsRegistered()
+    {
+        CardDefinitions.TryGet("True Believer", out var def).Should().BeTrue();
+        def!.CardTypes.Should().Be(CardType.Creature);
+        def.ManaCost.Should().NotBeNull();
+        def.ManaCost!.ConvertedManaCost.Should().Be(2);
+        def.ManaCost.ColorRequirements.Should().ContainKey(ManaColor.White).WhoseValue.Should().Be(2);
+        def.Power.Should().Be(2);
+        def.Toughness.Should().Be(2);
+    }
+
+    [Fact]
+    public void TrueBeliever_HasSubtypes()
+    {
+        CardDefinitions.TryGet("True Believer", out var def);
+        def!.Subtypes.Should().BeEquivalentTo(new[] { "Human", "Cleric" });
+    }
+
+    [Fact]
+    public void TrueBeliever_GrantsPlayerShroud()
+    {
+        CardDefinitions.TryGet("True Believer", out var def);
+        def!.ContinuousEffects.Should().ContainSingle();
+        def.ContinuousEffects[0].Type.Should().Be(ContinuousEffectType.GrantPlayerShroud);
+    }
+
+    [Fact]
+    public void TrueBeliever_HasNoActivatedAbilities()
+    {
+        CardDefinitions.TryGet("True Believer", out var def);
+        def!.ActivatedAbilities.Should().BeEmpty();
+    }
+
+    #endregion
+
+    #region Nova Cleric
+
+    [Fact]
+    public void NovaCleric_IsRegistered()
+    {
+        CardDefinitions.TryGet("Nova Cleric", out var def).Should().BeTrue();
+        def!.CardTypes.Should().Be(CardType.Creature);
+        def.ManaCost.Should().NotBeNull();
+        def.ManaCost!.ConvertedManaCost.Should().Be(1);
+        def.ManaCost.ColorRequirements.Should().ContainKey(ManaColor.White).WhoseValue.Should().Be(1);
+        def.Power.Should().Be(1);
+        def.Toughness.Should().Be(2);
+    }
+
+    [Fact]
+    public void NovaCleric_HasSubtypes()
+    {
+        CardDefinitions.TryGet("Nova Cleric", out var def);
+        def!.Subtypes.Should().BeEquivalentTo(new[] { "Human", "Cleric" });
+    }
+
+    [Fact]
+    public void NovaCleric_HasActivatedAbility()
+    {
+        CardDefinitions.TryGet("Nova Cleric", out var def);
+        def!.ActivatedAbilities.Should().ContainSingle();
+
+        var ability = def.ActivatedAbilities[0];
+        ability.Cost.TapSelf.Should().BeTrue();
+        ability.Cost.SacrificeSelf.Should().BeTrue();
+        ability.Cost.ManaCost.Should().NotBeNull();
+        ability.Cost.ManaCost!.ConvertedManaCost.Should().Be(3);
+        ability.Cost.ManaCost.ColorRequirements.Should().ContainKey(ManaColor.White);
+        ability.Effect.Should().BeOfType<TriggerEffects.DestroyAllEnchantmentsEffect>();
+    }
+
+    [Fact]
+    public async Task NovaCleric_Activation_DestroysAllEnchantments()
+    {
+        var (engine, state, p1, p2, h1, h2) = CreateEngineSetup();
+
+        var cleric = GameCard.Create("Nova Cleric");
+        p1.Battlefield.Add(cleric);
+        p1.ManaPool.Add(ManaColor.White, 3);
+
+        var ench1 = new GameCard { Name = "Crusade", CardTypes = CardType.Enchantment };
+        var ench2 = new GameCard { Name = "Worship", CardTypes = CardType.Enchantment };
+        p1.Battlefield.Add(ench1);
+        p2.Battlefield.Add(ench2);
+
+        var nonEnch = new GameCard { Name = "Bear", CardTypes = CardType.Creature, BasePower = 2, BaseToughness = 2 };
+        p2.Battlefield.Add(nonEnch);
+
+        var action = GameAction.ActivateAbility(p1.Id, cleric.Id);
+        await engine.ExecuteAction(action);
+        await engine.ResolveAllTriggersAsync();
+
+        // Cleric should be sacrificed
+        p1.Battlefield.Cards.Should().NotContain(c => c.Id == cleric.Id);
+        p1.Graveyard.Cards.Should().Contain(c => c.Id == cleric.Id);
+
+        // Both enchantments destroyed
+        p1.Battlefield.Cards.Should().NotContain(c => c.Id == ench1.Id);
+        p2.Battlefield.Cards.Should().NotContain(c => c.Id == ench2.Id);
+        p1.Graveyard.Cards.Should().Contain(c => c.Id == ench1.Id);
+        p2.Graveyard.Cards.Should().Contain(c => c.Id == ench2.Id);
+
+        // Non-enchantment should survive
+        p2.Battlefield.Cards.Should().Contain(c => c.Id == nonEnch.Id);
+    }
+
+    #endregion
+
+    #region Thornscape Apprentice
+
+    [Fact]
+    public void ThornscapeApprentice_IsRegistered()
+    {
+        CardDefinitions.TryGet("Thornscape Apprentice", out var def).Should().BeTrue();
+        def!.CardTypes.Should().Be(CardType.Creature);
+        def.ManaCost.Should().NotBeNull();
+        def.ManaCost!.ConvertedManaCost.Should().Be(1);
+        def.ManaCost.ColorRequirements.Should().ContainKey(ManaColor.Green).WhoseValue.Should().Be(1);
+        def.Power.Should().Be(1);
+        def.Toughness.Should().Be(1);
+    }
+
+    [Fact]
+    public void ThornscapeApprentice_HasSubtypes()
+    {
+        CardDefinitions.TryGet("Thornscape Apprentice", out var def);
+        def!.Subtypes.Should().BeEquivalentTo(new[] { "Human", "Wizard" });
+    }
+
+    [Fact]
+    public void ThornscapeApprentice_HasExactlyTwoAbilities()
+    {
+        CardDefinitions.TryGet("Thornscape Apprentice", out var def);
+        def!.ActivatedAbilities.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public void ThornscapeApprentice_FirstAbility_GrantsFirstStrike()
+    {
+        CardDefinitions.TryGet("Thornscape Apprentice", out var def);
+        var ability = def!.ActivatedAbilities[0];
+
+        ability.Cost.TapSelf.Should().BeTrue();
+        ability.Cost.ManaCost.Should().NotBeNull();
+        ability.Cost.ManaCost!.ColorRequirements.Should().ContainKey(ManaColor.Red);
+        ability.Effect.Should().BeOfType<TriggerEffects.GrantFirstStrikeEffect>();
+        ability.TargetFilter.Should().NotBeNull();
+    }
+
+    [Fact]
+    public void ThornscapeApprentice_SecondAbility_TapsTarget()
+    {
+        CardDefinitions.TryGet("Thornscape Apprentice", out var def);
+        var ability = def!.ActivatedAbilities[1];
+
+        ability.Cost.TapSelf.Should().BeTrue();
+        ability.Cost.ManaCost.Should().NotBeNull();
+        ability.Cost.ManaCost!.ColorRequirements.Should().ContainKey(ManaColor.White);
+        ability.Effect.Should().BeOfType<TriggerEffects.TapTargetEffect>();
+        ability.TargetFilter.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task ThornscapeApprentice_FirstAbility_GrantsFirstStrikeToTarget()
+    {
+        var (engine, state, p1, p2, h1, h2) = CreateEngineSetup();
+
+        var apprentice = GameCard.Create("Thornscape Apprentice");
+        p1.Battlefield.Add(apprentice);
+        p1.ManaPool.Add(ManaColor.Red, 1);
+
+        var target = new GameCard { Name = "Bear", CardTypes = CardType.Creature, BasePower = 2, BaseToughness = 2 };
+        p1.Battlefield.Add(target);
+
+        var action = GameAction.ActivateAbility(p1.Id, apprentice.Id, targetId: target.Id, abilityIndex: 0);
+        await engine.ExecuteAction(action);
+        await engine.ResolveAllTriggersAsync();
+
+        // Recalculate state to apply continuous effects
+        engine.RecalculateState();
+
+        apprentice.IsTapped.Should().BeTrue();
+        target.ActiveKeywords.Should().Contain(Keyword.FirstStrike);
+    }
+
+    [Fact]
+    public async Task ThornscapeApprentice_SecondAbility_TapsTargetCreature()
+    {
+        var (engine, state, p1, p2, h1, h2) = CreateEngineSetup();
+
+        var apprentice = GameCard.Create("Thornscape Apprentice");
+        p1.Battlefield.Add(apprentice);
+        p1.ManaPool.Add(ManaColor.White, 1);
+
+        var target = new GameCard { Name = "Bear", CardTypes = CardType.Creature, BasePower = 2, BaseToughness = 2 };
+        p2.Battlefield.Add(target);
+
+        var action = GameAction.ActivateAbility(p1.Id, apprentice.Id, targetId: target.Id, abilityIndex: 1);
+        await engine.ExecuteAction(action);
+        await engine.ResolveAllTriggersAsync();
+
+        apprentice.IsTapped.Should().BeTrue();
+        target.IsTapped.Should().BeTrue();
+    }
+
+    #endregion
+
+    #region Waterfront Bouncer
+
+    [Fact]
+    public void WaterfrontBouncer_IsRegistered()
+    {
+        CardDefinitions.TryGet("Waterfront Bouncer", out var def).Should().BeTrue();
+        def!.CardTypes.Should().Be(CardType.Creature);
+        def.ManaCost.Should().NotBeNull();
+        def.ManaCost!.ConvertedManaCost.Should().Be(2);
+        def.ManaCost.ColorRequirements.Should().ContainKey(ManaColor.Blue).WhoseValue.Should().Be(1);
+        def.Power.Should().Be(1);
+        def.Toughness.Should().Be(1);
+    }
+
+    [Fact]
+    public void WaterfrontBouncer_HasSubtypes()
+    {
+        CardDefinitions.TryGet("Waterfront Bouncer", out var def);
+        def!.Subtypes.Should().BeEquivalentTo(new[] { "Merfolk", "Spellshaper" });
+    }
+
+    [Fact]
+    public void WaterfrontBouncer_HasActivatedAbility()
+    {
+        CardDefinitions.TryGet("Waterfront Bouncer", out var def);
+        def!.ActivatedAbilities.Should().ContainSingle();
+
+        var ability = def.ActivatedAbilities[0];
+        ability.Cost.TapSelf.Should().BeTrue();
+        ability.Cost.ManaCost.Should().NotBeNull();
+        ability.Cost.ManaCost!.ColorRequirements.Should().ContainKey(ManaColor.Blue);
+        ability.Cost.DiscardAny.Should().BeTrue();
+        ability.Effect.Should().BeOfType<TriggerEffects.BounceTargetCreatureEffect>();
+        ability.TargetFilter.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task WaterfrontBouncer_Activation_BouncesTargetCreature()
+    {
+        var (engine, state, p1, p2, h1, h2) = CreateEngineSetup();
+
+        var bouncer = GameCard.Create("Waterfront Bouncer");
+        p1.Battlefield.Add(bouncer);
+        p1.ManaPool.Add(ManaColor.Blue, 1);
+
+        var discardCard = new GameCard { Name = "Forest", CardTypes = CardType.Land };
+        p1.Hand.Add(discardCard);
+
+        var target = new GameCard { Name = "Bear", CardTypes = CardType.Creature, BasePower = 2, BaseToughness = 2 };
+        p2.Battlefield.Add(target);
+
+        h1.EnqueueCardChoice(discardCard.Id); // Choose card to discard
+
+        var action = GameAction.ActivateAbility(p1.Id, bouncer.Id, targetId: target.Id);
+        await engine.ExecuteAction(action);
+        await engine.ResolveAllTriggersAsync();
+
+        // Bouncer should be tapped
+        bouncer.IsTapped.Should().BeTrue();
+
+        // Discard card should be in graveyard
+        p1.Hand.Cards.Should().NotContain(c => c.Id == discardCard.Id);
+        p1.Graveyard.Cards.Should().Contain(c => c.Id == discardCard.Id);
+
+        // Target creature should be returned to owner's hand
+        p2.Battlefield.Cards.Should().NotContain(c => c.Id == target.Id);
+        p2.Hand.Cards.Should().Contain(c => c.Id == target.Id);
+    }
+
+    [Fact]
+    public async Task WaterfrontBouncer_NoCardsInHand_CannotActivate()
+    {
+        var (engine, state, p1, p2, h1, h2) = CreateEngineSetup();
+
+        var bouncer = GameCard.Create("Waterfront Bouncer");
+        p1.Battlefield.Add(bouncer);
+        p1.ManaPool.Add(ManaColor.Blue, 1);
+
+        var target = new GameCard { Name = "Bear", CardTypes = CardType.Creature, BasePower = 2, BaseToughness = 2 };
+        p2.Battlefield.Add(target);
+
+        var action = GameAction.ActivateAbility(p1.Id, bouncer.Id, targetId: target.Id);
+        await engine.ExecuteAction(action);
+
+        // Bouncer should NOT be tapped (activation failed)
+        bouncer.IsTapped.Should().BeFalse();
+
+        // Target should still be on battlefield
+        p2.Battlefield.Cards.Should().Contain(c => c.Id == target.Id);
+    }
+
+    #endregion
+
+    #region Wild Mongrel
+
+    [Fact]
+    public void WildMongrel_IsRegistered()
+    {
+        CardDefinitions.TryGet("Wild Mongrel", out var def).Should().BeTrue();
+        def!.CardTypes.Should().Be(CardType.Creature);
+        def.ManaCost.Should().NotBeNull();
+        def.ManaCost!.ConvertedManaCost.Should().Be(2);
+        def.ManaCost.ColorRequirements.Should().ContainKey(ManaColor.Green).WhoseValue.Should().Be(1);
+        def.Power.Should().Be(2);
+        def.Toughness.Should().Be(2);
+    }
+
+    [Fact]
+    public void WildMongrel_HasSubtypes()
+    {
+        CardDefinitions.TryGet("Wild Mongrel", out var def);
+        def!.Subtypes.Should().BeEquivalentTo(new[] { "Dog" });
+    }
+
+    [Fact]
+    public void WildMongrel_HasDiscardPumpAbility()
+    {
+        CardDefinitions.TryGet("Wild Mongrel", out var def);
+        def!.ActivatedAbilities.Should().ContainSingle();
+
+        var ability = def.ActivatedAbilities[0];
+        ability.Cost.DiscardAny.Should().BeTrue();
+        ability.Cost.TapSelf.Should().BeFalse();
+        ability.Cost.ManaCost.Should().BeNull();
+        ability.Effect.Should().BeOfType<TriggerEffects.PumpSelfEffect>();
+    }
+
+    [Fact]
+    public async Task WildMongrel_Activation_PumpsAndDiscards()
+    {
+        var (engine, state, p1, p2, h1, h2) = CreateEngineSetup();
+
+        var mongrel = GameCard.Create("Wild Mongrel");
+        p1.Battlefield.Add(mongrel);
+
+        var discardCard = new GameCard { Name = "Forest", CardTypes = CardType.Land };
+        p1.Hand.Add(discardCard);
+
+        h1.EnqueueCardChoice(discardCard.Id);
+
+        var action = GameAction.ActivateAbility(p1.Id, mongrel.Id);
+        await engine.ExecuteAction(action);
+        await engine.ResolveAllTriggersAsync();
+        engine.RecalculateState();
+
+        // Card should be discarded
+        p1.Hand.Cards.Should().NotContain(c => c.Id == discardCard.Id);
+        p1.Graveyard.Cards.Should().Contain(c => c.Id == discardCard.Id);
+
+        // Mongrel should be pumped +1/+1
+        mongrel.Power.Should().Be(3);
+        mongrel.Toughness.Should().Be(3);
+    }
+
+    [Fact]
+    public async Task WildMongrel_MultipleActivations_StacksPump()
+    {
+        var (engine, state, p1, p2, h1, h2) = CreateEngineSetup();
+
+        var mongrel = GameCard.Create("Wild Mongrel");
+        p1.Battlefield.Add(mongrel);
+
+        var card1 = new GameCard { Name = "Forest", CardTypes = CardType.Land };
+        var card2 = new GameCard { Name = "Mountain", CardTypes = CardType.Land };
+        p1.Hand.Add(card1);
+        p1.Hand.Add(card2);
+
+        h1.EnqueueCardChoice(card1.Id);
+        var action1 = GameAction.ActivateAbility(p1.Id, mongrel.Id);
+        await engine.ExecuteAction(action1);
+        await engine.ResolveAllTriggersAsync();
+
+        h1.EnqueueCardChoice(card2.Id);
+        var action2 = GameAction.ActivateAbility(p1.Id, mongrel.Id);
+        await engine.ExecuteAction(action2);
+        await engine.ResolveAllTriggersAsync();
+        engine.RecalculateState();
+
+        // Should be +2/+2 from two activations
+        mongrel.Power.Should().Be(4);
+        mongrel.Toughness.Should().Be(4);
+    }
+
+    [Fact]
+    public async Task WildMongrel_NoTapRequired()
+    {
+        var (engine, state, p1, p2, h1, h2) = CreateEngineSetup();
+
+        var mongrel = GameCard.Create("Wild Mongrel");
+        p1.Battlefield.Add(mongrel);
+
+        var card = new GameCard { Name = "Forest", CardTypes = CardType.Land };
+        p1.Hand.Add(card);
+
+        h1.EnqueueCardChoice(card.Id);
+
+        var action = GameAction.ActivateAbility(p1.Id, mongrel.Id);
+        await engine.ExecuteAction(action);
+        await engine.ResolveAllTriggersAsync();
+
+        // Mongrel should NOT be tapped (no tap cost)
+        mongrel.IsTapped.Should().BeFalse();
+    }
+
+    #endregion
+
+    #region Aquamoeba
+
+    [Fact]
+    public void Aquamoeba_IsRegistered()
+    {
+        CardDefinitions.TryGet("Aquamoeba", out var def).Should().BeTrue();
+        def!.CardTypes.Should().Be(CardType.Creature);
+        def.ManaCost.Should().NotBeNull();
+        def.ManaCost!.ConvertedManaCost.Should().Be(2);
+        def.ManaCost.ColorRequirements.Should().ContainKey(ManaColor.Blue).WhoseValue.Should().Be(1);
+        def.Power.Should().Be(1);
+        def.Toughness.Should().Be(3);
+    }
+
+    [Fact]
+    public void Aquamoeba_HasSubtypes()
+    {
+        CardDefinitions.TryGet("Aquamoeba", out var def);
+        def!.Subtypes.Should().BeEquivalentTo(new[] { "Elemental", "Beast" });
+    }
+
+    [Fact]
+    public void Aquamoeba_HasSwapAbility()
+    {
+        CardDefinitions.TryGet("Aquamoeba", out var def);
+        def!.ActivatedAbilities.Should().ContainSingle();
+
+        var ability = def.ActivatedAbilities[0];
+        ability.Cost.DiscardAny.Should().BeTrue();
+        ability.Cost.TapSelf.Should().BeFalse();
+        ability.Cost.ManaCost.Should().BeNull();
+        ability.Effect.Should().BeOfType<TriggerEffects.SwapPowerToughnessEffect>();
+    }
+
+    [Fact]
+    public async Task Aquamoeba_Activation_SwapsPowerToughness()
+    {
+        var (engine, state, p1, p2, h1, h2) = CreateEngineSetup();
+
+        var aquamoeba = GameCard.Create("Aquamoeba");
+        p1.Battlefield.Add(aquamoeba);
+
+        var discardCard = new GameCard { Name = "Island", CardTypes = CardType.Land };
+        p1.Hand.Add(discardCard);
+
+        h1.EnqueueCardChoice(discardCard.Id);
+
+        var action = GameAction.ActivateAbility(p1.Id, aquamoeba.Id);
+        await engine.ExecuteAction(action);
+        await engine.ResolveAllTriggersAsync();
+        engine.RecalculateState();
+
+        // After swap: 1/3 becomes 3/1
+        aquamoeba.Power.Should().Be(3);
+        aquamoeba.Toughness.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Aquamoeba_NoHandCards_CannotActivate()
+    {
+        var (engine, state, p1, p2, h1, h2) = CreateEngineSetup();
+
+        var aquamoeba = GameCard.Create("Aquamoeba");
+        p1.Battlefield.Add(aquamoeba);
+
+        var action = GameAction.ActivateAbility(p1.Id, aquamoeba.Id);
+        await engine.ExecuteAction(action);
+
+        // Stats should remain unchanged (activation failed)
+        aquamoeba.Power.Should().Be(1);
+        aquamoeba.Toughness.Should().Be(3);
+    }
+
+    #endregion
+
+    #region Flametongue Kavu
+
+    [Fact]
+    public void FlametongueKavu_IsRegistered()
+    {
+        CardDefinitions.TryGet("Flametongue Kavu", out var def).Should().BeTrue();
+        def!.CardTypes.Should().Be(CardType.Creature);
+        def.ManaCost.Should().NotBeNull();
+        def.ManaCost!.ConvertedManaCost.Should().Be(4);
+        def.ManaCost.ColorRequirements.Should().ContainKey(ManaColor.Red).WhoseValue.Should().Be(1);
+        def.Power.Should().Be(4);
+        def.Toughness.Should().Be(2);
+    }
+
+    [Fact]
+    public void FlametongueKavu_HasSubtypes()
+    {
+        CardDefinitions.TryGet("Flametongue Kavu", out var def);
+        def!.Subtypes.Should().BeEquivalentTo(new[] { "Kavu" });
+    }
+
+    [Fact]
+    public void FlametongueKavu_HasETBTrigger()
+    {
+        CardDefinitions.TryGet("Flametongue Kavu", out var def);
+        def!.Triggers.Should().ContainSingle();
+        def.Triggers[0].Event.Should().Be(GameEvent.EnterBattlefield);
+        def.Triggers[0].Condition.Should().Be(global::MtgDecker.Engine.Triggers.TriggerCondition.Self);
+        def.Triggers[0].Effect.Should().BeOfType<TriggerEffects.DealDamageToTargetCreatureEffect>();
+    }
+
+    [Fact]
+    public async Task FlametongueKavu_ETB_Deals4DamageToTargetCreature()
+    {
+        var (engine, state, p1, p2, h1, h2) = CreateEngineSetup();
+
+        var target = new GameCard { Name = "Bear", CardTypes = CardType.Creature, BasePower = 2, BaseToughness = 5 };
+        p2.Battlefield.Add(target);
+
+        // Enqueue target choice for the ETB effect
+        h1.EnqueueTarget(new TargetInfo(target.Id, p2.Id, ZoneType.Battlefield));
+
+        var ftk = GameCard.Create("Flametongue Kavu");
+        p1.Battlefield.Add(ftk);
+        ftk.TurnEnteredBattlefield = state.TurnNumber;
+
+        await engine.QueueSelfTriggersOnStackAsync(GameEvent.EnterBattlefield, ftk, p1);
+        await engine.ResolveAllTriggersAsync();
+
+        // Target should have 4 damage
+        target.DamageMarked.Should().Be(4);
+    }
+
+    [Fact]
+    public async Task FlametongueKavu_ETB_NoOtherCreatures_TargetsItself()
+    {
+        var (engine, state, p1, p2, h1, h2) = CreateEngineSetup();
+
+        var ftk = GameCard.Create("Flametongue Kavu");
+        p1.Battlefield.Add(ftk);
+        ftk.TurnEnteredBattlefield = state.TurnNumber;
+
+        // No target enqueued — default behavior picks first eligible target (FTK itself)
+        await engine.QueueSelfTriggersOnStackAsync(GameEvent.EnterBattlefield, ftk, p1);
+        await engine.ResolveAllTriggersAsync();
+
+        // FTK is the only creature, so it must target itself (4 damage >= 2 toughness -> dies)
+        state.GameLog.Should().Contain(l => l.Contains("Flametongue Kavu deals 4 damage to Flametongue Kavu"));
+        state.GameLog.Should().Contain(l => l.Contains("Flametongue Kavu dies"));
+        p1.Battlefield.Cards.Should().NotContain(c => c.Name == "Flametongue Kavu");
+    }
+
+    [Fact]
+    public async Task FlametongueKavu_ETB_CanTargetOwnCreature()
+    {
+        var (engine, state, p1, p2, h1, h2) = CreateEngineSetup();
+
+        var ownCreature = new GameCard { Name = "Goblin", CardTypes = CardType.Creature, BasePower = 1, BaseToughness = 1 };
+        p1.Battlefield.Add(ownCreature);
+
+        h1.EnqueueTarget(new TargetInfo(ownCreature.Id, p1.Id, ZoneType.Battlefield));
+
+        var ftk = GameCard.Create("Flametongue Kavu");
+        p1.Battlefield.Add(ftk);
+        ftk.TurnEnteredBattlefield = state.TurnNumber;
+
+        await engine.QueueSelfTriggersOnStackAsync(GameEvent.EnterBattlefield, ftk, p1);
+        await engine.ResolveAllTriggersAsync();
+
+        // Own creature took 4 damage (1/1 creature -> dies from SBA lethal damage)
+        state.GameLog.Should().Contain(l => l.Contains("Flametongue Kavu deals 4 damage to Goblin"));
+        state.GameLog.Should().Contain(l => l.Contains("Goblin dies"));
+        p1.Battlefield.Cards.Should().NotContain(c => c.Name == "Goblin");
+        // FTK should still be alive on the battlefield
+        p1.Battlefield.Cards.Should().Contain(c => c.Name == "Flametongue Kavu");
+    }
+
+    #endregion
+
+    #region GameCard.Create tests for Task 5
+
+    [Fact]
+    public void GameCard_Create_TrueBeliever_HasCorrectStats()
+    {
+        var card = GameCard.Create("True Believer");
+        card.Power.Should().Be(2);
+        card.Toughness.Should().Be(2);
+        card.IsCreature.Should().BeTrue();
+        card.Subtypes.Should().BeEquivalentTo(new[] { "Human", "Cleric" });
+    }
+
+    [Fact]
+    public void GameCard_Create_WildMongrel_HasCorrectStats()
+    {
+        var card = GameCard.Create("Wild Mongrel");
+        card.Power.Should().Be(2);
+        card.Toughness.Should().Be(2);
+        card.IsCreature.Should().BeTrue();
+        card.Subtypes.Should().BeEquivalentTo(new[] { "Dog" });
+    }
+
+    [Fact]
+    public void GameCard_Create_Aquamoeba_HasCorrectStats()
+    {
+        var card = GameCard.Create("Aquamoeba");
+        card.Power.Should().Be(1);
+        card.Toughness.Should().Be(3);
+        card.IsCreature.Should().BeTrue();
+        card.Subtypes.Should().BeEquivalentTo(new[] { "Elemental", "Beast" });
+    }
+
+    [Fact]
+    public void GameCard_Create_FlametongueKavu_HasCorrectStats()
+    {
+        var card = GameCard.Create("Flametongue Kavu");
+        card.Power.Should().Be(4);
+        card.Toughness.Should().Be(2);
+        card.IsCreature.Should().BeTrue();
+        card.Subtypes.Should().BeEquivalentTo(new[] { "Kavu" });
+    }
+
+    [Fact]
+    public void GameCard_Create_WaterfrontBouncer_HasCorrectStats()
+    {
+        var card = GameCard.Create("Waterfront Bouncer");
+        card.Power.Should().Be(1);
+        card.Toughness.Should().Be(1);
+        card.IsCreature.Should().BeTrue();
+        card.Subtypes.Should().BeEquivalentTo(new[] { "Merfolk", "Spellshaper" });
+    }
+
+    [Fact]
+    public void GameCard_Create_ThornscapeApprentice_HasCorrectStats()
+    {
+        var card = GameCard.Create("Thornscape Apprentice");
+        card.Power.Should().Be(1);
+        card.Toughness.Should().Be(1);
+        card.IsCreature.Should().BeTrue();
+        card.Subtypes.Should().BeEquivalentTo(new[] { "Human", "Wizard" });
+    }
+
+    [Fact]
+    public void GameCard_Create_NovaCleric_HasCorrectStats()
+    {
+        var card = GameCard.Create("Nova Cleric");
+        card.Power.Should().Be(1);
+        card.Toughness.Should().Be(2);
+        card.IsCreature.Should().BeTrue();
+        card.Subtypes.Should().BeEquivalentTo(new[] { "Human", "Cleric" });
     }
 
     #endregion

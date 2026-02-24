@@ -1288,6 +1288,68 @@ public static class CardDefinitions
                         (card, _) => card.IsCreature),
                 ],
             },
+
+            // Creatures with activated abilities
+            ["True Believer"] = new(ManaCost.Parse("{W}{W}"), null, 2, 2, CardType.Creature)
+            {
+                Subtypes = ["Human", "Cleric"],
+                ContinuousEffects =
+                [
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantPlayerShroud, (_, _) => true),
+                ],
+            },
+            ["Nova Cleric"] = new(ManaCost.Parse("{W}"), null, 1, 2, CardType.Creature)
+            {
+                Subtypes = ["Human", "Cleric"],
+                ActivatedAbilities =
+                [
+                    new(new ActivatedAbilityCost(TapSelf: true, SacrificeSelf: true, ManaCost: ManaCost.Parse("{2}{W}")),
+                        new DestroyAllEnchantmentsEffect()),
+                ],
+            },
+            ["Thornscape Apprentice"] = new(ManaCost.Parse("{G}"), null, 1, 1, CardType.Creature)
+            {
+                Subtypes = ["Human", "Wizard"],
+                ActivatedAbilities =
+                [
+                    new(new ActivatedAbilityCost(TapSelf: true, ManaCost: ManaCost.Parse("{R}")),
+                        new GrantFirstStrikeEffect(), c => c.IsCreature),
+                    new(new ActivatedAbilityCost(TapSelf: true, ManaCost: ManaCost.Parse("{W}")),
+                        new TapTargetEffect(), c => c.IsCreature),
+                ],
+            },
+            ["Waterfront Bouncer"] = new(ManaCost.Parse("{1}{U}"), null, 1, 1, CardType.Creature)
+            {
+                Subtypes = ["Merfolk", "Spellshaper"],
+                ActivatedAbilities =
+                [
+                    new(new ActivatedAbilityCost(TapSelf: true, ManaCost: ManaCost.Parse("{U}"), DiscardAny: true),
+                        new BounceTargetCreatureEffect(), c => c.IsCreature),
+                ],
+            },
+            ["Wild Mongrel"] = new(ManaCost.Parse("{1}{G}"), null, 2, 2, CardType.Creature)
+            {
+                Subtypes = ["Dog"],
+                ActivatedAbilities =
+                [
+                    new(new ActivatedAbilityCost(DiscardAny: true),
+                        new PumpSelfEffect(1, 1)),
+                ],
+            },
+            ["Aquamoeba"] = new(ManaCost.Parse("{1}{U}"), null, 1, 3, CardType.Creature)
+            {
+                Subtypes = ["Elemental", "Beast"],
+                ActivatedAbilities =
+                [
+                    new(new ActivatedAbilityCost(DiscardAny: true),
+                        new SwapPowerToughnessEffect()),
+                ],
+            },
+            ["Flametongue Kavu"] = new(ManaCost.Parse("{3}{R}"), null, 4, 2, CardType.Creature)
+            {
+                Subtypes = ["Kavu"],
+                Triggers = [new Trigger(GameEvent.EnterBattlefield, TriggerCondition.Self, new DealDamageToTargetCreatureEffect(4))],
+            },
         };
 
         Registry = cards.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
