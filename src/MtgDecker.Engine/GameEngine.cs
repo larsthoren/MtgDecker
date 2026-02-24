@@ -85,6 +85,7 @@ public class GameEngine
                 await QueueBoardTriggersOnStackAsync(GameEvent.Upkeep, null, ct);
                 await QueueGraveyardTriggersOnStackAsync(GameEvent.Upkeep, ct);
                 await QueueEchoTriggersOnStackAsync(ct);
+                await QueueDelayedTriggersOnStackAsync(GameEvent.Upkeep, ct);
             }
 
             if (phase.Phase == Phase.Combat)

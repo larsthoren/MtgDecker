@@ -1195,6 +1195,24 @@ public static class CardDefinitions
                 TargetFilter.Artifact(), new CrumbleEffect()),
             ["Tranquil Domain"] = new(ManaCost.Parse("{1}{G}"), null, null, null, CardType.Instant,
                 Effect: new DestroyAllNonAuraEnchantmentsEffect()),
+
+            // Draw/Filter spells
+            ["Careful Study"] = new(ManaCost.Parse("{U}"), null, null, null, CardType.Sorcery,
+                Effect: new CarefulStudyEffect()),
+            ["Peek"] = new(ManaCost.Parse("{U}"), null, null, null, CardType.Instant,
+                TargetFilter.Player(), new PeekEffect()),
+            ["Accumulated Knowledge"] = new(ManaCost.Parse("{1}{U}"), null, null, null, CardType.Instant,
+                Effect: new AccumulatedKnowledgeEffect()),
+            ["Portent"] = new(ManaCost.Parse("{U}"), null, null, null, CardType.Sorcery,
+                TargetFilter.Player(), new PortentEffect()),
+            ["Enlightened Tutor"] = new(ManaCost.Parse("{W}"), null, null, null, CardType.Instant,
+                Effect: new EnlightenedTutorEffect()),
+            ["Frantic Search"] = new(ManaCost.Parse("{2}{U}"), null, null, null, CardType.Instant,
+                Effect: new FranticSearchEffect()),
+            ["Price of Progress"] = new(ManaCost.Parse("{1}{R}"), null, null, null, CardType.Instant,
+                Effect: new PriceOfProgressEffect()),
+            ["Earthquake"] = new(ManaCost.Parse("{R}"), null, null, null, CardType.Sorcery,
+                Effect: new EarthquakeEffect()),
         };
 
         Registry = cards.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
