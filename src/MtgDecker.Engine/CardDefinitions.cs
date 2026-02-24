@@ -1430,6 +1430,38 @@ public static class CardDefinitions
                         new CreateTokensEffect("Zombie", 2, 2, CardType.Creature, ["Zombie"])),
                 ],
             },
+
+            // === Alternate cost spells ===
+            ["Gush"] = new(ManaCost.Parse("{4}{U}"), null, null, null, CardType.Instant,
+                Effect: new DrawCardsEffect(2))
+            {
+                AlternateCost = new AlternateCost(ReturnLandSubtype: "Island", ReturnLandCount: 2),
+            },
+            ["Foil"] = new(ManaCost.Parse("{2}{U}{U}"), null, null, null, CardType.Instant,
+                TargetFilter.Spell(), new CounterSpellEffect())
+            {
+                AlternateCost = new AlternateCost(DiscardLandSubtype: "Island", DiscardAnyCount: 1),
+            },
+            ["Spinning Darkness"] = new(ManaCost.Parse("{4}{B}{B}"), null, null, null, CardType.Instant,
+                TargetFilter.NonBlackCreature(), new SpinningDarknessEffect())
+            {
+                AlternateCost = new AlternateCost(ExileFromGraveyardCount: 3, ExileFromGraveyardColor: ManaColor.Black),
+            },
+            ["Mogg Salvage"] = new(ManaCost.Parse("{2}{R}"), null, null, null, CardType.Instant,
+                TargetFilter.Artifact(), new NaturalizeEffect())
+            {
+                AlternateCost = new AlternateCost(RequiresControlSubtype: "Mountain", RequiresOpponentSubtype: "Island"),
+            },
+            ["Pyrokinesis"] = new(ManaCost.Parse("{4}{R}{R}"), null, null, null, CardType.Instant,
+                TargetFilter.Creature(), new DamageEffect(4, canTargetCreature: true, canTargetPlayer: false))
+            {
+                AlternateCost = new AlternateCost(ExileCardColor: ManaColor.Red),
+            },
+            ["Gaea's Blessing"] = new(ManaCost.Parse("{1}{G}"), null, null, null, CardType.Sorcery,
+                Effect: new GaeasBlessingEffect())
+            {
+                ShuffleGraveyardOnDeath = true,
+            },
         };
 
         Registry = cards.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);

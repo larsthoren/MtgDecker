@@ -397,9 +397,9 @@ public class GameEngine
         // Return land with matching subtype from battlefield
         if (alt.ReturnLandSubtype != null)
         {
-            var hasLand = player.Battlefield.Cards.Any(c =>
+            var landCount = player.Battlefield.Cards.Count(c =>
                 c.IsLand && c.Subtypes.Contains(alt.ReturnLandSubtype));
-            if (!hasLand) return false;
+            if (landCount < alt.ReturnLandCount) return false;
         }
 
         // Sacrifice lands with matching subtype
@@ -416,6 +416,40 @@ public class GameEngine
             var hasControlled = player.Battlefield.Cards.Any(c =>
                 c.Subtypes.Contains(alt.RequiresControlSubtype));
             if (!hasControlled) return false;
+        }
+
+        // Requires opponent controlling a permanent with the given subtype
+        if (alt.RequiresOpponentSubtype != null)
+        {
+            var opponent = _state.GetOpponent(player);
+            var hasOpponentControlled = opponent.Battlefield.Cards.Any(c =>
+                c.Subtypes.Contains(alt.RequiresOpponentSubtype));
+            if (!hasOpponentControlled) return false;
+        }
+
+        // Discard a land card with matching subtype from hand (not the spell itself)
+        if (alt.DiscardLandSubtype != null)
+        {
+            var hasLandCard = player.Hand.Cards.Any(c =>
+                c.Id != castCard.Id && c.Subtypes.Contains(alt.DiscardLandSubtype));
+            if (!hasLandCard) return false;
+        }
+
+        // Discard additional cards from hand (not the spell itself, not the land discard)
+        if (alt.DiscardAnyCount > 0)
+        {
+            // Count available cards: total hand minus spell itself minus one land card (if land discard required)
+            var availableForDiscard = player.Hand.Cards.Count(c => c.Id != castCard.Id);
+            if (alt.DiscardLandSubtype != null) availableForDiscard--; // one already used for land discard
+            if (availableForDiscard < alt.DiscardAnyCount) return false;
+        }
+
+        // Exile cards of the required color from the top of graveyard
+        if (alt.ExileFromGraveyardCount > 0 && alt.ExileFromGraveyardColor.HasValue)
+        {
+            var matchingCount = player.Graveyard.Cards.Count(c =>
+                c.ManaCost != null && c.ManaCost.ColorRequirements.ContainsKey(alt.ExileFromGraveyardColor.Value));
+            if (matchingCount < alt.ExileFromGraveyardCount) return false;
         }
 
         return true;
@@ -452,23 +486,28 @@ public class GameEngine
             }
         }
 
-        // Return land to hand
+        // Return lands to hand
         if (alt.ReturnLandSubtype != null)
         {
-            var eligible = player.Battlefield.Cards.Where(c =>
-                c.IsLand && c.Subtypes.Contains(alt.ReturnLandSubtype)).ToList();
-
-            var chosenId = await player.DecisionHandler.ChooseCard(
-                eligible, $"Choose an {alt.ReturnLandSubtype} to return", optional: false, ct);
-
-            if (chosenId.HasValue)
+            for (int i = 0; i < alt.ReturnLandCount; i++)
             {
-                var land = player.Battlefield.Cards.FirstOrDefault(c => c.Id == chosenId.Value);
-                if (land != null)
+                var eligible = player.Battlefield.Cards.Where(c =>
+                    c.IsLand && c.Subtypes.Contains(alt.ReturnLandSubtype)).ToList();
+
+                if (eligible.Count == 0) break;
+
+                var chosenId = await player.DecisionHandler.ChooseCard(
+                    eligible, $"Choose an {alt.ReturnLandSubtype} to return ({i + 1}/{alt.ReturnLandCount})", optional: false, ct);
+
+                if (chosenId.HasValue)
                 {
-                    player.Battlefield.RemoveById(land.Id);
-                    player.Hand.Add(land);
-                    _state.Log($"{player.Name} returns {land.Name} to hand.");
+                    var land = player.Battlefield.Cards.FirstOrDefault(c => c.Id == chosenId.Value);
+                    if (land != null)
+                    {
+                        player.Battlefield.RemoveById(land.Id);
+                        player.Hand.Add(land);
+                        _state.Log($"{player.Name} returns {land.Name} to hand.");
+                    }
                 }
             }
         }
@@ -495,6 +534,77 @@ public class GameEngine
                         player.Battlefield.RemoveById(land.Id);
                         player.Graveyard.Add(land);
                         _state.Log($"{player.Name} sacrifices {land.Name}.");
+                    }
+                }
+            }
+        }
+
+        // Discard a land card with matching subtype from hand
+        if (alt.DiscardLandSubtype != null)
+        {
+            var eligible = player.Hand.Cards.Where(c =>
+                c.Id != castCard.Id && c.Subtypes.Contains(alt.DiscardLandSubtype)).ToList();
+
+            var chosenId = await player.DecisionHandler.ChooseCard(
+                eligible, $"Choose an {alt.DiscardLandSubtype} card to discard", optional: false, ct);
+
+            if (chosenId.HasValue)
+            {
+                var discarded = player.Hand.Cards.FirstOrDefault(c => c.Id == chosenId.Value);
+                if (discarded != null)
+                {
+                    player.Hand.RemoveById(discarded.Id);
+                    player.Graveyard.Add(discarded);
+                    _state.Log($"{player.Name} discards {discarded.Name}.");
+                }
+            }
+        }
+
+        // Discard additional cards from hand
+        if (alt.DiscardAnyCount > 0)
+        {
+            for (int i = 0; i < alt.DiscardAnyCount; i++)
+            {
+                var eligible = player.Hand.Cards.Where(c => c.Id != castCard.Id).ToList();
+                if (eligible.Count == 0) break;
+
+                var chosenId = await player.DecisionHandler.ChooseCard(
+                    eligible, $"Choose a card to discard ({i + 1}/{alt.DiscardAnyCount})", optional: false, ct);
+
+                if (chosenId.HasValue)
+                {
+                    var discarded = player.Hand.Cards.FirstOrDefault(c => c.Id == chosenId.Value);
+                    if (discarded != null)
+                    {
+                        player.Hand.RemoveById(discarded.Id);
+                        player.Graveyard.Add(discarded);
+                        _state.Log($"{player.Name} discards {discarded.Name}.");
+                    }
+                }
+            }
+        }
+
+        // Exile cards from graveyard
+        if (alt.ExileFromGraveyardCount > 0 && alt.ExileFromGraveyardColor.HasValue)
+        {
+            for (int i = 0; i < alt.ExileFromGraveyardCount; i++)
+            {
+                var eligible = player.Graveyard.Cards.Where(c =>
+                    c.ManaCost != null && c.ManaCost.ColorRequirements.ContainsKey(alt.ExileFromGraveyardColor.Value)).ToList();
+
+                if (eligible.Count == 0) break;
+
+                var chosenId = await player.DecisionHandler.ChooseCard(
+                    eligible, $"Choose a {alt.ExileFromGraveyardColor} card to exile from graveyard ({i + 1}/{alt.ExileFromGraveyardCount})", optional: false, ct);
+
+                if (chosenId.HasValue)
+                {
+                    var exiled = player.Graveyard.Cards.FirstOrDefault(c => c.Id == chosenId.Value);
+                    if (exiled != null)
+                    {
+                        player.Graveyard.RemoveById(exiled.Id);
+                        player.Exile.Add(exiled);
+                        _state.Log($"{player.Name} exiles {exiled.Name} from graveyard.");
                     }
                 }
             }
