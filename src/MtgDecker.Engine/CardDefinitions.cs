@@ -1713,6 +1713,133 @@ public static class CardDefinitions
                 ActivatedAbilities = [new(new ActivatedAbilityCost(ManaCost: ManaCost.Parse("{1}")),
                     new CoPPreventDamageEffect(ManaColor.Black))],
             },
+
+            // === Task 12 Batch 2: Final 9 complex cards ===
+
+            // Assault (split card half: {R} sorcery, deal 2 damage to any target)
+            ["Assault"] = new(ManaCost.Parse("{R}"), null, null, null, CardType.Sorcery,
+                TargetFilter: TargetFilter.CreatureOrPlayer(),
+                Effect: new DamageEffect(2)),
+
+            // Battery (split card half: {3}{G} sorcery, create 3/3 Elephant token)
+            ["Battery"] = new(ManaCost.Parse("{3}{G}"), null, null, null, CardType.Sorcery,
+                Effect: new BatteryEffect()),
+
+            // Ramosian Sergeant ({W}, 1/1 Human Rebel, search for Rebel CMC 2 or less to battlefield)
+            ["Ramosian Sergeant"] = new(ManaCost.Parse("{W}"), null, 1, 1, CardType.Creature)
+            {
+                Subtypes = ["Human", "Rebel"],
+                ActivatedAbilities = [new(new ActivatedAbilityCost(TapSelf: true, ManaCost: ManaCost.Parse("{3}")),
+                    new SearchLibraryToBattlefieldEffect("Rebel", maxCmc: 2))],
+            },
+
+            // Eternal Dragon ({5}{W}{W}, 5/5 Dragon Spirit, Flying, Plainscycling {2}, graveyard return)
+            ["Eternal Dragon"] = new(ManaCost.Parse("{5}{W}{W}"), null, 5, 5, CardType.Creature)
+            {
+                Subtypes = ["Dragon", "Spirit"],
+                ContinuousEffects =
+                [
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
+                        (card, _) => card.Name == "Eternal Dragon",
+                        GrantedKeyword: Keyword.Flying,
+                        Layer: EffectLayer.Layer6_AbilityAddRemove),
+                ],
+                CyclingCost = ManaCost.Parse("{2}"),
+                CyclingReplaceDraw = true,
+                CyclingTriggers = [new Trigger(GameEvent.Cycle, TriggerCondition.Self, new PlainscyclingEffect("Plains"))],
+                Triggers = [new Trigger(GameEvent.Upkeep, TriggerCondition.SelfInGraveyardDuringUpkeep,
+                    new ReturnSelfForManaEffect(ManaCost.Parse("{3}{W}{W}")))],
+            },
+
+            // Phyrexian Dreadnought ({1}, 12/12 Artifact Creature, Trample, ETB sacrifice)
+            ["Phyrexian Dreadnought"] = new(ManaCost.Parse("{1}"), null, 12, 12, CardType.Artifact | CardType.Creature)
+            {
+                Subtypes = ["Phyrexian", "Dreadnought"],
+                ContinuousEffects =
+                [
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
+                        (card, _) => card.Name == "Phyrexian Dreadnought",
+                        GrantedKeyword: Keyword.Trample,
+                        Layer: EffectLayer.Layer6_AbilityAddRemove),
+                ],
+                Triggers = [new Trigger(GameEvent.EnterBattlefield, TriggerCondition.Self, new DreadnoughtETBEffect())],
+            },
+
+            // Decree of Silence ({6}{U}{U}, Enchantment)
+            ["Decree of Silence"] = new(ManaCost.Parse("{6}{U}{U}"), null, null, null, CardType.Enchantment)
+            {
+                Triggers = [new Trigger(GameEvent.SpellCast, TriggerCondition.OpponentCastsAnySpell, new DecreeOfSilenceEffect())],
+                CyclingCost = ManaCost.Parse("{4}{U}{U}"),
+                CyclingReplaceDraw = true,
+                CyclingTriggers = [new Trigger(GameEvent.Cycle, TriggerCondition.Self, new CounterTopSpellEffect())],
+            },
+
+            // Dystopia ({1}{B}{B}, Enchantment, cumulative upkeep + sacrifice green/white)
+            ["Dystopia"] = new(ManaCost.Parse("{1}{B}{B}"), null, null, null, CardType.Enchantment)
+            {
+                Triggers =
+                [
+                    new Trigger(GameEvent.Upkeep, TriggerCondition.Upkeep, new DystopiaUpkeepEffect()),
+                    new Trigger(GameEvent.Upkeep, TriggerCondition.AnyUpkeep, new DystopiaSacrificeEffect()),
+                ],
+            },
+
+            // Cleansing Meditation ({1}{W}{W}, Sorcery)
+            ["Cleansing Meditation"] = new(ManaCost.Parse("{1}{W}{W}"), null, null, null, CardType.Sorcery,
+                Effect: new CleansingMeditationEffect()),
+
+            // Wonder ({3}{U}, 2/2 Incarnation, Flying, graveyard flying grant)
+            ["Wonder"] = new(ManaCost.Parse("{3}{U}"), null, 2, 2, CardType.Creature)
+            {
+                Subtypes = ["Incarnation"],
+                ContinuousEffects =
+                [
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
+                        (card, _) => card.Name == "Wonder",
+                        GrantedKeyword: Keyword.Flying,
+                        Layer: EffectLayer.Layer6_AbilityAddRemove),
+                ],
+                GraveyardAbilities =
+                [
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
+                        (card, player) => card.IsCreature
+                            && player.Graveyard.Cards.Any(g => g.Name == "Wonder")
+                            && player.Battlefield.Cards.Any(l => l.Subtypes.Contains("Island")),
+                        GrantedKeyword: Keyword.Flying,
+                        Layer: EffectLayer.Layer6_AbilityAddRemove),
+                ],
+            },
+
+            // Kirtar's Desire ({W}, Enchantment — Aura, prevents attacking; threshold: also prevents blocking)
+            ["Kirtar's Desire"] = new(ManaCost.Parse("{W}"), null, null, null, CardType.Enchantment)
+            {
+                Subtypes = ["Aura"],
+                AuraTarget = AuraTarget.Creature,
+                DynamicContinuousEffectsFactory = aura =>
+                {
+                    var effects = new List<ContinuousEffect>();
+                    if (aura.AttachedTo.HasValue)
+                    {
+                        var attachedId = aura.AttachedTo.Value;
+                        // Can't attack
+                        effects.Add(new ContinuousEffect(Guid.Empty, ContinuousEffectType.PreventCreatureAttacks,
+                            (card, _) => card.Id == attachedId,
+                            Layer: EffectLayer.Layer6_AbilityAddRemove));
+                        // Can't block (threshold — controller of aura has 7+ cards in graveyard)
+                        effects.Add(new ContinuousEffect(Guid.Empty, ContinuousEffectType.PreventCreatureBlocking,
+                            (card, _) => card.Id == attachedId,
+                            Layer: EffectLayer.Layer6_AbilityAddRemove,
+                            StateCondition: state =>
+                            {
+                                // Find the aura's controller — check which player has it on battlefield
+                                var p1HasAura = state.Player1.Battlefield.Cards.Any(c => c.Id == aura.Id);
+                                var controller = p1HasAura ? state.Player1 : state.Player2;
+                                return controller.Graveyard.Cards.Count >= 7;
+                            }));
+                    }
+                    return effects;
+                },
+            },
         };
 
         Registry = cards.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);

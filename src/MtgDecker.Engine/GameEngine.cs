@@ -941,15 +941,27 @@ public class GameEngine
                 .ToList();
         }
 
-        // PreventCreatureAttacks: creatures can't attack this turn (e.g. Orim's Chant kicked)
-        var preventAttacks = _state.ActiveEffects.Any(e =>
-            e.Type == ContinuousEffectType.PreventCreatureAttacks);
-        if (preventAttacks)
+        // PreventCreatureAttacks: filter per-creature effects (e.g. Kirtar's Desire)
+        var perCreaturePreventEffects = _state.ActiveEffects
+            .Where(e => e.Type == ContinuousEffectType.PreventCreatureAttacks
+                && (e.StateCondition == null || e.StateCondition(_state)))
+            .ToList();
+        if (perCreaturePreventEffects.Count > 0)
         {
-            _state.Log("Creatures can't attack this turn.");
-            _state.CombatStep = CombatStep.None;
-            _state.Combat = null;
-            return;
+            // Check if any effect is a global "all creatures can't attack" (applies to all)
+            var globalPrevent = perCreaturePreventEffects.Any(e =>
+                eligibleAttackers.All(c => e.Applies(c, attacker)));
+            if (globalPrevent && eligibleAttackers.Count > 0)
+            {
+                _state.Log("Creatures can't attack this turn.");
+                _state.CombatStep = CombatStep.None;
+                _state.Combat = null;
+                return;
+            }
+            // Filter out individually-prevented creatures
+            eligibleAttackers = eligibleAttackers
+                .Where(c => !perCreaturePreventEffects.Any(e => e.Applies(c, attacker)))
+                .ToList();
         }
 
         if (eligibleAttackers.Count == 0)
@@ -1046,6 +1058,10 @@ public class GameEngine
 
         var eligibleBlockers = defender.Battlefield.Cards
             .Where(c => c.IsCreature && !c.IsTapped)
+            .Where(c => !_state.ActiveEffects.Any(e =>
+                e.Type == ContinuousEffectType.PreventCreatureBlocking
+                && e.Applies(c, defender)
+                && (e.StateCondition == null || e.StateCondition(_state))))
             .ToList();
 
         if (eligibleBlockers.Count > 0)
@@ -2081,6 +2097,9 @@ public class GameEngine
                     TriggerCondition.ControllerMainPhaseBeginning =>
                         evt == GameEvent.MainPhaseBeginning
                         && _state.ActivePlayer == player,
+                    TriggerCondition.OpponentCastsAnySpell =>
+                        evt == GameEvent.SpellCast
+                        && _state.ActivePlayer != player,
                     TriggerCondition.SelfAttacks => false,
                     _ => false,
                 };

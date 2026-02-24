@@ -50,4 +50,5 @@ public record CardDefinition(
     public ManaCost? MadnessCost { get; init; }
     public ManaCost? KickerCost { get; init; }
     public bool HasStorm { get; init; }
+    public bool CyclingReplaceDraw { get; init; }
 }

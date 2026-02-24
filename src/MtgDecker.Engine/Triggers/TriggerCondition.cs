@@ -24,4 +24,5 @@ public enum TriggerCondition
     ControllerDiscardsCard,
     ControllerLandToGraveyard,
     ControllerMainPhaseBeginning,
+    OpponentCastsAnySpell,
 }
