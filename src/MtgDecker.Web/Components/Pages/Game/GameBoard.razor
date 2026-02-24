@@ -857,6 +857,9 @@
     // Pending cast state (waiting for player to tap lands)
     private GameCard? _pendingCastCard;
 
+    // Ninjutsu targeting state (waiting for player to click an unblocked attacker)
+    private GameCard? _ninjutsuCard;
+
     // Card preview hover state
     private string? _hoveredImageUrl;
 
@@ -916,6 +919,9 @@
 
     private bool IsTargetingDimmed(GameCard card) =>
         IsTargetingMode && !IsEligibleTarget(card);
+
+    // --- Ninjutsu targeting helpers ---
+    private bool IsNinjutsuTargeting => _ninjutsuCard != null;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -1356,6 +1362,34 @@
         if (_selectedCard == null) return;
         await OnAction.InvokeAsync(GameAction.CastSpell(LocalPlayer.Id, _selectedCard.Id, useAlternateCost: true));
         ClearSelection();
+    }
+
+    // --- Ninjutsu ---
+
+    private bool HasNinjutsuAvailable(GameCard? card)
+    {
+        if (card == null) return false;
+        if (!CardDefinitions.TryGet(card.Name, out var def) || def.NinjutsuCost == null)
+            return false;
+        if (State.CurrentPhase != Phase.Combat || State.CombatStep < CombatStep.DeclareBlockers)
+            return false;
+        if (State.Combat == null) return false;
+        // Must have at least one unblocked attacker we control
+        return State.Combat.Attackers.Any(a =>
+            !State.Combat.IsBlocked(a)
+            && LocalPlayer.Battlefield.Cards.Any(c => c.Id == a));
+    }
+
+    private bool IsEligibleNinjutsuTarget(GameCard card)
+    {
+        if (!IsNinjutsuTargeting || State.Combat == null) return false;
+        return State.Combat.Attackers.Contains(card.Id)
+            && !State.Combat.IsBlocked(card.Id);
+    }
+
+    private bool IsNinjutsuDimmed(GameCard card)
+    {
+        return IsNinjutsuTargeting && !IsEligibleNinjutsuTarget(card);
     }
 
     // --- Helpers ---
