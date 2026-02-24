@@ -23,6 +23,7 @@ public class InteractiveDecisionHandler : IPlayerDecisionHandler, IManualManaPay
     private TaskCompletionSource<(IReadOnlyList<GameCard> ordered, bool shuffle)>? _reorderTcs;
     private TaskCompletionSource<string>? _creatureTypeTcs;
     private TaskCompletionSource<string>? _cardNameTcs;
+    private TaskCompletionSource<bool>? _madnessTcs;
 
     public bool IsWaitingForAction => _actionTcs is { Task.IsCompleted: false };
     public bool IsWaitingForMulligan => _mulliganTcs is { Task.IsCompleted: false };
@@ -55,6 +56,9 @@ public class InteractiveDecisionHandler : IPlayerDecisionHandler, IManualManaPay
     public string? CreatureTypePrompt { get; private set; }
     public bool IsWaitingForCardName => _cardNameTcs is { Task.IsCompleted: false };
     public string? CardNamePrompt { get; private set; }
+    public bool IsWaitingForMadness => _madnessTcs is { Task.IsCompleted: false };
+    public GameCard? MadnessCard { get; private set; }
+    public ManaCost? MadnessCostOption { get; private set; }
 
     /// <summary>
     /// True when this handler is waiting for any player input, meaning the
@@ -67,7 +71,8 @@ public class InteractiveDecisionHandler : IPlayerDecisionHandler, IManualManaPay
         || IsWaitingForBlockers || IsWaitingForBlockerOrder
         || IsWaitingForTarget || IsWaitingForCardChoice || IsWaitingForRevealAck
         || IsWaitingForDiscard || IsWaitingForSplit || IsWaitingForPileChoice
-        || IsWaitingForReorder || IsWaitingForCreatureType || IsWaitingForCardName;
+        || IsWaitingForReorder || IsWaitingForCreatureType || IsWaitingForCardName
+        || IsWaitingForMadness;
 
     public IReadOnlyList<ManaColor>? ManaColorOptions { get; private set; }
     public IReadOnlyList<GameCard>? EligibleAttackers { get; private set; }
@@ -408,6 +413,24 @@ public class InteractiveDecisionHandler : IPlayerDecisionHandler, IManualManaPay
     {
         CardNamePrompt = null;
         _cardNameTcs?.TrySetResult(name);
+    }
+
+    public Task<bool> ChooseMadness(GameCard card, ManaCost madnessCost, CancellationToken ct = default)
+    {
+        MadnessCard = card;
+        MadnessCostOption = madnessCost;
+        _madnessTcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var registration = ct.Register(() => { MadnessCard = null; MadnessCostOption = null; _madnessTcs.TrySetCanceled(); });
+        _madnessTcs.Task.ContinueWith(_ => registration.Dispose(), TaskContinuationOptions.ExecuteSynchronously);
+        OnWaitingForInput?.Invoke();
+        return _madnessTcs.Task;
+    }
+
+    public void SubmitMadnessChoice(bool castForMadness)
+    {
+        MadnessCard = null;
+        MadnessCostOption = null;
+        _madnessTcs?.TrySetResult(castForMadness);
     }
 
     // Reuses the discard UI state (DiscardOptions/DiscardCount/DiscardPrompt) since the

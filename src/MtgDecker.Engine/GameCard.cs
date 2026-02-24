@@ -146,6 +146,9 @@ public class GameCard
     // Carpet of Flowers once-per-turn tracking
     public bool CarpetUsedThisTurn { get; set; }
 
+    // Once-per-turn activated ability tracking (e.g. Basking Rootwalla)
+    public HashSet<int> AbilitiesActivatedThisTurn { get; } = new();
+
     // Combat tracking
     public int? TurnEnteredBattlefield { get; set; }
     public int DamageMarked { get; set; }

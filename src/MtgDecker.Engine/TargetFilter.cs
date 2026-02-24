@@ -57,4 +57,6 @@ public class TargetFilter
     public static TargetFilter ArtifactOrEnchantmentSpell() => new((card, zone) =>
         zone == ZoneType.Stack &&
         (card.CardTypes.HasFlag(CardType.Artifact) || card.CardTypes.HasFlag(CardType.Enchantment)));
+
+    public static TargetFilter AnySpellOnStack() => new((card, zone) => zone == ZoneType.Stack);
 }

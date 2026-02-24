@@ -15,6 +15,7 @@ public class GameEngine
     public GameEngine(GameState state)
     {
         _state = state;
+        _state.HandleDiscardAsync = HandleDiscardAsync;
         _handlers[ActionType.UntapCard] = new UntapCardHandler();
         _handlers[ActionType.Cycle] = new CycleHandler();
         _handlers[ActionType.ActivateFetch] = new ActivateFetchHandler();
@@ -62,11 +63,17 @@ public class GameEngine
         _state.Player2.LifeLostThisTurn = 0;
         _state.Player1.PermanentLeftBattlefieldThisTurn = false;
         _state.Player2.PermanentLeftBattlefieldThisTurn = false;
-        // Reset Carpet of Flowers once-per-turn flags
+        // Reset Carpet of Flowers once-per-turn flags and activated ability tracking
         foreach (var card in _state.Player1.Battlefield.Cards)
+        {
             card.CarpetUsedThisTurn = false;
+            card.AbilitiesActivatedThisTurn.Clear();
+        }
         foreach (var card in _state.Player2.Battlefield.Cards)
+        {
             card.CarpetUsedThisTurn = false;
+            card.AbilitiesActivatedThisTurn.Clear();
+        }
         _state.Log($"Turn {_state.TurnNumber}: {_state.ActivePlayer.Name}'s turn.");
 
         do
@@ -161,8 +168,7 @@ public class GameEngine
         foreach (var card in chosen.Take(excess))
         {
             player.Hand.Remove(card);
-            MoveToGraveyardWithReplacement(card, player);
-            _state.Log($"{player.Name} discards {card.Name}.");
+            await HandleDiscardAsync(card, player, ct);
             QueueDiscardTriggers(player);
         }
 
@@ -554,8 +560,7 @@ public class GameEngine
                 if (discarded != null)
                 {
                     player.Hand.RemoveById(discarded.Id);
-                    player.Graveyard.Add(discarded);
-                    _state.Log($"{player.Name} discards {discarded.Name}.");
+                    await HandleDiscardAsync(discarded, player, ct);
                 }
             }
         }
@@ -577,8 +582,7 @@ public class GameEngine
                     if (discarded != null)
                     {
                         player.Hand.RemoveById(discarded.Id);
-                        player.Graveyard.Add(discarded);
-                        _state.Log($"{player.Name} discards {discarded.Name}.");
+                        await HandleDiscardAsync(discarded, player, ct);
                     }
                 }
             }
@@ -2580,6 +2584,89 @@ public class GameEngine
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// Handles discarding a card, checking for madness. If the card has madness:
+    /// 1. Exile instead of graveyard
+    /// 2. Prompt player to cast for madness cost
+    /// 3. If yes and can pay: put on stack with madness cost
+    /// 4. If no or can't pay: move from exile to graveyard
+    /// The card must already be removed from hand before calling this.
+    /// </summary>
+    internal async Task HandleDiscardAsync(GameCard card, Player player, CancellationToken ct)
+    {
+        // Check for madness
+        if (CardDefinitions.TryGet(card.Name, out var def) && def.MadnessCost != null)
+        {
+            // Exile the card instead of putting it in graveyard
+            player.Exile.Add(card);
+            _state.Log($"{player.Name} discards {card.Name} — madness triggers! (exiled)");
+
+            // Ask player if they want to cast for madness cost
+            var wantsToCast = await player.DecisionHandler.ChooseMadness(card, def.MadnessCost, ct);
+
+            if (wantsToCast)
+            {
+                // Check if player can pay the madness cost
+                bool canPay = def.MadnessCost.ConvertedManaCost == 0 || player.ManaPool.CanPay(def.MadnessCost);
+
+                if (canPay)
+                {
+                    // Pay the madness cost
+                    if (def.MadnessCost.ConvertedManaCost > 0)
+                        await PayManaCostAsync(def.MadnessCost, player, ct);
+
+                    // Remove from exile and put on stack
+                    player.Exile.RemoveById(card.Id);
+
+                    // Find targets if needed
+                    var targets = new List<TargetInfo>();
+                    if (def.TargetFilter != null)
+                    {
+                        var result = await FindAndChooseTargetsAsync(
+                            def.TargetFilter, player, player.DecisionHandler, card.Name, ct);
+                        if (result != null && result.Count > 0)
+                            targets = result;
+                        else
+                        {
+                            // No legal targets or player cancelled — move to graveyard
+                            player.Graveyard.Add(card);
+                            _state.Log($"{card.Name} could not find a target — moved to graveyard.");
+                            return;
+                        }
+                    }
+
+                    var stackObj = new StackObject(card, player.Id, new Dictionary<ManaColor, int>(), targets, _state.StackCount)
+                    {
+                        IsMadness = true,
+                    };
+                    _state.StackPush(stackObj);
+                    _state.Log($"{player.Name} casts {card.Name} for its madness cost.");
+
+                    await QueueBoardTriggersOnStackAsync(GameEvent.SpellCast, card, ct);
+                    await QueueSelfCastTriggersAsync(card, player, ct);
+                    return;
+                }
+                else
+                {
+                    _state.Log($"{player.Name} cannot pay madness cost for {card.Name}.");
+                }
+            }
+            else
+            {
+                _state.Log($"{player.Name} declines to cast {card.Name} for madness.");
+            }
+
+            // Didn't cast — move from exile to graveyard
+            player.Exile.RemoveById(card.Id);
+            player.Graveyard.Add(card);
+            return;
+        }
+
+        // No madness — regular discard to graveyard
+        MoveToGraveyardWithReplacement(card, player);
+        _state.Log($"{player.Name} discards {card.Name}.");
     }
 
     internal void QueueDiscardTriggers(Player discardingPlayer)

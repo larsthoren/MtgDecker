@@ -42,6 +42,15 @@ internal class ActivateAbilityHandler : IActionHandler
             state.Log($"{abilitySource.Name} has no activated ability.");
             return;
         }
+
+        // Once-per-turn check
+        var abilityIndex = action.AbilityIndex ?? 0;
+        if (ability.OncePerTurn && abilitySource.AbilitiesActivatedThisTurn.Contains(abilityIndex))
+        {
+            state.Log($"{abilitySource.Name}'s ability can only be activated once each turn.");
+            return;
+        }
+
         var cost = ability.Cost;
 
         if (ability.Condition != null && !ability.Condition(player))
@@ -289,8 +298,8 @@ internal class ActivateAbilityHandler : IActionHandler
         if (discardTarget != null)
         {
             player.Hand.RemoveById(discardTarget.Id);
-            player.Graveyard.Add(discardTarget);
-            state.Log($"{player.Name} discards {discardTarget.Name}.");
+            await engine.HandleDiscardAsync(discardTarget, player, ct);
+            engine.QueueDiscardTriggers(player);
         }
 
         if (discardTargets != null)
@@ -298,8 +307,8 @@ internal class ActivateAbilityHandler : IActionHandler
             foreach (var card in discardTargets)
             {
                 player.Hand.RemoveById(card.Id);
-                player.Graveyard.Add(card);
-                state.Log($"{player.Name} discards {card.Name}.");
+                await engine.HandleDiscardAsync(card, player, ct);
+                engine.QueueDiscardTriggers(player);
             }
         }
 
@@ -374,6 +383,10 @@ internal class ActivateAbilityHandler : IActionHandler
         };
         state.StackPush(stackObj);
         state.Log($"{abilitySource.Name}'s ability is put on the stack.");
+
+        // Track once-per-turn activation
+        if (ability.OncePerTurn)
+            abilitySource.AbilitiesActivatedThisTurn.Add(abilityIndex);
 
         player.ActionHistory.Push(action);
     }

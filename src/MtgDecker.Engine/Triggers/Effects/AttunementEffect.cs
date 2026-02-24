@@ -40,8 +40,13 @@ public class AttunementEffect : IEffect
         foreach (var card in discarded)
         {
             player.Hand.RemoveById(card.Id);
-            player.Graveyard.Add(card);
-            state.Log($"{player.Name} discards {card.Name} (Attunement).");
+            if (state.HandleDiscardAsync != null)
+                await state.HandleDiscardAsync(card, player, ct);
+            else
+            {
+                player.Graveyard.Add(card);
+                state.Log($"{player.Name} discards {card.Name} (Attunement).");
+            }
         }
     }
 }

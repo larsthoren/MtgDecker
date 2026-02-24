@@ -34,7 +34,10 @@ public class FranticSearchEffect : SpellEffect
                 var card = player.Hand.RemoveById(cardId.Value);
                 if (card != null)
                 {
-                    player.Graveyard.Add(card);
+                    if (state.HandleDiscardAsync != null)
+                        await state.HandleDiscardAsync(card, player, ct);
+                    else
+                        player.Graveyard.Add(card);
                 }
             }
         }

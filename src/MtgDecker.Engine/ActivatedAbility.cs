@@ -24,4 +24,5 @@ public record ActivatedAbility(
     Func<GameCard, bool>? TargetFilter = null,
     bool CanTargetPlayer = false,
     Func<Player, bool>? Condition = null,
-    bool TargetOwnOnly = false);
+    bool TargetOwnOnly = false,
+    bool OncePerTurn = false);

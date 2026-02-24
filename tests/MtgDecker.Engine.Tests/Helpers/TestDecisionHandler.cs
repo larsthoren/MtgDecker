@@ -23,6 +23,7 @@ public class TestDecisionHandler : IPlayerDecisionHandler
     private readonly Queue<Func<IReadOnlyList<GameCard>, int, IReadOnlyList<GameCard>>> _exileChoices = new();
     private readonly Queue<string> _creatureTypeChoices = new();
     private readonly Queue<string> _cardNameChoices = new();
+    private readonly Queue<bool> _madnessChoices = new();
 
     public void EnqueueAction(GameAction action) => _actions.Enqueue(action);
 
@@ -55,6 +56,7 @@ public class TestDecisionHandler : IPlayerDecisionHandler
 
     public void EnqueueCreatureType(string type) => _creatureTypeChoices.Enqueue(type);
     public void EnqueueCardName(string name) => _cardNameChoices.Enqueue(name);
+    public void EnqueueMadnessChoice(bool choice) => _madnessChoices.Enqueue(choice);
 
     public Action? OnBeforeAction { get; set; }
 
@@ -186,6 +188,14 @@ public class TestDecisionHandler : IPlayerDecisionHandler
         if (_cardNameChoices.Count > 0)
             return Task.FromResult(_cardNameChoices.Dequeue());
         return Task.FromResult("Lightning Bolt");
+    }
+
+    public Task<bool> ChooseMadness(GameCard card, ManaCost madnessCost, CancellationToken ct = default)
+    {
+        if (_madnessChoices.Count > 0)
+            return Task.FromResult(_madnessChoices.Dequeue());
+        // Default: always cast for madness
+        return Task.FromResult(true);
     }
 }
 

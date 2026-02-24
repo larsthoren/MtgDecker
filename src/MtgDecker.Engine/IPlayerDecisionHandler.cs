@@ -39,6 +39,11 @@ public interface IPlayerDecisionHandler
 
     Task<string> ChooseCreatureType(string prompt, CancellationToken ct = default);
     Task<string> ChooseCardName(string prompt, CancellationToken ct = default);
+
+    /// <summary>
+    /// Asks the player whether to cast a card for its madness cost after discarding it.
+    /// </summary>
+    Task<bool> ChooseMadness(GameCard card, ManaCost madnessCost, CancellationToken ct = default);
 }
 
 /// <summary>

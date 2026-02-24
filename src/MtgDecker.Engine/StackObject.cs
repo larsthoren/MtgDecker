@@ -12,6 +12,7 @@ public class StackObject : IStackObject
     public IReadOnlyList<TargetInfo> Targets { get; }
     public int Timestamp { get; }
     public bool IsFlashback { get; init; }
+    public bool IsMadness { get; init; }
     public bool IsAdventure { get; init; }
     public int? XValue { get; init; }
 

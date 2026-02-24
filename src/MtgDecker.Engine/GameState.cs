@@ -53,6 +53,13 @@ public class GameState
     public Queue<Guid> ExtraTurns { get; } = new();
     public List<ContinuousEffect> ActiveEffects { get; } = new();
     public List<DelayedTrigger> DelayedTriggers { get; } = new();
+
+    /// <summary>
+    /// Delegate for handling discards with madness support.
+    /// Set by GameEngine so that spell effects can route discards through it.
+    /// The card must already be removed from hand before calling this.
+    /// </summary>
+    public Func<GameCard, Player, CancellationToken, Task>? HandleDiscardAsync { get; set; }
     public long NextEffectTimestamp { get; set; } = 1;
     public event Action? OnStateChanged;
 

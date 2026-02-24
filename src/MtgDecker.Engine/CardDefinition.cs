@@ -47,4 +47,5 @@ public record CardDefinition(
     public CardDefinition? TransformInto { get; init; }
     public AdventurePart? Adventure { get; init; }
     public bool CannotBeCountered { get; init; }
+    public ManaCost? MadnessCost { get; init; }
 }

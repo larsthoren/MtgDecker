@@ -1345,6 +1345,39 @@ public static class CardDefinitions
                         new SwapPowerToughnessEffect()),
                 ],
             },
+            // === Madness Cards ===
+
+            // Basking Rootwalla: {G} 1/1 Lizard. {1}{G}: +2/+2 until EOT (once per turn). Madness {0}.
+            ["Basking Rootwalla"] = new(ManaCost.Parse("{G}"), null, 1, 1, CardType.Creature)
+            {
+                Subtypes = ["Lizard"],
+                MadnessCost = ManaCost.Parse("{0}"),
+                ActivatedAbilities =
+                [
+                    new(new ActivatedAbilityCost(ManaCost: ManaCost.Parse("{1}{G}")),
+                        new PumpSelfEffect(2, 2), OncePerTurn: true),
+                ],
+            },
+            // Arrogant Wurm: {3}{G}{G} 4/4 Wurm. Trample. Madness {2}{G}.
+            ["Arrogant Wurm"] = new(ManaCost.Parse("{3}{G}{G}"), null, 4, 4, CardType.Creature)
+            {
+                Subtypes = ["Wurm"],
+                MadnessCost = ManaCost.Parse("{2}{G}"),
+                ContinuousEffects =
+                [
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
+                        (card, _) => card.Name == "Arrogant Wurm",
+                        GrantedKeyword: Keyword.Trample,
+                        Layer: EffectLayer.Layer6_AbilityAddRemove),
+                ],
+            },
+            // Circular Logic: {2}{U} Instant. Counter target spell unless its controller pays {1} for each card in your graveyard. Madness {U}.
+            ["Circular Logic"] = new(ManaCost.Parse("{2}{U}"), null, null, null, CardType.Instant,
+                TargetFilter.AnySpellOnStack(), new CircularLogicEffect())
+            {
+                MadnessCost = ManaCost.Parse("{U}"),
+            },
+
             ["Flametongue Kavu"] = new(ManaCost.Parse("{3}{R}"), null, 4, 2, CardType.Creature)
             {
                 Subtypes = ["Kavu"],

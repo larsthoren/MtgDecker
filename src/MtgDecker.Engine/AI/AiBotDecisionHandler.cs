@@ -460,6 +460,14 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
     }
 
     /// <summary>
+    /// AI always casts madness cards when able — free or cheap spells are high value.
+    /// </summary>
+    public Task<bool> ChooseMadness(GameCard card, ManaCost madnessCost, CancellationToken ct = default)
+    {
+        return Task.FromResult(true);
+    }
+
+    /// <summary>
     /// Chooses a target for a spell. Picks the opponent's creature with highest power,
     /// falling back to the first eligible target.
     /// </summary>
