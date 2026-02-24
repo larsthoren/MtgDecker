@@ -37,6 +37,7 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
 
       - name: Deploy to Azure Container Apps
+        if: vars.AZURE_CONTAINER_APP_NAME != ''
         uses: azure/container-apps-deploy-action@v2
         with:
           registryUrl: ${{ env.REGISTRY }}
