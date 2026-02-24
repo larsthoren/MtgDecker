@@ -1632,6 +1632,87 @@ public static class CardDefinitions
                 // doesn't untap during its controller's untap step" is deferred — the engine does not
                 // currently distinguish mana abilities from other activated abilities on lands.
             },
+
+            // ─── Task 12 Batch 1: Complex Cards ─────────────────────────────────
+
+            // Kicker cards
+            ["Overload"] = new(ManaCost.Parse("{R}"), null, null, null, CardType.Instant,
+                TargetFilter.Artifact(), new Effects.OverloadEffect())
+            {
+                KickerCost = ManaCost.Parse("{2}"),
+            },
+            ["Orim's Chant"] = new(ManaCost.Parse("{W}"), null, null, null, CardType.Instant,
+                TargetFilter.Player(), new Effects.OrimsChantEffect())
+            {
+                KickerCost = ManaCost.Parse("{W}"),
+            },
+
+            // Rancor (Aura with return-to-hand trigger)
+            ["Rancor"] = new(ManaCost.Parse("{G}"), null, null, null, CardType.Enchantment)
+            {
+                Subtypes = ["Aura"],
+                AuraTarget = AuraTarget.Creature,
+                DynamicContinuousEffectsFactory = rancorCard =>
+                {
+                    if (!rancorCard.AttachedTo.HasValue) return [];
+                    var attachedId = rancorCard.AttachedTo.Value;
+                    return
+                    [
+                        new ContinuousEffect(Guid.Empty, ContinuousEffectType.ModifyPowerToughness,
+                            (card, _) => card.Id == attachedId,
+                            PowerMod: 2, ToughnessMod: 0,
+                            Layer: EffectLayer.Layer7c_ModifyPT),
+                        new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
+                            (card, _) => card.Id == attachedId,
+                            GrantedKeyword: Keyword.Trample,
+                            Layer: EffectLayer.Layer6_AbilityAddRemove),
+                    ];
+                },
+                Triggers = [new Trigger(GameEvent.LeavesBattlefield, TriggerCondition.SelfLeavesBattlefield, new RancorReturnEffect())],
+            },
+
+            // Stifle
+            ["Stifle"] = new(ManaCost.Parse("{U}"), null, null, null, CardType.Instant,
+                Effect: new Effects.StifleEffect()),
+
+            // Teferi's Response (simplified: counter + draw 2)
+            ["Teferi's Response"] = new(ManaCost.Parse("{1}{U}"), null, null, null, CardType.Instant,
+                TargetFilter.Spell(), new Effects.TeferisResponseEffect()),
+
+            // Brain Freeze (storm)
+            ["Brain Freeze"] = new(ManaCost.Parse("{1}{U}"), null, null, null, CardType.Instant,
+                TargetFilter.Player(), new Effects.BrainFreezeEffect())
+            {
+                HasStorm = true,
+            },
+
+            // River Boa (islandwalk + regeneration)
+            ["River Boa"] = new(ManaCost.Parse("{1}{G}"), null, 2, 1, CardType.Creature)
+            {
+                Subtypes = ["Snake"],
+                ContinuousEffects =
+                [
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
+                        (card, _) => card.Name == "River Boa",
+                        GrantedKeyword: Keyword.Islandwalk,
+                        Layer: EffectLayer.Layer6_AbilityAddRemove),
+                ],
+                ActivatedAbilities = [new(new ActivatedAbilityCost(ManaCost: ManaCost.Parse("{G}")), new RegenerateEffect())],
+            },
+
+            // Circle of Protection: Red
+            ["Circle of Protection: Red"] = new(ManaCost.Parse("{1}{W}"), null, null, null, CardType.Enchantment)
+            {
+                ActivatedAbilities = [new(new ActivatedAbilityCost(ManaCost: ManaCost.Parse("{1}")),
+                    new CoPPreventDamageEffect(ManaColor.Red))],
+            },
+
+            // Circle of Protection: Black
+            ["Circle of Protection: Black"] = new(ManaCost.Parse("{1}{W}"), null, null, null, CardType.Enchantment)
+            {
+                ActivatedAbilities = [new(new ActivatedAbilityCost(ManaCost: ManaCost.Parse("{1}")),
+                    new CoPPreventDamageEffect(ManaColor.Black))],
+            },
         };
 
         Registry = cards.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);

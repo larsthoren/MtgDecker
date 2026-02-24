@@ -176,6 +176,7 @@ internal class FlashbackHandler : IActionHandler
         fbPlayer.ActionHistory.Push(action);
 
         state.Log($"{fbPlayer.Name} casts {fbCard.Name} (flashback).");
+        state.SpellsCastThisTurn++;
         await engine.QueueBoardTriggersOnStackAsync(GameEvent.SpellCast, fbCard, ct);
     }
 }

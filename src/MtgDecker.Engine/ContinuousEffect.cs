@@ -21,6 +21,7 @@ public enum ContinuousEffectType
     PreventActivatedAbilities,
     PreventLethalDamage,
     PreventSpellCasting,
+    PreventCreatureAttacks,
 }
 
 public record ContinuousEffect(

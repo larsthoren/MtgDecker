@@ -143,6 +143,12 @@ public class GameCard
     public string? ChosenType { get; set; }
     public string? ChosenName { get; set; }
 
+    // Kicker tracking
+    public bool WasKicked { get; set; }
+
+    // Regeneration shields
+    public int RegenerationShields { get; set; }
+
     // Carpet of Flowers once-per-turn tracking
     public bool CarpetUsedThisTurn { get; set; }
 

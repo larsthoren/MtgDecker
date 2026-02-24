@@ -48,4 +48,6 @@ public record CardDefinition(
     public AdventurePart? Adventure { get; init; }
     public bool CannotBeCountered { get; init; }
     public ManaCost? MadnessCost { get; init; }
+    public ManaCost? KickerCost { get; init; }
+    public bool HasStorm { get; init; }
 }

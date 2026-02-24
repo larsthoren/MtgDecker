@@ -14,6 +14,7 @@ public class StackObject : IStackObject
     public bool IsFlashback { get; init; }
     public bool IsMadness { get; init; }
     public bool IsAdventure { get; init; }
+    public bool IsKicked { get; init; }
     public int? XValue { get; init; }
 
     public StackObject(GameCard card, Guid controllerId, Dictionary<ManaColor, int> manaPaid, List<TargetInfo> targets, int timestamp)

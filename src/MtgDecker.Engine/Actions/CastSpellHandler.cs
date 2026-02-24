@@ -150,6 +150,9 @@ internal class CastSpellHandler : IActionHandler
         {
             await engine.PayAlternateCostAsync(def!.AlternateCost!, castPlayer, castCard, ct);
 
+            // Kicker: prompt after paying base cost
+            var isKicked = await engine.TryPayKickerAsync(castCard, castPlayer, ct);
+
             // Alternate cost fully pays — go to stack immediately
             if (castingFromExileAdventure)
             {
@@ -160,13 +163,14 @@ internal class CastSpellHandler : IActionHandler
             {
                 castPlayer.Hand.RemoveById(castCard.Id);
             }
-            var stackObj = new StackObject(castCard, castPlayer.Id, new Dictionary<ManaColor, int>(), targets, state.StackCount);
+            var stackObj = new StackObject(castCard, castPlayer.Id, new Dictionary<ManaColor, int>(), targets, state.StackCount) { IsKicked = isKicked };
             state.StackPush(stackObj);
 
             action.ManaCostPaid = castEffectiveCost;
             castPlayer.ActionHistory.Push(action);
 
             state.Log($"{castPlayer.Name} casts {castCard.Name}.");
+            state.SpellsCastThisTurn++;
 
             await engine.QueueBoardTriggersOnStackAsync(GameEvent.SpellCast, castCard, ct);
             await engine.QueueSelfCastTriggersAsync(castCard, castPlayer, ct);
@@ -193,6 +197,9 @@ internal class CastSpellHandler : IActionHandler
                 // Fully paid by colored auto-deduct — go to stack immediately
                 castPlayer.PendingManaTaps.Clear();
 
+                // Kicker: prompt after paying base cost
+                var isKicked = await engine.TryPayKickerAsync(castCard, castPlayer, ct);
+
                 if (castingFromExileAdventure)
                 {
                     castPlayer.Exile.RemoveById(castCard.Id);
@@ -202,13 +209,14 @@ internal class CastSpellHandler : IActionHandler
                 {
                     castPlayer.Hand.RemoveById(castCard.Id);
                 }
-                var stackObj = new StackObject(castCard, castPlayer.Id, autoDeducted, targets, state.StackCount);
+                var stackObj = new StackObject(castCard, castPlayer.Id, autoDeducted, targets, state.StackCount) { IsKicked = isKicked };
                 state.StackPush(stackObj);
 
                 action.ManaCostPaid = castEffectiveCost;
                 castPlayer.ActionHistory.Push(action);
 
                 state.Log($"{castPlayer.Name} casts {castCard.Name}.");
+                state.SpellsCastThisTurn++;
 
                 await engine.QueueBoardTriggersOnStackAsync(GameEvent.SpellCast, castCard, ct);
                 await engine.QueueSelfCastTriggersAsync(castCard, castPlayer, ct);

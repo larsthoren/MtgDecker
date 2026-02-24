@@ -61,6 +61,7 @@ public class GameEngine
         _state.Player2.PlaneswalkerAbilitiesUsedThisTurn.Clear();
         _state.Player1.LifeLostThisTurn = 0;
         _state.Player2.LifeLostThisTurn = 0;
+        _state.SpellsCastThisTurn = 0;
         _state.Player1.PermanentLeftBattlefieldThisTurn = false;
         _state.Player2.PermanentLeftBattlefieldThisTurn = false;
         // Reset Carpet of Flowers once-per-turn flags and activated ability tracking
@@ -292,6 +293,9 @@ public class GameEngine
 
         state.ClearMidCast();
 
+        // Kicker: prompt after paying base cost
+        var isKicked = await TryPayKickerAsync(card, player, ct);
+
         // Remove card from source zone
         if (fromExileAdventure)
         {
@@ -303,7 +307,7 @@ public class GameEngine
             player.Hand.RemoveById(card.Id);
         }
 
-        var stackObj = new StackObject(card, player.Id, manaPaid, targets, state.StackCount);
+        var stackObj = new StackObject(card, player.Id, manaPaid, targets, state.StackCount) { IsKicked = isKicked };
         state.StackPush(stackObj);
 
         if (action != null)
@@ -313,6 +317,7 @@ public class GameEngine
         }
 
         state.Log($"{player.Name} casts {card.Name}.");
+        state.SpellsCastThisTurn++;
 
         await QueueBoardTriggersOnStackAsync(GameEvent.SpellCast, card, ct);
         await QueueSelfCastTriggersAsync(card, player, ct);
@@ -385,6 +390,33 @@ public class GameEngine
         ManaColor.Colorless => "C",
         _ => color.ToString()
     };
+
+    /// <summary>
+    /// Checks if the card has a kicker cost, if the player can pay it, and prompts.
+    /// Returns true if kicker was paid.
+    /// </summary>
+    internal async Task<bool> TryPayKickerAsync(GameCard card, Player player, CancellationToken ct)
+    {
+        if (!CardDefinitions.TryGet(card.Name, out var def) || def.KickerCost == null)
+            return false;
+
+        if (!player.ManaPool.CanPay(def.KickerCost))
+            return false;
+
+        // Prompt: pass the card with optional=true. If player chooses it, they want to pay kicker.
+        // If null, they skip kicker.
+        var choice = await player.DecisionHandler.ChooseCard(
+            [card], $"Pay kicker cost {def.KickerCost} for {card.Name}?", optional: true, ct);
+
+        if (choice.HasValue)
+        {
+            player.ManaPool.Pay(def.KickerCost);
+            _state.Log($"{player.Name} pays kicker cost {def.KickerCost} for {card.Name}.");
+            return true;
+        }
+
+        return false;
+    }
 
     internal bool CanPayAlternateCost(AlternateCost alt, Player player, GameCard castCard)
     {
@@ -909,6 +941,17 @@ public class GameEngine
                 .ToList();
         }
 
+        // PreventCreatureAttacks: creatures can't attack this turn (e.g. Orim's Chant kicked)
+        var preventAttacks = _state.ActiveEffects.Any(e =>
+            e.Type == ContinuousEffectType.PreventCreatureAttacks);
+        if (preventAttacks)
+        {
+            _state.Log("Creatures can't attack this turn.");
+            _state.CombatStep = CombatStep.None;
+            _state.Combat = null;
+            return;
+        }
+
         if (eligibleAttackers.Count == 0)
         {
             _state.Log("No eligible attackers.");
@@ -1342,9 +1385,15 @@ public class GameEngine
     public void ClearDamage()
     {
         foreach (var card in _state.Player1.Battlefield.Cards)
+        {
             card.DamageMarked = 0;
+            card.RegenerationShields = 0;
+        }
         foreach (var card in _state.Player2.Battlefield.Cards)
+        {
             card.DamageMarked = 0;
+            card.RegenerationShields = 0;
+        }
     }
 
     public void StripEndOfTurnEffects()
@@ -1873,6 +1922,16 @@ public class GameEngine
 
         foreach (var card in dead)
         {
+            // Regeneration: instead of dying, tap, remove from combat, remove all damage, decrement shield
+            if (card.RegenerationShields > 0)
+            {
+                card.RegenerationShields--;
+                card.DamageMarked = 0;
+                card.IsTapped = true;
+                _state.Log($"{card.Name} regenerates (shield used).");
+                continue;
+            }
+
             TrackCreatureDeath(card, player);
             await FireLeaveBattlefieldTriggersAsync(card, player, ct);
             player.Battlefield.RemoveById(card.Id);
