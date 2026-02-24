@@ -259,6 +259,14 @@ internal class ActivateAbilityHandler : IActionHandler
             state.Log($"{player.Name} sacrifices {abilitySource.Name}.");
         }
 
+        if (cost.ReturnSelfToHand)
+        {
+            await engine.FireLeaveBattlefieldTriggersAsync(abilitySource, player, ct);
+            player.Battlefield.RemoveById(abilitySource.Id);
+            player.Hand.Add(abilitySource);
+            state.Log($"{player.Name} returns {abilitySource.Name} to hand.");
+        }
+
         if (sacrificeTarget != null)
         {
             await engine.FireLeaveBattlefieldTriggersAsync(sacrificeTarget, player, ct);

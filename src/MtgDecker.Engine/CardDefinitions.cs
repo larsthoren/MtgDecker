@@ -1462,6 +1462,35 @@ public static class CardDefinitions
             {
                 ShuffleGraveyardOnDeath = true,
             },
+
+            // --- Flashback + Echo cards ---
+            ["Roar of the Wurm"] = new(ManaCost.Parse("{6}{G}"), null, null, null, CardType.Sorcery,
+                Effect: new CreateTokenSpellEffect("Wurm", 6, 6, CardType.Creature, ["Wurm"]))
+            {
+                FlashbackCost = new FlashbackCost(ManaCost.Parse("{3}{G}")),
+            },
+            ["Krosan Reclamation"] = new(ManaCost.Parse("{1}{G}"), null, null, null, CardType.Instant,
+                TargetFilter.Player(), new KrosanReclamationEffect())
+            {
+                FlashbackCost = new FlashbackCost(ManaCost.Parse("{1}{G}")),
+            },
+            ["Flash of Insight"] = new(ManaCost.Parse("{1}{U}"), null, null, null, CardType.Instant,
+                Effect: new FlashOfInsightEffect())
+            {
+                FlashbackCost = new FlashbackCost(ManaCost: ManaCost.Parse("{1}{U}"), ExileBlueCardsFromGraveyard: 1),
+            },
+            ["Radiant's Dragoons"] = new(ManaCost.Parse("{3}{W}"), null, 2, 5, CardType.Creature)
+            {
+                Subtypes = ["Human", "Soldier"],
+                EchoCost = ManaCost.Parse("{3}{W}"),
+                Triggers = [new Trigger(GameEvent.EnterBattlefield, TriggerCondition.Self, new Triggers.Effects.GainLifeEffect(5))],
+            },
+            ["Attunement"] = new(ManaCost.Parse("{2}{U}"), null, null, null, CardType.Enchantment)
+            {
+                ActivatedAbilities = [new(
+                    new ActivatedAbilityCost(ReturnSelfToHand: true),
+                    new AttunementEffect())],
+            },
         };
 
         Registry = cards.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);

@@ -15,7 +15,8 @@ public record ActivatedAbilityCost(
     int PayLife = 0,
     int ExileFromGraveyardCount = 0,
     bool DiscardAny = false,
-    int DiscardCount = 0);
+    int DiscardCount = 0,
+    bool ReturnSelfToHand = false);
 
 public record ActivatedAbility(
     ActivatedAbilityCost Cost,

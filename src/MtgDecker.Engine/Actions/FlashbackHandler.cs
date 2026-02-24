@@ -63,6 +63,31 @@ internal class FlashbackHandler : IActionHandler
             }
         }
 
+        // Exile blue cards from graveyard (Flash of Insight)
+        IReadOnlyList<GameCard>? fbExiledBlueCards = null;
+        if (fbCost.ExileBlueCardsFromGraveyard > 0)
+        {
+            // Blue cards in graveyard (excluding the flashback card itself, which is being cast)
+            var blueCards = fbPlayer.Graveyard.Cards
+                .Where(c => c.Id != fbCard.Id && c.ManaCost != null
+                    && c.ManaCost.ColorRequirements.ContainsKey(ManaColor.Blue))
+                .ToList();
+            if (blueCards.Count == 0)
+            {
+                state.Log($"No blue cards in graveyard for flashback of {fbCard.Name}.");
+                return;
+            }
+            // Player chooses how many blue cards to exile (at least 1)
+            fbExiledBlueCards = await fbPlayer.DecisionHandler.ChooseCardsToExile(
+                blueCards, blueCards.Count,
+                $"Exile blue cards from graveyard for flashback of {fbCard.Name} (X = number exiled)", ct);
+            if (fbExiledBlueCards.Count == 0)
+            {
+                state.Log($"No blue cards chosen for flashback of {fbCard.Name}.");
+                return;
+            }
+        }
+
         // Use shared targeting helper
         var fbTargets = new List<TargetInfo>();
         if (fbDef.TargetFilter != null)
@@ -106,10 +131,23 @@ internal class FlashbackHandler : IActionHandler
             state.Log($"{fbPlayer.Name} sacrifices {fbSacTarget.Name} for flashback.");
         }
 
+        int? fbXValue = null;
+        if (fbExiledBlueCards != null)
+        {
+            foreach (var exiled in fbExiledBlueCards)
+            {
+                fbPlayer.Graveyard.RemoveById(exiled.Id);
+                fbPlayer.Exile.Add(exiled);
+            }
+            fbXValue = fbExiledBlueCards.Count;
+            state.Log($"{fbPlayer.Name} exiles {fbXValue} blue card(s) for flashback of {fbCard.Name} (X={fbXValue}).");
+        }
+
         fbPlayer.Graveyard.RemoveById(fbCard.Id);
         var fbStackObj = new StackObject(fbCard, fbPlayer.Id, fbManaPaid, fbTargets, state.StackCount)
         {
             IsFlashback = true,
+            XValue = fbXValue,
         };
         state.StackPush(fbStackObj);
 
