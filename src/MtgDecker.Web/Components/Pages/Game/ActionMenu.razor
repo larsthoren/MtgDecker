@@ -28,6 +28,14 @@
                            OnClick="() => OnPlayAlternate.InvokeAsync()">Cast (alt cost)</MudButton>
             }
 
+            @if (IsOwnCard && CurrentZone == ZoneType.Hand && HasNinjutsuCost)
+            {
+                <MudButton Size="Size.Small" Variant="Variant.Text" FullWidth="true"
+                           StartIcon="@Icons.Material.Filled.SwapHoriz" Color="Color.Secondary"
+                           Style="justify-content: flex-start;"
+                           OnClick="() => OnNinjutsu.InvokeAsync()">Ninjutsu</MudButton>
+            }
+
             @if (IsOwnCard && CurrentZone == ZoneType.Battlefield && !IsTapped && HasTapAbility)
             {
                 <MudButton Size="Size.Small" Variant="Variant.Text" FullWidth="true"
@@ -62,8 +70,10 @@
     [Parameter] public bool HasTapAbility { get; set; }
     [Parameter] public bool HasActivatedAbility { get; set; }
     [Parameter] public bool HasAlternateCost { get; set; }
+    [Parameter] public bool HasNinjutsuCost { get; set; }
     [Parameter] public EventCallback OnPlay { get; set; }
     [Parameter] public EventCallback OnPlayAlternate { get; set; }
+    [Parameter] public EventCallback OnNinjutsu { get; set; }
     [Parameter] public EventCallback OnTapToggle { get; set; }
     [Parameter] public EventCallback OnActivate { get; set; }
     [Parameter] public EventCallback OnClose { get; set; }

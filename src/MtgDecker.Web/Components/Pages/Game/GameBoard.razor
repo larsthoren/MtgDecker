@@ -185,6 +185,14 @@
                            OnClick="HandleTargetCancel">Cancel</MudButton>
             </div>
         }
+        @if (IsNinjutsuTargeting)
+        {
+            <div class="targeting-banner">
+                <span>Choose unblocked attacker to return to hand</span>
+                <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Warning"
+                           OnClick="CancelNinjutsu">Cancel</MudButton>
+            </div>
+        }
         <PhaseBar CurrentPhase="@State.CurrentPhase"
                   CurrentCombatStep="@State.CombatStep"
                   TurnNumber="@State.TurnNumber"
@@ -222,7 +230,7 @@
                 var isEligibleBlocker = Handler?.IsWaitingForBlockers == true && IsLocalDefending
                     && Handler?.EligibleBlockers?.Any(c => c.Id == card.Id) == true;
                 var attachments = GetAttachedCards(LocalPlayer, card.Id);
-                <div class="permanent-stack">
+                <div class="permanent-stack @(IsEligibleNinjutsuTarget(card) ? "ninjutsu-eligible" : "") @(IsNinjutsuDimmed(card) ? "ninjutsu-dimmed" : "")">
                     @foreach (var aura in attachments)
                     {
                         <div class="attached-aura" id="bf-card-@aura.Id">
@@ -462,10 +470,12 @@
                         HasTapAbility="@(_selectedCard.IsLand || _selectedCard.ManaAbility != null)"
                         HasActivatedAbility="@HasActivatedAbility(_selectedCard)"
                         HasAlternateCost="@HasAlternateCostForCard(_selectedCard)"
+                        HasNinjutsuCost="@HasNinjutsuAvailable(_selectedCard)"
                         OnPlay="HandlePlay"
                         OnPlayAlternate="HandlePlayAlternate"
                         OnTapToggle="HandleTapToggle"
                         OnActivate="HandleActivate"
+                        OnNinjutsu="HandleNinjutsu"
                         OnClose="ClearSelection" />
         </div>
     }
@@ -870,6 +880,9 @@
     // Pending cast state (waiting for player to tap lands)
     private GameCard? _pendingCastCard;
 
+    // Ninjutsu targeting state (waiting for player to click an unblocked attacker)
+    private GameCard? _ninjutsuCard;
+
     // Card preview hover state
     private string? _hoveredImageUrl;
 
@@ -1007,6 +1020,9 @@
     private bool IsTargetingDimmed(GameCard card) =>
         IsTargetingMode && !IsEligibleTarget(card);
 
+    // --- Ninjutsu targeting helpers ---
+    private bool IsNinjutsuTargeting => _ninjutsuCard != null;
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
@@ -1022,6 +1038,13 @@
 
     protected override async Task OnParametersSetAsync()
     {
+        // Clear ninjutsu targeting if combat ended
+        if (_ninjutsuCard != null &&
+            (State.CurrentPhase != Phase.Combat || State.Combat == null))
+        {
+            _ninjutsuCard = null;
+        }
+
         // When state updates arrive (e.g. after a land tap), check if a pending
         // cast can now be completed with the updated mana pool.
         await TryCompletePendingCast();
@@ -1066,6 +1089,14 @@
 
     private async Task HandleBattlefieldClick(GameCard card, bool isEligibleAttacker, bool isEligibleBlocker)
     {
+        // If ninjutsu targeting, check if this is a valid unblocked attacker
+        if (IsNinjutsuTargeting)
+        {
+            if (IsEligibleNinjutsuTarget(card))
+                await HandleNinjutsuTargetClick(card);
+            return;
+        }
+
         // If we're targeting, submit target
         if (Handler?.IsWaitingForTarget == true)
         {
@@ -1090,6 +1121,9 @@
 
     private async Task HandleLandClick(GameCard card)
     {
+        // Block land interaction during ninjutsu targeting
+        if (IsNinjutsuTargeting) return;
+
         // If we're targeting, submit target
         if (Handler?.IsWaitingForTarget == true)
         {
@@ -1446,6 +1480,51 @@
         if (_selectedCard == null) return;
         await OnAction.InvokeAsync(GameAction.CastSpell(LocalPlayer.Id, _selectedCard.Id, useAlternateCost: true));
         ClearSelection();
+    }
+
+    // --- Ninjutsu ---
+
+    private void HandleNinjutsu()
+    {
+        if (_selectedCard == null) return;
+        _ninjutsuCard = _selectedCard;
+        ClearSelection();
+    }
+
+    private async Task HandleNinjutsuTargetClick(GameCard card)
+    {
+        if (_ninjutsuCard == null) return;
+        await OnAction.InvokeAsync(
+            GameAction.Ninjutsu(LocalPlayer.Id, _ninjutsuCard.Id, card.Id));
+        _ninjutsuCard = null;
+    }
+
+    private void CancelNinjutsu() => _ninjutsuCard = null;
+
+    private bool HasNinjutsuAvailable(GameCard? card)
+    {
+        if (card == null) return false;
+        if (!CardDefinitions.TryGet(card.Name, out var def) || def.NinjutsuCost == null)
+            return false;
+        if (State.CurrentPhase != Phase.Combat || State.CombatStep < CombatStep.DeclareBlockers)
+            return false;
+        if (State.Combat == null) return false;
+        // Must have at least one unblocked attacker we control
+        return State.Combat.Attackers.Any(a =>
+            !State.Combat.IsBlocked(a)
+            && LocalPlayer.Battlefield.Cards.Any(c => c.Id == a));
+    }
+
+    private bool IsEligibleNinjutsuTarget(GameCard card)
+    {
+        if (!IsNinjutsuTargeting || State.Combat == null) return false;
+        return State.Combat.Attackers.Contains(card.Id)
+            && !State.Combat.IsBlocked(card.Id);
+    }
+
+    private bool IsNinjutsuDimmed(GameCard card)
+    {
+        return IsNinjutsuTargeting && !IsEligibleNinjutsuTarget(card);
     }
 
     // --- Helpers ---
