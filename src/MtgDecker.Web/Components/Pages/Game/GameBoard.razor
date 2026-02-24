@@ -64,6 +64,7 @@
                 <span>Opponent Graveyard (@OpponentPlayer.Graveyard.Cards.Count)</span>
                 <span class="graveyard-drag-hint">&#x2725;</span>
                 <MudIconButton Size="Size.Small" Icon="@Icons.Material.Filled.Close"
+                               @onmousedown:stopPropagation
                                OnClick="() => _showOpponentGraveyard = false" />
             </div>
             <div class="graveyard-name-list">
@@ -411,6 +412,7 @@
                 <span>Your Graveyard (@LocalPlayer.Graveyard.Cards.Count)</span>
                 <span class="graveyard-drag-hint">&#x2725;</span>
                 <MudIconButton Size="Size.Small" Icon="@Icons.Material.Filled.Close"
+                               @onmousedown:stopPropagation
                                OnClick="() => _showPlayerGraveyard = false" />
             </div>
             <div class="graveyard-name-list">
@@ -930,14 +932,14 @@
     private string GetPlayerGraveyardStyle()
     {
         if (_playerGraveyardX.HasValue && _playerGraveyardY.HasValue)
-            return $"left: {_playerGraveyardX:F0}px; top: {_playerGraveyardY:F0}px; bottom: auto; right: auto;";
+            return FormattableString.Invariant($"left: {_playerGraveyardX:F0}px; top: {_playerGraveyardY:F0}px; bottom: auto; right: auto;");
         return "";
     }
 
     private string GetOpponentGraveyardStyle()
     {
         if (_oppGraveyardX.HasValue && _oppGraveyardY.HasValue)
-            return $"left: {_oppGraveyardX:F0}px; top: {_oppGraveyardY:F0}px; bottom: auto; right: auto;";
+            return FormattableString.Invariant($"left: {_oppGraveyardX:F0}px; top: {_oppGraveyardY:F0}px; bottom: auto; right: auto;");
         return "";
     }
 
