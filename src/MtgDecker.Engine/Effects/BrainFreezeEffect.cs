@@ -23,11 +23,16 @@ public class BrainFreezeEffect : SpellEffect
 
         for (int i = 0; i < totalResolutions; i++)
         {
-            MillCards(state, targetPlayer, 3);
+            if (MillCards(state, targetPlayer, 3))
+                return; // Stop milling if shuffle-on-mill triggered or game over
         }
     }
 
-    private static void MillCards(GameState state, Player player, int count)
+    /// <summary>
+    /// Mills the specified number of cards from library to graveyard.
+    /// Returns true if milling should stop (game over or shuffle-on-mill triggered).
+    /// </summary>
+    private static bool MillCards(GameState state, Player player, int count)
     {
         for (int i = 0; i < count; i++)
         {
@@ -35,6 +40,19 @@ public class BrainFreezeEffect : SpellEffect
             if (card != null)
             {
                 player.Graveyard.Add(card);
+
+                // Check for ShuffleGraveyardOnMill (e.g. Gaea's Blessing)
+                if (CardDefinitions.TryGet(card.Name, out var millDef) && millDef.ShuffleGraveyardOnMill)
+                {
+                    foreach (var gyCard in player.Graveyard.Cards.ToList())
+                    {
+                        player.Graveyard.Remove(gyCard);
+                        player.Library.AddToTop(gyCard);
+                    }
+                    player.Library.Shuffle();
+                    state.Log($"{card.Name} was milled — {player.Name} shuffles their graveyard into their library.");
+                    return true; // Stop milling after shuffle
+                }
             }
             else
             {
@@ -43,9 +61,10 @@ public class BrainFreezeEffect : SpellEffect
                 state.IsGameOver = true;
                 state.Winner = winner.Name;
                 state.Log($"{player.Name} loses — cannot draw from an empty library.");
-                return;
+                return true;
             }
         }
         state.Log($"{player.Name} mills {count} cards.");
+        return false;
     }
 }

@@ -692,7 +692,7 @@ public class AlternateCostSpellsTests
         def.ManaCost!.ConvertedManaCost.Should().Be(2);
         def.CardTypes.Should().Be(CardType.Sorcery);
         def.Effect.Should().BeOfType<MtgDecker.Engine.Effects.GaeasBlessingEffect>();
-        def.ShuffleGraveyardOnDeath.Should().BeTrue();
+        def.ShuffleGraveyardOnMill.Should().BeTrue();
     }
 
     // =============================================
@@ -722,6 +722,13 @@ public class AlternateCostSpellsTests
 
         var libraryCountBefore = state.Player1.Library.Count;
 
+        // Target self (Player1) for the graveyard shuffle
+        h1.EnqueueTarget(new TargetInfo(Guid.Empty, state.Player1.Id, ZoneType.None));
+        // Choose up to 3 cards from graveyard
+        h1.EnqueueCardChoice(gy1.Id);
+        h1.EnqueueCardChoice(gy2.Id);
+        h1.EnqueueCardChoice(gy3.Id);
+
         await engine.ExecuteAction(GameAction.CastSpell(state.Player1.Id, gb.Id));
         await engine.ResolveAllTriggersAsync();
 
@@ -749,6 +756,9 @@ public class AlternateCostSpellsTests
         // Empty graveyard
         var libraryCountBefore = state.Player1.Library.Count;
 
+        // Target self (Player1)
+        h1.EnqueueTarget(new TargetInfo(Guid.Empty, state.Player1.Id, ZoneType.None));
+
         await engine.ExecuteAction(GameAction.CastSpell(state.Player1.Id, gb.Id));
         await engine.ResolveAllTriggersAsync();
 
@@ -757,12 +767,12 @@ public class AlternateCostSpellsTests
     }
 
     [Fact]
-    public void GaeasBlessing_ShuffleGraveyardOnDeath_WorksViaReplacement()
+    public void GaeasBlessing_MoveToGraveyard_DoesNotTriggerShuffle()
     {
         var (engine, state, _, _) = CreateSetup();
 
-        // Gaea's Blessing has ShuffleGraveyardOnDeath, so MoveToGraveyardWithReplacement
-        // should shuffle graveyard into library when this card would go to graveyard
+        // Gaea's Blessing now has ShuffleGraveyardOnMill (not OnDeath), so
+        // MoveToGraveyardWithReplacement should NOT trigger shuffle — it just goes to graveyard
         var gb = GameCard.Create("Gaea's Blessing", "Sorcery");
         var graveyardCard = new GameCard { Name = "OldCard" };
         state.Player1.Graveyard.Add(graveyardCard);
@@ -771,9 +781,9 @@ public class AlternateCostSpellsTests
 
         engine.MoveToGraveyardWithReplacement(gb, state.Player1);
 
-        // Gaea's Blessing + graveyard cards should all be in library now
-        state.Player1.Library.Count.Should().Be(libBefore + 2); // gb + graveyardCard
-        state.Player1.Graveyard.Count.Should().Be(0);
+        // Gaea's Blessing should go to graveyard normally (no shuffle)
+        state.Player1.Library.Count.Should().Be(libBefore);
+        state.Player1.Graveyard.Count.Should().Be(2); // OldCard + Gaea's Blessing
     }
 
     // =============================================

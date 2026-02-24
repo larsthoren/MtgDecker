@@ -43,6 +43,7 @@ public record CardDefinition(
     /// </summary>
     public Func<GameCard, IReadOnlyList<ContinuousEffect>>? DynamicContinuousEffectsFactory { get; init; }
     public bool ShuffleGraveyardOnDeath { get; init; }
+    public bool ShuffleGraveyardOnMill { get; init; }
     public ManaCost? NinjutsuCost { get; init; }
     public CardDefinition? TransformInto { get; init; }
     public AdventurePart? Adventure { get; init; }
@@ -51,4 +52,5 @@ public record CardDefinition(
     public ManaCost? KickerCost { get; init; }
     public bool HasStorm { get; init; }
     public bool CyclingReplaceDraw { get; init; }
+    public bool MustAttack { get; init; }
 }

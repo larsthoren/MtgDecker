@@ -620,29 +620,24 @@ public class GameEngine
             }
         }
 
-        // Exile cards from graveyard
+        // Exile the top N cards of the required color from graveyard (not player choice — Oracle says "the top three")
         if (alt.ExileFromGraveyardCount > 0 && alt.ExileFromGraveyardColor.HasValue)
         {
-            for (int i = 0; i < alt.ExileFromGraveyardCount; i++)
+            // Take a snapshot and iterate from top (end) to bottom to find the top N matching cards
+            var graveyardSnapshot = player.Graveyard.Cards.ToList();
+            var toExile = new List<GameCard>();
+            for (int i = graveyardSnapshot.Count - 1; i >= 0 && toExile.Count < alt.ExileFromGraveyardCount; i--)
             {
-                var eligible = player.Graveyard.Cards.Where(c =>
-                    c.ManaCost != null && c.ManaCost.ColorRequirements.ContainsKey(alt.ExileFromGraveyardColor.Value)).ToList();
+                var card = graveyardSnapshot[i];
+                if (card.ManaCost != null && card.ManaCost.ColorRequirements.ContainsKey(alt.ExileFromGraveyardColor.Value))
+                    toExile.Add(card);
+            }
 
-                if (eligible.Count == 0) break;
-
-                var chosenId = await player.DecisionHandler.ChooseCard(
-                    eligible, $"Choose a {alt.ExileFromGraveyardColor} card to exile from graveyard ({i + 1}/{alt.ExileFromGraveyardCount})", optional: false, ct);
-
-                if (chosenId.HasValue)
-                {
-                    var exiled = player.Graveyard.Cards.FirstOrDefault(c => c.Id == chosenId.Value);
-                    if (exiled != null)
-                    {
-                        player.Graveyard.RemoveById(exiled.Id);
-                        player.Exile.Add(exiled);
-                        _state.Log($"{player.Name} exiles {exiled.Name} from graveyard.");
-                    }
-                }
+            foreach (var card in toExile)
+            {
+                player.Graveyard.RemoveById(card.Id);
+                player.Exile.Add(card);
+                _state.Log($"{player.Name} exiles {card.Name} from graveyard.");
             }
         }
     }
@@ -928,14 +923,17 @@ public class GameEngine
                 && !c.ActiveKeywords.Contains(Keyword.Defender))
             .ToList();
 
-        // Ensnaring Bridge: creatures with power > cards in controller's hand can't attack
-        var ensnaringBridges = new[] { _state.Player1, _state.Player2 }
-            .SelectMany(p => p.Battlefield.Cards)
+        // Ensnaring Bridge: creatures with power > bridge controller's hand size can't attack
+        var bridgeControllers = _state.Player1.Battlefield.Cards
             .Where(c => string.Equals(c.Name, "Ensnaring Bridge", StringComparison.OrdinalIgnoreCase))
-            .ToList();
-        if (ensnaringBridges.Count > 0)
+            .Select(_ => _state.Player1)
+            .Concat(_state.Player2.Battlefield.Cards
+                .Where(c => string.Equals(c.Name, "Ensnaring Bridge", StringComparison.OrdinalIgnoreCase))
+                .Select(_ => _state.Player2));
+
+        foreach (var bridgeController in bridgeControllers)
         {
-            var handSize = attacker.Hand.Cards.Count;
+            var handSize = bridgeController.Hand.Cards.Count;
             eligibleAttackers = eligibleAttackers
                 .Where(c => (c.Power ?? 0) <= handSize)
                 .ToList();
@@ -978,6 +976,17 @@ public class GameEngine
         var validAttackerIds = chosenAttackerIds
             .Where(id => eligibleAttackers.Any(c => c.Id == id))
             .ToList();
+
+        // Force MustAttack creatures into the attack
+        var mustAttackIds = eligibleAttackers
+            .Where(c => CardDefinitions.TryGet(c.Name, out var d) && d.MustAttack)
+            .Select(c => c.Id)
+            .ToList();
+        foreach (var id in mustAttackIds)
+        {
+            if (!validAttackerIds.Contains(id))
+                validAttackerIds.Add(id);
+        }
 
         if (validAttackerIds.Count == 0)
         {

@@ -11,9 +11,15 @@ public class GaeasBlessingEffect : SpellEffect
     {
         var controller = state.GetPlayer(spell.ControllerId);
 
-        // Target player is the controller (self-target for simplicity)
-        // Choose up to 3 cards from graveyard to shuffle into library
-        var graveyardCards = controller.Graveyard.Cards.ToList();
+        // Target player (from spell targets)
+        Player targetPlayer;
+        if (spell.Targets.Count > 0)
+            targetPlayer = state.GetPlayer(spell.Targets[0].PlayerId);
+        else
+            targetPlayer = controller;
+
+        // Choose up to 3 cards from target player's graveyard to shuffle into their library
+        var graveyardCards = targetPlayer.Graveyard.Cards.ToList();
         if (graveyardCards.Count > 0)
         {
             var maxChoose = Math.Min(3, graveyardCards.Count);
@@ -21,7 +27,7 @@ public class GaeasBlessingEffect : SpellEffect
 
             for (int i = 0; i < maxChoose; i++)
             {
-                var eligible = controller.Graveyard.Cards.ToList();
+                var eligible = targetPlayer.Graveyard.Cards.ToList();
                 if (eligible.Count == 0) break;
 
                 var chosenId = await handler.ChooseCard(
@@ -29,23 +35,23 @@ public class GaeasBlessingEffect : SpellEffect
 
                 if (!chosenId.HasValue) break; // Optional — player can stop choosing
 
-                var card = controller.Graveyard.Cards.FirstOrDefault(c => c.Id == chosenId.Value);
+                var card = targetPlayer.Graveyard.Cards.FirstOrDefault(c => c.Id == chosenId.Value);
                 if (card != null)
                 {
-                    controller.Graveyard.RemoveById(card.Id);
-                    controller.Library.Add(card);
+                    targetPlayer.Graveyard.RemoveById(card.Id);
+                    targetPlayer.Library.Add(card);
                     shuffled++;
                 }
             }
 
             if (shuffled > 0)
             {
-                controller.Library.Shuffle();
-                state.Log($"{controller.Name} shuffles {shuffled} card(s) from graveyard into library (Gaea's Blessing).");
+                targetPlayer.Library.Shuffle();
+                state.Log($"{targetPlayer.Name} shuffles {shuffled} card(s) from graveyard into library (Gaea's Blessing).");
             }
         }
 
-        // Draw a card
+        // Caster draws a card (always the controller, not the target)
         var drawn = controller.Library.DrawFromTop();
         if (drawn != null)
         {

@@ -28,6 +28,7 @@ public class DestroyAllByColorEffect : SpellEffect
 
             foreach (var card in targets)
             {
+                card.RegenerationShields = 0; // Can't be regenerated
                 player.Battlefield.Remove(card);
                 player.Graveyard.Add(card);
             }

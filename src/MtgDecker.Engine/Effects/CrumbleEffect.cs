@@ -10,6 +10,8 @@ public class CrumbleEffect : SpellEffect
         var artifact = owner.Battlefield.RemoveById(target.CardId);
         if (artifact == null) return;
 
+        artifact.RegenerationShields = 0; // Can't be regenerated
+
         var manaValue = artifact.ManaCost?.ConvertedManaCost ?? 0;
         owner.Graveyard.Add(artifact);
         owner.AdjustLife(manaValue);

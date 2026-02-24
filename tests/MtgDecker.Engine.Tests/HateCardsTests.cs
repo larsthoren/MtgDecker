@@ -418,19 +418,19 @@ public class HateCardsTests
         };
         state.Player1.Battlefield.Add(bigCreature);
 
-        // P1 has 3 cards in hand — only creatures with power <= 3 can attack
-        state.Player1.Hand.Clear();
-        state.Player1.Hand.Add(new GameCard { Name = "H1" });
-        state.Player1.Hand.Add(new GameCard { Name = "H2" });
-        state.Player1.Hand.Add(new GameCard { Name = "H3" });
+        // P2 (bridge controller) has 3 cards in hand — only creatures with power <= 3 can attack
+        state.Player2.Hand.Clear();
+        state.Player2.Hand.Add(new GameCard { Name = "H1" });
+        state.Player2.Hand.Add(new GameCard { Name = "H2" });
+        state.Player2.Hand.Add(new GameCard { Name = "H3" });
 
         // P1 tries to attack
         p1Handler.EnqueueAttackers(new List<Guid> { bigCreature.Id });
 
         await engine.RunCombatAsync(CancellationToken.None);
 
-        // Big creature has power 4 > 3 cards in hand, so it can't attack
-        state.Player2.Life.Should().Be(20, "creature with power > hand size can't attack through Ensnaring Bridge");
+        // Big creature has power 4 > 3 (bridge controller's hand size), so it can't attack
+        state.Player2.Life.Should().Be(20, "creature with power > bridge controller's hand size can't attack through Ensnaring Bridge");
     }
 
     [Fact]
@@ -451,17 +451,17 @@ public class HateCardsTests
         };
         state.Player1.Battlefield.Add(creature);
 
-        // P1 has exactly 2 cards in hand
-        state.Player1.Hand.Clear();
-        state.Player1.Hand.Add(new GameCard { Name = "H1" });
-        state.Player1.Hand.Add(new GameCard { Name = "H2" });
+        // P2 (bridge controller) has exactly 2 cards in hand
+        state.Player2.Hand.Clear();
+        state.Player2.Hand.Add(new GameCard { Name = "H1" });
+        state.Player2.Hand.Add(new GameCard { Name = "H2" });
 
         p1Handler.EnqueueAttackers(new List<Guid> { creature.Id });
 
         await engine.RunCombatAsync(CancellationToken.None);
 
-        // Power 2 <= 2 hand size — can attack
-        state.Player2.Life.Should().Be(18, "creature with power equal to hand size can attack");
+        // Power 2 <= 2 (bridge controller's hand size) — can attack
+        state.Player2.Life.Should().Be(18, "creature with power equal to bridge controller's hand size can attack");
     }
 
     [Fact]
@@ -482,15 +482,15 @@ public class HateCardsTests
         };
         state.Player1.Battlefield.Add(creature);
 
-        // Empty hand
-        state.Player1.Hand.Clear();
+        // P2 (bridge controller) has empty hand
+        state.Player2.Hand.Clear();
 
         p1Handler.EnqueueAttackers(new List<Guid> { creature.Id });
 
         await engine.RunCombatAsync(CancellationToken.None);
 
-        // Power 1 > 0 hand size — can't attack
-        state.Player2.Life.Should().Be(20, "with empty hand, no creature with power > 0 can attack");
+        // Power 1 > 0 (bridge controller's hand size) — can't attack
+        state.Player2.Life.Should().Be(20, "with bridge controller's empty hand, no creature with power > 0 can attack");
     }
 
     [Fact]
@@ -511,14 +511,14 @@ public class HateCardsTests
         };
         state.Player1.Battlefield.Add(creature);
 
-        // Empty hand
-        state.Player1.Hand.Clear();
+        // P2 (bridge controller) has empty hand
+        state.Player2.Hand.Clear();
 
         p1Handler.EnqueueAttackers(new List<Guid> { creature.Id });
 
         await engine.RunCombatAsync(CancellationToken.None);
 
-        // Power 0 <= 0 hand size — can attack
+        // Power 0 <= 0 (bridge controller's hand size) — can attack
         state.Player2.Life.Should().Be(20, "0 power creature deals no damage but can attack");
     }
 
@@ -528,8 +528,7 @@ public class HateCardsTests
         var (engine, state, p1Handler, _) = CreateSetup();
         await engine.StartGameAsync();
 
-        // P1 controls the Bridge (restricts their own attacks too for opponent's hand)
-        // Actually, Ensnaring Bridge checks the ATTACKING player's hand size
+        // P1 controls the Bridge — checks bridge controller's (P1's) hand size
         var bridge = GameCard.Create("Ensnaring Bridge");
         state.Player1.Battlefield.Add(bridge);
 

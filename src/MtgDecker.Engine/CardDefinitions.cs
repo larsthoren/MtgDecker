@@ -1491,9 +1491,9 @@ public static class CardDefinitions
                 AlternateCost = new AlternateCost(ExileCardColor: ManaColor.Red),
             },
             ["Gaea's Blessing"] = new(ManaCost.Parse("{1}{G}"), null, null, null, CardType.Sorcery,
-                Effect: new GaeasBlessingEffect())
+                TargetFilter.Player(), new GaeasBlessingEffect())
             {
-                ShuffleGraveyardOnDeath = true,
+                ShuffleGraveyardOnMill = true,
             },
 
             // --- Flashback + Echo cards ---
@@ -1526,6 +1526,18 @@ public static class CardDefinitions
             },
 
             // Shadow creatures
+            ["Dauthi Slayer"] = new(ManaCost.Parse("{B}{B}"), null, 2, 2, CardType.Creature)
+            {
+                Subtypes = ["Dauthi", "Soldier"],
+                MustAttack = true,
+                ContinuousEffects =
+                [
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
+                        (card, _) => card.Name == "Dauthi Slayer",
+                        GrantedKeyword: Keyword.Shadow,
+                        Layer: EffectLayer.Layer6_AbilityAddRemove),
+                ],
+            },
             ["Soltari Foot Soldier"] = new(ManaCost.Parse("{W}"), null, 1, 1, CardType.Creature)
             {
                 Subtypes = ["Soltari", "Soldier"],
