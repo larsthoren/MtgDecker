@@ -1350,6 +1350,86 @@ public static class CardDefinitions
                 Subtypes = ["Kavu"],
                 Triggers = [new Trigger(GameEvent.EnterBattlefield, TriggerCondition.Self, new DealDamageToTargetCreatureEffect(4))],
             },
+
+            // === Enchantments with Triggers ===
+
+            // Warmth: Whenever an opponent casts a red spell, you gain 2 life.
+            ["Warmth"] = new(ManaCost.Parse("{1}{W}"), null, null, null, CardType.Enchantment)
+            {
+                Triggers = [new Trigger(GameEvent.SpellCast, TriggerCondition.OpponentCastsRedSpell, new Triggers.Effects.GainLifeEffect(2))],
+            },
+
+            // Spiritual Focus (simplified): Whenever you discard a card, gain 2 life and you may draw a card.
+            ["Spiritual Focus"] = new(ManaCost.Parse("{1}{W}"), null, null, null, CardType.Enchantment)
+            {
+                Triggers = [new Trigger(GameEvent.DiscardCard, TriggerCondition.ControllerDiscardsCard, new GainLifeAndOptionalDrawEffect(2))],
+            },
+
+            // Presence of the Master: Whenever a player casts an enchantment spell, counter it.
+            ["Presence of the Master"] = new(ManaCost.Parse("{3}{W}"), null, null, null, CardType.Enchantment)
+            {
+                Triggers = [new Trigger(GameEvent.SpellCast, TriggerCondition.AnyPlayerCastsEnchantment, new CounterSpellOnStackEffect())],
+            },
+
+            // Sacred Ground (simplified): Whenever a land you control goes to graveyard from the battlefield, return it to the battlefield.
+            ["Sacred Ground"] = new(ManaCost.Parse("{1}{W}"), null, null, null, CardType.Enchantment)
+            {
+                Triggers = [new Trigger(GameEvent.LeavesBattlefield, TriggerCondition.ControllerLandToGraveyard, new SacredGroundEffect())],
+            },
+
+            // Seal of Fire: Sacrifice: Deal 2 damage to any target.
+            ["Seal of Fire"] = new(ManaCost.Parse("{R}"), null, null, null, CardType.Enchantment)
+            {
+                ActivatedAbilities =
+                [
+                    new(new ActivatedAbilityCost(SacrificeSelf: true),
+                        new DealDamageEffect(2),
+                        TargetFilter: c => true,
+                        CanTargetPlayer: true),
+                ],
+            },
+
+            // Ivory Tower: At the beginning of your upkeep, gain X life where X = hand size - 4.
+            ["Ivory Tower"] = new(ManaCost.Parse("{1}"), null, null, null, CardType.Artifact)
+            {
+                Triggers = [new Trigger(GameEvent.Upkeep, TriggerCondition.Upkeep, new IvoryTowerEffect())],
+            },
+
+            // Rejuvenation Chamber: Fading 2. {T}: You gain 2 life.
+            ["Rejuvenation Chamber"] = new(ManaCost.Parse("{3}"), null, null, null, CardType.Artifact)
+            {
+                EntersWithCounters = new() { [CounterType.Fade] = 2 },
+                Triggers =
+                [
+                    new Trigger(GameEvent.Upkeep, TriggerCondition.Upkeep, new FadingUpkeepEffect()),
+                ],
+                ActivatedAbilities =
+                [
+                    new(new ActivatedAbilityCost(TapSelf: true), new Triggers.Effects.GainLifeEffect(2)),
+                ],
+            },
+
+            // Serenity: At the beginning of your upkeep, destroy all artifacts and enchantments.
+            ["Serenity"] = new(ManaCost.Parse("{1}{W}"), null, null, null, CardType.Enchantment)
+            {
+                Triggers = [new Trigger(GameEvent.Upkeep, TriggerCondition.Upkeep, new SerenityEffect())],
+            },
+
+            // Carpet of Flowers: At the beginning of each of your main phases, add X mana of any color where X = opponent's Islands.
+            ["Carpet of Flowers"] = new(ManaCost.Parse("{G}"), null, null, null, CardType.Enchantment)
+            {
+                Triggers = [new Trigger(GameEvent.MainPhaseBeginning, TriggerCondition.ControllerMainPhaseBeginning, new CarpetOfFlowersEffect())],
+            },
+
+            // Zombie Infestation: Discard 2 cards: Create a 2/2 black Zombie creature token.
+            ["Zombie Infestation"] = new(ManaCost.Parse("{1}{B}"), null, null, null, CardType.Enchantment)
+            {
+                ActivatedAbilities =
+                [
+                    new(new ActivatedAbilityCost(DiscardCount: 2),
+                        new CreateTokensEffect("Zombie", 2, 2, CardType.Creature, ["Zombie"])),
+                ],
+            },
         };
 
         Registry = cards.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);

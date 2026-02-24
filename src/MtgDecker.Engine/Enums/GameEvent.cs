@@ -14,4 +14,6 @@ public enum GameEvent
     TapForMana,
     Cycle,
     LandPlayed,
+    DiscardCard,
+    MainPhaseBeginning,
 }

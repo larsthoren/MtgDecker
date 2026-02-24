@@ -183,6 +183,36 @@ internal class ActivateAbilityHandler : IActionHandler
             }
         }
 
+        List<GameCard>? discardTargets = null;
+        if (cost.DiscardCount > 0)
+        {
+            var eligible = player.Hand.Cards.ToList();
+            if (eligible.Count < cost.DiscardCount)
+            {
+                state.Log($"Cannot activate {abilitySource.Name} — not enough cards in hand to discard (need {cost.DiscardCount}, have {eligible.Count}).");
+                return;
+            }
+
+            discardTargets = [];
+            for (int i = 0; i < cost.DiscardCount; i++)
+            {
+                var remaining = player.Hand.Cards.Where(c => !discardTargets.Contains(c)).ToList();
+                var chosenId = await player.DecisionHandler.ChooseCard(
+                    remaining, $"Choose a card to discard ({i + 1}/{cost.DiscardCount})", optional: false, ct);
+                if (chosenId.HasValue)
+                {
+                    var card = remaining.FirstOrDefault(c => c.Id == chosenId.Value);
+                    if (card != null) discardTargets.Add(card);
+                }
+            }
+
+            if (discardTargets.Count < cost.DiscardCount)
+            {
+                state.Log($"Cannot activate {abilitySource.Name} — not enough discard targets chosen.");
+                return;
+            }
+        }
+
         List<GameCard>? exileTargets = null;
         if (cost.ExileFromGraveyardCount > 0)
         {
@@ -253,6 +283,16 @@ internal class ActivateAbilityHandler : IActionHandler
             player.Hand.RemoveById(discardTarget.Id);
             player.Graveyard.Add(discardTarget);
             state.Log($"{player.Name} discards {discardTarget.Name}.");
+        }
+
+        if (discardTargets != null)
+        {
+            foreach (var card in discardTargets)
+            {
+                player.Hand.RemoveById(card.Id);
+                player.Graveyard.Add(card);
+                state.Log($"{player.Name} discards {card.Name}.");
+            }
         }
 
         if (cost.PayLife > 0)

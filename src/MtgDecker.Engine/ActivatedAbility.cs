@@ -14,7 +14,8 @@ public record ActivatedAbilityCost(
     CardType? DiscardCardType = null,
     int PayLife = 0,
     int ExileFromGraveyardCount = 0,
-    bool DiscardAny = false);
+    bool DiscardAny = false,
+    int DiscardCount = 0);
 
 public record ActivatedAbility(
     ActivatedAbilityCost Cost,

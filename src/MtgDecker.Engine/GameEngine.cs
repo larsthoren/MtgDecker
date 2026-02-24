@@ -62,6 +62,11 @@ public class GameEngine
         _state.Player2.LifeLostThisTurn = 0;
         _state.Player1.PermanentLeftBattlefieldThisTurn = false;
         _state.Player2.PermanentLeftBattlefieldThisTurn = false;
+        // Reset Carpet of Flowers once-per-turn flags
+        foreach (var card in _state.Player1.Battlefield.Cards)
+            card.CarpetUsedThisTurn = false;
+        foreach (var card in _state.Player2.Battlefield.Cards)
+            card.CarpetUsedThisTurn = false;
         _state.Log($"Turn {_state.TurnNumber}: {_state.ActivePlayer.Name}'s turn.");
 
         do
@@ -86,6 +91,12 @@ public class GameEngine
                 await QueueGraveyardTriggersOnStackAsync(GameEvent.Upkeep, ct);
                 await QueueEchoTriggersOnStackAsync(ct);
                 await QueueDelayedTriggersOnStackAsync(GameEvent.Upkeep, ct);
+            }
+
+            // Fire main phase beginning triggers (e.g., Carpet of Flowers)
+            if (phase.Phase == Phase.MainPhase1 || phase.Phase == Phase.MainPhase2)
+            {
+                await QueueBoardTriggersOnStackAsync(GameEvent.MainPhaseBeginning, null, ct);
             }
 
             if (phase.Phase == Phase.Combat)
@@ -152,7 +163,11 @@ public class GameEngine
             player.Hand.Remove(card);
             MoveToGraveyardWithReplacement(card, player);
             _state.Log($"{player.Name} discards {card.Name}.");
+            QueueDiscardTriggers(player);
         }
+
+        if (_state.StackCount > 0)
+            await ResolveAllTriggersAsync(ct);
     }
 
     internal void ExecuteTurnBasedAction(Phase phase)
@@ -1354,7 +1369,7 @@ public class GameEngine
     {
         foreach (var card in player.Battlefield.Cards)
         {
-            if (card.Id == effect.SourceId) continue; // lords don't buff themselves
+            if (effect.ExcludeSelf && card.Id == effect.SourceId) continue; // lords don't buff themselves
             if (!effect.Applies(card, player)) continue;
 
             card.EffectivePower = (card.EffectivePower ?? card.BasePower ?? 0) + effect.PowerMod;
@@ -1753,6 +1768,28 @@ public class GameEngine
                         && relevantCard != null
                         && relevantCard.Id != permanent.Id
                         && _state.ActivePlayer == player,
+                    TriggerCondition.OpponentCastsRedSpell =>
+                        evt == GameEvent.SpellCast
+                        && relevantCard != null
+                        && relevantCard.ManaCost != null
+                        && relevantCard.ManaCost.ColorRequirements.ContainsKey(ManaColor.Red)
+                        && _state.ActivePlayer != player,
+                    TriggerCondition.AnyPlayerCastsEnchantment =>
+                        evt == GameEvent.SpellCast
+                        && relevantCard != null
+                        && relevantCard.CardTypes.HasFlag(CardType.Enchantment)
+                        && relevantCard.Name != permanent.Name, // Don't counter itself
+                    TriggerCondition.ControllerDiscardsCard =>
+                        evt == GameEvent.DiscardCard
+                        && _state.ActivePlayer == player,
+                    TriggerCondition.ControllerLandToGraveyard =>
+                        evt == GameEvent.LeavesBattlefield
+                        && relevantCard != null
+                        && relevantCard.IsLand
+                        && player.Graveyard.Cards.Any(c => c.Id == relevantCard.Id),
+                    TriggerCondition.ControllerMainPhaseBeginning =>
+                        evt == GameEvent.MainPhaseBeginning
+                        && _state.ActivePlayer == player,
                     TriggerCondition.SelfAttacks => false,
                     _ => false,
                 };
@@ -1881,23 +1918,25 @@ public class GameEngine
         return Task.CompletedTask;
     }
 
-    internal Task FireLeaveBattlefieldTriggersAsync(GameCard card, Player controller, CancellationToken ct)
+    internal async Task FireLeaveBattlefieldTriggersAsync(GameCard card, Player controller, CancellationToken ct)
     {
         // Track revolt — a permanent controlled by this player left the battlefield
         controller.PermanentLeftBattlefieldThisTurn = true;
 
-        if (!CardDefinitions.TryGet(card.Name, out var def)) return Task.CompletedTask;
-
-        foreach (var trigger in def.Triggers)
+        if (CardDefinitions.TryGet(card.Name, out var def))
         {
-            if (trigger.Condition == TriggerCondition.SelfLeavesBattlefield)
+            foreach (var trigger in def.Triggers)
             {
-                _state.Log($"{card.Name} triggers: {trigger.Effect.GetType().Name.Replace("Effect", "")}");
-                _state.StackPush(new TriggeredAbilityStackObject(card, controller.Id, trigger.Effect));
+                if (trigger.Condition == TriggerCondition.SelfLeavesBattlefield)
+                {
+                    _state.Log($"{card.Name} triggers: {trigger.Effect.GetType().Name.Replace("Effect", "")}");
+                    _state.StackPush(new TriggeredAbilityStackObject(card, controller.Id, trigger.Effect));
+                }
             }
         }
 
-        return Task.CompletedTask;
+        // Fire board-wide LeavesBattlefield triggers (e.g., Sacred Ground for lands)
+        await QueueBoardTriggersOnStackAsync(GameEvent.LeavesBattlefield, card, ct);
     }
 
     /// <summary>Snapshots both players' battlefield card IDs for ETB diffing.</summary>
@@ -2308,6 +2347,34 @@ public class GameEngine
                         if (drawingPlayer.Id != player.Id) continue;
                         if (drawingPlayer.DrawsThisTurn != 3) continue;
                         _state.Log($"{card.Name} triggers on {drawingPlayer.Name}'s third draw this turn.");
+                        _state.StackPush(new TriggeredAbilityStackObject(card, player.Id, trigger.Effect));
+                    }
+                }
+            }
+        }
+    }
+
+    internal void QueueDiscardTriggers(Player discardingPlayer)
+    {
+        foreach (var player in new[] { _state.Player1, _state.Player2 })
+        {
+            foreach (var card in player.Battlefield.Cards)
+            {
+                if (card.AbilitiesRemoved) continue;
+
+                var triggers = card.Triggers.Count > 0
+                    ? card.Triggers
+                    : (CardDefinitions.TryGet(card.Name, out var def) ? def.Triggers : []);
+
+                foreach (var trigger in triggers)
+                {
+                    if (trigger.Event != GameEvent.DiscardCard) continue;
+
+                    if (trigger.Condition == TriggerCondition.ControllerDiscardsCard)
+                    {
+                        // Only fires when the permanent's controller discards
+                        if (discardingPlayer.Id != player.Id) continue;
+                        _state.Log($"{card.Name} triggers on {discardingPlayer.Name}'s discard.");
                         _state.StackPush(new TriggeredAbilityStackObject(card, player.Id, trigger.Effect));
                     }
                 }

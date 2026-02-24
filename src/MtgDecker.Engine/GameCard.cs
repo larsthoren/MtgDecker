@@ -139,6 +139,9 @@ public class GameCard
     // Per-source exile tracking (e.g., Parallax Wave)
     public List<Guid> ExiledCardIds { get; } = new();
 
+    // Carpet of Flowers once-per-turn tracking
+    public bool CarpetUsedThisTurn { get; set; }
+
     // Combat tracking
     public int? TurnEnteredBattlefield { get; set; }
     public int DamageMarked { get; set; }
