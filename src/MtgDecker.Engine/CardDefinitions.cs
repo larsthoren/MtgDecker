@@ -1491,6 +1491,73 @@ public static class CardDefinitions
                     new ActivatedAbilityCost(ReturnSelfToHand: true),
                     new AttunementEffect())],
             },
+
+            // Shadow creatures
+            ["Soltari Foot Soldier"] = new(ManaCost.Parse("{W}"), null, 1, 1, CardType.Creature)
+            {
+                Subtypes = ["Soltari", "Soldier"],
+                ContinuousEffects =
+                [
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
+                        (card, _) => card.Name == "Soltari Foot Soldier",
+                        GrantedKeyword: Keyword.Shadow,
+                        Layer: EffectLayer.Layer6_AbilityAddRemove),
+                ],
+            },
+            ["Soltari Monk"] = new(ManaCost.Parse("{W}{W}"), null, 2, 1, CardType.Creature)
+            {
+                Subtypes = ["Soltari", "Monk", "Cleric"],
+                ContinuousEffects =
+                [
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
+                        (card, _) => card.Name == "Soltari Monk",
+                        GrantedKeyword: Keyword.Shadow,
+                        Layer: EffectLayer.Layer6_AbilityAddRemove),
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
+                        (card, _) => card.Name == "Soltari Monk",
+                        GrantedKeyword: Keyword.ProtectionFromBlack,
+                        Layer: EffectLayer.Layer6_AbilityAddRemove),
+                ],
+            },
+            ["Soltari Priest"] = new(ManaCost.Parse("{W}{W}"), null, 2, 1, CardType.Creature)
+            {
+                Subtypes = ["Soltari", "Cleric"],
+                ContinuousEffects =
+                [
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
+                        (card, _) => card.Name == "Soltari Priest",
+                        GrantedKeyword: Keyword.Shadow,
+                        Layer: EffectLayer.Layer6_AbilityAddRemove),
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
+                        (card, _) => card.Name == "Soltari Priest",
+                        GrantedKeyword: Keyword.ProtectionFromRed,
+                        Layer: EffectLayer.Layer6_AbilityAddRemove),
+                ],
+            },
+            ["Soltari Champion"] = new(ManaCost.Parse("{2}{W}"), null, 2, 2, CardType.Creature)
+            {
+                Subtypes = ["Soltari", "Soldier"],
+                ContinuousEffects =
+                [
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
+                        (card, _) => card.Name == "Soltari Champion",
+                        GrantedKeyword: Keyword.Shadow,
+                        Layer: EffectLayer.Layer6_AbilityAddRemove),
+                ],
+                Triggers = [new Trigger(GameEvent.BeginCombat, TriggerCondition.SelfAttacks, new PumpAllOtherCreaturesEffect(1, 1))],
+            },
+            ["Xantid Swarm"] = new(ManaCost.Parse("{G}"), null, 0, 1, CardType.Creature)
+            {
+                Subtypes = ["Insect"],
+                ContinuousEffects =
+                [
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
+                        (card, _) => card.Name == "Xantid Swarm",
+                        GrantedKeyword: Keyword.Flying,
+                        Layer: EffectLayer.Layer6_AbilityAddRemove),
+                ],
+                Triggers = [new Trigger(GameEvent.BeginCombat, TriggerCondition.SelfAttacks, new XantidSwarmEffect())],
+            },
         };
 
         Registry = cards.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);

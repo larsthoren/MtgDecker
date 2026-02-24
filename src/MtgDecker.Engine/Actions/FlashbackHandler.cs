@@ -8,6 +8,16 @@ internal class FlashbackHandler : IActionHandler
     public async Task ExecuteAsync(GameAction action, GameEngine engine, GameState state, CancellationToken ct)
     {
         var fbPlayer = state.GetPlayer(action.PlayerId);
+
+        // PreventSpellCasting: check if this player is prevented from casting spells
+        if (state.ActiveEffects.Any(e =>
+            e.Type == ContinuousEffectType.PreventSpellCasting
+            && e.Applies(new GameCard(), fbPlayer)))
+        {
+            state.Log($"{fbPlayer.Name} can't cast spells this turn.");
+            return;
+        }
+
         var fbCard = fbPlayer.Graveyard.Cards.FirstOrDefault(c => c.Id == action.CardId);
         if (fbCard == null)
         {

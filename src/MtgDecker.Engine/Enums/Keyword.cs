@@ -24,4 +24,5 @@ public enum Keyword
     DoesNotUntap,
     ProtectionFromRed,
     ProtectionFromBlack,
+    Shadow,
 }

@@ -13,6 +13,16 @@ internal class CastSpellHandler : IActionHandler
             return;
         }
 
+        // PreventSpellCasting: check if this player is prevented from casting spells
+        var spellCaster = state.GetPlayer(action.PlayerId);
+        if (state.ActiveEffects.Any(e =>
+            e.Type == ContinuousEffectType.PreventSpellCasting
+            && e.Applies(new GameCard(), spellCaster)))
+        {
+            state.Log($"{spellCaster.Name} can't cast spells this turn.");
+            return;
+        }
+
         var castPlayer = state.GetPlayer(action.PlayerId);
         var castCard = castPlayer.Hand.Cards.FirstOrDefault(c => c.Id == action.CardId);
         bool castingFromExileAdventure = false;

@@ -616,6 +616,40 @@ public class GameEngine
     private bool HasHexproof(GameCard card) => card.ActiveKeywords.Contains(Keyword.Hexproof);
 
     /// <summary>
+    /// Checks if blocker is prevented from blocking attacker due to protection from a color.
+    /// Returns true if the block is illegal (should be skipped).
+    /// </summary>
+    private bool IsBlockedByProtection(GameCard attacker, GameCard blocker)
+    {
+        var blockerColors = blocker.ManaCost?.ColorRequirements.Keys
+            .Where(c => c != ManaColor.Colorless)
+            .ToHashSet() ?? new HashSet<ManaColor>();
+
+        if (attacker.ActiveKeywords.Contains(Keyword.ProtectionFromBlack) && blockerColors.Contains(ManaColor.Black))
+        {
+            _state.Log($"{blocker.Name} cannot block {attacker.Name} — protection from black.");
+            return true;
+        }
+        if (attacker.ActiveKeywords.Contains(Keyword.ProtectionFromRed) && blockerColors.Contains(ManaColor.Red))
+        {
+            _state.Log($"{blocker.Name} cannot block {attacker.Name} — protection from red.");
+            return true;
+        }
+        if (attacker.ActiveKeywords.Contains(Keyword.ProtectionFromBlue) && blockerColors.Contains(ManaColor.Blue))
+        {
+            _state.Log($"{blocker.Name} cannot block {attacker.Name} — protection from blue.");
+            return true;
+        }
+        if (attacker.ActiveKeywords.Contains(Keyword.ProtectionFromWhite) && blockerColors.Contains(ManaColor.White))
+        {
+            _state.Log($"{blocker.Name} cannot block {attacker.Name} — protection from white.");
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
     /// Shared targeting helper — builds eligible targets, prompts player, validates choice.
     /// Returns null if the player cancels targeting. Returns empty list if no legal targets exist.
     /// </summary>
@@ -974,6 +1008,64 @@ public class GameEngine
                         _state.Log($"{attackerCard.Name} has mountainwalk — cannot be blocked.");
                         continue;
                     }
+
+                    // Swampwalk: cannot be blocked if defender controls a Swamp
+                    if (attackerCard.ActiveKeywords.Contains(Keyword.Swampwalk)
+                        && defender.Battlefield.Cards.Any(c => c.Subtypes.Contains("Swamp")))
+                    {
+                        _state.Log($"{attackerCard.Name} has swampwalk — cannot be blocked.");
+                        continue;
+                    }
+
+                    // Forestwalk: cannot be blocked if defender controls a Forest
+                    if (attackerCard.ActiveKeywords.Contains(Keyword.Forestwalk)
+                        && defender.Battlefield.Cards.Any(c => c.Subtypes.Contains("Forest")))
+                    {
+                        _state.Log($"{attackerCard.Name} has forestwalk — cannot be blocked.");
+                        continue;
+                    }
+
+                    // Islandwalk: cannot be blocked if defender controls an Island
+                    if (attackerCard.ActiveKeywords.Contains(Keyword.Islandwalk)
+                        && defender.Battlefield.Cards.Any(c => c.Subtypes.Contains("Island")))
+                    {
+                        _state.Log($"{attackerCard.Name} has islandwalk — cannot be blocked.");
+                        continue;
+                    }
+
+                    // Plainswalk: cannot be blocked if defender controls a Plains
+                    if (attackerCard.ActiveKeywords.Contains(Keyword.Plainswalk)
+                        && defender.Battlefield.Cards.Any(c => c.Subtypes.Contains("Plains")))
+                    {
+                        _state.Log($"{attackerCard.Name} has plainswalk — cannot be blocked.");
+                        continue;
+                    }
+
+                    // Shadow: shadow can only be blocked by shadow; non-shadow can't be blocked by shadow
+                    if (attackerCard.ActiveKeywords.Contains(Keyword.Shadow)
+                        && !blockerCard.ActiveKeywords.Contains(Keyword.Shadow))
+                    {
+                        _state.Log($"{blockerCard.Name} cannot block {attackerCard.Name} — shadow can only be blocked by shadow.");
+                        continue;
+                    }
+                    if (!attackerCard.ActiveKeywords.Contains(Keyword.Shadow)
+                        && blockerCard.ActiveKeywords.Contains(Keyword.Shadow))
+                    {
+                        _state.Log($"{blockerCard.Name} has shadow — cannot block non-shadow {attackerCard.Name}.");
+                        continue;
+                    }
+
+                    // Flying: can only be blocked by creatures with flying (or reach)
+                    if (attackerCard.ActiveKeywords.Contains(Keyword.Flying)
+                        && !blockerCard.ActiveKeywords.Contains(Keyword.Flying))
+                    {
+                        _state.Log($"{blockerCard.Name} cannot block {attackerCard.Name} — attacker has flying.");
+                        continue;
+                    }
+
+                    // Protection from color: cannot be blocked by creatures of that color
+                    if (IsBlockedByProtection(attackerCard, blockerCard))
+                        continue;
 
                     _state.Combat.DeclareBlocker(blockerId, attackerCardId);
                     _state.Log($"{defender.Name} blocks {attackerCard.Name} with {blockerCard.Name}.");
