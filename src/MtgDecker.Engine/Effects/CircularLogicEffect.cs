@@ -2,12 +2,12 @@ namespace MtgDecker.Engine.Effects;
 
 /// <summary>
 /// Circular Logic — Counter target spell unless its controller pays {1} for each card
-/// in the caster's graveyard. Uses the same pay-or-counter pattern as ConditionalCounterEffect
-/// but with a dynamic cost based on graveyard size.
+/// in the caster's graveyard. Opponent is asked whether they want to pay.
 /// </summary>
 public class CircularLogicEffect : SpellEffect
 {
-    public override void Resolve(GameState state, StackObject spell)
+    public override async Task ResolveAsync(GameState state, StackObject spell,
+        IPlayerDecisionHandler handler, CancellationToken ct = default)
     {
         if (spell.Targets.Count == 0) return;
         var target = spell.Targets[0];
@@ -38,25 +38,31 @@ public class CircularLogicEffect : SpellEffect
         // Check if opponent can pay the generic cost
         if (opponent.ManaPool.Total >= graveyardCount)
         {
-            // Opponent pays — deduct generic mana from their pool
-            var remaining = graveyardCount;
-            var available = opponent.ManaPool.Available;
-            foreach (var (color, amount) in available)
-            {
-                var take = Math.Min(remaining, amount);
-                opponent.ManaPool.Deduct(color, take);
-                remaining -= take;
-                if (remaining <= 0) break;
-            }
+            // Ask opponent whether they want to pay
+            var choice = await opponent.DecisionHandler.ChooseCard(
+                [targetSpell.Card], $"Pay {{{graveyardCount}}} to prevent counter?", optional: true, ct: ct);
 
-            state.Log($"{opponent.Name} pays {{{graveyardCount}}} — {targetSpell.Card.Name} resolves.");
+            if (choice.HasValue)
+            {
+                // Opponent pays — deduct generic mana from their pool
+                var remaining = graveyardCount;
+                var available = opponent.ManaPool.Available;
+                foreach (var (color, amount) in available)
+                {
+                    var take = Math.Min(remaining, amount);
+                    opponent.ManaPool.Deduct(color, take);
+                    remaining -= take;
+                    if (remaining <= 0) break;
+                }
+
+                state.Log($"{opponent.Name} pays {{{graveyardCount}}} — {targetSpell.Card.Name} resolves.");
+                return;
+            }
         }
-        else
-        {
-            // Opponent cannot pay — counter the spell
-            state.StackRemove(targetSpell);
-            opponent.Graveyard.Add(targetSpell.Card);
-            state.Log($"{targetSpell.Card.Name} is countered by {spell.Card.Name} (unable to pay {{{graveyardCount}}}).");
-        }
+
+        // Opponent cannot or chose not to pay — counter the spell
+        state.StackRemove(targetSpell);
+        opponent.Graveyard.Add(targetSpell.Card);
+        state.Log($"{targetSpell.Card.Name} is countered by {spell.Card.Name} (unable to pay {{{graveyardCount}}}).");
     }
 }

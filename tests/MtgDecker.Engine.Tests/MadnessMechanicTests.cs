@@ -335,11 +335,12 @@ public class MadnessMechanicTests
     #region Circular Logic
 
     [Fact]
-    public void CircularLogicEffect_CountersSpell_WhenOpponentCannotPay()
+    public async Task CircularLogicEffect_CountersSpell_WhenOpponentCannotPay()
     {
+        var h2 = new TestDecisionHandler();
         var state = new GameState(
             new Player(Guid.NewGuid(), "P1", new TestDecisionHandler()),
-            new Player(Guid.NewGuid(), "P2", new TestDecisionHandler()));
+            new Player(Guid.NewGuid(), "P2", h2));
 
         // Put some cards in caster's (P1) graveyard
         state.Player1.Graveyard.Add(new GameCard { Name = "Card A" });
@@ -360,7 +361,7 @@ public class MadnessMechanicTests
             1);
 
         var effect = new CircularLogicEffect();
-        effect.Resolve(state, clStackObj);
+        await effect.ResolveAsync(state, clStackObj, h2);
 
         // Lightning Bolt should be countered (in graveyard)
         state.Player2.Graveyard.Cards.Should().Contain(c => c.Name == "Lightning Bolt");
@@ -368,11 +369,12 @@ public class MadnessMechanicTests
     }
 
     [Fact]
-    public void CircularLogicEffect_SpellResolves_WhenOpponentCanPay()
+    public async Task CircularLogicEffect_SpellResolves_WhenOpponentChoosesToPay()
     {
+        var h2 = new TestDecisionHandler();
         var state = new GameState(
             new Player(Guid.NewGuid(), "P1", new TestDecisionHandler()),
-            new Player(Guid.NewGuid(), "P2", new TestDecisionHandler()));
+            new Player(Guid.NewGuid(), "P2", h2));
 
         // 2 cards in caster's graveyard = cost of {2}
         state.Player1.Graveyard.Add(new GameCard { Name = "Card A" });
@@ -392,8 +394,11 @@ public class MadnessMechanicTests
             [new TargetInfo(targetSpell.Id, state.Player2.Id, ZoneType.Stack)],
             1);
 
+        // Opponent accepts to pay — ChooseCard returns the spell card id (accept)
+        h2.EnqueueCardChoice(targetSpell.Id);
+
         var effect = new CircularLogicEffect();
-        effect.Resolve(state, clStackObj);
+        await effect.ResolveAsync(state, clStackObj, h2);
 
         // Lightning Bolt should still be on the stack (not countered)
         state.Stack.OfType<StackObject>().Should().Contain(s => s.Card.Name == "Lightning Bolt");
@@ -402,11 +407,51 @@ public class MadnessMechanicTests
     }
 
     [Fact]
-    public void CircularLogicEffect_EmptyGraveyard_DoesNotCounter()
+    public async Task CircularLogicEffect_CountersSpell_WhenOpponentDeclinesToPay()
     {
+        var h2 = new TestDecisionHandler();
         var state = new GameState(
             new Player(Guid.NewGuid(), "P1", new TestDecisionHandler()),
-            new Player(Guid.NewGuid(), "P2", new TestDecisionHandler()));
+            new Player(Guid.NewGuid(), "P2", h2));
+
+        // 2 cards in caster's graveyard = cost of {2}
+        state.Player1.Graveyard.Add(new GameCard { Name = "Card A" });
+        state.Player1.Graveyard.Add(new GameCard { Name = "Card B" });
+
+        // Opponent has enough mana but will decline to pay
+        state.Player2.ManaPool.Add(ManaColor.Red, 3);
+
+        var targetSpell = new GameCard { Name = "Lightning Bolt", CardTypes = CardType.Instant };
+        var targetStackObj = new StackObject(targetSpell, state.Player2.Id,
+            new Dictionary<ManaColor, int>(), [], 0);
+        state.StackPush(targetStackObj);
+
+        var circularLogic = new GameCard { Name = "Circular Logic", CardTypes = CardType.Instant };
+        var clStackObj = new StackObject(circularLogic, state.Player1.Id,
+            new Dictionary<ManaColor, int>(),
+            [new TargetInfo(targetSpell.Id, state.Player2.Id, ZoneType.Stack)],
+            1);
+
+        // Opponent declines to pay — ChooseCard returns null
+        h2.EnqueueCardChoice(null);
+
+        var effect = new CircularLogicEffect();
+        await effect.ResolveAsync(state, clStackObj, h2);
+
+        // Lightning Bolt should be countered (in graveyard)
+        state.Player2.Graveyard.Cards.Should().Contain(c => c.Name == "Lightning Bolt");
+        state.Stack.OfType<StackObject>().Should().NotContain(s => s.Card.Name == "Lightning Bolt");
+        // Mana should NOT be deducted
+        state.Player2.ManaPool.Total.Should().Be(3);
+    }
+
+    [Fact]
+    public async Task CircularLogicEffect_EmptyGraveyard_DoesNotCounter()
+    {
+        var h2 = new TestDecisionHandler();
+        var state = new GameState(
+            new Player(Guid.NewGuid(), "P1", new TestDecisionHandler()),
+            new Player(Guid.NewGuid(), "P2", h2));
 
         // Empty graveyard = cost of 0 = always resolves
         var targetSpell = new GameCard { Name = "Lightning Bolt", CardTypes = CardType.Instant };
@@ -421,7 +466,7 @@ public class MadnessMechanicTests
             1);
 
         var effect = new CircularLogicEffect();
-        effect.Resolve(state, clStackObj);
+        await effect.ResolveAsync(state, clStackObj, h2);
 
         // Spell should still be on the stack
         state.Stack.OfType<StackObject>().Should().Contain(s => s.Card.Name == "Lightning Bolt");

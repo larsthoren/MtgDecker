@@ -4,8 +4,9 @@ namespace MtgDecker.Engine.Triggers.Effects;
 
 /// <summary>
 /// Carpet of Flowers: At the beginning of each of your main phases,
-/// add X mana of any one color, where X is the number of Islands
+/// you may add up to X mana of any one color, where X is the number of Islands
 /// target opponent controls. Only once per turn (tracked via GameCard.CarpetUsedThisTurn).
+/// NOTE: "up to X" is simplified to exactly X — in practice players almost always want the full amount.
 /// </summary>
 public class CarpetOfFlowersEffect : IEffect
 {
@@ -24,6 +25,15 @@ public class CarpetOfFlowersEffect : IEffect
         if (islandCount <= 0)
         {
             context.State.Log($"{context.Source.Name}: opponent controls no Islands.");
+            return;
+        }
+
+        // "You may" — ask if they want to add mana
+        var choice = await context.DecisionHandler.ChooseCard(
+            [context.Source], $"Add {islandCount} mana from Carpet of Flowers?", optional: true, ct: ct);
+        if (!choice.HasValue)
+        {
+            context.State.Log($"{context.Controller.Name} declines Carpet of Flowers.");
             return;
         }
 

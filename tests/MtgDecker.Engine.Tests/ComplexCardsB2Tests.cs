@@ -569,7 +569,7 @@ public class ComplexCardsB2Tests
     }
 
     [Fact]
-    public async Task DecreeOfSilence_CyclingCountersSpell()
+    public async Task DecreeOfSilence_CyclingCountersSpell_WhenPlayerAccepts()
     {
         var (state, _, h1, _) = CreateEngineState();
         var p1 = state.Player1;
@@ -580,6 +580,9 @@ public class ComplexCardsB2Tests
         state.StackPush(new StackObject(opponentSpell, p2.Id,
             new Dictionary<ManaColor, int>(), [], 0));
 
+        // Player chooses to counter it
+        h1.EnqueueCardChoice(opponentSpell.Id);
+
         var source = GameCard.Create("Decree of Silence");
         var effect = new CounterTopSpellEffect();
         var context = new EffectContext(state, p1, source, h1);
@@ -587,6 +590,31 @@ public class ComplexCardsB2Tests
 
         state.Stack.OfType<StackObject>().Should().NotContain(s => s.Card.Name == "Counterspell");
         p2.Graveyard.Cards.Should().Contain(c => c.Name == "Counterspell");
+    }
+
+    [Fact]
+    public async Task DecreeOfSilence_CyclingDoesNotCounter_WhenPlayerDeclines()
+    {
+        var (state, _, h1, _) = CreateEngineState();
+        var p1 = state.Player1;
+        var p2 = state.Player2;
+
+        // Put an opponent's spell on the stack
+        var opponentSpell = GameCard.Create("Counterspell");
+        state.StackPush(new StackObject(opponentSpell, p2.Id,
+            new Dictionary<ManaColor, int>(), [], 0));
+
+        // Player declines to counter
+        h1.EnqueueCardChoice(null);
+
+        var source = GameCard.Create("Decree of Silence");
+        var effect = new CounterTopSpellEffect();
+        var context = new EffectContext(state, p1, source, h1);
+        await effect.Execute(context);
+
+        // Spell should still be on the stack (not countered)
+        state.Stack.OfType<StackObject>().Should().Contain(s => s.Card.Name == "Counterspell");
+        p2.Graveyard.Cards.Should().NotContain(c => c.Name == "Counterspell");
     }
 
     #endregion

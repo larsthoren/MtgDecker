@@ -750,9 +750,9 @@ public class PriceOfProgressEffectTests
 public class EarthquakeEffectTests
 {
     [Fact]
-    public void Earthquake_DamagesNonflyingCreaturesAndPlayers()
+    public async Task Earthquake_DamagesNonflyingCreaturesAndPlayers_DefaultPicksX1()
     {
-        var state = TestHelper.CreateState();
+        var (state, h1, _) = TestHelper.CreateStateWithHandlers();
         var bear = new GameCard { Name = "Bear", CardTypes = CardType.Creature, BasePower = 2, BaseToughness = 2 };
         var bird = new GameCard { Name = "Bird", CardTypes = CardType.Creature, BasePower = 1, BaseToughness = 1 };
         bird.ActiveKeywords.Add(Keyword.Flying);
@@ -762,32 +762,54 @@ public class EarthquakeEffectTests
         var oppCreature = new GameCard { Name = "Goblin", CardTypes = CardType.Creature, BasePower = 1, BaseToughness = 1 };
         state.Player2.Battlefield.Add(oppCreature);
 
-        // Put 3 mana in pool (X = 3)
+        // Put 3 mana in pool
         state.Player1.ManaPool.Add(ManaColor.Red, 3);
 
         var spell = new StackObject(GameCard.Create("Earthquake"), state.Player1.Id,
             new Dictionary<ManaColor, int>(),
             new List<TargetInfo>(), 0);
 
-        new EarthquakeEffect().Resolve(state, spell);
+        // Default TestDecisionHandler picks first option = "X = 1"
+        await new EarthquakeEffect().ResolveAsync(state, spell, h1);
 
-        // Bear: 3 damage
-        bear.DamageMarked.Should().Be(3);
-        // Bird: Flying, so no damage
-        bird.DamageMarked.Should().Be(0);
-        // Goblin: 3 damage
-        oppCreature.DamageMarked.Should().Be(3);
-        // Both players take 3 damage
-        state.Player1.Life.Should().Be(17);
-        state.Player2.Life.Should().Be(17);
-        // Mana pool should be drained
+        bear.DamageMarked.Should().Be(1);
+        bird.DamageMarked.Should().Be(0, "flying creatures are not damaged");
+        oppCreature.DamageMarked.Should().Be(1);
+        state.Player1.Life.Should().Be(19);
+        state.Player2.Life.Should().Be(19);
+        // Only 1 mana deducted, 2 remaining
+        state.Player1.ManaPool.Total.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task Earthquake_ChoosesMaxX_DrainsEntirePool()
+    {
+        var (state, h1, _) = TestHelper.CreateStateWithHandlers();
+        var bear = new GameCard { Name = "Bear", CardTypes = CardType.Creature, BasePower = 2, BaseToughness = 2 };
+        state.Player1.Battlefield.Add(bear);
+
+        // Put 5 mana in pool
+        state.Player1.ManaPool.Add(ManaColor.Red, 5);
+
+        var spell = new StackObject(GameCard.Create("Earthquake"), state.Player1.Id,
+            new Dictionary<ManaColor, int>(),
+            new List<TargetInfo>(), 0);
+
+        // Enqueue null choice => defaults to max X (5)
+        h1.EnqueueCardChoice(null);
+
+        await new EarthquakeEffect().ResolveAsync(state, spell, h1);
+
+        bear.DamageMarked.Should().Be(5);
+        state.Player1.Life.Should().Be(15);
+        state.Player2.Life.Should().Be(15);
         state.Player1.ManaPool.Total.Should().Be(0);
     }
 
     [Fact]
-    public void Earthquake_X0_DoesNothing()
+    public async Task Earthquake_X0_DoesNothing()
     {
-        var state = TestHelper.CreateState();
+        var (state, h1, _) = TestHelper.CreateStateWithHandlers();
         var creature = new GameCard { Name = "Bear", CardTypes = CardType.Creature };
         state.Player1.Battlefield.Add(creature);
 
@@ -795,7 +817,7 @@ public class EarthquakeEffectTests
             new Dictionary<ManaColor, int>(),
             new List<TargetInfo>(), 0);
 
-        new EarthquakeEffect().Resolve(state, spell);
+        await new EarthquakeEffect().ResolveAsync(state, spell, h1);
 
         creature.DamageMarked.Should().Be(0);
         state.Player1.Life.Should().Be(20);
@@ -803,9 +825,9 @@ public class EarthquakeEffectTests
     }
 
     [Fact]
-    public void Earthquake_DrainsMixedManaPool()
+    public async Task Earthquake_DrainsMixedManaPool_ChoosesMax()
     {
-        var state = TestHelper.CreateState();
+        var (state, h1, _) = TestHelper.CreateStateWithHandlers();
 
         state.Player1.ManaPool.Add(ManaColor.Red, 2);
         state.Player1.ManaPool.Add(ManaColor.Colorless, 3);
@@ -814,7 +836,10 @@ public class EarthquakeEffectTests
             new Dictionary<ManaColor, int>(),
             new List<TargetInfo>(), 0);
 
-        new EarthquakeEffect().Resolve(state, spell);
+        // Choose max X by returning null (fallback to max)
+        h1.EnqueueCardChoice(null);
+
+        await new EarthquakeEffect().ResolveAsync(state, spell, h1);
 
         // X = 5 (2 Red + 3 Colorless)
         state.Player1.Life.Should().Be(15);
@@ -823,18 +848,41 @@ public class EarthquakeEffectTests
     }
 
     [Fact]
-    public void Earthquake_LogsCorrectly()
+    public async Task Earthquake_LogsCorrectly()
     {
-        var state = TestHelper.CreateState();
+        var (state, h1, _) = TestHelper.CreateStateWithHandlers();
         state.Player1.ManaPool.Add(ManaColor.Red, 2);
 
         var spell = new StackObject(GameCard.Create("Earthquake"), state.Player1.Id,
             new Dictionary<ManaColor, int>(),
             new List<TargetInfo>(), 0);
 
-        new EarthquakeEffect().Resolve(state, spell);
+        await new EarthquakeEffect().ResolveAsync(state, spell, h1);
 
-        state.GameLog.Should().Contain(msg => msg.Contains("Earthquake") && msg.Contains("2 damage"));
+        state.GameLog.Should().Contain(msg => msg.Contains("Earthquake") && msg.Contains("damage"));
+    }
+
+    [Fact]
+    public async Task Earthquake_OnlyDeductsChosenAmount_NotEntirePool()
+    {
+        var (state, h1, _) = TestHelper.CreateStateWithHandlers();
+
+        // Put 5 mana in pool
+        state.Player1.ManaPool.Add(ManaColor.Red, 5);
+
+        var spell = new StackObject(GameCard.Create("Earthquake"), state.Player1.Id,
+            new Dictionary<ManaColor, int>(),
+            new List<TargetInfo>(), 0);
+
+        // Default handler picks first option = "X = 1"
+        // (no enqueued choice, so default picks first)
+
+        await new EarthquakeEffect().ResolveAsync(state, spell, h1);
+
+        // X = 1: deal 1 damage, deduct 1 mana, leave 4
+        state.Player1.Life.Should().Be(19);
+        state.Player2.Life.Should().Be(19);
+        state.Player1.ManaPool.Total.Should().Be(4);
     }
 }
 

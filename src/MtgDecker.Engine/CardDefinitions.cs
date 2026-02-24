@@ -1189,6 +1189,7 @@ public static class CardDefinitions
                 Effect: new DestroyAllByColorEffect(ManaColor.Green, CardType.Creature)),
             ["Anarchy"] = new(ManaCost.Parse("{2}{R}{R}"), null, null, null, CardType.Sorcery,
                 Effect: new DestroyAllByColorEffect(ManaColor.White)),
+            // NOTE: Oracle targets opponent — functionally identical in 2-player game
             ["Simoon"] = new(ManaCost.Parse("{R}{G}"), null, null, null, CardType.Instant,
                 Effect: new DamageOpponentCreaturesEffect(1)),
             ["Crumble"] = new(ManaCost.Parse("{G}"), null, null, null, CardType.Instant,

@@ -734,6 +734,40 @@ public class PremodernEnchantmentTriggerTests
         state.Player1.ManaPool[ManaColor.Green].Should().Be(0);
     }
 
+    [Fact]
+    public async Task CarpetOfFlowers_Declined_DoesNotAddMana()
+    {
+        var (engine, state, p1Handler, p2Handler) = CreateSetup();
+
+        var carpet = GameCard.Create("Carpet of Flowers");
+        state.Player1.Battlefield.Add(carpet);
+
+        // Opponent controls 2 Islands
+        for (int i = 0; i < 2; i++)
+        {
+            state.Player2.Battlefield.Add(new GameCard
+            {
+                Name = "Island",
+                CardTypes = CardType.Land,
+                Subtypes = ["Island"],
+            });
+        }
+
+        // Player declines to use Carpet of Flowers
+        p1Handler.EnqueueCardChoice(null);
+
+        state.ActivePlayer = state.Player1;
+        await engine.QueueBoardTriggersOnStackAsync(GameEvent.MainPhaseBeginning, null);
+
+        if (state.StackCount > 0)
+            await engine.ResolveAllTriggersAsync();
+
+        // No mana should be added
+        state.Player1.ManaPool.Total.Should().Be(0);
+        // Should NOT be marked as used (can still use next main phase)
+        carpet.CarpetUsedThisTurn.Should().BeFalse();
+    }
+
     #endregion
 
     // ─── Zombie Infestation ────────────────────────────────────────────────
