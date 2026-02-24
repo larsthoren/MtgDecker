@@ -25,6 +25,17 @@ internal class FlashbackHandler : IActionHandler
             return;
         }
 
+        // Meddling Mage: check if any opponent's Meddling Mage has named this card
+        var fbOpponent = state.Player1.Id == action.PlayerId ? state.Player2 : state.Player1;
+        var fbMeddlingMage = fbOpponent.Battlefield.Cards
+            .FirstOrDefault(c => c.ChosenName != null
+                && string.Equals(c.ChosenName, fbCard.Name, StringComparison.OrdinalIgnoreCase));
+        if (fbMeddlingMage != null)
+        {
+            state.Log($"{fbCard.Name} can't be cast — named by {fbMeddlingMage.Name}.");
+            return;
+        }
+
         if (!CardDefinitions.TryGet(fbCard.Name, out var fbDef) || fbDef.FlashbackCost == null)
         {
             state.Log($"{fbCard.Name} has no flashback.");

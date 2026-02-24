@@ -37,6 +37,11 @@ public record CardDefinition(
     public IReadOnlyList<LoyaltyAbility>? LoyaltyAbilities { get; init; }
     public bool HasFlash { get; init; }
     public bool HasDelve { get; init; }
+    /// <summary>
+    /// Factory that generates continuous effects based on the actual GameCard instance at runtime.
+    /// Used for cards like Engineered Plague where the effect depends on a runtime choice (ChosenType).
+    /// </summary>
+    public Func<GameCard, IReadOnlyList<ContinuousEffect>>? DynamicContinuousEffectsFactory { get; init; }
     public bool ShuffleGraveyardOnDeath { get; init; }
     public ManaCost? NinjutsuCost { get; init; }
     public CardDefinition? TransformInto { get; init; }

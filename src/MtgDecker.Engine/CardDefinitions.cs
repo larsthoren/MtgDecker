@@ -1558,6 +1558,47 @@ public static class CardDefinitions
                 ],
                 Triggers = [new Trigger(GameEvent.BeginCombat, TriggerCondition.SelfAttacks, new XantidSwarmEffect())],
             },
+
+            // === Choose Name/Type + Hate Cards ===
+            ["Engineered Plague"] = new(ManaCost.Parse("{2}{B}"), null, null, null, CardType.Enchantment)
+            {
+                Triggers = [new Trigger(GameEvent.EnterBattlefield, TriggerCondition.Self, new ChooseCreatureTypeEffect())],
+                // ContinuousEffect is generated dynamically via DynamicContinuousEffectsFactory
+                // because the -1/-1 effect depends on the runtime ChosenType
+                DynamicContinuousEffectsFactory = card =>
+                {
+                    if (string.IsNullOrEmpty(card.ChosenType))
+                        return [];
+                    var chosenType = card.ChosenType;
+                    return
+                    [
+                        new ContinuousEffect(Guid.Empty, ContinuousEffectType.ModifyPowerToughness,
+                            (target, _) => target.IsCreature
+                                && target.Subtypes.Contains(chosenType, StringComparer.OrdinalIgnoreCase),
+                            PowerMod: -1, ToughnessMod: -1,
+                            Layer: EffectLayer.Layer7c_ModifyPT),
+                    ];
+                },
+            },
+            ["Meddling Mage"] = new(ManaCost.Parse("{W}{U}"), null, 2, 2, CardType.Creature)
+            {
+                IsLegendary = false,
+                Subtypes = ["Human", "Wizard"],
+                Triggers = [new Trigger(GameEvent.EnterBattlefield, TriggerCondition.Self, new ChooseCardNameEffect())],
+                // Cast prevention is enforced in CastSpellHandler by checking ChosenName on Meddling Mages
+            },
+            ["Ensnaring Bridge"] = new(ManaCost.Parse("{3}"), null, null, null, CardType.Artifact)
+            {
+                // Attack restriction is enforced in GameEngine.RunCombatAsync
+                // Creatures with power > cards in controller's hand can't attack
+            },
+            ["Tsabo's Web"] = new(ManaCost.Parse("{2}"), null, null, null, CardType.Artifact)
+            {
+                Triggers = [new Trigger(GameEvent.EnterBattlefield, TriggerCondition.Self, new DrawCardEffect())],
+                // Note: The static ability "Each land with an activated ability that isn't a mana ability
+                // doesn't untap during its controller's untap step" is deferred — the engine does not
+                // currently distinguish mana abilities from other activated abilities on lands.
+            },
         };
 
         Registry = cards.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);

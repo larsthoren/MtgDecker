@@ -36,6 +36,9 @@ public interface IPlayerDecisionHandler
 
     Task<IReadOnlyList<GameCard>> ChooseCardsToExile(
         IReadOnlyList<GameCard> options, int maxCount, string prompt, CancellationToken ct = default);
+
+    Task<string> ChooseCreatureType(string prompt, CancellationToken ct = default);
+    Task<string> ChooseCardName(string prompt, CancellationToken ct = default);
 }
 
 /// <summary>

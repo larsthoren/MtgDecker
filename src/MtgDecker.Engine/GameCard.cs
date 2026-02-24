@@ -139,6 +139,10 @@ public class GameCard
     // Per-source exile tracking (e.g., Parallax Wave)
     public List<Guid> ExiledCardIds { get; } = new();
 
+    // Chosen type/name for cards like Engineered Plague / Meddling Mage
+    public string? ChosenType { get; set; }
+    public string? ChosenName { get; set; }
+
     // Carpet of Flowers once-per-turn tracking
     public bool CarpetUsedThisTurn { get; set; }
 

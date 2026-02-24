@@ -23,6 +23,23 @@ internal class CastSpellHandler : IActionHandler
             return;
         }
 
+        // Meddling Mage: check if any Meddling Mage on the battlefield has named this card
+        var castPlayerPre = state.GetPlayer(action.PlayerId);
+        var candidateCard = castPlayerPre.Hand.Cards.FirstOrDefault(c => c.Id == action.CardId)
+            ?? castPlayerPre.Exile.Cards.FirstOrDefault(c => c.Id == action.CardId && c.IsOnAdventure);
+        if (candidateCard != null)
+        {
+            var opponent = state.Player1.Id == action.PlayerId ? state.Player2 : state.Player1;
+            var meddlingMage = opponent.Battlefield.Cards
+                .FirstOrDefault(c => c.ChosenName != null
+                    && string.Equals(c.ChosenName, candidateCard.Name, StringComparison.OrdinalIgnoreCase));
+            if (meddlingMage != null)
+            {
+                state.Log($"{candidateCard.Name} can't be cast — named by {meddlingMage.Name}.");
+                return;
+            }
+        }
+
         var castPlayer = state.GetPlayer(action.PlayerId);
         var castCard = castPlayer.Hand.Cards.FirstOrDefault(c => c.Id == action.CardId);
         bool castingFromExileAdventure = false;

@@ -892,6 +892,19 @@ public class GameEngine
                 && !c.ActiveKeywords.Contains(Keyword.Defender))
             .ToList();
 
+        // Ensnaring Bridge: creatures with power > cards in controller's hand can't attack
+        var ensnaringBridges = new[] { _state.Player1, _state.Player2 }
+            .SelectMany(p => p.Battlefield.Cards)
+            .Where(c => string.Equals(c.Name, "Ensnaring Bridge", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        if (ensnaringBridges.Count > 0)
+        {
+            var handSize = attacker.Hand.Cards.Count;
+            eligibleAttackers = eligibleAttackers
+                .Where(c => (c.Power ?? 0) <= handSize)
+                .ToList();
+        }
+
         if (eligibleAttackers.Count == 0)
         {
             _state.Log("No eligible attackers.");
@@ -1607,6 +1620,19 @@ public class GameEngine
                     Timestamp = _state.NextEffectTimestamp++
                 };
                 _state.ActiveEffects.Add(effect);
+            }
+
+            // Dynamic effects that depend on per-card runtime state (e.g. Engineered Plague's ChosenType)
+            if (def.DynamicContinuousEffectsFactory != null)
+            {
+                foreach (var dynamicEffect in def.DynamicContinuousEffectsFactory(card))
+                {
+                    _state.ActiveEffects.Add(dynamicEffect with
+                    {
+                        SourceId = card.Id,
+                        Timestamp = _state.NextEffectTimestamp++
+                    });
+                }
             }
         }
     }

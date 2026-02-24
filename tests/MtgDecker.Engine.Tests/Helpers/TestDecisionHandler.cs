@@ -21,6 +21,8 @@ public class TestDecisionHandler : IPlayerDecisionHandler
     private readonly Queue<int> _pileChoices = new();
     private readonly Queue<(Func<IReadOnlyList<GameCard>, IReadOnlyList<GameCard>> orderer, bool shuffle)> _reorderQueue = new();
     private readonly Queue<Func<IReadOnlyList<GameCard>, int, IReadOnlyList<GameCard>>> _exileChoices = new();
+    private readonly Queue<string> _creatureTypeChoices = new();
+    private readonly Queue<string> _cardNameChoices = new();
 
     public void EnqueueAction(GameAction action) => _actions.Enqueue(action);
 
@@ -50,6 +52,9 @@ public class TestDecisionHandler : IPlayerDecisionHandler
 
     public void EnqueueExileChoice(Func<IReadOnlyList<GameCard>, int, IReadOnlyList<GameCard>> chooser) =>
         _exileChoices.Enqueue(chooser);
+
+    public void EnqueueCreatureType(string type) => _creatureTypeChoices.Enqueue(type);
+    public void EnqueueCardName(string name) => _cardNameChoices.Enqueue(name);
 
     public Action? OnBeforeAction { get; set; }
 
@@ -167,6 +172,20 @@ public class TestDecisionHandler : IPlayerDecisionHandler
             return Task.FromResult(_exileChoices.Dequeue()(options, maxCount));
         // Default: exile as many as possible (greedy)
         return Task.FromResult<IReadOnlyList<GameCard>>(options.Take(maxCount).ToList());
+    }
+
+    public Task<string> ChooseCreatureType(string prompt, CancellationToken ct = default)
+    {
+        if (_creatureTypeChoices.Count > 0)
+            return Task.FromResult(_creatureTypeChoices.Dequeue());
+        return Task.FromResult("Goblin");
+    }
+
+    public Task<string> ChooseCardName(string prompt, CancellationToken ct = default)
+    {
+        if (_cardNameChoices.Count > 0)
+            return Task.FromResult(_cardNameChoices.Dequeue());
+        return Task.FromResult("Lightning Bolt");
     }
 }
 

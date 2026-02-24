@@ -442,6 +442,24 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
     }
 
     /// <summary>
+    /// Chooses a creature type. AI picks "Goblin" as a common relevant type.
+    /// </summary>
+    public async Task<string> ChooseCreatureType(string prompt, CancellationToken ct = default)
+    {
+        await DelayAsync(ct);
+        return "Goblin";
+    }
+
+    /// <summary>
+    /// Chooses a card name. AI picks "Lightning Bolt" as a common spell.
+    /// </summary>
+    public async Task<string> ChooseCardName(string prompt, CancellationToken ct = default)
+    {
+        await DelayAsync(ct);
+        return "Lightning Bolt";
+    }
+
+    /// <summary>
     /// Chooses a target for a spell. Picks the opponent's creature with highest power,
     /// falling back to the first eligible target.
     /// </summary>
