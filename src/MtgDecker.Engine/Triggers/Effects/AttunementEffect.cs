@@ -40,6 +40,7 @@ public class AttunementEffect : IEffect
         foreach (var card in discarded)
         {
             player.Hand.RemoveById(card.Id);
+            state.LastDiscardCausedByPlayerId = player.Id; // Self-caused
             if (state.HandleDiscardAsync != null)
                 await state.HandleDiscardAsync(card, player, ct);
             else

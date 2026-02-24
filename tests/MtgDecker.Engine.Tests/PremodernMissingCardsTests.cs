@@ -1266,7 +1266,7 @@ public class PremodernMissingCardsTests
         ability.Cost.DiscardAny.Should().BeTrue();
         ability.Cost.TapSelf.Should().BeFalse();
         ability.Cost.ManaCost.Should().BeNull();
-        ability.Effect.Should().BeOfType<TriggerEffects.PumpSelfEffect>();
+        ability.Effect.Should().BeOfType<TriggerEffects.WildMongrelEffect>();
     }
 
     [Fact]

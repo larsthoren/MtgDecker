@@ -34,6 +34,7 @@ public class FranticSearchEffect : SpellEffect
                 var card = player.Hand.RemoveById(cardId.Value);
                 if (card != null)
                 {
+                    state.LastDiscardCausedByPlayerId = spell.ControllerId;
                     if (state.HandleDiscardAsync != null)
                         await state.HandleDiscardAsync(card, player, ct);
                     else

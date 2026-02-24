@@ -22,7 +22,9 @@ public enum TriggerCondition
     OpponentCastsRedSpell,
     AnyPlayerCastsEnchantment,
     ControllerDiscardsCard,
+    OpponentCausesControllerDiscard,
     ControllerLandToGraveyard,
+    OpponentCausesControllerLandToGraveyard,
     ControllerMainPhaseBeginning,
     OpponentCastsAnySpell,
 }

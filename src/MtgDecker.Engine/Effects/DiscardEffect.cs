@@ -26,6 +26,7 @@ public class DiscardEffect : SpellEffect
             var card = candidates[0];
             candidates.RemoveAt(0);
             player.Hand.Remove(card);
+            state.LastDiscardCausedByPlayerId = spell.ControllerId; // Track who caused the discard
             if (state.HandleDiscardAsync != null)
                 await state.HandleDiscardAsync(card, player, ct);
             else

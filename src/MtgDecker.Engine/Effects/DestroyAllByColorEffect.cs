@@ -14,15 +14,15 @@ public class DestroyAllByColorEffect : SpellEffect
         CardTypeFilter = cardTypeFilter;
     }
 
-    private bool HasColor(ManaCost? cost) =>
-        cost != null && cost.ColorRequirements.ContainsKey(Color);
+    private static bool HasColor(GameCard card, ManaColor color) =>
+        card.Colors.Contains(color);
 
     public override void Resolve(GameState state, StackObject spell)
     {
         foreach (var player in new[] { state.Player1, state.Player2 })
         {
             var targets = player.Battlefield.Cards
-                .Where(c => HasColor(c.ManaCost))
+                .Where(c => HasColor(c, Color))
                 .Where(c => CardTypeFilter == null || c.CardTypes.HasFlag(CardTypeFilter.Value))
                 .ToList();
 

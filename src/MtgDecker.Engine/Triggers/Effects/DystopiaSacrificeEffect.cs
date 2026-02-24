@@ -54,8 +54,7 @@ public class DystopiaSacrificeEffect : IEffect
 
     private static bool IsGreenOrWhite(GameCard card)
     {
-        if (card.ManaCost == null) return false;
-        return card.ManaCost.ColorRequirements.ContainsKey(ManaColor.Green)
-            || card.ManaCost.ColorRequirements.ContainsKey(ManaColor.White);
+        return card.Colors.Contains(ManaColor.Green)
+            || card.Colors.Contains(ManaColor.White);
     }
 }

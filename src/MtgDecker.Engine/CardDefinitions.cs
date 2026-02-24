@@ -81,7 +81,7 @@ public static class CardDefinitions
             ["Siege-Gang Commander"] = new(ManaCost.Parse("{3}{R}{R}"), null, 2, 2, CardType.Creature)
             {
                 Subtypes = ["Goblin"],
-                Triggers = [new Trigger(GameEvent.EnterBattlefield, TriggerCondition.Self, new CreateTokensEffect("Goblin", 1, 1, CardType.Creature, ["Goblin"], count: 3))],
+                Triggers = [new Trigger(GameEvent.EnterBattlefield, TriggerCondition.Self, new CreateTokensEffect("Goblin", 1, 1, CardType.Creature, ["Goblin"], count: 3, tokenColors: [ManaColor.Red]))],
                 ActivatedAbilities = [new(new ActivatedAbilityCost(SacrificeSubtype: "Goblin", ManaCost: ManaCost.Parse("{1}{R}")), new DealDamageEffect(2), c => c.IsCreature, CanTargetPlayer: true)],
             },
             ["Goblin King"] = new(ManaCost.Parse("{1}{R}{R}"), null, 2, 2, CardType.Creature)
@@ -690,7 +690,7 @@ public static class CardDefinitions
                 ],
             },
             ["Call of the Herd"] = new(ManaCost.Parse("{2}{G}"), null, null, null, CardType.Sorcery,
-                Effect: new CreateTokenSpellEffect("Elephant", 3, 3, CardType.Creature, ["Elephant"]))
+                Effect: new CreateTokenSpellEffect("Elephant", 3, 3, CardType.Creature, ["Elephant"], tokenColors: [ManaColor.Green]))
             {
                 FlashbackCost = new FlashbackCost(ManaCost.Parse("{3}{G}")),
             },
@@ -788,7 +788,7 @@ public static class CardDefinitions
             {
                 Subtypes = ["Elf"],
                 EchoCost = ManaCost.Parse("{3}{G}{G}"),
-                Triggers = [new Trigger(GameEvent.EnterBattlefield, TriggerCondition.Self, new CreateTokensEffect("Squirrel", 1, 1, CardType.Creature, ["Squirrel"], count: 4))],
+                Triggers = [new Trigger(GameEvent.EnterBattlefield, TriggerCondition.Self, new CreateTokensEffect("Squirrel", 1, 1, CardType.Creature, ["Squirrel"], count: 4, tokenColors: [ManaColor.Green]))],
                 ContinuousEffects =
                 [
                     new ContinuousEffect(Guid.Empty, ContinuousEffectType.ModifyPowerToughness,
@@ -1220,7 +1220,7 @@ public static class CardDefinitions
                 ContinuousEffects =
                 [
                     new ContinuousEffect(Guid.Empty, ContinuousEffectType.ModifyPowerToughness,
-                        (card, _) => card.IsCreature && card.ManaCost?.ColorRequirements.ContainsKey(ManaColor.White) == true,
+                        (card, _) => card.IsCreature && card.Colors.Contains(ManaColor.White),
                         PowerMod: 1, ToughnessMod: 1,
                         Layer: EffectLayer.Layer7c_ModifyPT),
                 ],
@@ -1258,7 +1258,7 @@ public static class CardDefinitions
                 [
                     new ContinuousEffect(Guid.Empty, ContinuousEffectType.ModifyCost,
                         (_, _) => true, CostMod: 2,
-                        CostApplies: c => c.ManaCost?.ColorRequirements.ContainsKey(ManaColor.Red) == true),
+                        CostApplies: c => c.Colors.Contains(ManaColor.Red)),
                 ],
             },
             ["Gloom"] = new(ManaCost.Parse("{2}{B}"), null, null, null, CardType.Enchantment)
@@ -1268,13 +1268,13 @@ public static class CardDefinitions
                     // White spells cost {3} more to cast
                     new ContinuousEffect(Guid.Empty, ContinuousEffectType.ModifyCost,
                         (_, _) => true, CostMod: 3,
-                        CostApplies: c => c.ManaCost?.ColorRequirements.ContainsKey(ManaColor.White) == true),
+                        CostApplies: c => c.Colors.Contains(ManaColor.White)),
                     // Activated abilities of white enchantments cost {3} more to activate
                     new ContinuousEffect(Guid.Empty, ContinuousEffectType.ModifyActivatedAbilityCost,
                         (_, _) => true, CostMod: 3,
                         ActivatedAbilityCostApplies: c =>
                             c.CardTypes.HasFlag(CardType.Enchantment)
-                            && c.ManaCost?.ColorRequirements.ContainsKey(ManaColor.White) == true),
+                            && c.Colors.Contains(ManaColor.White)),
                 ],
             },
             ["Null Rod"] = new(ManaCost.Parse("{2}"), null, null, null, CardType.Artifact)
@@ -1338,7 +1338,7 @@ public static class CardDefinitions
                 ActivatedAbilities =
                 [
                     new(new ActivatedAbilityCost(DiscardAny: true),
-                        new PumpSelfEffect(1, 1)),
+                        new WildMongrelEffect()),
                 ],
             },
             ["Aquamoeba"] = new(ManaCost.Parse("{1}{U}"), null, 1, 3, CardType.Creature)
@@ -1397,10 +1397,11 @@ public static class CardDefinitions
                 Triggers = [new Trigger(GameEvent.SpellCast, TriggerCondition.OpponentCastsRedSpell, new Triggers.Effects.GainLifeEffect(2))],
             },
 
-            // Spiritual Focus (simplified): Whenever you discard a card, gain 2 life and you may draw a card.
+            // Spiritual Focus: Whenever a spell or ability an opponent controls causes you to discard a card,
+            // gain 2 life and you may draw a card.
             ["Spiritual Focus"] = new(ManaCost.Parse("{1}{W}"), null, null, null, CardType.Enchantment)
             {
-                Triggers = [new Trigger(GameEvent.DiscardCard, TriggerCondition.ControllerDiscardsCard, new GainLifeAndOptionalDrawEffect(2))],
+                Triggers = [new Trigger(GameEvent.DiscardCard, TriggerCondition.OpponentCausesControllerDiscard, new GainLifeAndOptionalDrawEffect(2))],
             },
 
             // Presence of the Master: Whenever a player casts an enchantment spell, counter it.
@@ -1409,10 +1410,11 @@ public static class CardDefinitions
                 Triggers = [new Trigger(GameEvent.SpellCast, TriggerCondition.AnyPlayerCastsEnchantment, new CounterSpellOnStackEffect())],
             },
 
-            // Sacred Ground (simplified): Whenever a land you control goes to graveyard from the battlefield, return it to the battlefield.
+            // Sacred Ground: Whenever a spell or ability an opponent controls causes a land to be put
+            // into your graveyard from the battlefield, return that card to the battlefield.
             ["Sacred Ground"] = new(ManaCost.Parse("{1}{W}"), null, null, null, CardType.Enchantment)
             {
-                Triggers = [new Trigger(GameEvent.LeavesBattlefield, TriggerCondition.ControllerLandToGraveyard, new SacredGroundEffect())],
+                Triggers = [new Trigger(GameEvent.LeavesBattlefield, TriggerCondition.OpponentCausesControllerLandToGraveyard, new SacredGroundEffect())],
             },
 
             // Seal of Fire: Sacrifice: Deal 2 damage to any target.
@@ -1465,7 +1467,7 @@ public static class CardDefinitions
                 ActivatedAbilities =
                 [
                     new(new ActivatedAbilityCost(DiscardCount: 2),
-                        new CreateTokensEffect("Zombie", 2, 2, CardType.Creature, ["Zombie"])),
+                        new CreateTokensEffect("Zombie", 2, 2, CardType.Creature, ["Zombie"], tokenColors: [ManaColor.Black])),
                 ],
             },
 
@@ -1491,7 +1493,7 @@ public static class CardDefinitions
                 AlternateCost = new AlternateCost(RequiresControlSubtype: "Mountain", RequiresOpponentSubtype: "Island"),
             },
             ["Pyrokinesis"] = new(ManaCost.Parse("{4}{R}{R}"), null, null, null, CardType.Instant,
-                TargetFilter.Creature(), new DamageEffect(4, canTargetCreature: true, canTargetPlayer: false))
+                Effect: new DividedDamageEffect(4))
             {
                 AlternateCost = new AlternateCost(ExileCardColor: ManaColor.Red),
             },
@@ -1503,7 +1505,7 @@ public static class CardDefinitions
 
             // --- Flashback + Echo cards ---
             ["Roar of the Wurm"] = new(ManaCost.Parse("{6}{G}"), null, null, null, CardType.Sorcery,
-                Effect: new CreateTokenSpellEffect("Wurm", 6, 6, CardType.Creature, ["Wurm"]))
+                Effect: new CreateTokenSpellEffect("Wurm", 6, 6, CardType.Creature, ["Wurm"], tokenColors: [ManaColor.Green]))
             {
                 FlashbackCost = new FlashbackCost(ManaCost.Parse("{3}{G}")),
             },
@@ -1707,9 +1709,7 @@ public static class CardDefinitions
             ["Stifle"] = new(ManaCost.Parse("{U}"), null, null, null, CardType.Instant,
                 Effect: new Effects.StifleEffect()),
 
-            // Teferi's Response (simplified: counter + draw 2)
-            ["Teferi's Response"] = new(ManaCost.Parse("{1}{U}"), null, null, null, CardType.Instant,
-                TargetFilter.Spell(), new Effects.TeferisResponseEffect()),
+
 
             // Brain Freeze (storm)
             ["Brain Freeze"] = new(ManaCost.Parse("{1}{U}"), null, null, null, CardType.Instant,

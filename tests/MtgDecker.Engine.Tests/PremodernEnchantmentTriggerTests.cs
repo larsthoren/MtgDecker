@@ -137,11 +137,11 @@ public class PremodernEnchantmentTriggerTests
         CardDefinitions.TryGet("Spiritual Focus", out var def);
         def!.Triggers.Should().HaveCount(1);
         def.Triggers[0].Event.Should().Be(GameEvent.DiscardCard);
-        def.Triggers[0].Condition.Should().Be(TriggerCondition.ControllerDiscardsCard);
+        def.Triggers[0].Condition.Should().Be(TriggerCondition.OpponentCausesControllerDiscard);
     }
 
     [Fact]
-    public async Task SpiritualFocus_ControllerDiscards_GainsLifeAndMayDraw()
+    public async Task SpiritualFocus_OpponentCausedDiscard_GainsLifeAndMayDraw()
     {
         var (engine, state, p1Handler, p2Handler) = CreateSetup();
 
@@ -154,7 +154,8 @@ public class PremodernEnchantmentTriggerTests
         var lifeBefore = state.Player1.Life;
         var handBefore = state.Player1.Hand.Cards.Count;
 
-        // Queue the discard trigger
+        // Queue the discard trigger — opponent caused
+        state.LastDiscardCausedByPlayerId = state.Player2.Id;
         state.ActivePlayer = state.Player1;
         engine.QueueDiscardTriggers(state.Player1);
 
@@ -305,11 +306,11 @@ public class PremodernEnchantmentTriggerTests
         CardDefinitions.TryGet("Sacred Ground", out var def);
         def!.Triggers.Should().HaveCount(1);
         def.Triggers[0].Event.Should().Be(GameEvent.LeavesBattlefield);
-        def.Triggers[0].Condition.Should().Be(TriggerCondition.ControllerLandToGraveyard);
+        def.Triggers[0].Condition.Should().Be(TriggerCondition.OpponentCausesControllerLandToGraveyard);
     }
 
     [Fact]
-    public async Task SacredGround_ReturnsLandFromGraveyard()
+    public async Task SacredGround_ReturnsLandFromGraveyard_WhenOpponentCauses()
     {
         var (engine, state, p1Handler, p2Handler) = CreateSetup();
 
@@ -326,6 +327,8 @@ public class PremodernEnchantmentTriggerTests
         // Simulate the land being in graveyard (already moved there before trigger resolves)
         state.Player1.Graveyard.Add(land);
 
+        // Opponent caused the land destruction
+        state.LastLandDestroyedByPlayerId = state.Player2.Id;
         state.ActivePlayer = state.Player1;
         // Fire the trigger
         await engine.QueueBoardTriggersOnStackAsync(GameEvent.LeavesBattlefield, land);

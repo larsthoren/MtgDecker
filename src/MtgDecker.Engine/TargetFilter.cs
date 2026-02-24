@@ -36,7 +36,7 @@ public class TargetFilter
 
     public static TargetFilter NonBlackCreature() => new((card, zone) =>
         zone == ZoneType.Battlefield && card.IsCreature
-        && (card.ManaCost == null || !card.ManaCost.ColorRequirements.ContainsKey(ManaColor.Black)));
+        && !card.Colors.Contains(ManaColor.Black));
 
     public static TargetFilter CreatureWithCMCAtMost(int maxCmc) => new((card, zone) =>
         zone == ZoneType.Battlefield && card.IsCreature

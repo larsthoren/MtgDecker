@@ -5,8 +5,8 @@ namespace MtgDecker.Engine.Effects;
 
 public class BlueElementalBlastEffect : SpellEffect
 {
-    private static bool IsRed(ManaCost? cost) =>
-        cost != null && cost.ColorRequirements.ContainsKey(ManaColor.Red);
+    private static bool IsRed(GameCard card) =>
+        card.Colors.Contains(ManaColor.Red);
 
     public override void Resolve(GameState state, StackObject spell)
     {
@@ -20,7 +20,7 @@ public class BlueElementalBlastEffect : SpellEffect
 
         if (stackSpell != null)
         {
-            if (IsRed(stackSpell.Card.ManaCost))
+            if (IsRed(stackSpell.Card))
             {
                 state.StackRemove(stackSpell);
                 var controller = state.GetPlayer(stackSpell.ControllerId);
@@ -37,7 +37,7 @@ public class BlueElementalBlastEffect : SpellEffect
         // Check if target is on battlefield (destroy it)
         var owner = state.GetPlayer(target.PlayerId);
         var card = owner.Battlefield.Cards.FirstOrDefault(c => c.Id == target.CardId);
-        if (card != null && IsRed(card.ManaCost))
+        if (card != null && IsRed(card))
         {
             owner.Battlefield.RemoveById(card.Id);
             owner.Graveyard.Add(card);

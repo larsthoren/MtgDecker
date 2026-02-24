@@ -88,6 +88,9 @@ public class CataclysmEffect : SpellEffect
 
         foreach (var card in toSacrifice)
         {
+            // Track who caused land destruction for Sacred Ground
+            if (card.IsLand)
+                state.LastLandDestroyedByPlayerId = spell.ControllerId;
             player.Battlefield.RemoveById(card.Id);
             player.Graveyard.Add(card);
             state.Log($"{player.Name} sacrifices {card.Name} ({spell.Card.Name}).");

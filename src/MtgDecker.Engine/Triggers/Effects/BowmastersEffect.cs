@@ -72,9 +72,18 @@ public class BowmastersEffect : IEffect
             && (context.State.Player1.Battlefield.Contains(e.SourceId)
                 ? context.State.Player1 : context.State.Player2).Id == player.Id);
 
+        // Check for color-specific shield (Circle of Protection)
+        var colorShield = player.DamagePreventionShields
+            .FirstOrDefault(s => context.Source.Colors.Contains(s.Color));
+
         if (hasDamageProtection)
         {
             context.State.Log($"Damage to {player.Name} is prevented (protection).");
+        }
+        else if (colorShield != null)
+        {
+            player.DamagePreventionShields.Remove(colorShield);
+            context.State.Log($"Damage to {player.Name} is prevented (Circle of Protection).");
         }
         else
         {

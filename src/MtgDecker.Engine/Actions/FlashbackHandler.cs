@@ -90,8 +90,7 @@ internal class FlashbackHandler : IActionHandler
         {
             // Blue cards in graveyard (excluding the flashback card itself, which is being cast)
             var blueCards = fbPlayer.Graveyard.Cards
-                .Where(c => c.Id != fbCard.Id && c.ManaCost != null
-                    && c.ManaCost.ColorRequirements.ContainsKey(ManaColor.Blue))
+                .Where(c => c.Id != fbCard.Id && c.Colors.Contains(ManaColor.Blue))
                 .ToList();
             if (blueCards.Count == 0)
             {

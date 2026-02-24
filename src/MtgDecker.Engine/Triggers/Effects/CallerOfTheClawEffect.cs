@@ -1,4 +1,5 @@
 using MtgDecker.Engine.Enums;
+using MtgDecker.Engine.Mana;
 
 namespace MtgDecker.Engine.Triggers.Effects;
 
@@ -26,6 +27,7 @@ public class CallerOfTheClawEffect : IEffect
                 Subtypes = ["Bear"],
                 IsToken = true,
                 TurnEnteredBattlefield = context.State.TurnNumber,
+                Colors = { ManaColor.Green },
             };
             player.Battlefield.Add(token);
         }

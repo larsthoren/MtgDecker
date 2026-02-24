@@ -11,6 +11,10 @@ public class DestroyTargetEffect : IEffect
             ? context.State.Player1
             : context.State.Player2;
 
+        // Track who caused land destruction for Sacred Ground
+        if (target.IsLand)
+            context.State.LastLandDestroyedByPlayerId = context.Controller.Id;
+
         owner.Battlefield.RemoveById(target.Id);
         if (!target.IsToken)
             owner.Graveyard.Add(target);

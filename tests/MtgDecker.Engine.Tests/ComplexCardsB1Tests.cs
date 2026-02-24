@@ -12,7 +12,7 @@ namespace MtgDecker.Engine.Tests;
 
 /// <summary>
 /// Tests for Task 12 Batch 1: Overload, Orim's Chant, Rancor, Stifle,
-/// Teferi's Response, Brain Freeze, River Boa, Circle of Protection: Red/Black.
+/// Brain Freeze, River Boa, Circle of Protection: Red/Black.
 /// </summary>
 public class ComplexCardsB1Tests
 {
@@ -58,7 +58,6 @@ public class ComplexCardsB1Tests
     [InlineData("Orim's Chant")]
     [InlineData("Rancor")]
     [InlineData("Stifle")]
-    [InlineData("Teferi's Response")]
     [InlineData("Brain Freeze")]
     [InlineData("River Boa")]
     [InlineData("Circle of Protection: Red")]
@@ -118,17 +117,6 @@ public class ComplexCardsB1Tests
         def.ManaCost!.ConvertedManaCost.Should().Be(1);
         def.ManaCost.ColorRequirements.Should().ContainKey(ManaColor.Blue);
         def.Effect.Should().BeOfType<StifleEffect>();
-    }
-
-    [Fact]
-    public void TeferisResponse_HasCorrectProperties()
-    {
-        CardDefinitions.TryGet("Teferi's Response", out var def);
-        def!.CardTypes.Should().Be(CardType.Instant);
-        def.ManaCost!.ConvertedManaCost.Should().Be(2);
-        def.ManaCost.ColorRequirements.Should().ContainKey(ManaColor.Blue);
-        def.TargetFilter.Should().NotBeNull();
-        def.Effect.Should().BeOfType<TeferisResponseEffect>();
     }
 
     [Fact]
@@ -474,103 +462,6 @@ public class ComplexCardsB1Tests
     #endregion
 
     // ═══════════════════════════════════════════════════════════════════
-    // TEFERI'S RESPONSE EFFECT TESTS
-    // ═══════════════════════════════════════════════════════════════════
-
-    #region Teferi's Response
-
-    [Fact]
-    public void TeferisResponse_CountersTargetSpell()
-    {
-        var (state, p1, p2) = CreateGameState();
-        var targetCard = GameCard.Create("Lightning Bolt");
-        var targetSpell = new StackObject(targetCard, p2.Id,
-            new Dictionary<ManaColor, int>(), [], 0);
-        state.StackPush(targetSpell);
-
-        // Set up library for drawing
-        p1.Library.AddToTop(GameCard.Create("Card1"));
-        p1.Library.AddToTop(GameCard.Create("Card2"));
-
-        var target = new TargetInfo(targetCard.Id, p2.Id, ZoneType.Stack);
-        var spell = CreateSpell("Teferi's Response", p1.Id, [target]);
-
-        new TeferisResponseEffect().Resolve(state, spell);
-
-        state.Stack.OfType<StackObject>().Should().NotContain(s => s.Card.Id == targetCard.Id);
-        p2.Graveyard.Cards.Should().Contain(c => c.Id == targetCard.Id);
-    }
-
-    [Fact]
-    public void TeferisResponse_DrawsTwoCards()
-    {
-        var (state, p1, p2) = CreateGameState();
-        var targetCard = GameCard.Create("Lightning Bolt");
-        var targetSpell = new StackObject(targetCard, p2.Id,
-            new Dictionary<ManaColor, int>(), [], 0);
-        state.StackPush(targetSpell);
-
-        var card1 = GameCard.Create("Card1");
-        var card2 = GameCard.Create("Card2");
-        p1.Library.AddToTop(card1);
-        p1.Library.AddToTop(card2);
-
-        var target = new TargetInfo(targetCard.Id, p2.Id, ZoneType.Stack);
-        var spell = CreateSpell("Teferi's Response", p1.Id, [target]);
-
-        new TeferisResponseEffect().Resolve(state, spell);
-
-        p1.Hand.Cards.Should().HaveCount(2);
-        state.GameLog.Should().Contain(l => l.Contains("draws 2 cards"));
-    }
-
-    [Fact]
-    public void TeferisResponse_Fizzles_WhenTargetResolved()
-    {
-        var (state, p1, p2) = CreateGameState();
-        var targetCard = GameCard.Create("Lightning Bolt");
-        // Target is NOT on the stack
-
-        p1.Library.AddToTop(GameCard.Create("Card1"));
-        p1.Library.AddToTop(GameCard.Create("Card2"));
-
-        var target = new TargetInfo(targetCard.Id, p2.Id, ZoneType.Stack);
-        var spell = CreateSpell("Teferi's Response", p1.Id, [target]);
-
-        new TeferisResponseEffect().Resolve(state, spell);
-
-        // Still draws 2 cards (Teferi's Response draws whether or not counter succeeds)
-        p1.Hand.Cards.Should().HaveCount(2);
-        state.GameLog.Should().Contain(l => l.Contains("fizzles"));
-    }
-
-    [Fact]
-    public void TeferisResponse_CantCounterUncounterable()
-    {
-        var (state, p1, p2) = CreateGameState();
-        var emrakul = GameCard.Create("Emrakul, the Aeons Torn");
-        var emrakulSpell = new StackObject(emrakul, p2.Id,
-            new Dictionary<ManaColor, int>(), [], 0);
-        state.StackPush(emrakulSpell);
-
-        p1.Library.AddToTop(GameCard.Create("Card1"));
-        p1.Library.AddToTop(GameCard.Create("Card2"));
-
-        var target = new TargetInfo(emrakul.Id, p2.Id, ZoneType.Stack);
-        var spell = CreateSpell("Teferi's Response", p1.Id, [target]);
-
-        new TeferisResponseEffect().Resolve(state, spell);
-
-        // Emrakul stays on the stack
-        state.Stack.OfType<StackObject>().Should().Contain(s => s.Card.Id == emrakul.Id);
-        // But still draws 2 cards
-        p1.Hand.Cards.Should().HaveCount(2);
-        state.GameLog.Should().Contain(l => l.Contains("can't be countered"));
-    }
-
-    #endregion
-
-    // ═══════════════════════════════════════════════════════════════════
     // BRAIN FREEZE EFFECT TESTS
     // ═══════════════════════════════════════════════════════════════════
 
@@ -721,7 +612,7 @@ public class ComplexCardsB1Tests
     #region Circle of Protection
 
     [Fact]
-    public async Task CoPPreventDamageEffect_AddsActiveEffect()
+    public async Task CoPPreventDamageEffect_AddsDamagePreventionShield()
     {
         var (state, p1, p2) = CreateGameState();
         var cop = GameCard.Create("Circle of Protection: Red");
@@ -731,10 +622,8 @@ public class ComplexCardsB1Tests
 
         await effect.Execute(context);
 
-        state.ActiveEffects.Should().Contain(e =>
-            e.Type == ContinuousEffectType.PreventDamageToPlayer);
-        state.ActiveEffects.First(e => e.Type == ContinuousEffectType.PreventDamageToPlayer)
-            .UntilEndOfTurn.Should().BeTrue();
+        p1.DamagePreventionShields.Should().HaveCount(1);
+        p1.DamagePreventionShields[0].Color.Should().Be(ManaColor.Red);
     }
 
     [Fact]
@@ -749,6 +638,82 @@ public class ComplexCardsB1Tests
         await effect.Execute(context);
 
         state.GameLog.Should().Contain(l => l.Contains("Black"));
+    }
+
+    [Fact]
+    public async Task CoPPreventDamageEffect_IsColorSpecific()
+    {
+        var (state, p1, p2) = CreateGameState();
+        var cop = GameCard.Create("Circle of Protection: Red");
+
+        var context = new EffectContext(state, p1, cop, p1.DecisionHandler);
+        var effect = new CoPPreventDamageEffect(ManaColor.Red);
+
+        await effect.Execute(context);
+
+        // Shield is for Red only
+        p1.DamagePreventionShields[0].Color.Should().Be(ManaColor.Red);
+    }
+
+    [Fact]
+    public void CoPPreventDamageShield_IsConsumedOnUse()
+    {
+        var h1 = new TestDecisionHandler();
+        var h2 = new TestDecisionHandler();
+        var p1 = new Player(Guid.NewGuid(), "P1", h1);
+        var p2 = new Player(Guid.NewGuid(), "P2", h2);
+        var state = new GameState(p1, p2);
+        var engine = new GameEngine(state);
+
+        // Add a Red shield
+        p1.DamagePreventionShields.Add(new DamagePreventionShield(ManaColor.Red));
+
+        // Red creature attacks
+        var redCreature = new GameCard { Name = "Goblin", Power = 3, Toughness = 1, CardTypes = CardType.Creature };
+        redCreature.Colors.Add(ManaColor.Red);
+
+        var consumed = engine.TryConsumeColorDamageShield(p1, redCreature);
+        consumed.Should().BeTrue();
+        p1.DamagePreventionShields.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void CoPPreventDamageShield_DoesNotPreventWrongColor()
+    {
+        var h1 = new TestDecisionHandler();
+        var h2 = new TestDecisionHandler();
+        var p1 = new Player(Guid.NewGuid(), "P1", h1);
+        var p2 = new Player(Guid.NewGuid(), "P2", h2);
+        var state = new GameState(p1, p2);
+        var engine = new GameEngine(state);
+
+        // Add a Red shield
+        p1.DamagePreventionShields.Add(new DamagePreventionShield(ManaColor.Red));
+
+        // Blue creature attacks — shield should NOT be consumed
+        var blueCreature = new GameCard { Name = "Phantom", Power = 2, Toughness = 2, CardTypes = CardType.Creature };
+        blueCreature.Colors.Add(ManaColor.Blue);
+
+        var consumed = engine.TryConsumeColorDamageShield(p1, blueCreature);
+        consumed.Should().BeFalse();
+        p1.DamagePreventionShields.Should().HaveCount(1);
+    }
+
+    [Fact]
+    public void CoPPreventDamageShield_ClearedAtEndOfTurn()
+    {
+        var h1 = new TestDecisionHandler();
+        var h2 = new TestDecisionHandler();
+        var p1 = new Player(Guid.NewGuid(), "P1", h1);
+        var p2 = new Player(Guid.NewGuid(), "P2", h2);
+        var state = new GameState(p1, p2);
+        var engine = new GameEngine(state);
+
+        p1.DamagePreventionShields.Add(new DamagePreventionShield(ManaColor.Red));
+
+        engine.StripEndOfTurnEffects();
+
+        p1.DamagePreventionShields.Should().BeEmpty();
     }
 
     #endregion

@@ -24,8 +24,21 @@ public class DamageEffect : SpellEffect
         {
             // Player target
             var player = state.GetPlayer(target.PlayerId);
-            player.AdjustLife(-Amount);
-            state.Log($"{spell.Card.Name} deals {Amount} damage to {player.Name}. ({player.Life} life)");
+
+            // Check for color-specific damage shield (Circle of Protection)
+            var colorShield = player.DamagePreventionShields
+                .FirstOrDefault(s => spell.Card.Colors.Contains(s.Color));
+
+            if (colorShield != null)
+            {
+                player.DamagePreventionShields.Remove(colorShield);
+                state.Log($"{spell.Card.Name}'s damage to {player.Name} is prevented (Circle of Protection).");
+            }
+            else
+            {
+                player.AdjustLife(-Amount);
+                state.Log($"{spell.Card.Name} deals {Amount} damage to {player.Name}. ({player.Life} life)");
+            }
         }
         else
         {

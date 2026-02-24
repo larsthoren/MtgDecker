@@ -169,6 +169,7 @@ public class GameEngine
         foreach (var card in chosen.Take(excess))
         {
             player.Hand.Remove(card);
+            _state.LastDiscardCausedByPlayerId = null; // Game rule discard
             await HandleDiscardAsync(card, player, ct);
             QueueDiscardTriggers(player);
         }
@@ -427,8 +428,7 @@ public class GameEngine
         if (alt.ExileCardColor.HasValue)
         {
             var hasColoredCard = player.Hand.Cards.Any(c =>
-                c.Id != castCard.Id && c.ManaCost != null &&
-                c.ManaCost.ColorRequirements.ContainsKey(alt.ExileCardColor.Value));
+                c.Id != castCard.Id && c.Colors.Contains(alt.ExileCardColor.Value));
             if (!hasColoredCard) return false;
         }
 
@@ -486,7 +486,7 @@ public class GameEngine
         if (alt.ExileFromGraveyardCount > 0 && alt.ExileFromGraveyardColor.HasValue)
         {
             var matchingCount = player.Graveyard.Cards.Count(c =>
-                c.ManaCost != null && c.ManaCost.ColorRequirements.ContainsKey(alt.ExileFromGraveyardColor.Value));
+                c.Colors.Contains(alt.ExileFromGraveyardColor.Value));
             if (matchingCount < alt.ExileFromGraveyardCount) return false;
         }
 
@@ -506,8 +506,7 @@ public class GameEngine
         if (alt.ExileCardColor.HasValue)
         {
             var eligible = player.Hand.Cards.Where(c =>
-                c.Id != castCard.Id && c.ManaCost != null &&
-                c.ManaCost.ColorRequirements.ContainsKey(alt.ExileCardColor.Value)).ToList();
+                c.Id != castCard.Id && c.Colors.Contains(alt.ExileCardColor.Value)).ToList();
 
             var chosenId = await player.DecisionHandler.ChooseCard(
                 eligible, $"Choose a {alt.ExileCardColor} card to exile", optional: false, ct);
@@ -629,7 +628,7 @@ public class GameEngine
             for (int i = graveyardSnapshot.Count - 1; i >= 0 && toExile.Count < alt.ExileFromGraveyardCount; i--)
             {
                 var card = graveyardSnapshot[i];
-                if (card.ManaCost != null && card.ManaCost.ColorRequirements.ContainsKey(alt.ExileFromGraveyardColor.Value))
+                if (card.Colors.Contains(alt.ExileFromGraveyardColor.Value))
                     toExile.Add(card);
             }
 
@@ -775,6 +774,19 @@ public class GameEngine
         return _state.ActiveEffects.Any(e =>
             e.Type == ContinuousEffectType.PreventDamageToPlayer
             && GetEffectController(e.SourceId)?.Id == playerId);
+    }
+
+    /// <summary>
+    /// Checks if the player has a color-specific damage prevention shield (e.g. Circle of Protection)
+    /// matching the source card's colors. If found, consumes the shield (single-use) and returns true.
+    /// </summary>
+    internal bool TryConsumeColorDamageShield(Player player, GameCard source)
+    {
+        var shield = player.DamagePreventionShields
+            .FirstOrDefault(s => source.Colors.Contains(s.Color));
+        if (shield == null) return false;
+        player.DamagePreventionShields.Remove(shield);
+        return true;
     }
 
     /// <summary>
@@ -1268,6 +1280,10 @@ public class GameEngine
                     {
                         _state.Log($"{attackerCard.Name}'s {damage} damage to {defender.Name} is prevented (protection).");
                     }
+                    else if (TryConsumeColorDamageShield(defender, attackerCard))
+                    {
+                        _state.Log($"{attackerCard.Name}'s {damage} damage to {defender.Name} is prevented (Circle of Protection).");
+                    }
                     else
                     {
                         // Apply Worship-style lethal damage prevention
@@ -1424,6 +1440,9 @@ public class GameEngine
     public void StripEndOfTurnEffects()
     {
         _state.ActiveEffects.RemoveAll(e => e.UntilEndOfTurn);
+        // Clear single-use damage prevention shields (Circle of Protection)
+        _state.Player1.DamagePreventionShields.Clear();
+        _state.Player2.DamagePreventionShields.Clear();
     }
 
     public void RemoveExpiredEffects()
@@ -2087,8 +2106,7 @@ public class GameEngine
                     TriggerCondition.OpponentCastsRedSpell =>
                         evt == GameEvent.SpellCast
                         && relevantCard != null
-                        && relevantCard.ManaCost != null
-                        && relevantCard.ManaCost.ColorRequirements.ContainsKey(ManaColor.Red)
+                        && relevantCard.Colors.Contains(ManaColor.Red)
                         && _state.ActivePlayer != player,
                     TriggerCondition.AnyPlayerCastsEnchantment =>
                         evt == GameEvent.SpellCast
@@ -2098,11 +2116,23 @@ public class GameEngine
                     TriggerCondition.ControllerDiscardsCard =>
                         evt == GameEvent.DiscardCard
                         && _state.ActivePlayer == player,
+                    TriggerCondition.OpponentCausesControllerDiscard =>
+                        evt == GameEvent.DiscardCard
+                        && _state.ActivePlayer == player
+                        && _state.LastDiscardCausedByPlayerId.HasValue
+                        && _state.LastDiscardCausedByPlayerId.Value != player.Id,
                     TriggerCondition.ControllerLandToGraveyard =>
                         evt == GameEvent.LeavesBattlefield
                         && relevantCard != null
                         && relevantCard.IsLand
                         && player.Graveyard.Cards.Any(c => c.Id == relevantCard.Id),
+                    TriggerCondition.OpponentCausesControllerLandToGraveyard =>
+                        evt == GameEvent.LeavesBattlefield
+                        && relevantCard != null
+                        && relevantCard.IsLand
+                        && player.Graveyard.Cards.Any(c => c.Id == relevantCard.Id)
+                        && _state.LastLandDestroyedByPlayerId.HasValue
+                        && _state.LastLandDestroyedByPlayerId.Value != player.Id,
                     TriggerCondition.ControllerMainPhaseBeginning =>
                         evt == GameEvent.MainPhaseBeginning
                         && _state.ActivePlayer == player,
@@ -2777,6 +2807,15 @@ public class GameEngine
                         // Only fires when the permanent's controller discards
                         if (discardingPlayer.Id != player.Id) continue;
                         _state.Log($"{card.Name} triggers on {discardingPlayer.Name}'s discard.");
+                        _state.StackPush(new TriggeredAbilityStackObject(card, player.Id, trigger.Effect));
+                    }
+                    else if (trigger.Condition == TriggerCondition.OpponentCausesControllerDiscard)
+                    {
+                        // Only fires when an opponent caused the controller to discard
+                        if (discardingPlayer.Id != player.Id) continue;
+                        if (!_state.LastDiscardCausedByPlayerId.HasValue
+                            || _state.LastDiscardCausedByPlayerId.Value == player.Id) continue;
+                        _state.Log($"{card.Name} triggers on opponent-caused discard.");
                         _state.StackPush(new TriggeredAbilityStackObject(card, player.Id, trigger.Effect));
                     }
                 }

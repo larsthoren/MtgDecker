@@ -9,6 +9,8 @@ public class DestroyAllLandsEffect : SpellEffect
             var lands = player.Battlefield.Cards.Where(c => c.IsLand).ToList();
             foreach (var land in lands)
             {
+                // Track who caused land destruction for Sacred Ground
+                state.LastLandDestroyedByPlayerId = spell.ControllerId;
                 player.Battlefield.Remove(land);
                 player.Graveyard.Add(land);
             }

@@ -13,6 +13,7 @@ public class EachPlayerDiscardsEffect : IEffect
             {
                 var card = player.Hand.Cards[^1];
                 player.Hand.Remove(card);
+                context.State.LastDiscardCausedByPlayerId = context.Controller.Id;
                 if (context.State.HandleDiscardAsync != null)
                     await context.State.HandleDiscardAsync(card, player, ct);
                 else

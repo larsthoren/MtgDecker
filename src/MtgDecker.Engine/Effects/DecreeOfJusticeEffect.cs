@@ -1,4 +1,5 @@
 using MtgDecker.Engine.Enums;
+using MtgDecker.Engine.Mana;
 
 namespace MtgDecker.Engine.Effects;
 
@@ -42,6 +43,7 @@ public class DecreeOfJusticeEffect : SpellEffect
                 Subtypes = ["Angel"],
                 IsToken = true,
                 TurnEnteredBattlefield = state.TurnNumber,
+                Colors = { ManaColor.White },
             };
             controller.Battlefield.Add(token);
         }

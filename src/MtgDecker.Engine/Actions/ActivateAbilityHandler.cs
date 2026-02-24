@@ -312,6 +312,7 @@ internal class ActivateAbilityHandler : IActionHandler
         if (discardTarget != null)
         {
             player.Hand.RemoveById(discardTarget.Id);
+            state.LastDiscardCausedByPlayerId = player.Id; // Self-caused (activated ability)
             await engine.HandleDiscardAsync(discardTarget, player, ct);
             engine.QueueDiscardTriggers(player);
         }
@@ -321,6 +322,7 @@ internal class ActivateAbilityHandler : IActionHandler
             foreach (var card in discardTargets)
             {
                 player.Hand.RemoveById(card.Id);
+                state.LastDiscardCausedByPlayerId = player.Id; // Self-caused (activated ability)
                 await engine.HandleDiscardAsync(card, player, ct);
                 engine.QueueDiscardTriggers(player);
             }

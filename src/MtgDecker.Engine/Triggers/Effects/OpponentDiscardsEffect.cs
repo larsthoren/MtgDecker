@@ -12,6 +12,7 @@ public class OpponentDiscardsEffect : IEffect
         {
             var card = opponent.Hand.Cards[^1];
             opponent.Hand.Remove(card);
+            context.State.LastDiscardCausedByPlayerId = context.Controller.Id; // Opponent-caused
             if (context.State.HandleDiscardAsync != null)
                 await context.State.HandleDiscardAsync(card, opponent, ct);
             else

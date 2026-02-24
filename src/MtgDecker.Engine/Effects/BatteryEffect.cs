@@ -1,4 +1,5 @@
 using MtgDecker.Engine.Enums;
+using MtgDecker.Engine.Mana;
 
 namespace MtgDecker.Engine.Effects;
 
@@ -16,6 +17,7 @@ public class BatteryEffect : SpellEffect
             Subtypes = ["Elephant"],
             IsToken = true,
             TurnEnteredBattlefield = state.TurnNumber,
+            Colors = { ManaColor.Green },
         };
         controller.Battlefield.Add(token);
         state.Log($"{controller.Name} creates a 3/3 Elephant token.");

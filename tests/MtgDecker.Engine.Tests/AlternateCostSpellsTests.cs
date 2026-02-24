@@ -658,7 +658,13 @@ public class AlternateCostSpellsTests
         state.Player1.Hand.Add(redCard);
         state.Player2.Battlefield.Add(creature);
 
-        h1.EnqueueTarget(new TargetInfo(creature.Id, state.Player2.Id, ZoneType.Battlefield));
+        // First ChooseCard: pick which red card to exile for alternate cost
+        h1.EnqueueCardChoice(redCard.Id);
+        // DividedDamageEffect uses ChooseCard 4 times (1 damage per pick)
+        h1.EnqueueCardChoice(creature.Id);
+        h1.EnqueueCardChoice(creature.Id);
+        h1.EnqueueCardChoice(creature.Id);
+        h1.EnqueueCardChoice(creature.Id);
 
         await engine.ExecuteAction(GameAction.CastSpell(state.Player1.Id, pyro.Id));
 
