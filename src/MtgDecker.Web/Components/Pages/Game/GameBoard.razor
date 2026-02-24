@@ -2,6 +2,7 @@
 @using MtgDecker.Engine.Enums
 @using MtgDecker.Engine.Mana
 @namespace MtgDecker.Web.Components.Pages.Game
+@implements IDisposable
 
 <div class="game-board" tabindex="0" @ref="_boardRef">
     @if (IsGameOver)
@@ -1472,6 +1473,11 @@
         if (string.IsNullOrWhiteSpace(_chatInput)) return;
         await OnChatSent.InvokeAsync(_chatInput.Trim());
         _chatInput = "";
+    }
+
+    public void Dispose()
+    {
+        _graveyardDotNetRef?.Dispose();
     }
 
 }
