@@ -440,3 +440,14 @@
     0%, 100% { box-shadow: 0 0 12px 4px rgba(255, 136, 0, 0.8); }
     50% { box-shadow: 0 0 18px 6px rgba(255, 136, 0, 1); }
 }
+
+.ninjutsu-eligible {
+    outline: 2px solid var(--mud-palette-secondary);
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.ninjutsu-dimmed {
+    opacity: 0.35;
+    pointer-events: none;
+}

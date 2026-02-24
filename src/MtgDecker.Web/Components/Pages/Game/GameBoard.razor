@@ -178,6 +178,14 @@
                            OnClick="HandleTargetCancel">Cancel</MudButton>
             </div>
         }
+        @if (IsNinjutsuTargeting)
+        {
+            <div class="targeting-banner">
+                <span>Choose unblocked attacker to return to hand</span>
+                <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Warning"
+                           OnClick="CancelNinjutsu">Cancel</MudButton>
+            </div>
+        }
         <PhaseBar CurrentPhase="@State.CurrentPhase"
                   CurrentCombatStep="@State.CombatStep"
                   TurnNumber="@State.TurnNumber"
@@ -215,7 +223,7 @@
                 var isEligibleBlocker = Handler?.IsWaitingForBlockers == true && IsLocalDefending
                     && Handler?.EligibleBlockers?.Any(c => c.Id == card.Id) == true;
                 var attachments = GetAttachedCards(LocalPlayer, card.Id);
-                <div class="permanent-stack">
+                <div class="permanent-stack @(IsEligibleNinjutsuTarget(card) ? "ninjutsu-eligible" : "") @(IsNinjutsuDimmed(card) ? "ninjutsu-dimmed" : "")">
                     @foreach (var aura in attachments)
                     {
                         <div class="attached-aura" id="bf-card-@aura.Id">
@@ -984,6 +992,14 @@
 
     private async Task HandleBattlefieldClick(GameCard card, bool isEligibleAttacker, bool isEligibleBlocker)
     {
+        // If ninjutsu targeting, check if this is a valid unblocked attacker
+        if (IsNinjutsuTargeting)
+        {
+            if (IsEligibleNinjutsuTarget(card))
+                await HandleNinjutsuTargetClick(card);
+            return;
+        }
+
         // If we're targeting, submit target
         if (Handler?.IsWaitingForTarget == true)
         {
