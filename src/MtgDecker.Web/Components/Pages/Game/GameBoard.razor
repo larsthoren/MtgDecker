@@ -948,6 +948,13 @@
 
     protected override async Task OnParametersSetAsync()
     {
+        // Clear ninjutsu targeting if combat ended
+        if (_ninjutsuCard != null &&
+            (State.CurrentPhase != Phase.Combat || State.Combat == null))
+        {
+            _ninjutsuCard = null;
+        }
+
         // When state updates arrive (e.g. after a land tap), check if a pending
         // cast can now be completed with the updated mana pool.
         await TryCompletePendingCast();
@@ -1024,6 +1031,9 @@
 
     private async Task HandleLandClick(GameCard card)
     {
+        // Block land interaction during ninjutsu targeting
+        if (IsNinjutsuTargeting) return;
+
         // If we're targeting, submit target
         if (Handler?.IsWaitingForTarget == true)
         {
