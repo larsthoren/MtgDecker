@@ -486,3 +486,6 @@ nul
 
 # Git worktrees
 .worktrees/
+
+# Development settings (contains connection strings)
+**/appsettings.Development.json
