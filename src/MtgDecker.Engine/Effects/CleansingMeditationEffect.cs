@@ -47,10 +47,10 @@ public class CleansingMeditationEffect : SpellEffect
         {
             state.Log("Threshold active — returning controller's enchantments.");
 
-            // Return all enchantment cards from controller's graveyard to battlefield
-            // (includes the ones just destroyed plus any already there)
+            // Return only enchantments that were destroyed this way (not pre-existing graveyard ones)
             var enchantmentsInGraveyard = controller.Graveyard.Cards
-                .Where(c => c.CardTypes.HasFlag(CardType.Enchantment))
+                .Where(c => c.CardTypes.HasFlag(CardType.Enchantment)
+                    && controllerEnchantmentIds.Contains(c.Id))
                 .ToList();
 
             foreach (var ench in enchantmentsInGraveyard)

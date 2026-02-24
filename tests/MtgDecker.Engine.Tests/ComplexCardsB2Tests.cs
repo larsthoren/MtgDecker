@@ -795,7 +795,7 @@ public class ComplexCardsB2Tests
     }
 
     [Fact]
-    public async Task CleansingMeditation_WithThreshold_AlsoReturnsGraveyardEnchantments()
+    public async Task CleansingMeditation_WithThreshold_OnlyReturnsDestroyedEnchantments()
     {
         var (state, p1, _) = CreateGameState();
 
@@ -803,11 +803,11 @@ public class ComplexCardsB2Tests
         for (int i = 0; i < 7; i++)
             p1.Graveyard.Add(new GameCard { Name = $"Junk {i}", CardTypes = CardType.Creature });
 
-        // An enchantment already in graveyard
+        // An enchantment already in graveyard (NOT destroyed this way)
         var oldEnch = new GameCard { Name = "Old Enchantment", CardTypes = CardType.Enchantment };
         p1.Graveyard.Add(oldEnch);
 
-        // An enchantment on battlefield
+        // An enchantment on battlefield (WILL be destroyed this way)
         var currentEnch = new GameCard { Name = "Current Enchantment", CardTypes = CardType.Enchantment };
         p1.Battlefield.Add(currentEnch);
 
@@ -815,9 +815,11 @@ public class ComplexCardsB2Tests
         CardDefinitions.TryGet("Cleansing Meditation", out var def);
         await def!.Effect!.ResolveAsync(state, spell, p1.DecisionHandler);
 
-        // Both enchantments should be on battlefield now
+        // Only the enchantment destroyed this way should return
         p1.Battlefield.Cards.Should().Contain(c => c.Name == "Current Enchantment");
-        p1.Battlefield.Cards.Should().Contain(c => c.Name == "Old Enchantment");
+        // Pre-existing graveyard enchantment stays in graveyard
+        p1.Graveyard.Cards.Should().Contain(c => c.Name == "Old Enchantment");
+        p1.Battlefield.Cards.Should().NotContain(c => c.Name == "Old Enchantment");
     }
 
     [Fact]
