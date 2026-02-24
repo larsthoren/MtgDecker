@@ -2012,6 +2012,19 @@ public class GameEngine
         }
     }
 
+    /// <summary>
+    /// Executes "As [card] enters the battlefield" replacement effects.
+    /// These happen during resolution/entry, not as triggers — cannot be Stifled.
+    /// </summary>
+    private async Task ExecuteAsEntersEffectAsync(GameCard card, Player controller, CancellationToken ct)
+    {
+        if (CardDefinitions.TryGet(card.Name, out var def) && def.AsEntersBattlefieldEffect != null)
+        {
+            var context = new Triggers.EffectContext(_state, controller, card, controller.DecisionHandler);
+            await def.AsEntersBattlefieldEffect.Execute(context, ct);
+        }
+    }
+
     /// <summary>Queues Self triggers for a specific card onto the stack.</summary>
     internal Task QueueSelfTriggersOnStackAsync(GameEvent evt, GameCard source, Player controller, CancellationToken ct = default)
     {
@@ -2299,11 +2312,13 @@ public class GameEngine
         foreach (var card in _state.Player1.Battlefield.Cards.Where(c => !p1Before.Contains(c.Id)))
         {
             ApplyEntersWithCounters(card);
+            await ExecuteAsEntersEffectAsync(card, _state.Player1, ct);
             await QueueSelfTriggersOnStackAsync(GameEvent.EnterBattlefield, card, _state.Player1, ct);
         }
         foreach (var card in _state.Player2.Battlefield.Cards.Where(c => !p2Before.Contains(c.Id)))
         {
             ApplyEntersWithCounters(card);
+            await ExecuteAsEntersEffectAsync(card, _state.Player2, ct);
             await QueueSelfTriggersOnStackAsync(GameEvent.EnterBattlefield, card, _state.Player2, ct);
         }
     }
@@ -2580,6 +2595,11 @@ public class GameEngine
                     await TryAttachAuraAsync(spell.Card, controller, ct);
 
                     ApplyEntersWithCounters(spell.Card);
+
+                    // "As enters" replacement effects (e.g., Engineered Plague choosing type, Meddling Mage choosing name)
+                    // These happen during resolution, not as triggers — cannot be Stifled
+                    await ExecuteAsEntersEffectAsync(spell.Card, controller, ct);
+
                     await QueueSelfTriggersOnStackAsync(GameEvent.EnterBattlefield, spell.Card, controller, ct);
                     await OnBoardChangedAsync(ct);
                 }

@@ -4,7 +4,8 @@ namespace MtgDecker.Engine.Effects;
 
 public class CleansingMeditationEffect : SpellEffect
 {
-    public override void Resolve(GameState state, StackObject spell)
+    public override async Task ResolveAsync(GameState state, StackObject spell,
+        IPlayerDecisionHandler handler, CancellationToken ct = default)
     {
         var controller = state.GetPlayer(spell.ControllerId);
 
@@ -54,17 +55,48 @@ public class CleansingMeditationEffect : SpellEffect
 
             foreach (var ench in enchantmentsInGraveyard)
             {
-                // Skip auras — they need valid targets
-                if (ench.Subtypes.Contains("Aura"))
+                if (CardDefinitions.TryGet(ench.Name, out var enchDef) && enchDef.AuraTarget.HasValue)
                 {
-                    state.Log($"{ench.Name} stays in graveyard (aura needs a target).");
-                    continue;
-                }
+                    // Aura — needs a valid target to enter the battlefield
+                    var opponent = state.GetOpponent(controller);
+                    var eligible = controller.Battlefield.Cards.Concat(opponent.Battlefield.Cards)
+                        .Where(c => enchDef.AuraTarget switch
+                        {
+                            AuraTarget.Land => c.IsLand,
+                            AuraTarget.Creature => c.IsCreature,
+                            AuraTarget.Permanent => true,
+                            _ => false,
+                        })
+                        .ToList();
 
-                controller.Graveyard.RemoveById(ench.Id);
-                controller.Battlefield.Add(ench);
-                ench.TurnEnteredBattlefield = state.TurnNumber;
-                state.Log($"{ench.Name} returns to the battlefield.");
+                    if (eligible.Count == 0)
+                    {
+                        state.Log($"{ench.Name} stays in graveyard (no valid target for aura).");
+                        continue;
+                    }
+
+                    var target = await handler.ChooseTarget(ench.Name, eligible, controller.Id, ct);
+                    if (target == null)
+                    {
+                        state.Log($"{ench.Name} stays in graveyard (no target chosen).");
+                        continue;
+                    }
+
+                    controller.Graveyard.RemoveById(ench.Id);
+                    controller.Battlefield.Add(ench);
+                    ench.AttachedTo = target.CardId;
+                    ench.TurnEnteredBattlefield = state.TurnNumber;
+                    var targetCard = eligible.FirstOrDefault(c => c.Id == target.CardId);
+                    state.Log($"{ench.Name} returns to the battlefield attached to {targetCard?.Name ?? "unknown"}.");
+                }
+                else
+                {
+                    // Non-aura enchantment — return directly
+                    controller.Graveyard.RemoveById(ench.Id);
+                    controller.Battlefield.Add(ench);
+                    ench.TurnEnteredBattlefield = state.TurnNumber;
+                    state.Log($"{ench.Name} returns to the battlefield.");
+                }
             }
         }
     }

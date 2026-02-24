@@ -744,7 +744,7 @@ public class ComplexCardsB2Tests
     #region Cleansing Meditation
 
     [Fact]
-    public void CleansingMeditation_DestroysAllEnchantments()
+    public async Task CleansingMeditation_DestroysAllEnchantments()
     {
         var (state, p1, p2) = CreateGameState();
 
@@ -757,7 +757,7 @@ public class ComplexCardsB2Tests
 
         var spell = CreateSpell("Cleansing Meditation", p1.Id, []);
         CardDefinitions.TryGet("Cleansing Meditation", out var def);
-        def!.Effect!.Resolve(state, spell);
+        await def!.Effect!.ResolveAsync(state, spell, p1.DecisionHandler);
 
         // Both enchantments destroyed
         p1.Battlefield.Cards.Should().NotContain(c => c.Name == "Enchantment A");
@@ -770,7 +770,7 @@ public class ComplexCardsB2Tests
     }
 
     [Fact]
-    public void CleansingMeditation_WithThreshold_ReturnsControllerEnchantments()
+    public async Task CleansingMeditation_WithThreshold_ReturnsControllerEnchantments()
     {
         var (state, p1, p2) = CreateGameState();
 
@@ -785,7 +785,7 @@ public class ComplexCardsB2Tests
 
         var spell = CreateSpell("Cleansing Meditation", p1.Id, []);
         CardDefinitions.TryGet("Cleansing Meditation", out var def);
-        def!.Effect!.Resolve(state, spell);
+        await def!.Effect!.ResolveAsync(state, spell, p1.DecisionHandler);
 
         // P1's enchantment should be back on battlefield (threshold return)
         p1.Battlefield.Cards.Should().Contain(c => c.Name == "Enchantment A");
@@ -795,7 +795,7 @@ public class ComplexCardsB2Tests
     }
 
     [Fact]
-    public void CleansingMeditation_WithThreshold_AlsoReturnsGraveyardEnchantments()
+    public async Task CleansingMeditation_WithThreshold_AlsoReturnsGraveyardEnchantments()
     {
         var (state, p1, _) = CreateGameState();
 
@@ -813,11 +813,119 @@ public class ComplexCardsB2Tests
 
         var spell = CreateSpell("Cleansing Meditation", p1.Id, []);
         CardDefinitions.TryGet("Cleansing Meditation", out var def);
-        def!.Effect!.Resolve(state, spell);
+        await def!.Effect!.ResolveAsync(state, spell, p1.DecisionHandler);
 
         // Both enchantments should be on battlefield now
         p1.Battlefield.Cards.Should().Contain(c => c.Name == "Current Enchantment");
         p1.Battlefield.Cards.Should().Contain(c => c.Name == "Old Enchantment");
+    }
+
+    [Fact]
+    public async Task CleansingMeditation_WithThreshold_ReturnsAurasAttachedToValidTargets()
+    {
+        var h1 = new TestDecisionHandler();
+        var h2 = new TestDecisionHandler();
+        var p1 = new Player(Guid.NewGuid(), "Alice", h1);
+        var p2 = new Player(Guid.NewGuid(), "Bob", h2);
+        var state = new GameState(p1, p2);
+
+        // Give P1 threshold (7 cards in graveyard)
+        for (int i = 0; i < 7; i++)
+            p1.Graveyard.Add(new GameCard { Name = $"Junk {i}", CardTypes = CardType.Creature });
+
+        // A creature on the battlefield to attach the aura to
+        var creature = new GameCard
+        {
+            Name = "Bear", TypeLine = "Creature — Bear",
+            CardTypes = CardType.Creature, BasePower = 2, BaseToughness = 2,
+            TurnEnteredBattlefield = 0
+        };
+        p1.Battlefield.Add(creature);
+
+        // An aura enchantment on the battlefield (Rancor — AuraTarget.Creature)
+        var rancor = GameCard.Create("Rancor");
+        rancor.AttachedTo = creature.Id;
+        p1.Battlefield.Add(rancor);
+
+        // Enqueue a target choice for the aura return — choose the bear
+        h1.EnqueueTarget(new TargetInfo(creature.Id, p1.Id, ZoneType.Battlefield));
+
+        var spell = CreateSpell("Cleansing Meditation", p1.Id, []);
+        CardDefinitions.TryGet("Cleansing Meditation", out var def);
+        await def!.Effect!.ResolveAsync(state, spell, h1);
+
+        // Rancor should be back on the battlefield attached to the creature
+        p1.Battlefield.Cards.Should().Contain(c => c.Name == "Rancor");
+        var returnedRancor = p1.Battlefield.Cards.First(c => c.Name == "Rancor");
+        returnedRancor.AttachedTo.Should().Be(creature.Id);
+    }
+
+    [Fact]
+    public async Task CleansingMeditation_WithThreshold_AuraStaysInGraveyardWhenNoValidTarget()
+    {
+        var h1 = new TestDecisionHandler();
+        var h2 = new TestDecisionHandler();
+        var p1 = new Player(Guid.NewGuid(), "Alice", h1);
+        var p2 = new Player(Guid.NewGuid(), "Bob", h2);
+        var state = new GameState(p1, p2);
+
+        // Give P1 threshold (7 cards in graveyard)
+        for (int i = 0; i < 7; i++)
+            p1.Graveyard.Add(new GameCard { Name = $"Junk {i}", CardTypes = CardType.Creature });
+
+        // An aura that targets creatures — but no creatures on either battlefield
+        var rancor = GameCard.Create("Rancor");
+        p1.Battlefield.Add(rancor);
+
+        var spell = CreateSpell("Cleansing Meditation", p1.Id, []);
+        CardDefinitions.TryGet("Cleansing Meditation", out var def);
+        await def!.Effect!.ResolveAsync(state, spell, h1);
+
+        // Rancor should stay in graveyard (no valid target for creature aura)
+        p1.Graveyard.Cards.Should().Contain(c => c.Name == "Rancor");
+        p1.Battlefield.Cards.Should().NotContain(c => c.Name == "Rancor");
+    }
+
+    [Fact]
+    public async Task CleansingMeditation_WithThreshold_NonAuraEnchantmentsStillReturn()
+    {
+        var h1 = new TestDecisionHandler();
+        var h2 = new TestDecisionHandler();
+        var p1 = new Player(Guid.NewGuid(), "Alice", h1);
+        var p2 = new Player(Guid.NewGuid(), "Bob", h2);
+        var state = new GameState(p1, p2);
+
+        // Give P1 threshold (7 cards in graveyard)
+        for (int i = 0; i < 7; i++)
+            p1.Graveyard.Add(new GameCard { Name = $"Junk {i}", CardTypes = CardType.Creature });
+
+        // A creature target for the aura
+        var creature = new GameCard
+        {
+            Name = "Bear", TypeLine = "Creature — Bear",
+            CardTypes = CardType.Creature, BasePower = 2, BaseToughness = 2,
+            TurnEnteredBattlefield = 0
+        };
+        p1.Battlefield.Add(creature);
+
+        // Both an aura and a non-aura enchantment on the battlefield
+        var rancor = GameCard.Create("Rancor");
+        rancor.AttachedTo = creature.Id;
+        p1.Battlefield.Add(rancor);
+
+        var nonAura = new GameCard { Name = "Enchantment A", CardTypes = CardType.Enchantment };
+        p1.Battlefield.Add(nonAura);
+
+        // Target for aura return
+        h1.EnqueueTarget(new TargetInfo(creature.Id, p1.Id, ZoneType.Battlefield));
+
+        var spell = CreateSpell("Cleansing Meditation", p1.Id, []);
+        CardDefinitions.TryGet("Cleansing Meditation", out var def);
+        await def!.Effect!.ResolveAsync(state, spell, h1);
+
+        // Both should return
+        p1.Battlefield.Cards.Should().Contain(c => c.Name == "Rancor");
+        p1.Battlefield.Cards.Should().Contain(c => c.Name == "Enchantment A");
     }
 
     #endregion

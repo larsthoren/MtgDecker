@@ -53,4 +53,11 @@ public record CardDefinition(
     public bool HasStorm { get; init; }
     public bool CyclingReplaceDraw { get; init; }
     public bool MustAttack { get; init; }
+    /// <summary>
+    /// "As [card] enters the battlefield, choose..." replacement effect.
+    /// Executes during spell resolution BEFORE ETB triggers are queued.
+    /// Cannot be Stifled (unlike ETB triggers).
+    /// Used by Engineered Plague (choose creature type) and Meddling Mage (choose card name).
+    /// </summary>
+    public IEffect? AsEntersBattlefieldEffect { get; init; }
 }

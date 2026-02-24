@@ -1615,7 +1615,9 @@ public static class CardDefinitions
             // === Choose Name/Type + Hate Cards ===
             ["Engineered Plague"] = new(ManaCost.Parse("{2}{B}"), null, null, null, CardType.Enchantment)
             {
-                Triggers = [new Trigger(GameEvent.EnterBattlefield, TriggerCondition.Self, new ChooseCreatureTypeEffect())],
+                // "As Engineered Plague enters the battlefield, choose a creature type."
+                // This is a replacement effect, not a trigger — cannot be Stifled.
+                AsEntersBattlefieldEffect = new ChooseCreatureTypeEffect(),
                 // ContinuousEffect is generated dynamically via DynamicContinuousEffectsFactory
                 // because the -1/-1 effect depends on the runtime ChosenType
                 DynamicContinuousEffectsFactory = card =>
@@ -1637,7 +1639,9 @@ public static class CardDefinitions
             {
                 IsLegendary = false,
                 Subtypes = ["Human", "Wizard"],
-                Triggers = [new Trigger(GameEvent.EnterBattlefield, TriggerCondition.Self, new ChooseCardNameEffect())],
+                // "As Meddling Mage enters the battlefield, choose a nonland card name."
+                // This is a replacement effect, not a trigger — cannot be Stifled.
+                AsEntersBattlefieldEffect = new ChooseCardNameEffect(),
                 // Cast prevention is enforced in CastSpellHandler by checking ChosenName on Meddling Mages
             },
             ["Ensnaring Bridge"] = new(ManaCost.Parse("{3}"), null, null, null, CardType.Artifact)
@@ -1767,6 +1771,9 @@ public static class CardDefinitions
             },
 
             // Eternal Dragon ({5}{W}{W}, 5/5 Dragon Spirit, Flying, Plainscycling {2}, graveyard return)
+            // NOTE: Oracle "{3}{W}{W}: Return Eternal Dragon from your graveyard to your hand. Activate only during your upkeep."
+            // is an activated ability, not a trigger. Modeled as an upkeep trigger with optional payment since the engine
+            // doesn't support graveyard-based activated abilities. Functionally equivalent — player gets the choice.
             ["Eternal Dragon"] = new(ManaCost.Parse("{5}{W}{W}"), null, 5, 5, CardType.Creature)
             {
                 Subtypes = ["Dragon", "Spirit"],

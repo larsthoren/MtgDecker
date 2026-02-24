@@ -617,4 +617,94 @@ public class HateCardsTests
         effects[0].PowerMod.Should().Be(-1);
         effects[0].ToughnessMod.Should().Be(-1);
     }
+
+    // ─── "As Enters" Replacement Effects ──────────────────────────────
+
+    [Fact]
+    public void EngineeredPlague_UsesAsEntersNotETBTrigger()
+    {
+        CardDefinitions.TryGet("Engineered Plague", out var def).Should().BeTrue();
+
+        // Should use AsEntersBattlefieldEffect (replacement, cannot be Stifled)
+        def!.AsEntersBattlefieldEffect.Should().NotBeNull();
+        def.AsEntersBattlefieldEffect.Should().BeOfType<ChooseCreatureTypeEffect>();
+
+        // Should NOT have an ETB trigger for the choice
+        def.Triggers.Should().NotContain(t => t.Event == GameEvent.EnterBattlefield);
+    }
+
+    [Fact]
+    public void MeddlingMage_UsesAsEntersNotETBTrigger()
+    {
+        CardDefinitions.TryGet("Meddling Mage", out var def).Should().BeTrue();
+
+        // Should use AsEntersBattlefieldEffect (replacement, cannot be Stifled)
+        def!.AsEntersBattlefieldEffect.Should().NotBeNull();
+        def.AsEntersBattlefieldEffect.Should().BeOfType<ChooseCardNameEffect>();
+
+        // Should NOT have an ETB trigger for the choice
+        def.Triggers.Should().NotContain(t => t.Event == GameEvent.EnterBattlefield);
+    }
+
+    [Fact]
+    public async Task EngineeredPlague_AsEnters_ChoiceHappensDuringResolution()
+    {
+        // The type choice should happen immediately during spell resolution,
+        // not as a separate trigger on the stack (which could be Stifled).
+        var (engine, state, p1Handler, _) = CreateSetup();
+        await engine.StartGameAsync();
+
+        p1Handler.EnqueueCreatureType("Elf");
+
+        var goblin = new GameCard
+        {
+            Name = "Llanowar Elves", TypeLine = "Creature — Elf Druid",
+            CardTypes = CardType.Creature, Subtypes = ["Elf", "Druid"],
+            BasePower = 1, BaseToughness = 1, TurnEnteredBattlefield = 0
+        };
+        state.Player1.Battlefield.Add(goblin);
+
+        state.CurrentPhase = Phase.MainPhase1;
+        var plague = GameCard.Create("Engineered Plague");
+        state.Player1.Hand.Add(plague);
+        state.Player1.ManaPool.Add(ManaColor.Black);
+        state.Player1.ManaPool.Add(ManaColor.Colorless);
+        state.Player1.ManaPool.Add(ManaColor.Colorless);
+
+        await engine.ExecuteAction(GameAction.CastSpell(state.Player1.Id, plague.Id));
+        // Resolve just the spell on top of stack — the "as enters" choice should
+        // happen during resolution, not as a separate trigger
+        await engine.ResolveAllTriggersAsync();
+
+        // The choice should have been made during resolution
+        plague.ChosenType.Should().Be("Elf");
+
+        // The continuous effect should already be active
+        engine.RecalculateState();
+        goblin.Power.Should().Be(0, "Elf should get -1 power from Engineered Plague choosing Elf");
+        goblin.Toughness.Should().Be(0, "Elf should get -1 toughness from Engineered Plague choosing Elf");
+    }
+
+    [Fact]
+    public async Task MeddlingMage_AsEnters_NameChoiceHappensDuringResolution()
+    {
+        var (engine, state, _, p2Handler) = CreateSetup();
+        await engine.StartGameAsync();
+
+        p2Handler.EnqueueCardName("Counterspell");
+
+        state.CurrentPhase = Phase.MainPhase1;
+        state.ActivePlayer = state.Player2;
+        var mage = GameCard.Create("Meddling Mage");
+        state.Player2.Hand.Add(mage);
+        state.Player2.ManaPool.Add(ManaColor.White);
+        state.Player2.ManaPool.Add(ManaColor.Blue);
+
+        await engine.ExecuteAction(GameAction.CastSpell(state.Player2.Id, mage.Id));
+        await engine.ResolveAllTriggersAsync();
+
+        // Name should have been chosen during resolution
+        mage.ChosenName.Should().Be("Counterspell");
+        state.Player2.Battlefield.Cards.Should().Contain(c => c.Id == mage.Id);
+    }
 }
