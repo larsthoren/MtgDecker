@@ -1213,6 +1213,81 @@ public static class CardDefinitions
                 Effect: new PriceOfProgressEffect()),
             ["Earthquake"] = new(ManaCost.Parse("{R}"), null, null, null, CardType.Sorcery,
                 Effect: new EarthquakeEffect()),
+
+            // Static enchantments & artifacts
+            ["Crusade"] = new(ManaCost.Parse("{W}{W}"), null, null, null, CardType.Enchantment)
+            {
+                ContinuousEffects =
+                [
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.ModifyPowerToughness,
+                        (card, _) => card.IsCreature && card.ManaCost?.ColorRequirements.ContainsKey(ManaColor.White) == true,
+                        PowerMod: 1, ToughnessMod: 1,
+                        Layer: EffectLayer.Layer7c_ModifyPT),
+                ],
+            },
+            ["Absolute Law"] = new(ManaCost.Parse("{1}{W}"), null, null, null, CardType.Enchantment)
+            {
+                ContinuousEffects =
+                [
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
+                        (card, _) => card.IsCreature,
+                        GrantedKeyword: Keyword.ProtectionFromRed,
+                        Layer: EffectLayer.Layer6_AbilityAddRemove),
+                ],
+            },
+            ["Worship"] = new(ManaCost.Parse("{3}{W}"), null, null, null, CardType.Enchantment)
+            {
+                ContinuousEffects =
+                [
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.PreventLethalDamage,
+                        (_, _) => true),
+                ],
+            },
+            ["Sphere of Resistance"] = new(ManaCost.Parse("{2}"), null, null, null, CardType.Artifact)
+            {
+                ContinuousEffects =
+                [
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.ModifyCost,
+                        (_, _) => true, CostMod: 1,
+                        CostApplies: _ => true),
+                ],
+            },
+            ["Chill"] = new(ManaCost.Parse("{1}{U}"), null, null, null, CardType.Enchantment)
+            {
+                ContinuousEffects =
+                [
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.ModifyCost,
+                        (_, _) => true, CostMod: 2,
+                        CostApplies: c => c.ManaCost?.ColorRequirements.ContainsKey(ManaColor.Red) == true),
+                ],
+            },
+            ["Gloom"] = new(ManaCost.Parse("{2}{B}"), null, null, null, CardType.Enchantment)
+            {
+                // Note: Oracle text also says "Activated abilities of white enchantments cost {3} more to activate."
+                // The activated ability cost increase is deferred — only the spell cost increase is implemented.
+                ContinuousEffects =
+                [
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.ModifyCost,
+                        (_, _) => true, CostMod: 3,
+                        CostApplies: c => c.ManaCost?.ColorRequirements.ContainsKey(ManaColor.White) == true),
+                ],
+            },
+            ["Null Rod"] = new(ManaCost.Parse("{2}"), null, null, null, CardType.Artifact)
+            {
+                ContinuousEffects =
+                [
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.PreventActivatedAbilities,
+                        (card, _) => card.CardTypes.HasFlag(CardType.Artifact)),
+                ],
+            },
+            ["Cursed Totem"] = new(ManaCost.Parse("{2}"), null, null, null, CardType.Artifact)
+            {
+                ContinuousEffects =
+                [
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.PreventActivatedAbilities,
+                        (card, _) => card.IsCreature),
+                ],
+            },
         };
 
         Registry = cards.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);

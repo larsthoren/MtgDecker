@@ -11,6 +11,15 @@ internal class ActivateAbilityHandler : IActionHandler
         var abilitySource = player.Battlefield.Cards.FirstOrDefault(c => c.Id == action.CardId);
         if (abilitySource == null) return;
 
+        // Check if activated abilities are prevented (e.g. Null Rod for artifacts, Cursed Totem for creatures)
+        if (state.ActiveEffects.Any(e =>
+            e.Type == ContinuousEffectType.PreventActivatedAbilities
+            && e.Applies(abilitySource, player)))
+        {
+            state.Log($"{abilitySource.Name}'s activated abilities can't be activated.");
+            return;
+        }
+
         if (abilitySource.IsCreature && abilitySource.AbilitiesRemoved)
         {
             state.Log($"{abilitySource.Name} has lost its abilities — cannot activate.");

@@ -587,6 +587,35 @@ public class GameEngine
             && GetEffectController(e.SourceId)?.Id == playerId);
     }
 
+    /// <summary>
+    /// Applies Worship-style damage prevention. If the player has a PreventLethalDamage effect
+    /// and controls a creature, damage that would reduce life below 1 is reduced so life stays at 1.
+    /// Returns the (possibly reduced) damage amount.
+    /// </summary>
+    internal int ApplyLethalDamageProtection(Player player, int damage)
+    {
+        if (damage <= 0) return damage;
+
+        var hasEffect = _state.ActiveEffects.Any(e =>
+            e.Type == ContinuousEffectType.PreventLethalDamage
+            && GetEffectController(e.SourceId)?.Id == player.Id);
+
+        if (!hasEffect) return damage;
+
+        // Worship requires the player to control a creature
+        if (!player.Battlefield.Cards.Any(c => c.IsCreature)) return damage;
+
+        // If this damage would reduce life below 1, cap it so life stays at 1
+        var resultingLife = player.Life - damage;
+        if (resultingLife < 1)
+        {
+            var maxDamage = Math.Max(0, player.Life - 1);
+            return maxDamage;
+        }
+
+        return damage;
+    }
+
     private Player? GetEffectController(Guid sourceId)
     {
         if (_state.Player1.Battlefield.Contains(sourceId)) return _state.Player1;
@@ -939,15 +968,19 @@ public class GameEngine
                     }
                     else
                     {
-                        defender.AdjustLife(-damage);
-                        _state.Log($"{attackerCard.Name} deals {damage} damage to {defender.Name}. ({defender.Life} life)");
+                        // Apply Worship-style lethal damage prevention
+                        var actualDamage = ApplyLethalDamageProtection(defender, damage);
+                        if (actualDamage < damage)
+                            _state.Log($"Worship prevents {damage - actualDamage} damage to {defender.Name}.");
+                        defender.AdjustLife(-actualDamage);
+                        _state.Log($"{attackerCard.Name} deals {actualDamage} damage to {defender.Name}. ({defender.Life} life)");
                         unblockedAttackers.Add(attackerCard);
 
-                        // Lifelink: controller gains life equal to damage dealt
+                        // Lifelink: controller gains life equal to damage actually dealt
                         if (attackerCard.ActiveKeywords.Contains(Keyword.Lifelink))
                         {
-                            attacker.AdjustLife(damage);
-                            _state.Log($"{attackerCard.Name} has lifelink — {attacker.Name} gains {damage} life. ({attacker.Life} life)");
+                            attacker.AdjustLife(actualDamage);
+                            _state.Log($"{attackerCard.Name} has lifelink — {attacker.Name} gains {actualDamage} life. ({attacker.Life} life)");
                         }
                     }
                 }

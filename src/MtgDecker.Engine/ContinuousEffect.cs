@@ -18,6 +18,8 @@ public enum ContinuousEffectType
     OverrideLandType,
     PreventLifeGain,
     PreventCastFromGraveyard,
+    PreventActivatedAbilities,
+    PreventLethalDamage,
 }
 
 public record ContinuousEffect(

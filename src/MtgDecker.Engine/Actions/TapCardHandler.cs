@@ -20,6 +20,16 @@ internal class TapCardHandler : IActionHandler
             return;
         }
 
+        // Check if activated abilities are prevented (e.g. Null Rod for artifacts, Cursed Totem for creatures)
+        // Per MTG rules, mana abilities are activated abilities — Null Rod prevents artifact mana abilities
+        if (tapTarget.ManaAbility != null && state.ActiveEffects.Any(e =>
+            e.Type == ContinuousEffectType.PreventActivatedAbilities
+            && e.Applies(tapTarget, player)))
+        {
+            state.Log($"{tapTarget.Name}'s activated abilities can't be activated.");
+            return;
+        }
+
         tapTarget.IsTapped = true;
         player.ActionHistory.Push(action);
 
