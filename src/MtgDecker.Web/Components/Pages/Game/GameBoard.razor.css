@@ -350,27 +350,80 @@
     border-radius: 8px;
 }
 
-/* Graveyard viewer panel */
-.graveyard-panel {
+/* Graveyard floating panels */
+.graveyard-floating-panel {
+    position: fixed;
+    z-index: 400;
+    width: 200px;
+    max-height: 60vh;
     background: rgba(20, 20, 20, 0.95);
     border: 1px solid rgba(255, 255, 255, 0.15);
     border-radius: 8px;
-    padding: 8px;
-    max-height: 200px;
-    overflow-y: auto;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
 }
 
-.graveyard-header {
+/* Default positions */
+.graveyard-player {
+    bottom: 16px;
+    left: 16px;
+}
+
+.graveyard-opponent {
+    top: 16px;
+    left: 16px;
+}
+
+/* Drag header */
+.graveyard-drag-header {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    margin-bottom: 6px;
+    gap: 6px;
+    padding: 6px 8px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.85);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    cursor: grab;
+    user-select: none;
+    flex-shrink: 0;
 }
 
-.graveyard-cards {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
+.graveyard-drag-header:active {
+    cursor: grabbing;
+}
+
+.graveyard-drag-hint {
+    margin-left: auto;
+    opacity: 0.4;
+    font-size: 14px;
+}
+
+/* Scrollable name list */
+.graveyard-name-list {
+    overflow-y: auto;
+    padding: 4px 0;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+/* Individual card name row */
+.graveyard-name-row {
+    padding: 3px 10px;
+    font-size: 0.78rem;
+    color: rgba(255, 255, 255, 0.75);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: default;
+    transition: background-color 0.1s ease;
+}
+
+.graveyard-name-row:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 1);
 }
 
 /* Panel tabs */
