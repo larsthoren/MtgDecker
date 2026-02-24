@@ -23,6 +23,7 @@ public enum ContinuousEffectType
     PreventSpellCasting,
     PreventCreatureAttacks,
     PreventCreatureBlocking,
+    ModifyActivatedAbilityCost,
 }
 
 public record ContinuousEffect(
@@ -47,4 +48,5 @@ public record ContinuousEffect(
     int? SetToughness = null,
     bool ApplyToSelf = false,
     Func<GameState, bool>? StateCondition = null,
-    int? ExpiresOnTurnNumber = null);
+    int? ExpiresOnTurnNumber = null,
+    Func<GameCard, bool>? ActivatedAbilityCostApplies = null);

@@ -1015,7 +1015,7 @@ public static class CardDefinitions
                 TargetFilter.InstantOrSorcerySpell(), new ConditionalCounterEffect(1)),
 
             ["Pyroblast"] = new(ManaCost.Parse("{R}"), null, null, null, CardType.Instant,
-                TargetFilter.Spell(), new PyroblastEffect()),
+                TargetFilter.SpellOrPermanent(), new PyroblastEffect()),
 
             ["Surgical Extraction"] = new(ManaCost.Parse("{B/P}"), null, null, null, CardType.Instant,
                 Effect: new SurgicalExtractionEffect()),
@@ -1176,11 +1176,11 @@ public static class CardDefinitions
 
             // Removal spells
             ["Red Elemental Blast"] = new(ManaCost.Parse("{R}"), null, null, null, CardType.Instant,
-                TargetFilter.Spell(), new PyroblastEffect()),
+                TargetFilter.SpellOrPermanent(), new PyroblastEffect()),
             ["Blue Elemental Blast"] = new(ManaCost.Parse("{U}"), null, null, null, CardType.Instant,
-                TargetFilter.Spell(), new BlueElementalBlastEffect()),
+                TargetFilter.SpellOrPermanent(), new BlueElementalBlastEffect()),
             ["Hydroblast"] = new(ManaCost.Parse("{U}"), null, null, null, CardType.Instant,
-                TargetFilter.Spell(), new BlueElementalBlastEffect()),
+                TargetFilter.SpellOrPermanent(), new BlueElementalBlastEffect()),
             ["Annul"] = new(ManaCost.Parse("{U}"), null, null, null, CardType.Instant,
                 TargetFilter.ArtifactOrEnchantmentSpell(), new CounterSpellEffect()),
             ["Erase"] = new(ManaCost.Parse("{W}"), null, null, null, CardType.Instant,
@@ -1263,13 +1263,18 @@ public static class CardDefinitions
             },
             ["Gloom"] = new(ManaCost.Parse("{2}{B}"), null, null, null, CardType.Enchantment)
             {
-                // Note: Oracle text also says "Activated abilities of white enchantments cost {3} more to activate."
-                // The activated ability cost increase is deferred — only the spell cost increase is implemented.
                 ContinuousEffects =
                 [
+                    // White spells cost {3} more to cast
                     new ContinuousEffect(Guid.Empty, ContinuousEffectType.ModifyCost,
                         (_, _) => true, CostMod: 3,
                         CostApplies: c => c.ManaCost?.ColorRequirements.ContainsKey(ManaColor.White) == true),
+                    // Activated abilities of white enchantments cost {3} more to activate
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.ModifyActivatedAbilityCost,
+                        (_, _) => true, CostMod: 3,
+                        ActivatedAbilityCostApplies: c =>
+                            c.CardTypes.HasFlag(CardType.Enchantment)
+                            && c.ManaCost?.ColorRequirements.ContainsKey(ManaColor.White) == true),
                 ],
             },
             ["Null Rod"] = new(ManaCost.Parse("{2}"), null, null, null, CardType.Artifact)
@@ -1640,9 +1645,24 @@ public static class CardDefinitions
             ["Tsabo's Web"] = new(ManaCost.Parse("{2}"), null, null, null, CardType.Artifact)
             {
                 Triggers = [new Trigger(GameEvent.EnterBattlefield, TriggerCondition.Self, new DrawCardEffect())],
-                // Note: The static ability "Each land with an activated ability that isn't a mana ability
-                // doesn't untap during its controller's untap step" is deferred — the engine does not
-                // currently distinguish mana abilities from other activated abilities on lands.
+                ContinuousEffects =
+                [
+                    // "Each land with an activated ability that isn't a mana ability
+                    // doesn't untap during its controller's untap step."
+                    new ContinuousEffect(Guid.Empty, ContinuousEffectType.GrantKeyword,
+                        (card, _) =>
+                        {
+                            if (!card.IsLand) return false;
+                            if (!CardDefinitions.TryGet(card.Name, out var def)) return false;
+                            // FetchAbility is a non-mana activated ability
+                            if (def.FetchAbility != null) return true;
+                            // ActivatedAbilities are non-mana activated abilities
+                            if (def.ActivatedAbilities.Count > 0) return true;
+                            return false;
+                        },
+                        GrantedKeyword: Keyword.DoesNotUntap,
+                        Layer: EffectLayer.Layer6_AbilityAddRemove),
+                ],
             },
 
             // ─── Task 12 Batch 1: Complex Cards ─────────────────────────────────

@@ -53,6 +53,20 @@ internal class ActivateAbilityHandler : IActionHandler
 
         var cost = ability.Cost;
 
+        // Check for activated ability cost modifications (e.g., Gloom)
+        var effectiveCost = cost.ManaCost;
+        if (effectiveCost != null)
+        {
+            var extraCost = state.ActiveEffects
+                .Where(e => e.Type == ContinuousEffectType.ModifyActivatedAbilityCost
+                       && e.ActivatedAbilityCostApplies != null
+                       && e.ActivatedAbilityCostApplies(abilitySource))
+                .Sum(e => e.CostMod);
+
+            if (extraCost > 0)
+                effectiveCost = effectiveCost.WithGenericReduction(-extraCost);
+        }
+
         if (ability.Condition != null && !ability.Condition(player))
         {
             state.Log($"Cannot activate {abilitySource.Name} — condition not met.");
@@ -77,7 +91,7 @@ internal class ActivateAbilityHandler : IActionHandler
             return;
         }
 
-        if (cost.ManaCost != null && !player.ManaPool.CanPay(cost.ManaCost))
+        if (effectiveCost != null && !player.ManaPool.CanPay(effectiveCost))
         {
             state.Log($"Cannot activate {abilitySource.Name} — not enough mana.");
             return;
@@ -251,9 +265,9 @@ internal class ActivateAbilityHandler : IActionHandler
             }
         }
 
-        if (cost.ManaCost != null)
+        if (effectiveCost != null)
         {
-            await engine.PayManaCostAsync(cost.ManaCost, player, ct);
+            await engine.PayManaCostAsync(effectiveCost, player, ct);
             player.PendingManaTaps.Clear();
         }
 

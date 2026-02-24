@@ -31,6 +31,9 @@ public class TargetFilter
 
     public static TargetFilter Spell() => new((card, zone) => zone == ZoneType.Stack);
 
+    public static TargetFilter SpellOrPermanent() => new((card, zone) =>
+        zone == ZoneType.Stack || zone == ZoneType.Battlefield);
+
     public static TargetFilter NonBlackCreature() => new((card, zone) =>
         zone == ZoneType.Battlefield && card.IsCreature
         && (card.ManaCost == null || !card.ManaCost.ColorRequirements.ContainsKey(ManaColor.Black)));
