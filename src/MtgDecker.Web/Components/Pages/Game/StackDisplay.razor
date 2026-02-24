@@ -91,7 +91,7 @@
     private async Task StartDrag(MouseEventArgs e)
     {
         _dotNetRef ??= DotNetObjectReference.Create(this);
-        await JS.InvokeVoidAsync("stackDrag.start", _stackRef, _dotNetRef, e.ClientX, e.ClientY);
+        await JS.InvokeVoidAsync("panelDrag.start", _stackRef, _dotNetRef, "OnDrag", e.ClientX, e.ClientY);
     }
 
     [JSInvokable]

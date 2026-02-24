@@ -2,6 +2,7 @@
 @using MtgDecker.Engine.Enums
 @using MtgDecker.Engine.Mana
 @namespace MtgDecker.Web.Components.Pages.Game
+@implements IDisposable
 
 <div class="game-board" tabindex="0" @ref="_boardRef">
     @if (IsGameOver)
@@ -27,7 +28,7 @@
         <MudChip T="string" Size="Size.Small" Color="Color.Error">@OpponentPlayer.Life HP</MudChip>
         <MudChip T="string" Size="Size.Small" Color="Color.Default">Hand: @OpponentPlayer.Hand.Cards.Count</MudChip>
         <MudChip T="string" Size="Size.Small" Color="Color.Default"
-                 OnClick="() => _showOpponentGraveyard = !_showOpponentGraveyard"
+                 OnClick="ToggleOpponentGraveyard"
                  Style="cursor: pointer;">Grave: @OpponentPlayer.Graveyard.Cards.Count</MudChip>
         <MudChip T="string" Size="Size.Small" Color="Color.Default">Exile: @OpponentPlayer.Exile.Cards.Count</MudChip>
         <MudChip T="string" Size="Size.Small" Color="Color.Default">Lib: @OpponentPlayer.Library.Count</MudChip>
@@ -55,19 +56,25 @@
 
     @if (_showOpponentGraveyard && OpponentPlayer.Graveyard.Cards.Count > 0)
     {
-        <div class="graveyard-panel">
-            <div class="graveyard-header">
-                <MudText Typo="Typo.caption" Style="font-weight: 600;">Opponent Graveyard (@OpponentPlayer.Graveyard.Cards.Count)</MudText>
+        <div class="graveyard-floating-panel graveyard-opponent" @ref="_oppGraveyardRef"
+             style="@GetOpponentGraveyardStyle()">
+            <div class="graveyard-drag-header"
+                 @onmousedown="StartOpponentGraveyardDrag"
+                 @onmousedown:preventDefault>
+                <span>Opponent Graveyard (@OpponentPlayer.Graveyard.Cards.Count)</span>
+                <span class="graveyard-drag-hint">&#x2725;</span>
                 <MudIconButton Size="Size.Small" Icon="@Icons.Material.Filled.Close"
+                               @onmousedown:stopPropagation
                                OnClick="() => _showOpponentGraveyard = false" />
             </div>
-            <div class="graveyard-cards">
-                @foreach (var card in OpponentPlayer.Graveyard.Cards)
+            <div class="graveyard-name-list">
+                @foreach (var card in OpponentPlayer.Graveyard.Cards.AsEnumerable().Reverse())
                 {
-                    <CardDisplay Name="@card.Name" ImageUrl="@card.ImageUrl" CardSize="100"
-                                 Clickable="false"
-                                 OnHoverStart="SetHoveredCard"
-                                 OnHoverEnd="ClearHoveredCard" />
+                    <div class="graveyard-name-row"
+                         @onmouseenter="() => SetHoveredCard(card.ImageUrl)"
+                         @onmouseleave="ClearHoveredCard">
+                        @card.Name
+                    </div>
                 }
             </div>
         </div>
@@ -363,7 +370,7 @@
             </div>
         }
         <MudChip T="string" Size="Size.Small" Color="Color.Default"
-                 OnClick="() => _showPlayerGraveyard = !_showPlayerGraveyard"
+                 OnClick="TogglePlayerGraveyard"
                  Style="cursor: pointer;">Grave: @LocalPlayer.Graveyard.Cards.Count</MudChip>
         <MudChip T="string" Size="Size.Small" Color="Color.Default">Exile: @LocalPlayer.Exile.Cards.Count</MudChip>
         <MudChip T="string" Size="Size.Small" Color="Color.Default">Lib: @LocalPlayer.Library.Count</MudChip>
@@ -397,19 +404,25 @@
 
     @if (_showPlayerGraveyard && LocalPlayer.Graveyard.Cards.Count > 0)
     {
-        <div class="graveyard-panel">
-            <div class="graveyard-header">
-                <MudText Typo="Typo.caption" Style="font-weight: 600;">Your Graveyard (@LocalPlayer.Graveyard.Cards.Count)</MudText>
+        <div class="graveyard-floating-panel graveyard-player" @ref="_playerGraveyardRef"
+             style="@GetPlayerGraveyardStyle()">
+            <div class="graveyard-drag-header"
+                 @onmousedown="StartPlayerGraveyardDrag"
+                 @onmousedown:preventDefault>
+                <span>Your Graveyard (@LocalPlayer.Graveyard.Cards.Count)</span>
+                <span class="graveyard-drag-hint">&#x2725;</span>
                 <MudIconButton Size="Size.Small" Icon="@Icons.Material.Filled.Close"
+                               @onmousedown:stopPropagation
                                OnClick="() => _showPlayerGraveyard = false" />
             </div>
-            <div class="graveyard-cards">
-                @foreach (var card in LocalPlayer.Graveyard.Cards)
+            <div class="graveyard-name-list">
+                @foreach (var card in LocalPlayer.Graveyard.Cards.AsEnumerable().Reverse())
                 {
-                    <CardDisplay Name="@card.Name" ImageUrl="@card.ImageUrl" CardSize="100"
-                                 Clickable="false"
-                                 OnHoverStart="SetHoveredCard"
-                                 OnHoverEnd="ClearHoveredCard" />
+                    <div class="graveyard-name-row"
+                         @onmouseenter="() => SetHoveredCard(card.ImageUrl)"
+                         @onmouseleave="ClearHoveredCard">
+                        @card.Name
+                    </div>
                 }
             </div>
         </div>
@@ -886,6 +899,83 @@
     // Graveyard viewer toggle state
     private bool _showPlayerGraveyard;
     private bool _showOpponentGraveyard;
+
+    // Graveyard panel drag state
+    private ElementReference _playerGraveyardRef;
+    private ElementReference _oppGraveyardRef;
+    private double? _playerGraveyardX;
+    private double? _playerGraveyardY;
+    private double? _oppGraveyardX;
+    private double? _oppGraveyardY;
+    private DotNetObjectReference<GameBoard>? _graveyardDotNetRef;
+
+    private void TogglePlayerGraveyard()
+    {
+        _showPlayerGraveyard = !_showPlayerGraveyard;
+        if (_showPlayerGraveyard)
+        {
+            _playerGraveyardX = null;
+            _playerGraveyardY = null;
+        }
+    }
+
+    private void ToggleOpponentGraveyard()
+    {
+        _showOpponentGraveyard = !_showOpponentGraveyard;
+        if (_showOpponentGraveyard)
+        {
+            _oppGraveyardX = null;
+            _oppGraveyardY = null;
+        }
+    }
+
+    private string GetPlayerGraveyardStyle()
+    {
+        if (_playerGraveyardX.HasValue && _playerGraveyardY.HasValue)
+            return FormattableString.Invariant($"left: {_playerGraveyardX:F0}px; top: {_playerGraveyardY:F0}px; bottom: auto; right: auto;");
+        return "";
+    }
+
+    private string GetOpponentGraveyardStyle()
+    {
+        if (_oppGraveyardX.HasValue && _oppGraveyardY.HasValue)
+            return FormattableString.Invariant($"left: {_oppGraveyardX:F0}px; top: {_oppGraveyardY:F0}px; bottom: auto; right: auto;");
+        return "";
+    }
+
+    private async Task StartPlayerGraveyardDrag(MouseEventArgs e)
+    {
+        _graveyardDotNetRef ??= DotNetObjectReference.Create(this);
+        await JS.InvokeVoidAsync("panelDrag.start", _playerGraveyardRef, _graveyardDotNetRef, "OnPlayerGraveyardDrag", e.ClientX, e.ClientY);
+    }
+
+    private async Task StartOpponentGraveyardDrag(MouseEventArgs e)
+    {
+        _graveyardDotNetRef ??= DotNetObjectReference.Create(this);
+        await JS.InvokeVoidAsync("panelDrag.start", _oppGraveyardRef, _graveyardDotNetRef, "OnOpponentGraveyardDrag", e.ClientX, e.ClientY);
+    }
+
+    [JSInvokable]
+    public void OnPlayerGraveyardDragMove(double x, double y)
+    {
+        _playerGraveyardX = x;
+        _playerGraveyardY = y;
+        InvokeAsync(StateHasChanged);
+    }
+
+    [JSInvokable]
+    public void OnPlayerGraveyardDragEnd() => InvokeAsync(StateHasChanged);
+
+    [JSInvokable]
+    public void OnOpponentGraveyardDragMove(double x, double y)
+    {
+        _oppGraveyardX = x;
+        _oppGraveyardY = y;
+        InvokeAsync(StateHasChanged);
+    }
+
+    [JSInvokable]
+    public void OnOpponentGraveyardDragEnd() => InvokeAsync(StateHasChanged);
 
     private Player LocalPlayer => PlayerSeat == 1 ? State.Player1 : State.Player2;
     private Player OpponentPlayer => PlayerSeat == 1 ? State.Player2 : State.Player1;
@@ -1385,6 +1475,11 @@
         if (string.IsNullOrWhiteSpace(_chatInput)) return;
         await OnChatSent.InvokeAsync(_chatInput.Trim());
         _chatInput = "";
+    }
+
+    public void Dispose()
+    {
+        _graveyardDotNetRef?.Dispose();
     }
 
 }
