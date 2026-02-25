@@ -1,4 +1,5 @@
 using MtgDecker.Engine.Enums;
+using MtgDecker.Engine.Mana;
 
 namespace MtgDecker.Engine.Triggers.Effects;
 
@@ -37,6 +38,7 @@ public class DecreeOfJusticeCyclingEffect : IEffect
                 Subtypes = ["Soldier"],
                 IsToken = true,
                 TurnEnteredBattlefield = context.State.TurnNumber,
+                Colors = { ManaColor.White },
             };
             controller.Battlefield.Add(token);
         }

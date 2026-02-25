@@ -21,7 +21,7 @@ public record CardDefinition(
     public FetchAbility? FetchAbility { get; init; }
     public IReadOnlyList<ContinuousEffect> ContinuousEffects { get; init; } = [];
     public IReadOnlyList<ContinuousEffect> GraveyardAbilities { get; init; } = [];
-    public ActivatedAbility? ActivatedAbility { get; init; }
+    public IReadOnlyList<ActivatedAbility> ActivatedAbilities { get; init; } = [];
     public AuraTarget? AuraTarget { get; init; }
     public ManaCost? CyclingCost { get; init; }
     public IReadOnlyList<Trigger> CyclingTriggers { get; init; } = [];
@@ -37,10 +37,28 @@ public record CardDefinition(
     public IReadOnlyList<LoyaltyAbility>? LoyaltyAbilities { get; init; }
     public bool HasFlash { get; init; }
     public bool HasDelve { get; init; }
+    /// <summary>
+    /// Factory that generates continuous effects based on the actual GameCard instance at runtime.
+    /// Used for cards like Engineered Plague where the effect depends on a runtime choice (ChosenType).
+    /// </summary>
+    public Func<GameCard, IReadOnlyList<ContinuousEffect>>? DynamicContinuousEffectsFactory { get; init; }
     public bool ShuffleGraveyardOnDeath { get; init; }
+    public bool ShuffleGraveyardOnMill { get; init; }
     public ManaCost? NinjutsuCost { get; init; }
     public CardDefinition? TransformInto { get; init; }
     public AdventurePart? Adventure { get; init; }
     public SpellRole SpellRole { get; init; } = SpellRole.Proactive;
     public bool CannotBeCountered { get; init; }
+    public ManaCost? MadnessCost { get; init; }
+    public ManaCost? KickerCost { get; init; }
+    public bool HasStorm { get; init; }
+    public bool CyclingReplaceDraw { get; init; }
+    public bool MustAttack { get; init; }
+    /// <summary>
+    /// "As [card] enters the battlefield, choose..." replacement effect.
+    /// Executes during spell resolution BEFORE ETB triggers are queued.
+    /// Cannot be Stifled (unlike ETB triggers).
+    /// Used by Engineered Plague (choose creature type) and Meddling Mage (choose card name).
+    /// </summary>
+    public IEffect? AsEntersBattlefieldEffect { get; init; }
 }

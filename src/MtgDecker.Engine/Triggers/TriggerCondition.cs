@@ -19,4 +19,12 @@ public enum TriggerCondition
     SelfIsCast,
     ControllerPlaysAnotherLand,
     ThirdDrawInTurn,
+    OpponentCastsRedSpell,
+    AnyPlayerCastsEnchantment,
+    ControllerDiscardsCard,
+    OpponentCausesControllerDiscard,
+    ControllerLandToGraveyard,
+    OpponentCausesControllerLandToGraveyard,
+    ControllerMainPhaseBeginning,
+    OpponentCastsAnySpell,
 }

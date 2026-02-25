@@ -15,6 +15,7 @@ public class GameEngine
     public GameEngine(GameState state)
     {
         _state = state;
+        _state.HandleDiscardAsync = HandleDiscardAsync;
         _handlers[ActionType.UntapCard] = new UntapCardHandler();
         _handlers[ActionType.Cycle] = new CycleHandler();
         _handlers[ActionType.ActivateFetch] = new ActivateFetchHandler();
@@ -60,8 +61,20 @@ public class GameEngine
         _state.Player2.PlaneswalkerAbilitiesUsedThisTurn.Clear();
         _state.Player1.LifeLostThisTurn = 0;
         _state.Player2.LifeLostThisTurn = 0;
+        _state.SpellsCastThisTurn = 0;
         _state.Player1.PermanentLeftBattlefieldThisTurn = false;
         _state.Player2.PermanentLeftBattlefieldThisTurn = false;
+        // Reset Carpet of Flowers once-per-turn flags and activated ability tracking
+        foreach (var card in _state.Player1.Battlefield.Cards)
+        {
+            card.CarpetUsedThisTurn = false;
+            card.AbilitiesActivatedThisTurn.Clear();
+        }
+        foreach (var card in _state.Player2.Battlefield.Cards)
+        {
+            card.CarpetUsedThisTurn = false;
+            card.AbilitiesActivatedThisTurn.Clear();
+        }
         _state.Log($"Turn {_state.TurnNumber}: {_state.ActivePlayer.Name}'s turn.");
 
         do
@@ -85,6 +98,13 @@ public class GameEngine
                 await QueueBoardTriggersOnStackAsync(GameEvent.Upkeep, null, ct);
                 await QueueGraveyardTriggersOnStackAsync(GameEvent.Upkeep, ct);
                 await QueueEchoTriggersOnStackAsync(ct);
+                await QueueDelayedTriggersOnStackAsync(GameEvent.Upkeep, ct);
+            }
+
+            // Fire main phase beginning triggers (e.g., Carpet of Flowers)
+            if (phase.Phase == Phase.MainPhase1 || phase.Phase == Phase.MainPhase2)
+            {
+                await QueueBoardTriggersOnStackAsync(GameEvent.MainPhaseBeginning, null, ct);
             }
 
             if (phase.Phase == Phase.Combat)
@@ -149,9 +169,13 @@ public class GameEngine
         foreach (var card in chosen.Take(excess))
         {
             player.Hand.Remove(card);
-            MoveToGraveyardWithReplacement(card, player);
-            _state.Log($"{player.Name} discards {card.Name}.");
+            _state.LastDiscardCausedByPlayerId = null; // Game rule discard
+            await HandleDiscardAsync(card, player, ct);
+            QueueDiscardTriggers(player);
         }
+
+        if (_state.StackCount > 0)
+            await ResolveAllTriggersAsync(ct);
     }
 
     internal void ExecuteTurnBasedAction(Phase phase)
@@ -270,6 +294,9 @@ public class GameEngine
 
         state.ClearMidCast();
 
+        // Kicker: prompt after paying base cost
+        var isKicked = await TryPayKickerAsync(card, player, ct);
+
         // Remove card from source zone
         if (fromExileAdventure)
         {
@@ -281,7 +308,7 @@ public class GameEngine
             player.Hand.RemoveById(card.Id);
         }
 
-        var stackObj = new StackObject(card, player.Id, manaPaid, targets, state.StackCount);
+        var stackObj = new StackObject(card, player.Id, manaPaid, targets, state.StackCount) { IsKicked = isKicked };
         state.StackPush(stackObj);
 
         if (action != null)
@@ -291,6 +318,7 @@ public class GameEngine
         }
 
         state.Log($"{player.Name} casts {card.Name}.");
+        state.SpellsCastThisTurn++;
 
         await QueueBoardTriggersOnStackAsync(GameEvent.SpellCast, card, ct);
         await QueueSelfCastTriggersAsync(card, player, ct);
@@ -364,6 +392,33 @@ public class GameEngine
         _ => color.ToString()
     };
 
+    /// <summary>
+    /// Checks if the card has a kicker cost, if the player can pay it, and prompts.
+    /// Returns true if kicker was paid.
+    /// </summary>
+    internal async Task<bool> TryPayKickerAsync(GameCard card, Player player, CancellationToken ct)
+    {
+        if (!CardDefinitions.TryGet(card.Name, out var def) || def.KickerCost == null)
+            return false;
+
+        if (!player.ManaPool.CanPay(def.KickerCost))
+            return false;
+
+        // Prompt: pass the card with optional=true. If player chooses it, they want to pay kicker.
+        // If null, they skip kicker.
+        var choice = await player.DecisionHandler.ChooseCard(
+            [card], $"Pay kicker cost {def.KickerCost} for {card.Name}?", optional: true, ct);
+
+        if (choice.HasValue)
+        {
+            player.ManaPool.Pay(def.KickerCost);
+            _state.Log($"{player.Name} pays kicker cost {def.KickerCost} for {card.Name}.");
+            return true;
+        }
+
+        return false;
+    }
+
     internal bool CanPayAlternateCost(AlternateCost alt, Player player, GameCard castCard)
     {
         // Life check: must have strictly more life than the cost
@@ -373,17 +428,16 @@ public class GameEngine
         if (alt.ExileCardColor.HasValue)
         {
             var hasColoredCard = player.Hand.Cards.Any(c =>
-                c.Id != castCard.Id && c.ManaCost != null &&
-                c.ManaCost.ColorRequirements.ContainsKey(alt.ExileCardColor.Value));
+                c.Id != castCard.Id && c.Colors.Contains(alt.ExileCardColor.Value));
             if (!hasColoredCard) return false;
         }
 
         // Return land with matching subtype from battlefield
         if (alt.ReturnLandSubtype != null)
         {
-            var hasLand = player.Battlefield.Cards.Any(c =>
+            var landCount = player.Battlefield.Cards.Count(c =>
                 c.IsLand && c.Subtypes.Contains(alt.ReturnLandSubtype));
-            if (!hasLand) return false;
+            if (landCount < alt.ReturnLandCount) return false;
         }
 
         // Sacrifice lands with matching subtype
@@ -402,6 +456,40 @@ public class GameEngine
             if (!hasControlled) return false;
         }
 
+        // Requires opponent controlling a permanent with the given subtype
+        if (alt.RequiresOpponentSubtype != null)
+        {
+            var opponent = _state.GetOpponent(player);
+            var hasOpponentControlled = opponent.Battlefield.Cards.Any(c =>
+                c.Subtypes.Contains(alt.RequiresOpponentSubtype));
+            if (!hasOpponentControlled) return false;
+        }
+
+        // Discard a land card with matching subtype from hand (not the spell itself)
+        if (alt.DiscardLandSubtype != null)
+        {
+            var hasLandCard = player.Hand.Cards.Any(c =>
+                c.Id != castCard.Id && c.Subtypes.Contains(alt.DiscardLandSubtype));
+            if (!hasLandCard) return false;
+        }
+
+        // Discard additional cards from hand (not the spell itself, not the land discard)
+        if (alt.DiscardAnyCount > 0)
+        {
+            // Count available cards: total hand minus spell itself minus one land card (if land discard required)
+            var availableForDiscard = player.Hand.Cards.Count(c => c.Id != castCard.Id);
+            if (alt.DiscardLandSubtype != null) availableForDiscard--; // one already used for land discard
+            if (availableForDiscard < alt.DiscardAnyCount) return false;
+        }
+
+        // Exile cards of the required color from the top of graveyard
+        if (alt.ExileFromGraveyardCount > 0 && alt.ExileFromGraveyardColor.HasValue)
+        {
+            var matchingCount = player.Graveyard.Cards.Count(c =>
+                c.Colors.Contains(alt.ExileFromGraveyardColor.Value));
+            if (matchingCount < alt.ExileFromGraveyardCount) return false;
+        }
+
         return true;
     }
 
@@ -418,8 +506,7 @@ public class GameEngine
         if (alt.ExileCardColor.HasValue)
         {
             var eligible = player.Hand.Cards.Where(c =>
-                c.Id != castCard.Id && c.ManaCost != null &&
-                c.ManaCost.ColorRequirements.ContainsKey(alt.ExileCardColor.Value)).ToList();
+                c.Id != castCard.Id && c.Colors.Contains(alt.ExileCardColor.Value)).ToList();
 
             var chosenId = await player.DecisionHandler.ChooseCard(
                 eligible, $"Choose a {alt.ExileCardColor} card to exile", optional: false, ct);
@@ -436,23 +523,28 @@ public class GameEngine
             }
         }
 
-        // Return land to hand
+        // Return lands to hand
         if (alt.ReturnLandSubtype != null)
         {
-            var eligible = player.Battlefield.Cards.Where(c =>
-                c.IsLand && c.Subtypes.Contains(alt.ReturnLandSubtype)).ToList();
-
-            var chosenId = await player.DecisionHandler.ChooseCard(
-                eligible, $"Choose an {alt.ReturnLandSubtype} to return", optional: false, ct);
-
-            if (chosenId.HasValue)
+            for (int i = 0; i < alt.ReturnLandCount; i++)
             {
-                var land = player.Battlefield.Cards.FirstOrDefault(c => c.Id == chosenId.Value);
-                if (land != null)
+                var eligible = player.Battlefield.Cards.Where(c =>
+                    c.IsLand && c.Subtypes.Contains(alt.ReturnLandSubtype)).ToList();
+
+                if (eligible.Count == 0) break;
+
+                var chosenId = await player.DecisionHandler.ChooseCard(
+                    eligible, $"Choose an {alt.ReturnLandSubtype} to return ({i + 1}/{alt.ReturnLandCount})", optional: false, ct);
+
+                if (chosenId.HasValue)
                 {
-                    player.Battlefield.RemoveById(land.Id);
-                    player.Hand.Add(land);
-                    _state.Log($"{player.Name} returns {land.Name} to hand.");
+                    var land = player.Battlefield.Cards.FirstOrDefault(c => c.Id == chosenId.Value);
+                    if (land != null)
+                    {
+                        player.Battlefield.RemoveById(land.Id);
+                        player.Hand.Add(land);
+                        _state.Log($"{player.Name} returns {land.Name} to hand.");
+                    }
                 }
             }
         }
@@ -483,11 +575,109 @@ public class GameEngine
                 }
             }
         }
+
+        // Discard a land card with matching subtype from hand
+        if (alt.DiscardLandSubtype != null)
+        {
+            var eligible = player.Hand.Cards.Where(c =>
+                c.Id != castCard.Id && c.Subtypes.Contains(alt.DiscardLandSubtype)).ToList();
+
+            var chosenId = await player.DecisionHandler.ChooseCard(
+                eligible, $"Choose an {alt.DiscardLandSubtype} card to discard", optional: false, ct);
+
+            if (chosenId.HasValue)
+            {
+                var discarded = player.Hand.Cards.FirstOrDefault(c => c.Id == chosenId.Value);
+                if (discarded != null)
+                {
+                    player.Hand.RemoveById(discarded.Id);
+                    await HandleDiscardAsync(discarded, player, ct);
+                }
+            }
+        }
+
+        // Discard additional cards from hand
+        if (alt.DiscardAnyCount > 0)
+        {
+            for (int i = 0; i < alt.DiscardAnyCount; i++)
+            {
+                var eligible = player.Hand.Cards.Where(c => c.Id != castCard.Id).ToList();
+                if (eligible.Count == 0) break;
+
+                var chosenId = await player.DecisionHandler.ChooseCard(
+                    eligible, $"Choose a card to discard ({i + 1}/{alt.DiscardAnyCount})", optional: false, ct);
+
+                if (chosenId.HasValue)
+                {
+                    var discarded = player.Hand.Cards.FirstOrDefault(c => c.Id == chosenId.Value);
+                    if (discarded != null)
+                    {
+                        player.Hand.RemoveById(discarded.Id);
+                        await HandleDiscardAsync(discarded, player, ct);
+                    }
+                }
+            }
+        }
+
+        // Exile the top N cards of the required color from graveyard (not player choice — Oracle says "the top three")
+        if (alt.ExileFromGraveyardCount > 0 && alt.ExileFromGraveyardColor.HasValue)
+        {
+            // Take a snapshot and iterate from top (end) to bottom to find the top N matching cards
+            var graveyardSnapshot = player.Graveyard.Cards.ToList();
+            var toExile = new List<GameCard>();
+            for (int i = graveyardSnapshot.Count - 1; i >= 0 && toExile.Count < alt.ExileFromGraveyardCount; i--)
+            {
+                var card = graveyardSnapshot[i];
+                if (card.Colors.Contains(alt.ExileFromGraveyardColor.Value))
+                    toExile.Add(card);
+            }
+
+            foreach (var card in toExile)
+            {
+                player.Graveyard.RemoveById(card.Id);
+                player.Exile.Add(card);
+                _state.Log($"{player.Name} exiles {card.Name} from graveyard.");
+            }
+        }
     }
 
     internal bool HasShroud(GameCard card) => card.ActiveKeywords.Contains(Keyword.Shroud);
 
     private bool HasHexproof(GameCard card) => card.ActiveKeywords.Contains(Keyword.Hexproof);
+
+    /// <summary>
+    /// Checks if blocker is prevented from blocking attacker due to protection from a color.
+    /// Returns true if the block is illegal (should be skipped).
+    /// </summary>
+    private bool IsBlockedByProtection(GameCard attacker, GameCard blocker)
+    {
+        var blockerColors = blocker.ManaCost?.ColorRequirements.Keys
+            .Where(c => c != ManaColor.Colorless)
+            .ToHashSet() ?? new HashSet<ManaColor>();
+
+        if (attacker.ActiveKeywords.Contains(Keyword.ProtectionFromBlack) && blockerColors.Contains(ManaColor.Black))
+        {
+            _state.Log($"{blocker.Name} cannot block {attacker.Name} — protection from black.");
+            return true;
+        }
+        if (attacker.ActiveKeywords.Contains(Keyword.ProtectionFromRed) && blockerColors.Contains(ManaColor.Red))
+        {
+            _state.Log($"{blocker.Name} cannot block {attacker.Name} — protection from red.");
+            return true;
+        }
+        if (attacker.ActiveKeywords.Contains(Keyword.ProtectionFromBlue) && blockerColors.Contains(ManaColor.Blue))
+        {
+            _state.Log($"{blocker.Name} cannot block {attacker.Name} — protection from blue.");
+            return true;
+        }
+        if (attacker.ActiveKeywords.Contains(Keyword.ProtectionFromWhite) && blockerColors.Contains(ManaColor.White))
+        {
+            _state.Log($"{blocker.Name} cannot block {attacker.Name} — protection from white.");
+            return true;
+        }
+
+        return false;
+    }
 
     /// <summary>
     /// Shared targeting helper — builds eligible targets, prompts player, validates choice.
@@ -584,6 +774,48 @@ public class GameEngine
         return _state.ActiveEffects.Any(e =>
             e.Type == ContinuousEffectType.PreventDamageToPlayer
             && GetEffectController(e.SourceId)?.Id == playerId);
+    }
+
+    /// <summary>
+    /// Checks if the player has a color-specific damage prevention shield (e.g. Circle of Protection)
+    /// matching the source card's colors. If found, consumes the shield (single-use) and returns true.
+    /// </summary>
+    internal bool TryConsumeColorDamageShield(Player player, GameCard source)
+    {
+        var shield = player.DamagePreventionShields
+            .FirstOrDefault(s => source.Colors.Contains(s.Color));
+        if (shield == null) return false;
+        player.DamagePreventionShields.Remove(shield);
+        return true;
+    }
+
+    /// <summary>
+    /// Applies Worship-style damage prevention. If the player has a PreventLethalDamage effect
+    /// and controls a creature, damage that would reduce life below 1 is reduced so life stays at 1.
+    /// Returns the (possibly reduced) damage amount.
+    /// </summary>
+    internal int ApplyLethalDamageProtection(Player player, int damage)
+    {
+        if (damage <= 0) return damage;
+
+        var hasEffect = _state.ActiveEffects.Any(e =>
+            e.Type == ContinuousEffectType.PreventLethalDamage
+            && GetEffectController(e.SourceId)?.Id == player.Id);
+
+        if (!hasEffect) return damage;
+
+        // Worship requires the player to control a creature
+        if (!player.Battlefield.Cards.Any(c => c.IsCreature)) return damage;
+
+        // If this damage would reduce life below 1, cap it so life stays at 1
+        var resultingLife = player.Life - damage;
+        if (resultingLife < 1)
+        {
+            var maxDamage = Math.Max(0, player.Life - 1);
+            return maxDamage;
+        }
+
+        return damage;
     }
 
     private Player? GetEffectController(Guid sourceId)
@@ -703,6 +935,45 @@ public class GameEngine
                 && !c.ActiveKeywords.Contains(Keyword.Defender))
             .ToList();
 
+        // Ensnaring Bridge: creatures with power > bridge controller's hand size can't attack
+        var bridgeControllers = _state.Player1.Battlefield.Cards
+            .Where(c => string.Equals(c.Name, "Ensnaring Bridge", StringComparison.OrdinalIgnoreCase))
+            .Select(_ => _state.Player1)
+            .Concat(_state.Player2.Battlefield.Cards
+                .Where(c => string.Equals(c.Name, "Ensnaring Bridge", StringComparison.OrdinalIgnoreCase))
+                .Select(_ => _state.Player2));
+
+        foreach (var bridgeController in bridgeControllers)
+        {
+            var handSize = bridgeController.Hand.Cards.Count;
+            eligibleAttackers = eligibleAttackers
+                .Where(c => (c.Power ?? 0) <= handSize)
+                .ToList();
+        }
+
+        // PreventCreatureAttacks: filter per-creature effects (e.g. Kirtar's Desire)
+        var perCreaturePreventEffects = _state.ActiveEffects
+            .Where(e => e.Type == ContinuousEffectType.PreventCreatureAttacks
+                && (e.StateCondition == null || e.StateCondition(_state)))
+            .ToList();
+        if (perCreaturePreventEffects.Count > 0)
+        {
+            // Check if any effect is a global "all creatures can't attack" (applies to all)
+            var globalPrevent = perCreaturePreventEffects.Any(e =>
+                eligibleAttackers.All(c => e.Applies(c, attacker)));
+            if (globalPrevent && eligibleAttackers.Count > 0)
+            {
+                _state.Log("Creatures can't attack this turn.");
+                _state.CombatStep = CombatStep.None;
+                _state.Combat = null;
+                return;
+            }
+            // Filter out individually-prevented creatures
+            eligibleAttackers = eligibleAttackers
+                .Where(c => !perCreaturePreventEffects.Any(e => e.Applies(c, attacker)))
+                .ToList();
+        }
+
         if (eligibleAttackers.Count == 0)
         {
             _state.Log("No eligible attackers.");
@@ -717,6 +988,17 @@ public class GameEngine
         var validAttackerIds = chosenAttackerIds
             .Where(id => eligibleAttackers.Any(c => c.Id == id))
             .ToList();
+
+        // Force MustAttack creatures into the attack
+        var mustAttackIds = eligibleAttackers
+            .Where(c => CardDefinitions.TryGet(c.Name, out var d) && d.MustAttack)
+            .Select(c => c.Id)
+            .ToList();
+        foreach (var id in mustAttackIds)
+        {
+            if (!validAttackerIds.Contains(id))
+                validAttackerIds.Add(id);
+        }
 
         if (validAttackerIds.Count == 0)
         {
@@ -797,6 +1079,10 @@ public class GameEngine
 
         var eligibleBlockers = defender.Battlefield.Cards
             .Where(c => c.IsCreature && !c.IsTapped)
+            .Where(c => !_state.ActiveEffects.Any(e =>
+                e.Type == ContinuousEffectType.PreventCreatureBlocking
+                && e.Applies(c, defender)
+                && (e.StateCondition == null || e.StateCondition(_state))))
             .ToList();
 
         if (eligibleBlockers.Count > 0)
@@ -819,6 +1105,64 @@ public class GameEngine
                         _state.Log($"{attackerCard.Name} has mountainwalk — cannot be blocked.");
                         continue;
                     }
+
+                    // Swampwalk: cannot be blocked if defender controls a Swamp
+                    if (attackerCard.ActiveKeywords.Contains(Keyword.Swampwalk)
+                        && defender.Battlefield.Cards.Any(c => c.Subtypes.Contains("Swamp")))
+                    {
+                        _state.Log($"{attackerCard.Name} has swampwalk — cannot be blocked.");
+                        continue;
+                    }
+
+                    // Forestwalk: cannot be blocked if defender controls a Forest
+                    if (attackerCard.ActiveKeywords.Contains(Keyword.Forestwalk)
+                        && defender.Battlefield.Cards.Any(c => c.Subtypes.Contains("Forest")))
+                    {
+                        _state.Log($"{attackerCard.Name} has forestwalk — cannot be blocked.");
+                        continue;
+                    }
+
+                    // Islandwalk: cannot be blocked if defender controls an Island
+                    if (attackerCard.ActiveKeywords.Contains(Keyword.Islandwalk)
+                        && defender.Battlefield.Cards.Any(c => c.Subtypes.Contains("Island")))
+                    {
+                        _state.Log($"{attackerCard.Name} has islandwalk — cannot be blocked.");
+                        continue;
+                    }
+
+                    // Plainswalk: cannot be blocked if defender controls a Plains
+                    if (attackerCard.ActiveKeywords.Contains(Keyword.Plainswalk)
+                        && defender.Battlefield.Cards.Any(c => c.Subtypes.Contains("Plains")))
+                    {
+                        _state.Log($"{attackerCard.Name} has plainswalk — cannot be blocked.");
+                        continue;
+                    }
+
+                    // Shadow: shadow can only be blocked by shadow; non-shadow can't be blocked by shadow
+                    if (attackerCard.ActiveKeywords.Contains(Keyword.Shadow)
+                        && !blockerCard.ActiveKeywords.Contains(Keyword.Shadow))
+                    {
+                        _state.Log($"{blockerCard.Name} cannot block {attackerCard.Name} — shadow can only be blocked by shadow.");
+                        continue;
+                    }
+                    if (!attackerCard.ActiveKeywords.Contains(Keyword.Shadow)
+                        && blockerCard.ActiveKeywords.Contains(Keyword.Shadow))
+                    {
+                        _state.Log($"{blockerCard.Name} has shadow — cannot block non-shadow {attackerCard.Name}.");
+                        continue;
+                    }
+
+                    // Flying: can only be blocked by creatures with flying (or reach)
+                    if (attackerCard.ActiveKeywords.Contains(Keyword.Flying)
+                        && !blockerCard.ActiveKeywords.Contains(Keyword.Flying))
+                    {
+                        _state.Log($"{blockerCard.Name} cannot block {attackerCard.Name} — attacker has flying.");
+                        continue;
+                    }
+
+                    // Protection from color: cannot be blocked by creatures of that color
+                    if (IsBlockedByProtection(attackerCard, blockerCard))
+                        continue;
 
                     _state.Combat.DeclareBlocker(blockerId, attackerCardId);
                     _state.Log($"{defender.Name} blocks {attackerCard.Name} with {blockerCard.Name}.");
@@ -953,17 +1297,25 @@ public class GameEngine
                     {
                         _state.Log($"{attackerCard.Name}'s {damage} damage to {defender.Name} is prevented (protection).");
                     }
+                    else if (TryConsumeColorDamageShield(defender, attackerCard))
+                    {
+                        _state.Log($"{attackerCard.Name}'s {damage} damage to {defender.Name} is prevented (Circle of Protection).");
+                    }
                     else
                     {
-                        defender.AdjustLife(-damage);
-                        _state.Log($"{attackerCard.Name} deals {damage} damage to {defender.Name}. ({defender.Life} life)");
+                        // Apply Worship-style lethal damage prevention
+                        var actualDamage = ApplyLethalDamageProtection(defender, damage);
+                        if (actualDamage < damage)
+                            _state.Log($"Worship prevents {damage - actualDamage} damage to {defender.Name}.");
+                        defender.AdjustLife(-actualDamage);
+                        _state.Log($"{attackerCard.Name} deals {actualDamage} damage to {defender.Name}. ({defender.Life} life)");
                         unblockedAttackers.Add(attackerCard);
 
-                        // Lifelink: controller gains life equal to damage dealt
+                        // Lifelink: controller gains life equal to damage actually dealt
                         if (attackerCard.ActiveKeywords.Contains(Keyword.Lifelink))
                         {
-                            attacker.AdjustLife(damage);
-                            _state.Log($"{attackerCard.Name} has lifelink — {attacker.Name} gains {damage} life. ({attacker.Life} life)");
+                            attacker.AdjustLife(actualDamage);
+                            _state.Log($"{attackerCard.Name} has lifelink — {attacker.Name} gains {actualDamage} life. ({attacker.Life} life)");
                         }
                     }
                 }
@@ -1091,14 +1443,23 @@ public class GameEngine
     public void ClearDamage()
     {
         foreach (var card in _state.Player1.Battlefield.Cards)
+        {
             card.DamageMarked = 0;
+            card.RegenerationShields = 0;
+        }
         foreach (var card in _state.Player2.Battlefield.Cards)
+        {
             card.DamageMarked = 0;
+            card.RegenerationShields = 0;
+        }
     }
 
     public void StripEndOfTurnEffects()
     {
         _state.ActiveEffects.RemoveAll(e => e.UntilEndOfTurn);
+        // Clear single-use damage prevention shields (Circle of Protection)
+        _state.Player1.DamagePreventionShields.Clear();
+        _state.Player2.DamagePreventionShields.Clear();
     }
 
     public void RemoveExpiredEffects()
@@ -1337,7 +1698,7 @@ public class GameEngine
     {
         foreach (var card in player.Battlefield.Cards)
         {
-            if (card.Id == effect.SourceId) continue; // lords don't buff themselves
+            if (effect.ExcludeSelf && card.Id == effect.SourceId) continue; // lords don't buff themselves
             if (!effect.Applies(card, player)) continue;
 
             card.EffectivePower = (card.EffectivePower ?? card.BasePower ?? 0) + effect.PowerMod;
@@ -1373,6 +1734,19 @@ public class GameEngine
                     Timestamp = _state.NextEffectTimestamp++
                 };
                 _state.ActiveEffects.Add(effect);
+            }
+
+            // Dynamic effects that depend on per-card runtime state (e.g. Engineered Plague's ChosenType)
+            if (def.DynamicContinuousEffectsFactory != null)
+            {
+                foreach (var dynamicEffect in def.DynamicContinuousEffectsFactory(card))
+                {
+                    _state.ActiveEffects.Add(dynamicEffect with
+                    {
+                        SourceId = card.Id,
+                        Timestamp = _state.NextEffectTimestamp++
+                    });
+                }
             }
         }
     }
@@ -1609,6 +1983,16 @@ public class GameEngine
 
         foreach (var card in dead)
         {
+            // Regeneration: instead of dying, tap, remove from combat, remove all damage, decrement shield
+            if (card.RegenerationShields > 0)
+            {
+                card.RegenerationShields--;
+                card.DamageMarked = 0;
+                card.IsTapped = true;
+                _state.Log($"{card.Name} regenerates (shield used).");
+                continue;
+            }
+
             TrackCreatureDeath(card, player);
             await FireLeaveBattlefieldTriggersAsync(card, player, ct);
             player.Battlefield.RemoveById(card.Id);
@@ -1642,6 +2026,19 @@ public class GameEngine
                 card.AddCounters(CounterType.Loyalty, def.StartingLoyalty.Value);
                 _state.Log($"{card.Name} enters with {def.StartingLoyalty.Value} loyalty.");
             }
+        }
+    }
+
+    /// <summary>
+    /// Executes "As [card] enters the battlefield" replacement effects.
+    /// These happen during resolution/entry, not as triggers — cannot be Stifled.
+    /// </summary>
+    private async Task ExecuteAsEntersEffectAsync(GameCard card, Player controller, CancellationToken ct)
+    {
+        if (CardDefinitions.TryGet(card.Name, out var def) && def.AsEntersBattlefieldEffect != null)
+        {
+            var context = new Triggers.EffectContext(_state, controller, card, controller.DecisionHandler);
+            await def.AsEntersBattlefieldEffect.Execute(context, ct);
         }
     }
 
@@ -1736,6 +2133,42 @@ public class GameEngine
                         && relevantCard != null
                         && relevantCard.Id != permanent.Id
                         && _state.ActivePlayer == player,
+                    TriggerCondition.OpponentCastsRedSpell =>
+                        evt == GameEvent.SpellCast
+                        && relevantCard != null
+                        && relevantCard.Colors.Contains(ManaColor.Red)
+                        && _state.ActivePlayer != player,
+                    TriggerCondition.AnyPlayerCastsEnchantment =>
+                        evt == GameEvent.SpellCast
+                        && relevantCard != null
+                        && relevantCard.CardTypes.HasFlag(CardType.Enchantment)
+                        && relevantCard.Name != permanent.Name, // Don't counter itself
+                    TriggerCondition.ControllerDiscardsCard =>
+                        evt == GameEvent.DiscardCard
+                        && _state.ActivePlayer == player,
+                    TriggerCondition.OpponentCausesControllerDiscard =>
+                        evt == GameEvent.DiscardCard
+                        && _state.ActivePlayer == player
+                        && _state.LastDiscardCausedByPlayerId.HasValue
+                        && _state.LastDiscardCausedByPlayerId.Value != player.Id,
+                    TriggerCondition.ControllerLandToGraveyard =>
+                        evt == GameEvent.LeavesBattlefield
+                        && relevantCard != null
+                        && relevantCard.IsLand
+                        && player.Graveyard.Cards.Any(c => c.Id == relevantCard.Id),
+                    TriggerCondition.OpponentCausesControllerLandToGraveyard =>
+                        evt == GameEvent.LeavesBattlefield
+                        && relevantCard != null
+                        && relevantCard.IsLand
+                        && player.Graveyard.Cards.Any(c => c.Id == relevantCard.Id)
+                        && _state.LastLandDestroyedByPlayerId.HasValue
+                        && _state.LastLandDestroyedByPlayerId.Value != player.Id,
+                    TriggerCondition.ControllerMainPhaseBeginning =>
+                        evt == GameEvent.MainPhaseBeginning
+                        && _state.ActivePlayer == player,
+                    TriggerCondition.OpponentCastsAnySpell =>
+                        evt == GameEvent.SpellCast
+                        && _state.ActivePlayer != player,
                     TriggerCondition.SelfAttacks => false,
                     _ => false,
                 };
@@ -1864,23 +2297,25 @@ public class GameEngine
         return Task.CompletedTask;
     }
 
-    internal Task FireLeaveBattlefieldTriggersAsync(GameCard card, Player controller, CancellationToken ct)
+    internal async Task FireLeaveBattlefieldTriggersAsync(GameCard card, Player controller, CancellationToken ct)
     {
         // Track revolt — a permanent controlled by this player left the battlefield
         controller.PermanentLeftBattlefieldThisTurn = true;
 
-        if (!CardDefinitions.TryGet(card.Name, out var def)) return Task.CompletedTask;
-
-        foreach (var trigger in def.Triggers)
+        if (CardDefinitions.TryGet(card.Name, out var def))
         {
-            if (trigger.Condition == TriggerCondition.SelfLeavesBattlefield)
+            foreach (var trigger in def.Triggers)
             {
-                _state.Log($"{card.Name} triggers: {trigger.Effect.GetType().Name.Replace("Effect", "")}");
-                _state.StackPush(new TriggeredAbilityStackObject(card, controller.Id, trigger.Effect));
+                if (trigger.Condition == TriggerCondition.SelfLeavesBattlefield)
+                {
+                    _state.Log($"{card.Name} triggers: {trigger.Effect.GetType().Name.Replace("Effect", "")}");
+                    _state.StackPush(new TriggeredAbilityStackObject(card, controller.Id, trigger.Effect));
+                }
             }
         }
 
-        return Task.CompletedTask;
+        // Fire board-wide LeavesBattlefield triggers (e.g., Sacred Ground for lands)
+        await QueueBoardTriggersOnStackAsync(GameEvent.LeavesBattlefield, card, ct);
     }
 
     /// <summary>Snapshots both players' battlefield card IDs for ETB diffing.</summary>
@@ -1894,11 +2329,13 @@ public class GameEngine
         foreach (var card in _state.Player1.Battlefield.Cards.Where(c => !p1Before.Contains(c.Id)))
         {
             ApplyEntersWithCounters(card);
+            await ExecuteAsEntersEffectAsync(card, _state.Player1, ct);
             await QueueSelfTriggersOnStackAsync(GameEvent.EnterBattlefield, card, _state.Player1, ct);
         }
         foreach (var card in _state.Player2.Battlefield.Cards.Where(c => !p2Before.Contains(c.Id)))
         {
             ApplyEntersWithCounters(card);
+            await ExecuteAsEntersEffectAsync(card, _state.Player2, ct);
             await QueueSelfTriggersOnStackAsync(GameEvent.EnterBattlefield, card, _state.Player2, ct);
         }
     }
@@ -2175,6 +2612,11 @@ public class GameEngine
                     await TryAttachAuraAsync(spell.Card, controller, ct);
 
                     ApplyEntersWithCounters(spell.Card);
+
+                    // "As enters" replacement effects (e.g., Engineered Plague choosing type, Meddling Mage choosing name)
+                    // These happen during resolution, not as triggers — cannot be Stifled
+                    await ExecuteAsEntersEffectAsync(spell.Card, controller, ct);
+
                     await QueueSelfTriggersOnStackAsync(GameEvent.EnterBattlefield, spell.Card, controller, ct);
                     await OnBoardChangedAsync(ct);
                 }
@@ -2291,6 +2733,126 @@ public class GameEngine
                         if (drawingPlayer.Id != player.Id) continue;
                         if (drawingPlayer.DrawsThisTurn != 3) continue;
                         _state.Log($"{card.Name} triggers on {drawingPlayer.Name}'s third draw this turn.");
+                        _state.StackPush(new TriggeredAbilityStackObject(card, player.Id, trigger.Effect));
+                    }
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Handles discarding a card, checking for madness. If the card has madness:
+    /// 1. Exile instead of graveyard
+    /// 2. Prompt player to cast for madness cost
+    /// 3. If yes and can pay: put on stack with madness cost
+    /// 4. If no or can't pay: move from exile to graveyard
+    /// The card must already be removed from hand before calling this.
+    /// </summary>
+    internal async Task HandleDiscardAsync(GameCard card, Player player, CancellationToken ct)
+    {
+        // Check for madness
+        if (CardDefinitions.TryGet(card.Name, out var def) && def.MadnessCost != null)
+        {
+            // Exile the card instead of putting it in graveyard
+            player.Exile.Add(card);
+            _state.Log($"{player.Name} discards {card.Name} — madness triggers! (exiled)");
+
+            // Ask player if they want to cast for madness cost
+            var wantsToCast = await player.DecisionHandler.ChooseMadness(card, def.MadnessCost, ct);
+
+            if (wantsToCast)
+            {
+                // Check if player can pay the madness cost
+                bool canPay = def.MadnessCost.ConvertedManaCost == 0 || player.ManaPool.CanPay(def.MadnessCost);
+
+                if (canPay)
+                {
+                    // Pay the madness cost
+                    if (def.MadnessCost.ConvertedManaCost > 0)
+                        await PayManaCostAsync(def.MadnessCost, player, ct);
+
+                    // Remove from exile and put on stack
+                    player.Exile.RemoveById(card.Id);
+
+                    // Find targets if needed
+                    var targets = new List<TargetInfo>();
+                    if (def.TargetFilter != null)
+                    {
+                        var result = await FindAndChooseTargetsAsync(
+                            def.TargetFilter, player, player.DecisionHandler, card.Name, ct);
+                        if (result != null && result.Count > 0)
+                            targets = result;
+                        else
+                        {
+                            // No legal targets or player cancelled — move to graveyard
+                            player.Graveyard.Add(card);
+                            _state.Log($"{card.Name} could not find a target — moved to graveyard.");
+                            return;
+                        }
+                    }
+
+                    var stackObj = new StackObject(card, player.Id, new Dictionary<ManaColor, int>(), targets, _state.StackCount)
+                    {
+                        IsMadness = true,
+                    };
+                    _state.StackPush(stackObj);
+                    _state.Log($"{player.Name} casts {card.Name} for its madness cost.");
+
+                    await QueueBoardTriggersOnStackAsync(GameEvent.SpellCast, card, ct);
+                    await QueueSelfCastTriggersAsync(card, player, ct);
+                    return;
+                }
+                else
+                {
+                    _state.Log($"{player.Name} cannot pay madness cost for {card.Name}.");
+                }
+            }
+            else
+            {
+                _state.Log($"{player.Name} declines to cast {card.Name} for madness.");
+            }
+
+            // Didn't cast — move from exile to graveyard
+            player.Exile.RemoveById(card.Id);
+            player.Graveyard.Add(card);
+            return;
+        }
+
+        // No madness — regular discard to graveyard
+        MoveToGraveyardWithReplacement(card, player);
+        _state.Log($"{player.Name} discards {card.Name}.");
+    }
+
+    internal void QueueDiscardTriggers(Player discardingPlayer)
+    {
+        foreach (var player in new[] { _state.Player1, _state.Player2 })
+        {
+            foreach (var card in player.Battlefield.Cards)
+            {
+                if (card.AbilitiesRemoved) continue;
+
+                var triggers = card.Triggers.Count > 0
+                    ? card.Triggers
+                    : (CardDefinitions.TryGet(card.Name, out var def) ? def.Triggers : []);
+
+                foreach (var trigger in triggers)
+                {
+                    if (trigger.Event != GameEvent.DiscardCard) continue;
+
+                    if (trigger.Condition == TriggerCondition.ControllerDiscardsCard)
+                    {
+                        // Only fires when the permanent's controller discards
+                        if (discardingPlayer.Id != player.Id) continue;
+                        _state.Log($"{card.Name} triggers on {discardingPlayer.Name}'s discard.");
+                        _state.StackPush(new TriggeredAbilityStackObject(card, player.Id, trigger.Effect));
+                    }
+                    else if (trigger.Condition == TriggerCondition.OpponentCausesControllerDiscard)
+                    {
+                        // Only fires when an opponent caused the controller to discard
+                        if (discardingPlayer.Id != player.Id) continue;
+                        if (!_state.LastDiscardCausedByPlayerId.HasValue
+                            || _state.LastDiscardCausedByPlayerId.Value == player.Id) continue;
+                        _state.Log($"{card.Name} triggers on opponent-caused discard.");
                         _state.StackPush(new TriggeredAbilityStackObject(card, player.Id, trigger.Effect));
                     }
                 }

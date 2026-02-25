@@ -5,7 +5,7 @@ public class EachPlayerDiscardsEffect : IEffect
     public int Count { get; }
     public EachPlayerDiscardsEffect(int count = 1) => Count = count;
 
-    public Task Execute(EffectContext context, CancellationToken ct = default)
+    public async Task Execute(EffectContext context, CancellationToken ct = default)
     {
         foreach (var player in new[] { context.State.Player1, context.State.Player2 })
         {
@@ -13,10 +13,15 @@ public class EachPlayerDiscardsEffect : IEffect
             {
                 var card = player.Hand.Cards[^1];
                 player.Hand.Remove(card);
-                player.Graveyard.Add(card);
-                context.State.Log($"{player.Name} discards {card.Name} to {context.Source.Name}.");
+                context.State.LastDiscardCausedByPlayerId = context.Controller.Id;
+                if (context.State.HandleDiscardAsync != null)
+                    await context.State.HandleDiscardAsync(card, player, ct);
+                else
+                {
+                    player.Graveyard.Add(card);
+                    context.State.Log($"{player.Name} discards {card.Name} to {context.Source.Name}.");
+                }
             }
         }
-        return Task.CompletedTask;
     }
 }

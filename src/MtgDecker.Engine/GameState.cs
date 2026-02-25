@@ -53,6 +53,27 @@ public class GameState
     public Queue<Guid> ExtraTurns { get; } = new();
     public List<ContinuousEffect> ActiveEffects { get; } = new();
     public List<DelayedTrigger> DelayedTriggers { get; } = new();
+    public int SpellsCastThisTurn { get; set; }
+
+    /// <summary>
+    /// Delegate for handling discards with madness support.
+    /// Set by GameEngine so that spell effects can route discards through it.
+    /// The card must already be removed from hand before calling this.
+    /// </summary>
+    public Func<GameCard, Player, CancellationToken, Task>? HandleDiscardAsync { get; set; }
+    /// <summary>
+    /// Tracks who caused the most recent discard event. Null = game rule (hand size),
+    /// player's own ID = self-caused (e.g. Wild Mongrel), opponent's ID = opponent-caused.
+    /// Set before firing discard triggers.
+    /// </summary>
+    public Guid? LastDiscardCausedByPlayerId { get; set; }
+
+    /// <summary>
+    /// Tracks who caused the most recent land-to-graveyard event.
+    /// Null or self = self-caused (fetchlands). Opponent = opponent-caused (Wasteland, Armageddon).
+    /// </summary>
+    public Guid? LastLandDestroyedByPlayerId { get; set; }
+
     public long NextEffectTimestamp { get; set; } = 1;
     public event Action? OnStateChanged;
 

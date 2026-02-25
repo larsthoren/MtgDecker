@@ -15,6 +15,7 @@ internal class ActivateFetchHandler : IActionHandler
         if (fetchAbility == null) return;
 
         player.AdjustLife(-1);
+        state.LastLandDestroyedByPlayerId = player.Id; // Self-sacrifice
         await engine.FireLeaveBattlefieldTriggersAsync(fetchLand, player, ct);
         player.Battlefield.RemoveById(fetchLand.Id);
         player.Graveyard.Add(fetchLand);

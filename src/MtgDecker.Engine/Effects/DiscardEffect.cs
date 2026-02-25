@@ -11,7 +11,8 @@ public class DiscardEffect : SpellEffect
         Filter = filter;
     }
 
-    public override void Resolve(GameState state, StackObject spell)
+    public override async Task ResolveAsync(GameState state, StackObject spell,
+        IPlayerDecisionHandler handler, CancellationToken ct = default)
     {
         if (spell.Targets.Count == 0) return;
         var target = spell.Targets[0];
@@ -25,8 +26,14 @@ public class DiscardEffect : SpellEffect
             var card = candidates[0];
             candidates.RemoveAt(0);
             player.Hand.Remove(card);
-            player.Graveyard.Add(card);
-            state.Log($"{player.Name} discards {card.Name}.");
+            state.LastDiscardCausedByPlayerId = spell.ControllerId; // Track who caused the discard
+            if (state.HandleDiscardAsync != null)
+                await state.HandleDiscardAsync(card, player, ct);
+            else
+            {
+                player.Graveyard.Add(card);
+                state.Log($"{player.Name} discards {card.Name}.");
+            }
         }
     }
 }

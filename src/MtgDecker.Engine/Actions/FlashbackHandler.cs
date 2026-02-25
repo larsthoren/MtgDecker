@@ -8,10 +8,31 @@ internal class FlashbackHandler : IActionHandler
     public async Task ExecuteAsync(GameAction action, GameEngine engine, GameState state, CancellationToken ct)
     {
         var fbPlayer = state.GetPlayer(action.PlayerId);
+
+        // PreventSpellCasting: check if this player is prevented from casting spells
+        if (state.ActiveEffects.Any(e =>
+            e.Type == ContinuousEffectType.PreventSpellCasting
+            && e.Applies(new GameCard(), fbPlayer)))
+        {
+            state.Log($"{fbPlayer.Name} can't cast spells this turn.");
+            return;
+        }
+
         var fbCard = fbPlayer.Graveyard.Cards.FirstOrDefault(c => c.Id == action.CardId);
         if (fbCard == null)
         {
             state.Log("Card not found in graveyard.");
+            return;
+        }
+
+        // Meddling Mage: check if any opponent's Meddling Mage has named this card
+        var fbOpponent = state.Player1.Id == action.PlayerId ? state.Player2 : state.Player1;
+        var fbMeddlingMage = fbOpponent.Battlefield.Cards
+            .FirstOrDefault(c => c.ChosenName != null
+                && string.Equals(c.ChosenName, fbCard.Name, StringComparison.OrdinalIgnoreCase));
+        if (fbMeddlingMage != null)
+        {
+            state.Log($"{fbCard.Name} can't be cast — named by {fbMeddlingMage.Name}.");
             return;
         }
 
@@ -63,6 +84,30 @@ internal class FlashbackHandler : IActionHandler
             }
         }
 
+        // Exile blue cards from graveyard (Flash of Insight)
+        IReadOnlyList<GameCard>? fbExiledBlueCards = null;
+        if (fbCost.ExileBlueCardsFromGraveyard > 0)
+        {
+            // Blue cards in graveyard (excluding the flashback card itself, which is being cast)
+            var blueCards = fbPlayer.Graveyard.Cards
+                .Where(c => c.Id != fbCard.Id && c.Colors.Contains(ManaColor.Blue))
+                .ToList();
+            if (blueCards.Count == 0)
+            {
+                state.Log($"No blue cards in graveyard for flashback of {fbCard.Name}.");
+                return;
+            }
+            // Player chooses how many blue cards to exile (at least 1)
+            fbExiledBlueCards = await fbPlayer.DecisionHandler.ChooseCardsToExile(
+                blueCards, blueCards.Count,
+                $"Exile blue cards from graveyard for flashback of {fbCard.Name} (X = number exiled)", ct);
+            if (fbExiledBlueCards.Count == 0)
+            {
+                state.Log($"No blue cards chosen for flashback of {fbCard.Name}.");
+                return;
+            }
+        }
+
         // Use shared targeting helper
         var fbTargets = new List<TargetInfo>();
         if (fbDef.TargetFilter != null)
@@ -106,10 +151,23 @@ internal class FlashbackHandler : IActionHandler
             state.Log($"{fbPlayer.Name} sacrifices {fbSacTarget.Name} for flashback.");
         }
 
+        int? fbXValue = null;
+        if (fbExiledBlueCards != null)
+        {
+            foreach (var exiled in fbExiledBlueCards)
+            {
+                fbPlayer.Graveyard.RemoveById(exiled.Id);
+                fbPlayer.Exile.Add(exiled);
+            }
+            fbXValue = fbExiledBlueCards.Count;
+            state.Log($"{fbPlayer.Name} exiles {fbXValue} blue card(s) for flashback of {fbCard.Name} (X={fbXValue}).");
+        }
+
         fbPlayer.Graveyard.RemoveById(fbCard.Id);
         var fbStackObj = new StackObject(fbCard, fbPlayer.Id, fbManaPaid, fbTargets, state.StackCount)
         {
             IsFlashback = true,
+            XValue = fbXValue,
         };
         state.StackPush(fbStackObj);
 
@@ -117,6 +175,7 @@ internal class FlashbackHandler : IActionHandler
         fbPlayer.ActionHistory.Push(action);
 
         state.Log($"{fbPlayer.Name} casts {fbCard.Name} (flashback).");
+        state.SpellsCastThisTurn++;
         await engine.QueueBoardTriggersOnStackAsync(GameEvent.SpellCast, fbCard, ct);
     }
 }

@@ -36,7 +36,24 @@ public class GameCard
     public bool IsTapped { get; set; }
 
     // Resolved from CardDefinitions registry or auto-parsed
-    public ManaCost? ManaCost { get; set; }
+    private ManaCost? _manaCost;
+    public ManaCost? ManaCost
+    {
+        get => _manaCost;
+        set
+        {
+            _manaCost = value;
+            // Auto-populate Colors from ManaCost when set (if Colors not already populated)
+            if (value != null && Colors.Count == 0)
+            {
+                foreach (var color in value.ColorRequirements.Keys)
+                {
+                    if (color != ManaColor.Colorless)
+                        Colors.Add(color);
+                }
+            }
+        }
+    }
 
     // BaseManaAbility stores the original mana ability (before continuous effects).
     // ManaAbility is the "effective" value used by the engine.
@@ -107,6 +124,9 @@ public class GameCard
     // Keywords granted by continuous effects or intrinsic abilities
     public HashSet<Keyword> ActiveKeywords { get; } = new();
 
+    // Card colors — initialized from ManaCost, can be overridden (e.g., tokens, color-changing effects)
+    public HashSet<ManaColor> Colors { get; set; } = new();
+
     // Adventure state — true when in exile after adventure half resolved
     public bool IsOnAdventure { get; set; }
 
@@ -138,6 +158,22 @@ public class GameCard
 
     // Per-source exile tracking (e.g., Parallax Wave)
     public List<Guid> ExiledCardIds { get; } = new();
+
+    // Chosen type/name for cards like Engineered Plague / Meddling Mage
+    public string? ChosenType { get; set; }
+    public string? ChosenName { get; set; }
+
+    // Kicker tracking
+    public bool WasKicked { get; set; }
+
+    // Regeneration shields
+    public int RegenerationShields { get; set; }
+
+    // Carpet of Flowers once-per-turn tracking
+    public bool CarpetUsedThisTurn { get; set; }
+
+    // Once-per-turn activated ability tracking (e.g. Basking Rootwalla)
+    public HashSet<int> AbilitiesActivatedThisTurn { get; } = new();
 
     // Combat tracking
     public int? TurnEnteredBattlefield { get; set; }
@@ -173,7 +209,7 @@ public class GameCard
     {
         if (CardDefinitions.TryGet(name, out var def))
         {
-            return new GameCard
+            var card = new GameCard
             {
                 Name = name,
                 TypeLine = typeLine,
@@ -192,6 +228,7 @@ public class GameCard
                 EchoPaid = def.EchoCost == null,
                 BackFaceDefinition = def.TransformInto,
             };
+            return card;
         }
         return new GameCard
         {

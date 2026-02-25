@@ -168,9 +168,9 @@ public class Phase5CounterMechanicsTests
     {
         CardDefinitions.TryGet("Priest of Titania", out var def);
 
-        def!.ActivatedAbility.Should().NotBeNull();
-        def.ActivatedAbility!.Cost.TapSelf.Should().BeTrue();
-        def.ActivatedAbility.Effect.Should().BeOfType<DynamicAddManaEffect>();
+        def!.ActivatedAbilities.Should().NotBeEmpty();
+        def.ActivatedAbilities[0].Cost.TapSelf.Should().BeTrue();
+        def.ActivatedAbilities[0].Effect.Should().BeOfType<DynamicAddManaEffect>();
     }
 
     [Fact]

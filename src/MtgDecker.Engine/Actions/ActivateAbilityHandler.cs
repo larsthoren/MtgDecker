@@ -11,6 +11,15 @@ internal class ActivateAbilityHandler : IActionHandler
         var abilitySource = player.Battlefield.Cards.FirstOrDefault(c => c.Id == action.CardId);
         if (abilitySource == null) return;
 
+        // Check if activated abilities are prevented (e.g. Null Rod for artifacts, Cursed Totem for creatures)
+        if (state.ActiveEffects.Any(e =>
+            e.Type == ContinuousEffectType.PreventActivatedAbilities
+            && e.Applies(abilitySource, player)))
+        {
+            state.Log($"{abilitySource.Name}'s activated abilities can't be activated.");
+            return;
+        }
+
         if (abilitySource.IsCreature && abilitySource.AbilitiesRemoved)
         {
             state.Log($"{abilitySource.Name} has lost its abilities — cannot activate.");
@@ -20,8 +29,12 @@ internal class ActivateAbilityHandler : IActionHandler
         ActivatedAbility? ability = abilitySource.TokenActivatedAbility;
         if (ability == null)
         {
-            if (CardDefinitions.TryGet(abilitySource.Name, out var abilityDef))
-                ability = abilityDef.ActivatedAbility;
+            if (CardDefinitions.TryGet(abilitySource.Name, out var abilityDef) && abilityDef.ActivatedAbilities.Count > 0)
+            {
+                var index = action.AbilityIndex ?? 0;
+                if (index >= 0 && index < abilityDef.ActivatedAbilities.Count)
+                    ability = abilityDef.ActivatedAbilities[index];
+            }
         }
 
         if (ability == null)
@@ -29,7 +42,30 @@ internal class ActivateAbilityHandler : IActionHandler
             state.Log($"{abilitySource.Name} has no activated ability.");
             return;
         }
+
+        // Once-per-turn check
+        var abilityIndex = action.AbilityIndex ?? 0;
+        if (ability.OncePerTurn && abilitySource.AbilitiesActivatedThisTurn.Contains(abilityIndex))
+        {
+            state.Log($"{abilitySource.Name}'s ability can only be activated once each turn.");
+            return;
+        }
+
         var cost = ability.Cost;
+
+        // Check for activated ability cost modifications (e.g., Gloom)
+        var effectiveCost = cost.ManaCost;
+        if (effectiveCost != null)
+        {
+            var extraCost = state.ActiveEffects
+                .Where(e => e.Type == ContinuousEffectType.ModifyActivatedAbilityCost
+                       && e.ActivatedAbilityCostApplies != null
+                       && e.ActivatedAbilityCostApplies(abilitySource))
+                .Sum(e => e.CostMod);
+
+            if (extraCost > 0)
+                effectiveCost = effectiveCost.WithGenericReduction(-extraCost);
+        }
 
         if (ability.Condition != null && !ability.Condition(player))
         {
@@ -55,7 +91,7 @@ internal class ActivateAbilityHandler : IActionHandler
             return;
         }
 
-        if (cost.ManaCost != null && !player.ManaPool.CanPay(cost.ManaCost))
+        if (effectiveCost != null && !player.ManaPool.CanPay(effectiveCost))
         {
             state.Log($"Cannot activate {abilitySource.Name} — not enough mana.");
             return;
@@ -147,6 +183,58 @@ internal class ActivateAbilityHandler : IActionHandler
                 return;
             }
         }
+        else if (cost.DiscardAny)
+        {
+            var eligible = player.Hand.Cards.ToList();
+
+            if (eligible.Count == 0)
+            {
+                state.Log($"Cannot activate {abilitySource.Name} — no cards in hand to discard.");
+                return;
+            }
+
+            var chosenId = await player.DecisionHandler.ChooseCard(
+                eligible, "Choose a card to discard", optional: false, ct);
+
+            if (chosenId.HasValue)
+                discardTarget = eligible.FirstOrDefault(c => c.Id == chosenId.Value);
+
+            if (discardTarget == null)
+            {
+                state.Log($"Cannot activate {abilitySource.Name} — no discard target chosen.");
+                return;
+            }
+        }
+
+        List<GameCard>? discardTargets = null;
+        if (cost.DiscardCount > 0)
+        {
+            var eligible = player.Hand.Cards.ToList();
+            if (eligible.Count < cost.DiscardCount)
+            {
+                state.Log($"Cannot activate {abilitySource.Name} — not enough cards in hand to discard (need {cost.DiscardCount}, have {eligible.Count}).");
+                return;
+            }
+
+            discardTargets = [];
+            for (int i = 0; i < cost.DiscardCount; i++)
+            {
+                var remaining = player.Hand.Cards.Where(c => !discardTargets.Contains(c)).ToList();
+                var chosenId = await player.DecisionHandler.ChooseCard(
+                    remaining, $"Choose a card to discard ({i + 1}/{cost.DiscardCount})", optional: false, ct);
+                if (chosenId.HasValue)
+                {
+                    var card = remaining.FirstOrDefault(c => c.Id == chosenId.Value);
+                    if (card != null) discardTargets.Add(card);
+                }
+            }
+
+            if (discardTargets.Count < cost.DiscardCount)
+            {
+                state.Log($"Cannot activate {abilitySource.Name} — not enough discard targets chosen.");
+                return;
+            }
+        }
 
         List<GameCard>? exileTargets = null;
         if (cost.ExileFromGraveyardCount > 0)
@@ -177,9 +265,9 @@ internal class ActivateAbilityHandler : IActionHandler
             }
         }
 
-        if (cost.ManaCost != null)
+        if (effectiveCost != null)
         {
-            await engine.PayManaCostAsync(cost.ManaCost, player, ct);
+            await engine.PayManaCostAsync(effectiveCost, player, ct);
             player.PendingManaTaps.Clear();
         }
 
@@ -192,6 +280,14 @@ internal class ActivateAbilityHandler : IActionHandler
             player.Battlefield.RemoveById(abilitySource.Id);
             player.Graveyard.Add(abilitySource);
             state.Log($"{player.Name} sacrifices {abilitySource.Name}.");
+        }
+
+        if (cost.ReturnSelfToHand)
+        {
+            await engine.FireLeaveBattlefieldTriggersAsync(abilitySource, player, ct);
+            player.Battlefield.RemoveById(abilitySource.Id);
+            player.Hand.Add(abilitySource);
+            state.Log($"{player.Name} returns {abilitySource.Name} to hand.");
         }
 
         if (sacrificeTarget != null)
@@ -216,8 +312,20 @@ internal class ActivateAbilityHandler : IActionHandler
         if (discardTarget != null)
         {
             player.Hand.RemoveById(discardTarget.Id);
-            player.Graveyard.Add(discardTarget);
-            state.Log($"{player.Name} discards {discardTarget.Name}.");
+            state.LastDiscardCausedByPlayerId = player.Id; // Self-caused (activated ability)
+            await engine.HandleDiscardAsync(discardTarget, player, ct);
+            engine.QueueDiscardTriggers(player);
+        }
+
+        if (discardTargets != null)
+        {
+            foreach (var card in discardTargets)
+            {
+                player.Hand.RemoveById(card.Id);
+                state.LastDiscardCausedByPlayerId = player.Id; // Self-caused (activated ability)
+                await engine.HandleDiscardAsync(card, player, ct);
+                engine.QueueDiscardTriggers(player);
+            }
         }
 
         if (cost.PayLife > 0)
@@ -291,6 +399,10 @@ internal class ActivateAbilityHandler : IActionHandler
         };
         state.StackPush(stackObj);
         state.Log($"{abilitySource.Name}'s ability is put on the stack.");
+
+        // Track once-per-turn activation
+        if (ability.OncePerTurn)
+            abilitySource.AbilitiesActivatedThisTurn.Add(abilityIndex);
 
         player.ActionHistory.Push(action);
     }

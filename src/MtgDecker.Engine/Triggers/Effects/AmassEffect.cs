@@ -1,4 +1,5 @@
 using MtgDecker.Engine.Enums;
+using MtgDecker.Engine.Mana;
 
 namespace MtgDecker.Engine.Triggers.Effects;
 
@@ -28,6 +29,7 @@ public class AmassEffect(string subtype, int amount) : IEffect
                 Subtypes = [Subtype, "Army"],
                 IsToken = true,
                 TurnEnteredBattlefield = context.State.TurnNumber,
+                Colors = { ManaColor.Black },
             };
             context.Controller.Battlefield.Add(army);
             context.State.Log($"{context.Controller.Name} creates a {Subtype} Army token (0/0).");

@@ -1,3 +1,5 @@
+using MtgDecker.Engine.Enums;
+
 namespace MtgDecker.Engine.Effects;
 
 /// <summary>
@@ -48,6 +50,7 @@ public class FuneralPyreEffect : SpellEffect
                     Subtypes = ["Spirit"],
                     IsToken = true,
                     TurnEnteredBattlefield = state.TurnNumber,
+                    Colors = { ManaColor.White },
                 };
                 owner.Battlefield.Add(token);
                 state.Log($"{owner.Name} creates a 1/1 Spirit token with flying.");

@@ -15,17 +15,17 @@ public class Phase3MotherOfRunesTests
     {
         CardDefinitions.TryGet("Mother of Runes", out var def);
 
-        def!.ActivatedAbility.Should().NotBeNull();
-        def.ActivatedAbility!.Cost.TapSelf.Should().BeTrue();
-        def.ActivatedAbility.Effect.Should().BeOfType<GrantProtectionEffect>();
-        def.ActivatedAbility.TargetFilter.Should().NotBeNull("targets a creature");
+        def!.ActivatedAbilities.Should().NotBeEmpty();
+        def.ActivatedAbilities[0].Cost.TapSelf.Should().BeTrue();
+        def.ActivatedAbilities[0].Effect.Should().BeOfType<GrantProtectionEffect>();
+        def.ActivatedAbilities[0].TargetFilter.Should().NotBeNull("targets a creature");
     }
 
     [Fact]
     public void MotherOfRunes_TargetFilter_OnlyCreatures()
     {
         CardDefinitions.TryGet("Mother of Runes", out var def);
-        var filter = def!.ActivatedAbility!.TargetFilter!;
+        var filter = def!.ActivatedAbilities[0].TargetFilter!;
 
         var creature = new GameCard { Name = "Bear", CardTypes = CardType.Creature };
         var land = new GameCard { Name = "Plains", CardTypes = CardType.Land };

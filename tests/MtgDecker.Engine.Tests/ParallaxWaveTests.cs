@@ -41,9 +41,9 @@ public class ParallaxWaveTests
     public void HasRemoveCounter_ActivatedAbility()
     {
         CardDefinitions.TryGet("Parallax Wave", out var def).Should().BeTrue();
-        def!.ActivatedAbility.Should().NotBeNull();
-        def.ActivatedAbility!.Cost.RemoveCounterType.Should().Be(CounterType.Fade);
-        def.ActivatedAbility.Effect.Should().BeOfType<ExileCreatureEffect>();
+        def!.ActivatedAbilities.Should().NotBeEmpty();
+        def.ActivatedAbilities[0].Cost.RemoveCounterType.Should().Be(CounterType.Fade);
+        def.ActivatedAbilities[0].Effect.Should().BeOfType<ExileCreatureEffect>();
     }
 
     [Fact]

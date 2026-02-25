@@ -92,9 +92,10 @@ public class DelayedTriggerTests
     {
         var (engine, state, p1Handler, p2Handler) = CreateSetup();
 
-        // Register a delayed trigger for Upkeep (not EndStep)
+        // Register a delayed trigger for SpellCast (not EndStep or Upkeep)
+        // SpellCast is never fired via QueueDelayedTriggersOnStackAsync, so it stays
         state.DelayedTriggers.Add(new DelayedTrigger(
-            GameEvent.Upkeep,
+            GameEvent.SpellCast,
             new DestroyAllSubtypeEffect("Goblin"),
             state.Player1.Id));
 
@@ -114,7 +115,7 @@ public class DelayedTriggerTests
 
         await engine.RunTurnAsync();
 
-        // Only EndStep delayed triggers are processed, so Upkeep one stays
+        // SpellCast delayed triggers are not processed during a turn, so it stays
         state.DelayedTriggers.Should().HaveCount(1);
     }
 

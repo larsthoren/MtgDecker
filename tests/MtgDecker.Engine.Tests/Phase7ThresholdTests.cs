@@ -88,11 +88,11 @@ public class Phase7ThresholdTests
     {
         CardDefinitions.TryGet("Barbarian Ring", out var def);
 
-        def!.ActivatedAbility.Should().NotBeNull();
-        def.ActivatedAbility!.Condition.Should().NotBeNull("requires threshold");
-        def.ActivatedAbility.Cost.SacrificeSelf.Should().BeTrue();
-        def.ActivatedAbility.Cost.TapSelf.Should().BeTrue();
-        def.ActivatedAbility.Effect.Should().BeOfType<DealDamageEffect>();
+        def!.ActivatedAbilities.Should().NotBeEmpty();
+        def.ActivatedAbilities[0].Condition.Should().NotBeNull("requires threshold");
+        def.ActivatedAbilities[0].Cost.SacrificeSelf.Should().BeTrue();
+        def.ActivatedAbilities[0].Cost.TapSelf.Should().BeTrue();
+        def.ActivatedAbilities[0].Effect.Should().BeOfType<DealDamageEffect>();
     }
 
     [Fact]
@@ -103,7 +103,7 @@ public class Phase7ThresholdTests
         var (_, p1, _, _, _) = Setup();
         FillGraveyard(p1, 7);
 
-        def!.ActivatedAbility!.Condition!(p1).Should().BeTrue();
+        def!.ActivatedAbilities[0].Condition!(p1).Should().BeTrue();
     }
 
     [Fact]
@@ -114,7 +114,7 @@ public class Phase7ThresholdTests
         var (_, p1, _, _, _) = Setup();
         FillGraveyard(p1, 6);
 
-        def!.ActivatedAbility!.Condition!(p1).Should().BeFalse();
+        def!.ActivatedAbilities[0].Condition!(p1).Should().BeFalse();
     }
 
     [Fact]
@@ -171,11 +171,11 @@ public class Phase7ThresholdTests
     {
         CardDefinitions.TryGet("Cabal Pit", out var def);
 
-        def!.ActivatedAbility.Should().NotBeNull();
-        def.ActivatedAbility!.Condition.Should().NotBeNull("requires threshold");
-        def.ActivatedAbility.Cost.SacrificeSelf.Should().BeTrue();
-        def.ActivatedAbility.Cost.TapSelf.Should().BeTrue();
-        def.ActivatedAbility.Effect.Should().BeOfType<WeakenTargetEffect>();
+        def!.ActivatedAbilities.Should().NotBeEmpty();
+        def.ActivatedAbilities[0].Condition.Should().NotBeNull("requires threshold");
+        def.ActivatedAbilities[0].Cost.SacrificeSelf.Should().BeTrue();
+        def.ActivatedAbilities[0].Cost.TapSelf.Should().BeTrue();
+        def.ActivatedAbilities[0].Effect.Should().BeOfType<WeakenTargetEffect>();
     }
 
     // === WeakenTargetEffect ===

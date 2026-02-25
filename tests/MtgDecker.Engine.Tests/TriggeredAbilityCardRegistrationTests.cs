@@ -23,7 +23,7 @@ public class TriggeredAbilityCardRegistrationTests
     public void GoblinSharpshooter_StillHasActivatedAbility()
     {
         CardDefinitions.TryGet("Goblin Sharpshooter", out var def).Should().BeTrue();
-        def!.ActivatedAbility.Should().NotBeNull();
+        def!.ActivatedAbilities.Should().NotBeEmpty();
     }
 
     [Fact]

@@ -31,9 +31,12 @@ public class TargetFilter
 
     public static TargetFilter Spell() => new((card, zone) => zone == ZoneType.Stack);
 
+    public static TargetFilter SpellOrPermanent() => new((card, zone) =>
+        zone == ZoneType.Stack || zone == ZoneType.Battlefield);
+
     public static TargetFilter NonBlackCreature() => new((card, zone) =>
         zone == ZoneType.Battlefield && card.IsCreature
-        && (card.ManaCost == null || !card.ManaCost.ColorRequirements.ContainsKey(ManaColor.Black)));
+        && !card.Colors.Contains(ManaColor.Black));
 
     public static TargetFilter CreatureWithCMCAtMost(int maxCmc) => new((card, zone) =>
         zone == ZoneType.Battlefield && card.IsCreature
@@ -50,4 +53,13 @@ public class TargetFilter
 
     public static TargetFilter NonlandPermanent() => new((card, zone) =>
         zone == ZoneType.Battlefield && !card.IsLand);
+
+    public static TargetFilter Artifact() => new((card, zone) =>
+        zone == ZoneType.Battlefield && card.CardTypes.HasFlag(CardType.Artifact));
+
+    public static TargetFilter ArtifactOrEnchantmentSpell() => new((card, zone) =>
+        zone == ZoneType.Stack &&
+        (card.CardTypes.HasFlag(CardType.Artifact) || card.CardTypes.HasFlag(CardType.Enchantment)));
+
+    public static TargetFilter AnySpellOnStack() => new((card, zone) => zone == ZoneType.Stack);
 }

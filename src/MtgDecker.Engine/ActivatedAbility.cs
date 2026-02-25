@@ -13,7 +13,10 @@ public record ActivatedAbilityCost(
     CardType? SacrificeCardType = null,
     CardType? DiscardCardType = null,
     int PayLife = 0,
-    int ExileFromGraveyardCount = 0);
+    int ExileFromGraveyardCount = 0,
+    bool DiscardAny = false,
+    int DiscardCount = 0,
+    bool ReturnSelfToHand = false);
 
 public record ActivatedAbility(
     ActivatedAbilityCost Cost,
@@ -21,4 +24,5 @@ public record ActivatedAbility(
     Func<GameCard, bool>? TargetFilter = null,
     bool CanTargetPlayer = false,
     Func<Player, bool>? Condition = null,
-    bool TargetOwnOnly = false);
+    bool TargetOwnOnly = false,
+    bool OncePerTurn = false);

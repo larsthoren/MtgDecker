@@ -77,6 +77,7 @@ internal class CastAdventureHandler : IActionHandler
         advPlayer.ActionHistory.Push(action);
 
         state.Log($"{advPlayer.Name} casts {adventure.Name} (adventure of {advCard.Name}).");
+        state.SpellsCastThisTurn++;
         await engine.QueueBoardTriggersOnStackAsync(GameEvent.SpellCast, advCard, ct);
     }
 }

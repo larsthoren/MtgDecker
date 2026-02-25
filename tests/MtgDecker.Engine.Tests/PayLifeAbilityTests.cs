@@ -23,9 +23,9 @@ public class PayLifeAbilityTests : IDisposable
         )
         {
             Name = TestCardName,
-            ActivatedAbility = new ActivatedAbility(
+            ActivatedAbilities = [new ActivatedAbility(
                 Cost: new ActivatedAbilityCost(PayLife: 7),
-                Effect: new DrawCardsActivatedEffect(7))
+                Effect: new DrawCardsActivatedEffect(7))]
         });
 
         CardDefinitions.Register(new CardDefinition(
@@ -37,10 +37,10 @@ public class PayLifeAbilityTests : IDisposable
         )
         {
             Name = TestNormalAbilityCard,
-            ActivatedAbility = new ActivatedAbility(
+            ActivatedAbilities = [new ActivatedAbility(
                 Cost: new ActivatedAbilityCost(TapSelf: true),
                 Effect: new DealDamageEffect(1),
-                CanTargetPlayer: true)
+                CanTargetPlayer: true)]
         });
     }
 

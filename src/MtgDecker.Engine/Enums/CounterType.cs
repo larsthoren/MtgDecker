@@ -8,4 +8,6 @@ public enum CounterType
     Loyalty,
     Stun,
     Fuse,
+    Depletion,
+    Age,
 }

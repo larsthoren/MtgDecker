@@ -3,6 +3,12 @@ using MtgDecker.Engine.Mana;
 
 namespace MtgDecker.Engine;
 
+/// <summary>
+/// A single-use damage prevention shield (e.g., Circle of Protection).
+/// Prevents the next instance of damage from a source of the specified color.
+/// </summary>
+public record DamagePreventionShield(ManaColor Color);
+
 public class Player
 {
     public Guid Id { get; }
@@ -27,6 +33,7 @@ public class Player
     public int LifeLostThisTurn { get; set; }
     public bool PermanentLeftBattlefieldThisTurn { get; set; }
     public List<Emblem> Emblems { get; } = [];
+    public List<DamagePreventionShield> DamagePreventionShields { get; } = [];
 
     public void AdjustLife(int delta, GameState? state = null)
     {

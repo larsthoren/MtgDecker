@@ -1,0 +1,50 @@
+using MtgDecker.Engine.Enums;
+
+namespace MtgDecker.Engine.Triggers.Effects;
+
+/// <summary>
+/// Carpet of Flowers: At the beginning of each of your main phases,
+/// you may add up to X mana of any one color, where X is the number of Islands
+/// target opponent controls. Only once per turn (tracked via GameCard.CarpetUsedThisTurn).
+/// NOTE: "up to X" is simplified to exactly X — in practice players almost always want the full amount.
+/// </summary>
+public class CarpetOfFlowersEffect : IEffect
+{
+    public async Task Execute(EffectContext context, CancellationToken ct = default)
+    {
+        // Check if already used this turn
+        if (context.Source.CarpetUsedThisTurn)
+        {
+            return;
+        }
+
+        var opponent = context.State.GetOpponent(context.Controller);
+        var islandCount = opponent.Battlefield.Cards
+            .Count(c => c.Subtypes.Contains("Island", StringComparer.OrdinalIgnoreCase));
+
+        if (islandCount <= 0)
+        {
+            context.State.Log($"{context.Source.Name}: opponent controls no Islands.");
+            return;
+        }
+
+        // "You may" — ask if they want to add mana
+        var choice = await context.DecisionHandler.ChooseCard(
+            [context.Source], $"Add {islandCount} mana from Carpet of Flowers?", optional: true, ct: ct);
+        if (!choice.HasValue)
+        {
+            context.State.Log($"{context.Controller.Name} declines Carpet of Flowers.");
+            return;
+        }
+
+        // Choose a color
+        var colors = new List<ManaColor>
+            { ManaColor.White, ManaColor.Blue, ManaColor.Black, ManaColor.Red, ManaColor.Green };
+        var chosen = await context.DecisionHandler.ChooseManaColor(colors, ct);
+
+        // Add X mana of chosen color
+        context.Controller.ManaPool.Add(chosen, islandCount);
+        context.Source.CarpetUsedThisTurn = true;
+        context.State.Log($"{context.Source.Name} adds {islandCount} {chosen} mana ({opponent.Name} controls {islandCount} Island(s)).");
+    }
+}

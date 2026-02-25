@@ -29,7 +29,8 @@ internal class CycleHandler : IActionHandler
         player.Hand.RemoveById(cycleCard.Id);
         player.Graveyard.Add(cycleCard);
 
-        engine.DrawCards(player, 1);
+        if (!cycleDef.CyclingReplaceDraw)
+            engine.DrawCards(player, 1);
         state.Log($"{player.Name} cycles {cycleCard.Name}.");
 
         foreach (var trigger in cycleDef.CyclingTriggers)

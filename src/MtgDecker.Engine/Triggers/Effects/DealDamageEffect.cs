@@ -22,9 +22,18 @@ public class DealDamageEffect(int amount) : IEffect
                 && (context.State.Player1.Battlefield.Contains(e.SourceId)
                     ? context.State.Player1 : context.State.Player2).Id == target.Id);
 
+            // Check for color-specific shield (Circle of Protection)
+            var colorShield = target.DamagePreventionShields
+                .FirstOrDefault(s => context.Source.Colors.Contains(s.Color));
+
             if (hasDamageProtection)
             {
                 context.State.Log($"Damage to {target.Name} is prevented (protection).");
+            }
+            else if (colorShield != null)
+            {
+                target.DamagePreventionShields.Remove(colorShield);
+                context.State.Log($"Damage to {target.Name} is prevented (Circle of Protection).");
             }
             else
             {

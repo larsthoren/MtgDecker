@@ -22,4 +22,7 @@ public enum Keyword
     Hexproof,
     CantBlockNonFlying,
     DoesNotUntap,
+    ProtectionFromRed,
+    ProtectionFromBlack,
+    Shadow,
 }

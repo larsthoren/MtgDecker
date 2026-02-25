@@ -19,9 +19,9 @@ public class Phase12MasticoreTests
         def.Triggers[0].Condition.Should().Be(TriggerCondition.Upkeep);
         def.Triggers[0].Effect.Should().BeOfType<MasticoreUpkeepEffect>();
 
-        def.ActivatedAbility.Should().NotBeNull();
-        def.ActivatedAbility!.Cost.ManaCost!.ToString().Should().Be("{2}");
-        def.ActivatedAbility.Effect.Should().BeOfType<DealDamageEffect>();
+        def.ActivatedAbilities.Should().NotBeEmpty();
+        def.ActivatedAbilities[0].Cost.ManaCost!.ToString().Should().Be("{2}");
+        def.ActivatedAbilities[0].Effect.Should().BeOfType<DealDamageEffect>();
     }
 
     [Fact]

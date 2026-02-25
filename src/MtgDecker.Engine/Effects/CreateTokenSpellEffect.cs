@@ -1,4 +1,5 @@
 using MtgDecker.Engine.Enums;
+using MtgDecker.Engine.Mana;
 
 namespace MtgDecker.Engine.Effects;
 
@@ -10,8 +11,10 @@ public class CreateTokenSpellEffect : SpellEffect
     public CardType CardTypes { get; }
     public IReadOnlyList<string> Subtypes { get; }
     public int Count { get; }
+    public IReadOnlyList<ManaColor>? TokenColors { get; }
 
-    public CreateTokenSpellEffect(string name, int power, int toughness, CardType cardTypes, IReadOnlyList<string> subtypes, int count = 1)
+    public CreateTokenSpellEffect(string name, int power, int toughness, CardType cardTypes,
+        IReadOnlyList<string> subtypes, int count = 1, IReadOnlyList<ManaColor>? tokenColors = null)
     {
         TokenName = name;
         Power = power;
@@ -19,6 +22,7 @@ public class CreateTokenSpellEffect : SpellEffect
         CardTypes = cardTypes;
         Subtypes = subtypes;
         Count = count;
+        TokenColors = tokenColors;
     }
 
     public override void Resolve(GameState state, StackObject spell)
@@ -36,6 +40,11 @@ public class CreateTokenSpellEffect : SpellEffect
                 IsToken = true,
                 TurnEnteredBattlefield = state.TurnNumber,
             };
+            if (TokenColors != null)
+            {
+                foreach (var color in TokenColors)
+                    token.Colors.Add(color);
+            }
             controller.Battlefield.Add(token);
             state.Log($"{controller.Name} creates a {TokenName} token ({Power}/{Toughness}).");
         }

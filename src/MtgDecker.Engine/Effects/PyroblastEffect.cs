@@ -5,8 +5,8 @@ namespace MtgDecker.Engine.Effects;
 
 public class PyroblastEffect : SpellEffect
 {
-    private static bool IsBlue(ManaCost? cost) =>
-        cost != null && cost.ColorRequirements.ContainsKey(ManaColor.Blue);
+    private static bool IsBlue(GameCard card) =>
+        card.Colors.Contains(ManaColor.Blue);
 
     public override void Resolve(GameState state, StackObject spell)
     {
@@ -20,7 +20,7 @@ public class PyroblastEffect : SpellEffect
 
         if (stackSpell != null)
         {
-            if (IsBlue(stackSpell.Card.ManaCost))
+            if (IsBlue(stackSpell.Card))
             {
                 state.StackRemove(stackSpell);
                 var controller = state.GetPlayer(stackSpell.ControllerId);
@@ -37,7 +37,7 @@ public class PyroblastEffect : SpellEffect
         // Check if target is on battlefield (destroy it)
         var owner = state.GetPlayer(target.PlayerId);
         var card = owner.Battlefield.Cards.FirstOrDefault(c => c.Id == target.CardId);
-        if (card != null && IsBlue(card.ManaCost))
+        if (card != null && IsBlue(card))
         {
             owner.Battlefield.RemoveById(card.Id);
             owner.Graveyard.Add(card);
