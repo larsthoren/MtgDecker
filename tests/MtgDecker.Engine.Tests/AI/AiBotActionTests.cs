@@ -171,12 +171,12 @@ public class AiBotActionTests
         var (state, player) = CreateGameWithBot();
         player.LandsPlayedThisTurn = 1;
 
-        // Two forests on battlefield (Naturalize costs {1}{G})
+        // Two forests on battlefield (Argothian Enchantress costs {1}{G})
         player.Battlefield.Add(GameCard.Create("Forest", "Basic Land — Forest"));
         player.Battlefield.Add(GameCard.Create("Forest", "Basic Land — Forest"));
 
-        // Green spell in hand
-        player.Hand.Add(new GameCard { Name = "Naturalize", CardTypes = CardType.Instant, ManaCost = ManaCost.Parse("{1}{G}") });
+        // Green proactive spell in hand (Argothian Enchantress is Proactive)
+        player.Hand.Add(new GameCard { Name = "Argothian Enchantress", CardTypes = CardType.Creature, ManaCost = ManaCost.Parse("{1}{G}") });
 
         var action = await ((AiBotDecisionHandler)player.DecisionHandler).GetAction(state, player.Id);
 
@@ -213,8 +213,8 @@ public class AiBotActionTests
         var volcanic = GameCard.Create("Volcanic Island", "Land");
         player.Battlefield.Add(volcanic);
 
-        // Bot has a Red spell in hand
-        player.Hand.Add(new GameCard { Name = "Lightning Bolt", CardTypes = CardType.Instant, ManaCost = ManaCost.Parse("{R}") });
+        // Bot has a Red proactive spell in hand (Goblin Lackey is Proactive)
+        player.Hand.Add(new GameCard { Name = "Goblin Lackey", CardTypes = CardType.Creature, ManaCost = ManaCost.Parse("{R}") });
 
         // Bot should tap the land
         var bot = (AiBotDecisionHandler)player.DecisionHandler;

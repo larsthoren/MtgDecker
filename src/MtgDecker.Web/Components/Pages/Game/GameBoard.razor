@@ -2,6 +2,7 @@
 @using MtgDecker.Engine.Enums
 @using MtgDecker.Engine.Mana
 @namespace MtgDecker.Web.Components.Pages.Game
+@implements IDisposable
 
 <div class="game-board" tabindex="0" @ref="_boardRef">
     @if (IsGameOver)
@@ -20,13 +21,14 @@
     }
 
     @* Row 1: Opponent info bar *@
-    <div class="opponent-info-bar @(IsPlayerTargetable ? "targetable" : "")"
+    <div class="opponent-info-bar @(IsPlayerTargetable ? "targetable" : "") @(HighlightedPlayerIds.Contains(OpponentPlayer.Id) ? "stack-target-highlighted-bar" : "")"
+         id="player-info-@OpponentPlayer.Id"
          @onclick="HandleOpponentInfoBarClick">
         <MudText Typo="Typo.subtitle2">@OpponentPlayer.Name</MudText>
         <MudChip T="string" Size="Size.Small" Color="Color.Error">@OpponentPlayer.Life HP</MudChip>
         <MudChip T="string" Size="Size.Small" Color="Color.Default">Hand: @OpponentPlayer.Hand.Cards.Count</MudChip>
         <MudChip T="string" Size="Size.Small" Color="Color.Default"
-                 OnClick="() => _showOpponentGraveyard = !_showOpponentGraveyard"
+                 OnClick="ToggleOpponentGraveyard"
                  Style="cursor: pointer;">Grave: @OpponentPlayer.Graveyard.Cards.Count</MudChip>
         <MudChip T="string" Size="Size.Small" Color="Color.Default">Exile: @OpponentPlayer.Exile.Cards.Count</MudChip>
         <MudChip T="string" Size="Size.Small" Color="Color.Default">Lib: @OpponentPlayer.Library.Count</MudChip>
@@ -54,19 +56,25 @@
 
     @if (_showOpponentGraveyard && OpponentPlayer.Graveyard.Cards.Count > 0)
     {
-        <div class="graveyard-panel">
-            <div class="graveyard-header">
-                <MudText Typo="Typo.caption" Style="font-weight: 600;">Opponent Graveyard (@OpponentPlayer.Graveyard.Cards.Count)</MudText>
+        <div class="graveyard-floating-panel graveyard-opponent" @ref="_oppGraveyardRef"
+             style="@GetOpponentGraveyardStyle()">
+            <div class="graveyard-drag-header"
+                 @onmousedown="StartOpponentGraveyardDrag"
+                 @onmousedown:preventDefault>
+                <span>Opponent Graveyard (@OpponentPlayer.Graveyard.Cards.Count)</span>
+                <span class="graveyard-drag-hint">&#x2725;</span>
                 <MudIconButton Size="Size.Small" Icon="@Icons.Material.Filled.Close"
+                               @onmousedown:stopPropagation
                                OnClick="() => _showOpponentGraveyard = false" />
             </div>
-            <div class="graveyard-cards">
-                @foreach (var card in OpponentPlayer.Graveyard.Cards)
+            <div class="graveyard-name-list">
+                @foreach (var card in OpponentPlayer.Graveyard.Cards.AsEnumerable().Reverse())
                 {
-                    <CardDisplay Name="@card.Name" ImageUrl="@card.ImageUrl" CardSize="100"
-                                 Clickable="false"
-                                 OnHoverStart="SetHoveredCard"
-                                 OnHoverEnd="ClearHoveredCard" />
+                    <div class="graveyard-name-row"
+                         @onmouseenter="() => SetHoveredCard(card.ImageUrl)"
+                         @onmouseleave="ClearHoveredCard">
+                        @card.Name
+                    </div>
                 }
             </div>
         </div>
@@ -81,7 +89,7 @@
                 <div class="permanent-stack">
                     @foreach (var aura in attachments)
                     {
-                        <div class="attached-aura attached-aura-sm">
+                        <div class="attached-aura attached-aura-sm" id="bf-card-@aura.Id">
                             <CardDisplay Name="@aura.Name"
                                          ImageUrl="@aura.ImageUrl"
                                          Tapped="@aura.IsTapped"
@@ -89,12 +97,13 @@
                                          Clickable="@(IsTargetingMode)"
                                          EligibleTarget="@IsEligibleTarget(aura)"
                                          TargetingDimmed="@IsTargetingDimmed(aura)"
+                                         IsTargetHighlighted="@(HighlightedBattlefieldCardIds.Contains(aura.Id))"
                                          OnClick="async () => await HandleOpponentCardClick(aura)"
                                          OnHoverStart="SetHoveredCard"
                                          OnHoverEnd="ClearHoveredCard" />
                         </div>
                     }
-                    <div class="host-card">
+                    <div class="host-card" id="bf-card-@card.Id">
                         <CardDisplay Name="@card.Name"
                                      ImageUrl="@card.ImageUrl"
                                      Tapped="@card.IsTapped"
@@ -102,6 +111,7 @@
                                      Clickable="@(IsTargetingMode)"
                                      EligibleTarget="@IsEligibleTarget(card)"
                                      TargetingDimmed="@IsTargetingDimmed(card)"
+                                     IsTargetHighlighted="@(HighlightedBattlefieldCardIds.Contains(card.Id))"
                                      IsAttacking="@(State.Combat?.Attackers.Contains(card.Id) == true)"
                                      IsBlocking="@IsCardBlockingAnywhere(card.Id)"
                                      Power="@card.Power"
@@ -122,7 +132,7 @@
                 <div class="permanent-stack">
                     @foreach (var aura in attachments)
                     {
-                        <div class="attached-aura attached-aura-sm">
+                        <div class="attached-aura attached-aura-sm" id="bf-card-@aura.Id">
                             <CardDisplay Name="@aura.Name"
                                          ImageUrl="@aura.ImageUrl"
                                          Tapped="@aura.IsTapped"
@@ -130,12 +140,13 @@
                                          Clickable="@(IsTargetingMode)"
                                          EligibleTarget="@IsEligibleTarget(aura)"
                                          TargetingDimmed="@IsTargetingDimmed(aura)"
+                                         IsTargetHighlighted="@(HighlightedBattlefieldCardIds.Contains(aura.Id))"
                                          OnClick="async () => await HandleOpponentCardClick(aura)"
                                          OnHoverStart="SetHoveredCard"
                                          OnHoverEnd="ClearHoveredCard" />
                         </div>
                     }
-                    <div class="host-card">
+                    <div class="host-card" id="bf-card-@card.Id">
                         <CardDisplay Name="@card.Name"
                                      ImageUrl="@card.ImageUrl"
                                      Tapped="@card.IsTapped"
@@ -143,6 +154,7 @@
                                      Clickable="@(IsTargetingMode)"
                                      EligibleTarget="@IsEligibleTarget(card)"
                                      TargetingDimmed="@IsTargetingDimmed(card)"
+                                     IsTargetHighlighted="@(HighlightedBattlefieldCardIds.Contains(card.Id))"
                                      IsAttacking="@(State.Combat?.Attackers.Contains(card.Id) == true)"
                                      IsBlocking="@IsCardBlockingAnywhere(card.Id)"
                                      Power="@card.Power"
@@ -173,6 +185,14 @@
                            OnClick="HandleTargetCancel">Cancel</MudButton>
             </div>
         }
+        @if (IsNinjutsuTargeting)
+        {
+            <div class="targeting-banner">
+                <span>Choose unblocked attacker to return to hand</span>
+                <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Warning"
+                           OnClick="CancelNinjutsu">Cancel</MudButton>
+            </div>
+        }
         <PhaseBar CurrentPhase="@State.CurrentPhase"
                   CurrentCombatStep="@State.CombatStep"
                   TurnNumber="@State.TurnNumber"
@@ -193,7 +213,12 @@
                   IsTargeting="@(Handler?.IsWaitingForTarget == true)"
                   OnStackCardClicked="HandleStackCardTarget"
                   OnHoverStart="SetHoveredCard"
-                  OnHoverEnd="ClearHoveredCard" />
+                  OnHoverEnd="ClearHoveredCard"
+                  OnTargetHover="HandleStackTargetHover"
+                  HighlightedStackItemIds="@HighlightedStackItemIds" />
+
+    @* Target arrows overlay (stack hover) *@
+    <TargetArrows HoverInfo="@_stackTargetHover" />
 
     @* Row 4: Player battlefield *@
     <div class="player-battlefield">
@@ -205,22 +230,23 @@
                 var isEligibleBlocker = Handler?.IsWaitingForBlockers == true && IsLocalDefending
                     && Handler?.EligibleBlockers?.Any(c => c.Id == card.Id) == true;
                 var attachments = GetAttachedCards(LocalPlayer, card.Id);
-                <div class="permanent-stack">
+                <div class="permanent-stack @(IsEligibleNinjutsuTarget(card) ? "ninjutsu-eligible" : "") @(IsNinjutsuDimmed(card) ? "ninjutsu-dimmed" : "")">
                     @foreach (var aura in attachments)
                     {
-                        <div class="attached-aura">
+                        <div class="attached-aura" id="bf-card-@aura.Id">
                             <CardDisplay Name="@aura.Name" ImageUrl="@aura.ImageUrl" Tapped="@aura.IsTapped"
                                          CardSize="146"
                                          Selected="@(_selectedCard?.Id == aura.Id)"
                                          EligibleTarget="@IsEligibleTarget(aura)"
                                          TargetingDimmed="@IsTargetingDimmed(aura)"
+                                         IsTargetHighlighted="@(HighlightedBattlefieldCardIds.Contains(aura.Id))"
                                          Clickable="true"
                                          OnClick="async () => await HandleBattlefieldClick(aura, false, false)"
                                          OnHoverStart="SetHoveredCard"
                                          OnHoverEnd="ClearHoveredCard" />
                         </div>
                     }
-                    <div class="host-card">
+                    <div class="host-card" id="bf-card-@card.Id">
                         <CardDisplay Name="@card.Name" ImageUrl="@card.ImageUrl" Tapped="@card.IsTapped"
                                      Power="@card.Power" Toughness="@card.Toughness" DamageMarked="@card.DamageMarked"
                                      CardSize="146"
@@ -230,6 +256,7 @@
                                      Eligible="@(isEligibleAttacker || isEligibleBlocker)"
                                      EligibleTarget="@IsEligibleTarget(card)"
                                      TargetingDimmed="@IsTargetingDimmed(card)"
+                                     IsTargetHighlighted="@(HighlightedBattlefieldCardIds.Contains(card.Id))"
                                      SummoningSick="@(card.IsCreature && card.HasSummoningSickness(State.TurnNumber))"
                                      Counters="@(card.Counters.Count > 0 ? card.Counters : null)"
                                      Clickable="true"
@@ -252,24 +279,26 @@
                 <div class="permanent-stack">
                     @foreach (var aura in attachments)
                     {
-                        <div class="attached-aura">
+                        <div class="attached-aura" id="bf-card-@aura.Id">
                             <CardDisplay Name="@aura.Name" ImageUrl="@aura.ImageUrl" Tapped="@aura.IsTapped"
                                          CardSize="146"
                                          Selected="@(_selectedCard?.Id == aura.Id)"
                                          EligibleTarget="@IsEligibleTarget(aura)"
                                          TargetingDimmed="@IsTargetingDimmed(aura)"
+                                         IsTargetHighlighted="@(HighlightedBattlefieldCardIds.Contains(aura.Id))"
                                          Clickable="true"
                                          OnClick="async () => await HandleBattlefieldClick(aura, false, false)"
                                          OnHoverStart="SetHoveredCard"
                                          OnHoverEnd="ClearHoveredCard" />
                         </div>
                     }
-                    <div class="land-wrapper host-card">
+                    <div class="land-wrapper host-card" id="bf-card-@card.Id">
                         <CardDisplay Name="@card.Name" ImageUrl="@card.ImageUrl" Tapped="@card.IsTapped"
                                      CardSize="146"
                                      Selected="@(_selectedCard?.Id == card.Id)"
                                      EligibleTarget="@IsEligibleTarget(card)"
                                      TargetingDimmed="@IsTargetingDimmed(card)"
+                                     IsTargetHighlighted="@(HighlightedBattlefieldCardIds.Contains(card.Id))"
                                      Clickable="true"
                                      OnClick="async () => await HandleLandClick(card)"
                                      OnHoverStart="SetHoveredCard"
@@ -293,7 +322,8 @@
     </div>
 
     @* Row 5: Player info bar *@
-    <div class="player-info-bar @(IsPlayerTargetable ? "targetable" : "")"
+    <div class="player-info-bar @(IsPlayerTargetable ? "targetable" : "") @(HighlightedPlayerIds.Contains(LocalPlayer.Id) ? "stack-target-highlighted-bar" : "")"
+         id="player-info-@LocalPlayer.Id"
          @onclick="HandlePlayerInfoBarClick">
         <MudText Typo="Typo.subtitle2">@LocalPlayer.Name</MudText>
         @{
@@ -348,7 +378,7 @@
             </div>
         }
         <MudChip T="string" Size="Size.Small" Color="Color.Default"
-                 OnClick="() => _showPlayerGraveyard = !_showPlayerGraveyard"
+                 OnClick="TogglePlayerGraveyard"
                  Style="cursor: pointer;">Grave: @LocalPlayer.Graveyard.Cards.Count</MudChip>
         <MudChip T="string" Size="Size.Small" Color="Color.Default">Exile: @LocalPlayer.Exile.Cards.Count</MudChip>
         <MudChip T="string" Size="Size.Small" Color="Color.Default">Lib: @LocalPlayer.Library.Count</MudChip>
@@ -382,19 +412,25 @@
 
     @if (_showPlayerGraveyard && LocalPlayer.Graveyard.Cards.Count > 0)
     {
-        <div class="graveyard-panel">
-            <div class="graveyard-header">
-                <MudText Typo="Typo.caption" Style="font-weight: 600;">Your Graveyard (@LocalPlayer.Graveyard.Cards.Count)</MudText>
+        <div class="graveyard-floating-panel graveyard-player" @ref="_playerGraveyardRef"
+             style="@GetPlayerGraveyardStyle()">
+            <div class="graveyard-drag-header"
+                 @onmousedown="StartPlayerGraveyardDrag"
+                 @onmousedown:preventDefault>
+                <span>Your Graveyard (@LocalPlayer.Graveyard.Cards.Count)</span>
+                <span class="graveyard-drag-hint">&#x2725;</span>
                 <MudIconButton Size="Size.Small" Icon="@Icons.Material.Filled.Close"
+                               @onmousedown:stopPropagation
                                OnClick="() => _showPlayerGraveyard = false" />
             </div>
-            <div class="graveyard-cards">
-                @foreach (var card in LocalPlayer.Graveyard.Cards)
+            <div class="graveyard-name-list">
+                @foreach (var card in LocalPlayer.Graveyard.Cards.AsEnumerable().Reverse())
                 {
-                    <CardDisplay Name="@card.Name" ImageUrl="@card.ImageUrl" CardSize="100"
-                                 Clickable="false"
-                                 OnHoverStart="SetHoveredCard"
-                                 OnHoverEnd="ClearHoveredCard" />
+                    <div class="graveyard-name-row"
+                         @onmouseenter="() => SetHoveredCard(card.ImageUrl)"
+                         @onmouseleave="ClearHoveredCard">
+                        @card.Name
+                    </div>
                 }
             </div>
         </div>
@@ -434,10 +470,12 @@
                         HasTapAbility="@(_selectedCard.IsLand || _selectedCard.ManaAbility != null)"
                         HasActivatedAbility="@HasActivatedAbility(_selectedCard)"
                         HasAlternateCost="@HasAlternateCostForCard(_selectedCard)"
+                        HasNinjutsuCost="@HasNinjutsuAvailable(_selectedCard)"
                         OnPlay="HandlePlay"
                         OnPlayAlternate="HandlePlayAlternate"
                         OnTapToggle="HandleTapToggle"
                         OnActivate="HandleActivate"
+                        OnNinjutsu="HandleNinjutsu"
                         OnClose="ClearSelection" />
         </div>
     }
@@ -842,12 +880,115 @@
     // Pending cast state (waiting for player to tap lands)
     private GameCard? _pendingCastCard;
 
+    // Ninjutsu targeting state (waiting for player to click an unblocked attacker)
+    private GameCard? _ninjutsuCard;
+
     // Card preview hover state
     private string? _hoveredImageUrl;
+
+    // Stack target hover state
+    private StackTargetHoverInfo? _stackTargetHover;
+    private HashSet<Guid> HighlightedBattlefieldCardIds = new();
+    private HashSet<Guid> HighlightedStackItemIds = new();
+    private HashSet<Guid> HighlightedPlayerIds = new();
+
+    private void HandleStackTargetHover(StackTargetHoverInfo? info)
+    {
+        _stackTargetHover = info;
+        if (info?.Targets is { Count: > 0 } targets)
+        {
+            HighlightedBattlefieldCardIds = targets.Where(t => t.Zone == TargetZone.Battlefield).Select(t => t.CardId).ToHashSet();
+            HighlightedStackItemIds = targets.Where(t => t.Zone == TargetZone.Stack).Select(t => t.CardId).ToHashSet();
+            HighlightedPlayerIds = targets.Where(t => t.Zone == TargetZone.Player).Select(t => t.PlayerId).ToHashSet();
+        }
+        else
+        {
+            HighlightedBattlefieldCardIds = new();
+            HighlightedStackItemIds = new();
+            HighlightedPlayerIds = new();
+        }
+    }
 
     // Graveyard viewer toggle state
     private bool _showPlayerGraveyard;
     private bool _showOpponentGraveyard;
+
+    // Graveyard panel drag state
+    private ElementReference _playerGraveyardRef;
+    private ElementReference _oppGraveyardRef;
+    private double? _playerGraveyardX;
+    private double? _playerGraveyardY;
+    private double? _oppGraveyardX;
+    private double? _oppGraveyardY;
+    private DotNetObjectReference<GameBoard>? _graveyardDotNetRef;
+
+    private void TogglePlayerGraveyard()
+    {
+        _showPlayerGraveyard = !_showPlayerGraveyard;
+        if (_showPlayerGraveyard)
+        {
+            _playerGraveyardX = null;
+            _playerGraveyardY = null;
+        }
+    }
+
+    private void ToggleOpponentGraveyard()
+    {
+        _showOpponentGraveyard = !_showOpponentGraveyard;
+        if (_showOpponentGraveyard)
+        {
+            _oppGraveyardX = null;
+            _oppGraveyardY = null;
+        }
+    }
+
+    private string GetPlayerGraveyardStyle()
+    {
+        if (_playerGraveyardX.HasValue && _playerGraveyardY.HasValue)
+            return FormattableString.Invariant($"left: {_playerGraveyardX:F0}px; top: {_playerGraveyardY:F0}px; bottom: auto; right: auto;");
+        return "";
+    }
+
+    private string GetOpponentGraveyardStyle()
+    {
+        if (_oppGraveyardX.HasValue && _oppGraveyardY.HasValue)
+            return FormattableString.Invariant($"left: {_oppGraveyardX:F0}px; top: {_oppGraveyardY:F0}px; bottom: auto; right: auto;");
+        return "";
+    }
+
+    private async Task StartPlayerGraveyardDrag(MouseEventArgs e)
+    {
+        _graveyardDotNetRef ??= DotNetObjectReference.Create(this);
+        await JS.InvokeVoidAsync("panelDrag.start", _playerGraveyardRef, _graveyardDotNetRef, "OnPlayerGraveyardDrag", e.ClientX, e.ClientY);
+    }
+
+    private async Task StartOpponentGraveyardDrag(MouseEventArgs e)
+    {
+        _graveyardDotNetRef ??= DotNetObjectReference.Create(this);
+        await JS.InvokeVoidAsync("panelDrag.start", _oppGraveyardRef, _graveyardDotNetRef, "OnOpponentGraveyardDrag", e.ClientX, e.ClientY);
+    }
+
+    [JSInvokable]
+    public void OnPlayerGraveyardDragMove(double x, double y)
+    {
+        _playerGraveyardX = x;
+        _playerGraveyardY = y;
+        InvokeAsync(StateHasChanged);
+    }
+
+    [JSInvokable]
+    public void OnPlayerGraveyardDragEnd() => InvokeAsync(StateHasChanged);
+
+    [JSInvokable]
+    public void OnOpponentGraveyardDragMove(double x, double y)
+    {
+        _oppGraveyardX = x;
+        _oppGraveyardY = y;
+        InvokeAsync(StateHasChanged);
+    }
+
+    [JSInvokable]
+    public void OnOpponentGraveyardDragEnd() => InvokeAsync(StateHasChanged);
 
     private Player LocalPlayer => PlayerSeat == 1 ? State.Player1 : State.Player2;
     private Player OpponentPlayer => PlayerSeat == 1 ? State.Player2 : State.Player1;
@@ -879,6 +1020,9 @@
     private bool IsTargetingDimmed(GameCard card) =>
         IsTargetingMode && !IsEligibleTarget(card);
 
+    // --- Ninjutsu targeting helpers ---
+    private bool IsNinjutsuTargeting => _ninjutsuCard != null;
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
@@ -894,6 +1038,13 @@
 
     protected override async Task OnParametersSetAsync()
     {
+        // Clear ninjutsu targeting if combat ended
+        if (_ninjutsuCard != null &&
+            (State.CurrentPhase != Phase.Combat || State.Combat == null))
+        {
+            _ninjutsuCard = null;
+        }
+
         // When state updates arrive (e.g. after a land tap), check if a pending
         // cast can now be completed with the updated mana pool.
         await TryCompletePendingCast();
@@ -938,6 +1089,14 @@
 
     private async Task HandleBattlefieldClick(GameCard card, bool isEligibleAttacker, bool isEligibleBlocker)
     {
+        // If ninjutsu targeting, check if this is a valid unblocked attacker
+        if (IsNinjutsuTargeting)
+        {
+            if (IsEligibleNinjutsuTarget(card))
+                await HandleNinjutsuTargetClick(card);
+            return;
+        }
+
         // If we're targeting, submit target
         if (Handler?.IsWaitingForTarget == true)
         {
@@ -962,6 +1121,9 @@
 
     private async Task HandleLandClick(GameCard card)
     {
+        // Block land interaction during ninjutsu targeting
+        if (IsNinjutsuTargeting) return;
+
         // If we're targeting, submit target
         if (Handler?.IsWaitingForTarget == true)
         {
@@ -1320,6 +1482,51 @@
         ClearSelection();
     }
 
+    // --- Ninjutsu ---
+
+    private void HandleNinjutsu()
+    {
+        if (_selectedCard == null) return;
+        _ninjutsuCard = _selectedCard;
+        ClearSelection();
+    }
+
+    private async Task HandleNinjutsuTargetClick(GameCard card)
+    {
+        if (_ninjutsuCard == null) return;
+        await OnAction.InvokeAsync(
+            GameAction.Ninjutsu(LocalPlayer.Id, _ninjutsuCard.Id, card.Id));
+        _ninjutsuCard = null;
+    }
+
+    private void CancelNinjutsu() => _ninjutsuCard = null;
+
+    private bool HasNinjutsuAvailable(GameCard? card)
+    {
+        if (card == null) return false;
+        if (!CardDefinitions.TryGet(card.Name, out var def) || def.NinjutsuCost == null)
+            return false;
+        if (State.CurrentPhase != Phase.Combat || State.CombatStep < CombatStep.DeclareBlockers)
+            return false;
+        if (State.Combat == null) return false;
+        // Must have at least one unblocked attacker we control
+        return State.Combat.Attackers.Any(a =>
+            !State.Combat.IsBlocked(a)
+            && LocalPlayer.Battlefield.Cards.Any(c => c.Id == a));
+    }
+
+    private bool IsEligibleNinjutsuTarget(GameCard card)
+    {
+        if (!IsNinjutsuTargeting || State.Combat == null) return false;
+        return State.Combat.Attackers.Contains(card.Id)
+            && !State.Combat.IsBlocked(card.Id);
+    }
+
+    private bool IsNinjutsuDimmed(GameCard card)
+    {
+        return IsNinjutsuTargeting && !IsEligibleNinjutsuTarget(card);
+    }
+
     // --- Helpers ---
 
     private bool IsCardBlockingAnywhere(Guid cardId) =>
@@ -1347,6 +1554,11 @@
         if (string.IsNullOrWhiteSpace(_chatInput)) return;
         await OnChatSent.InvokeAsync(_chatInput.Trim());
         _chatInput = "";
+    }
+
+    public void Dispose()
+    {
+        _graveyardDotNetRef?.Dispose();
     }
 
 }

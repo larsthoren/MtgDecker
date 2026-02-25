@@ -1,4 +1,5 @@
 @using MtgDecker.Engine
+@using MtgDecker.Engine.Enums
 @namespace MtgDecker.Web.Components.Pages.Game
 @inject IJSRuntime JS
 
@@ -21,10 +22,11 @@
 
                 @if (item is StackObject spell)
                 {
-                    <div class="stack-card-entry @(IsTargeting ? "stack-targetable" : "")"
+                    <div class="stack-card-entry @(IsTargeting ? "stack-targetable" : "") @(HighlightedStackItemIds?.Contains(spell.Card.Id) == true ? "stack-target-highlighted" : "")"
+                         id="stack-item-@spell.Card.Id"
                          @onclick="() => HandleStackClick(spell.Card)"
-                         @onmouseenter="() => OnHoverStart.InvokeAsync(spell.Card.ImageUrl)"
-                         @onmouseleave="() => OnHoverEnd.InvokeAsync()">
+                         @onmouseenter="async () => { await OnHoverStart.InvokeAsync(spell.Card.ImageUrl); await HandleStackItemHoverEnter(item); }"
+                         @onmouseleave="async () => { await OnHoverEnd.InvokeAsync(); await HandleStackItemHoverLeave(); }">
                         <CardDisplay Name="@spell.Card.Name"
                                      ImageUrl="@spell.Card.ImageUrl"
                                      CardSize="100"
@@ -43,10 +45,11 @@
                 }
                 else if (item is TriggeredAbilityStackObject triggered)
                 {
-                    <div class="stack-card-entry @(IsTargeting ? "stack-targetable" : "")"
+                    <div class="stack-card-entry @(IsTargeting ? "stack-targetable" : "") @(HighlightedStackItemIds?.Contains(triggered.Source.Id) == true ? "stack-target-highlighted" : "")"
+                         id="stack-item-@triggered.Source.Id"
                          @onclick="() => HandleStackClick(triggered.Source)"
-                         @onmouseenter="() => OnHoverStart.InvokeAsync(triggered.Source.ImageUrl)"
-                         @onmouseleave="() => OnHoverEnd.InvokeAsync()">
+                         @onmouseenter="async () => { await OnHoverStart.InvokeAsync(triggered.Source.ImageUrl); await HandleStackItemHoverEnter(item); }"
+                         @onmouseleave="async () => { await OnHoverEnd.InvokeAsync(); await HandleStackItemHoverLeave(); }">
                         <CardDisplay Name="@triggered.Source.Name"
                                      ImageUrl="@triggered.Source.ImageUrl"
                                      CardSize="100"
@@ -70,6 +73,9 @@
     [Parameter] public EventCallback<string?> OnHoverStart { get; set; }
     [Parameter] public EventCallback OnHoverEnd { get; set; }
 
+    [Parameter] public EventCallback<StackTargetHoverInfo?> OnTargetHover { get; set; }
+    [Parameter] public HashSet<Guid>? HighlightedStackItemIds { get; set; }
+
     private ElementReference _stackRef;
     private double? _posX;
     private double? _posY;
@@ -85,7 +91,7 @@
     private async Task StartDrag(MouseEventArgs e)
     {
         _dotNetRef ??= DotNetObjectReference.Create(this);
-        await JS.InvokeVoidAsync("stackDrag.start", _stackRef, _dotNetRef, e.ClientX, e.ClientY);
+        await JS.InvokeVoidAsync("panelDrag.start", _stackRef, _dotNetRef, "OnDrag", e.ClientX, e.ClientY);
     }
 
     [JSInvokable]
@@ -106,6 +112,41 @@
     {
         if (IsTargeting)
             await OnStackCardClicked.InvokeAsync(card);
+    }
+
+    private async Task HandleStackItemHoverEnter(IStackObject item)
+    {
+        var targets = new List<TargetHighlight>();
+        string sourceId;
+
+        if (item is StackObject spell)
+        {
+            sourceId = $"stack-item-{spell.Card.Id}";
+            foreach (var t in spell.Targets)
+            {
+                var zone = t.Zone == ZoneType.Stack ? TargetZone.Stack
+                         : t.CardId == Guid.Empty ? TargetZone.Player
+                         : TargetZone.Battlefield;
+                targets.Add(new TargetHighlight(t.CardId, t.PlayerId, zone));
+            }
+        }
+        else if (item is TriggeredAbilityStackObject triggered)
+        {
+            sourceId = $"stack-item-{triggered.Source.Id}";
+            if (triggered.Target != null)
+                targets.Add(new TargetHighlight(triggered.Target.Id, triggered.ControllerId, TargetZone.Battlefield));
+            if (triggered.TargetPlayerId.HasValue)
+                targets.Add(new TargetHighlight(Guid.Empty, triggered.TargetPlayerId.Value, TargetZone.Player));
+        }
+        else return;
+
+        if (targets.Count > 0)
+            await OnTargetHover.InvokeAsync(new StackTargetHoverInfo(sourceId, targets));
+    }
+
+    private async Task HandleStackItemHoverLeave()
+    {
+        await OnTargetHover.InvokeAsync(null);
     }
 
     public void Dispose()

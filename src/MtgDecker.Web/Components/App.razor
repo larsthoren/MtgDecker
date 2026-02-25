@@ -24,22 +24,30 @@
         window.scrollToBottom = (element) => {
             if (element) element.scrollTop = element.scrollHeight;
         };
-        window.stackDrag = {
-            start: function (el, dotNetRef, startX, startY) {
+        window.panelDrag = {
+            start: function (el, dotNetRef, callbackMethod, startX, startY) {
                 const rect = el.getBoundingClientRect();
                 const offsetX = startX - rect.left;
                 const offsetY = startY - rect.top;
                 function onMove(e) {
-                    dotNetRef.invokeMethodAsync('OnDragMove', e.clientX - offsetX, e.clientY - offsetY);
+                    dotNetRef.invokeMethodAsync(callbackMethod + 'Move', e.clientX - offsetX, e.clientY - offsetY);
                 }
                 function onUp() {
                     document.removeEventListener('mousemove', onMove);
                     document.removeEventListener('mouseup', onUp);
-                    dotNetRef.invokeMethodAsync('OnDragEnd');
+                    dotNetRef.invokeMethodAsync(callbackMethod + 'End');
                 }
                 document.addEventListener('mousemove', onMove);
                 document.addEventListener('mouseup', onUp);
             }
+        };
+        window.getElementCenters = function(elementIds) {
+            return elementIds.map(function(id) {
+                var el = document.getElementById(id);
+                if (!el) return null;
+                var rect = el.getBoundingClientRect();
+                return { id: id, x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+            });
         };
     </script>
 </body>

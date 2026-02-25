@@ -32,8 +32,7 @@ builder.Logging.AddProvider(new InMemoryLogProvider(logStore, TimeProvider.Syste
 
 var app = builder.Build();
 
-// Auto-migrate database on startup (dev only; use explicit migrations in production)
-if (app.Environment.IsDevelopment())
+// Auto-migrate database on startup
 {
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<MtgDeckerDbContext>();
@@ -41,7 +40,6 @@ if (app.Environment.IsDevelopment())
 }
 
 // Seed preset decks for game testing
-if (app.Environment.IsDevelopment())
 {
     using var seedScope = app.Services.CreateScope();
     var mediator = seedScope.ServiceProvider.GetRequiredService<IMediator>();

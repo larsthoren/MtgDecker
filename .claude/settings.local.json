@@ -26,7 +26,11 @@
       "WebFetch(domain:www.mtggoldfish.com)",
       "WebFetch(domain:mtgdecks.net)",
       "WebFetch(domain:aetherhub.com)",
-      "Bash(which python:*)"
+      "Bash(which python:*)",
+      "Bash(export:*)",
+      "Bash(find:*)",
+      "Bash(cd /c/Users/larst/MtgDecker/.claude/worktrees/mtgo-mana-payment && gh pr list --head worktree-mtgo-mana-payment 2>&1)",
+      "Bash(cd /c/Users/larst/MtgDecker/.claude/worktrees/mtgo-mana-payment && git fetch origin main && git merge origin/main 2>&1)"
     ]
   }
 }

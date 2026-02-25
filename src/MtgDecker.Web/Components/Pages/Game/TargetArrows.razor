@@ -1,0 +1,114 @@
+@using MtgDecker.Web.Components.Pages.Game
+@namespace MtgDecker.Web.Components.Pages.Game
+@inject IJSRuntime JS
+@implements IDisposable
+
+@if (_arrows.Count > 0)
+{
+    <svg class="target-arrows-overlay" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+            <marker id="arrowhead" markerWidth="10" markerHeight="7"
+                    refX="10" refY="3.5" orient="auto" markerUnits="strokeWidth">
+                <polygon points="0 0, 10 3.5, 0 7" fill="#ff8800" />
+            </marker>
+        </defs>
+        @foreach (var arrow in _arrows)
+        {
+            <path d="@arrow.Path" stroke="#ff8800" stroke-width="3"
+                  fill="none" opacity="0.85" marker-end="url(#arrowhead)" />
+        }
+    </svg>
+}
+
+@code {
+    [Parameter] public StackTargetHoverInfo? HoverInfo { get; set; }
+
+    private record ArrowPath(string Path);
+    private List<ArrowPath> _arrows = new();
+    private CancellationTokenSource? _cts;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _cts?.Cancel();
+        _arrows.Clear();
+
+        if (HoverInfo == null || HoverInfo.Targets.Count == 0)
+            return;
+
+        _cts = new CancellationTokenSource();
+
+        try
+        {
+            var elementIds = new List<string> { HoverInfo.SourceElementId };
+
+            foreach (var target in HoverInfo.Targets)
+            {
+                if (target.Zone == TargetZone.Player)
+                    elementIds.Add($"player-info-{target.PlayerId}");
+                else if (target.Zone == TargetZone.Stack)
+                    elementIds.Add($"stack-item-{target.CardId}");
+                else
+                    elementIds.Add($"bf-card-{target.CardId}");
+            }
+
+            var positions = await JS.InvokeAsync<ElementPosition?[]>(
+                "getElementCenters", _cts.Token, (object)elementIds.ToArray());
+
+            if (_cts.Token.IsCancellationRequested) return;
+
+            var sourcePos = positions[0];
+            if (sourcePos == null) return;
+
+            for (int i = 1; i < positions.Length; i++)
+            {
+                var targetPos = positions[i];
+                if (targetPos == null) continue;
+
+                var target = HoverInfo.Targets[i - 1];
+                var path = BuildCurvedPath(sourcePos, targetPos, target.Zone);
+                _arrows.Add(new ArrowPath(path));
+            }
+        }
+        catch (OperationCanceledException) { }
+        catch (JSDisconnectedException) { }
+    }
+
+    private static string BuildCurvedPath(ElementPosition source, ElementPosition target, TargetZone zone)
+    {
+        double sx = source.X, sy = source.Y;
+        double tx = target.X, ty = target.Y;
+
+        // Control point for the quadratic bezier curve
+        double cx, cy;
+
+        if (zone == TargetZone.Stack)
+        {
+            // Stack-to-stack: curve outward to the left
+            cx = Math.Min(sx, tx) - 80;
+            cy = (sy + ty) / 2;
+        }
+        else
+        {
+            // Battlefield/player: gentle curve perpendicular to the line
+            double mx = (sx + tx) / 2;
+            double my = (sy + ty) / 2;
+            double dx = tx - sx;
+            double dy = ty - sy;
+            double len = Math.Sqrt(dx * dx + dy * dy);
+            if (len < 1) len = 1;
+            // Offset perpendicular to the line (30px)
+            cx = mx + (-dy / len) * 30;
+            cy = my + (dx / len) * 30;
+        }
+
+        return FormattableString.Invariant($"M {sx:F0} {sy:F0} Q {cx:F0} {cy:F0} {tx:F0} {ty:F0}");
+    }
+
+    public void Dispose()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+    }
+
+    private record ElementPosition(string Id, double X, double Y);
+}

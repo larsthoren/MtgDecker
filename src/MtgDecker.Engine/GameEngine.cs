@@ -1189,6 +1189,23 @@ public class GameEngine
             }
         }
 
+        // Priority after blockers declared (MTG rule 509.4)
+        await RunPriorityAsync(ct);
+
+        // Re-validate attackers — creatures may have been removed during priority
+        // (e.g., Ninjutsu returns an unblocked attacker to hand)
+        validAttackerIds = validAttackerIds
+            .Where(id => attacker.Battlefield.Cards.Any(c => c.Id == id))
+            .ToList();
+
+        if (validAttackerIds.Count == 0)
+        {
+            _state.CombatStep = CombatStep.EndCombat;
+            _state.CombatStep = CombatStep.None;
+            _state.Combat = null;
+            return;
+        }
+
         // Combat Damage
         _state.CombatStep = CombatStep.CombatDamage;
         var unblocked = ResolveCombatDamage(attacker, defender);
