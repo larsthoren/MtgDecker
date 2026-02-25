@@ -141,6 +141,14 @@ A `DbContextResetBehavior` MediatR pipeline clears the change tracker before eac
 - DTOs and filter types get their own files under Interfaces/.
 - Dark theme by default (MTG aesthetic), light theme toggle available.
 
+## Git Branch Strategy
+
+- **`develop`** — default/integration branch. Feature branches merge here via PR.
+- **`main`** — release/deploy branch. Merging to `main` triggers CI/CD deploy to Azure.
+- Feature branches → PR to `develop` (daily work)
+- `develop` → PR to `main` (release/deploy)
+- No direct push to `main` or `develop` (branch protection enabled)
+
 ## Workflow
 
 - Always use superpowers skills when applicable (TDD, code review, executing plans, writing plans, brainstorming, systematic debugging, verification before completion, etc.).
