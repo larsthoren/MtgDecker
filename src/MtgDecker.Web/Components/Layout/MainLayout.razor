@@ -1,6 +1,7 @@
 @inherits LayoutComponentBase
 @implements IDisposable
 @inject NavigationManager NavigationManager
+@inject IWebHostEnvironment Environment
 
 <MudThemeProvider @bind-IsDarkMode="_isDarkMode" Theme="_theme" />
 <MudPopoverProvider />
@@ -22,18 +23,24 @@
 
     <MudDrawer @bind-Open="_drawerOpen" ClipMode="DrawerClipMode.Always" Elevation="2">
         <MudNavMenu>
-            <MudNavLink Href="/cards" Match="NavLinkMatch.Prefix"
-                        Icon="@Icons.Material.Filled.Search">Card Search</MudNavLink>
-            <MudNavLink Href="/decks" Match="NavLinkMatch.Prefix"
-                        Icon="@Icons.Material.Filled.LibraryBooks">My Decks</MudNavLink>
-            <MudNavLink Href="/collection" Match="NavLinkMatch.Prefix"
-                        Icon="@Icons.Material.Filled.CollectionsBookmark">My Collection</MudNavLink>
+            @if (Environment.IsDevelopment())
+            {
+                <MudNavLink Href="/cards" Match="NavLinkMatch.Prefix"
+                            Icon="@Icons.Material.Filled.Search">Card Search</MudNavLink>
+                <MudNavLink Href="/decks" Match="NavLinkMatch.Prefix"
+                            Icon="@Icons.Material.Filled.LibraryBooks">My Decks</MudNavLink>
+                <MudNavLink Href="/collection" Match="NavLinkMatch.Prefix"
+                            Icon="@Icons.Material.Filled.CollectionsBookmark">My Collection</MudNavLink>
+            }
             <MudNavLink Href="/game/new" Match="NavLinkMatch.Prefix"
                         Icon="@Icons.Material.Filled.SportsEsports">Play Game</MudNavLink>
-            <MudNavLink Href="/admin/import" Match="NavLinkMatch.Prefix"
-                        Icon="@Icons.Material.Filled.CloudDownload">Import Data</MudNavLink>
-            <MudNavLink Href="/admin/logs" Match="NavLinkMatch.Prefix"
-                        Icon="@Icons.Material.Filled.BugReport">Logs</MudNavLink>
+            @if (Environment.IsDevelopment())
+            {
+                <MudNavLink Href="/admin/import" Match="NavLinkMatch.Prefix"
+                            Icon="@Icons.Material.Filled.CloudDownload">Import Data</MudNavLink>
+                <MudNavLink Href="/admin/logs" Match="NavLinkMatch.Prefix"
+                            Icon="@Icons.Material.Filled.BugReport">Logs</MudNavLink>
+            }
         </MudNavMenu>
     </MudDrawer>
 
