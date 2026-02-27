@@ -67,6 +67,69 @@ public class ScryfallClientTests
         content.Should().Contain("Test");
     }
 
+    [Fact]
+    public async Task FetchCardsByNamesAsync_ReturnsMappedCards()
+    {
+        var collectionResponse = new
+        {
+            data = new[]
+            {
+                new
+                {
+                    id = "abc-123",
+                    oracle_id = "oracle-1",
+                    name = "Lightning Bolt",
+                    mana_cost = "{R}",
+                    cmc = 1.0,
+                    type_line = "Instant",
+                    oracle_text = "Deal 3 damage to any target.",
+                    colors = new[] { "R" },
+                    color_identity = new[] { "R" },
+                    rarity = "common",
+                    set = "lea",
+                    set_name = "Limited Edition Alpha",
+                    collector_number = "161",
+                    layout = "normal",
+                    image_uris = new { normal = "https://cards.scryfall.io/normal/bolt.jpg", small = (string?)null, art_crop = (string?)null },
+                    legalities = new Dictionary<string, string> { ["legacy"] = "legal" },
+                    prices = new { usd = "1.00", usd_foil = (string?)null, eur = (string?)null, eur_foil = (string?)null, tix = (string?)null }
+                }
+            },
+            not_found = Array.Empty<object>()
+        };
+
+        var handler = new FakeHttpMessageHandler(JsonSerializer.Serialize(collectionResponse));
+        var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.scryfall.com/") };
+        var client = new ScryfallClient(httpClient);
+
+        var (found, notFound) = await client.FetchCardsByNamesAsync(new[] { "Lightning Bolt" });
+
+        found.Should().HaveCount(1);
+        found[0].Name.Should().Be("Lightning Bolt");
+        found[0].ManaCost.Should().Be("{R}");
+        found[0].TypeLine.Should().Be("Instant");
+        notFound.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task FetchCardsByNamesAsync_ReportsNotFoundCards()
+    {
+        var collectionResponse = new
+        {
+            data = Array.Empty<object>(),
+            not_found = new[] { new { name = "Nonexistent Card" } }
+        };
+
+        var handler = new FakeHttpMessageHandler(JsonSerializer.Serialize(collectionResponse));
+        var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.scryfall.com/") };
+        var client = new ScryfallClient(httpClient);
+
+        var (found, notFound) = await client.FetchCardsByNamesAsync(new[] { "Nonexistent Card" });
+
+        found.Should().BeEmpty();
+        notFound.Should().Contain("Nonexistent Card");
+    }
+
     private class FakeHttpMessageHandler : HttpMessageHandler
     {
         private readonly string _responseContent;

@@ -39,6 +39,18 @@ var app = builder.Build();
     db.Database.Migrate();
 }
 
+// Seed card data for preset decks (fetches from Scryfall API if missing)
+{
+    using var cardSeedScope = app.Services.CreateScope();
+    var mediator = cardSeedScope.ServiceProvider.GetRequiredService<IMediator>();
+    var cardSeedResult = await mediator.Send(new SeedPresetCardDataCommand());
+
+    if (cardSeedResult.SeededCount > 0)
+        Console.WriteLine($"[Seed] Fetched {cardSeedResult.SeededCount} cards from Scryfall.");
+    foreach (var name in cardSeedResult.NotFoundOnScryfall)
+        Console.WriteLine($"[Seed] Card not found on Scryfall: {name}");
+}
+
 // Seed preset decks for game testing
 {
     using var seedScope = app.Services.CreateScope();
@@ -58,6 +70,29 @@ if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
     app.UseHsts();
+
+    // Only allow game pages and static assets in production
+    app.Use(async (context, next) =>
+    {
+        var path = context.Request.Path.Value ?? "/";
+
+        var isAllowed = path == "/" ||
+                        path.StartsWith("/game", StringComparison.OrdinalIgnoreCase) ||
+                        path.StartsWith("/_content", StringComparison.OrdinalIgnoreCase) ||
+                        path.StartsWith("/_framework", StringComparison.OrdinalIgnoreCase) ||
+                        path.StartsWith("/_blazor", StringComparison.OrdinalIgnoreCase) ||
+                        path.StartsWith("/css", StringComparison.OrdinalIgnoreCase) ||
+                        path.StartsWith("/favicon", StringComparison.OrdinalIgnoreCase) ||
+                        path == "/not-found";
+
+        if (!isAllowed)
+        {
+            context.Response.StatusCode = 404;
+            return;
+        }
+
+        await next();
+    });
 }
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 app.UseHttpsRedirection();
