@@ -39,6 +39,18 @@ var app = builder.Build();
     db.Database.Migrate();
 }
 
+// Seed card data for preset decks (fetches from Scryfall API if missing)
+{
+    using var cardSeedScope = app.Services.CreateScope();
+    var mediator = cardSeedScope.ServiceProvider.GetRequiredService<IMediator>();
+    var cardSeedResult = await mediator.Send(new SeedPresetCardDataCommand());
+
+    if (cardSeedResult.SeededCount > 0)
+        Console.WriteLine($"[Seed] Fetched {cardSeedResult.SeededCount} cards from Scryfall.");
+    foreach (var name in cardSeedResult.NotFoundOnScryfall)
+        Console.WriteLine($"[Seed] Card not found on Scryfall: {name}");
+}
+
 // Seed preset decks for game testing
 {
     using var seedScope = app.Services.CreateScope();
