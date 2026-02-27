@@ -70,6 +70,29 @@ if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
     app.UseHsts();
+
+    // Only allow game pages and static assets in production
+    app.Use(async (context, next) =>
+    {
+        var path = context.Request.Path.Value ?? "/";
+
+        var isAllowed = path == "/" ||
+                        path.StartsWith("/game", StringComparison.OrdinalIgnoreCase) ||
+                        path.StartsWith("/_content", StringComparison.OrdinalIgnoreCase) ||
+                        path.StartsWith("/_framework", StringComparison.OrdinalIgnoreCase) ||
+                        path.StartsWith("/_blazor", StringComparison.OrdinalIgnoreCase) ||
+                        path.StartsWith("/css", StringComparison.OrdinalIgnoreCase) ||
+                        path.StartsWith("/favicon", StringComparison.OrdinalIgnoreCase) ||
+                        path == "/not-found";
+
+        if (!isAllowed)
+        {
+            context.Response.StatusCode = 404;
+            return;
+        }
+
+        await next();
+    });
 }
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 app.UseHttpsRedirection();
