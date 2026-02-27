@@ -139,3 +139,18 @@ public class ScryfallBulkDataEntry
     [JsonPropertyName("size")]
     public long Size { get; set; }
 }
+
+public class ScryfallCollectionResponse
+{
+    [JsonPropertyName("data")]
+    public List<ScryfallCard> Data { get; set; } = new();
+
+    [JsonPropertyName("not_found")]
+    public List<ScryfallCardIdentifier> NotFound { get; set; } = new();
+}
+
+public class ScryfallCardIdentifier
+{
+    [JsonPropertyName("name")]
+    public string? Name { get; set; }
+}

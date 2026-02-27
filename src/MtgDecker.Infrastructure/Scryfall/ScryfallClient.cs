@@ -1,5 +1,7 @@
+using System.Text;
 using System.Text.Json;
 using MtgDecker.Application.Interfaces;
+using MtgDecker.Domain.Entities;
 
 namespace MtgDecker.Infrastructure.Scryfall;
 
@@ -38,6 +40,45 @@ public class ScryfallClient : IScryfallClient
         response.EnsureSuccessStatusCode();
         var stream = await response.Content.ReadAsStreamAsync(ct);
         return new ResponseStream(stream, response);
+    }
+
+    public async Task<(List<Card> Found, List<string> NotFound)> FetchCardsByNamesAsync(
+        IEnumerable<string> names, CancellationToken ct = default)
+    {
+        var nameList = names.ToList();
+        var allCards = new List<Card>();
+        var allNotFound = new List<string>();
+
+        // Scryfall collection endpoint accepts max 75 identifiers per request
+        var batches = nameList.Chunk(75).ToList();
+        for (var i = 0; i < batches.Count; i++)
+        {
+            var batch = batches[i];
+            var identifiers = batch.Select(n => new { name = n }).ToArray();
+            var requestBody = new { identifiers };
+
+            var json = JsonSerializer.Serialize(requestBody);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+            var response = await _httpClient.PostAsync("cards/collection", content, ct);
+            response.EnsureSuccessStatusCode();
+
+            var responseStream = await response.Content.ReadAsStreamAsync(ct);
+            var result = await JsonSerializer.DeserializeAsync<ScryfallCollectionResponse>(
+                responseStream, cancellationToken: ct);
+
+            if (result?.Data != null)
+                allCards.AddRange(result.Data.Select(ScryfallCardMapper.MapToCard));
+
+            if (result?.NotFound != null)
+                allNotFound.AddRange(result.NotFound.Where(nf => nf.Name != null).Select(nf => nf.Name!));
+
+            // Respect Scryfall rate limit (100ms between requests)
+            if (i < batches.Count - 1)
+                await Task.Delay(100, ct);
+        }
+
+        return (allCards, allNotFound);
     }
 
     private sealed class ResponseStream : Stream
