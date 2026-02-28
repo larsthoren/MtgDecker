@@ -11,15 +11,7 @@ public class OpponentDiscardsEffect : IEffect
         for (int i = 0; i < Count && opponent.Hand.Cards.Count > 0; i++)
         {
             var card = opponent.Hand.Cards[^1];
-            opponent.Hand.Remove(card);
-            context.State.LastDiscardCausedByPlayerId = context.Controller.Id; // Opponent-caused
-            if (context.State.HandleDiscardAsync != null)
-                await context.State.HandleDiscardAsync(card, opponent, ct);
-            else
-            {
-                opponent.Graveyard.Add(card);
-                context.State.Log($"{opponent.Name} discards {card.Name}.");
-            }
+            await context.State.PerformDiscardAsync(card, opponent, context.Controller.Id, ct);
         }
     }
 }

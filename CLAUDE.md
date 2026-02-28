@@ -94,7 +94,7 @@ tests/
   MtgDecker.Domain.Tests/         91 tests
   MtgDecker.Application.Tests/    143 tests
   MtgDecker.Infrastructure.Tests/ 57 tests
-  MtgDecker.Engine.Tests/         1248 tests
+  MtgDecker.Engine.Tests/         2492 tests
 ```
 
 ## Key Patterns
@@ -120,6 +120,15 @@ The `MtgDecker.Engine` project is a standalone game engine with no database depe
 - **AI simulation**: `AiBotDecisionHandler` (heuristic AI) + `BoardEvaluator` (static scoring) + `SimulationRunner` for bot-vs-bot games with batch statistics.
 - **Enforcement**: Summoning sickness prevents tapping creatures the turn they enter (unless haste). Undo is scoped to mana taps only (untap individual lands via UI affordance). Target cancellation lets players back out of targeting sequences. No sandbox/freeform actions — the engine enforces all rules.
 - **State-based actions**: Deck-out (MTG 104.3c) and life-check after combat. `GameState.Winner` tracks game outcome.
+- **Shared helpers** (use these instead of re-implementing):
+  - `GameState.Players` — `IReadOnlyList<Player>`, use instead of `new[] { state.Player1, state.Player2 }`.
+  - `GameState.GetCardController(Guid cardId)` — finds which player's battlefield contains a card.
+  - `GameState.ComputeCostModification(GameCard, Player)` — calculates total cost modification from continuous effects.
+  - `GameState.PerformDiscardAsync(GameCard, Player, Guid causedByPlayerId, CancellationToken)` — centralized discard with madness support. Removes from hand, sets `LastDiscardCausedByPlayerId`, routes through `HandleDiscardAsync`.
+  - `Player.ResetTurnState()` — clears all per-turn flags (land drops, damage, summoning sickness markers).
+  - `GameCard.EffectiveTriggers` — returns instance triggers if any, otherwise falls back to `CardDefinitions` registry.
+  - `SpellEffect.FindTargetSpellOnStack(GameState, GameCard)` — protected helper for counter-spell effects to find their target on the stack.
+  - `Zone` — O(1) `Contains(Guid)` via internal HashSet index; use freely in hot paths.
 
 ## Critical: EF Core + Blazor Server Pitfalls
 

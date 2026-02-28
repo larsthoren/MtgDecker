@@ -17,7 +17,7 @@ public class Phase12SurvivalTests
         def.ActivatedAbilities[0].Cost.ManaCost.Should().NotBeNull();
         def.ActivatedAbilities[0].Cost.ManaCost!.ToString().Should().Be("{G}");
         def.ActivatedAbilities[0].Cost.DiscardCardType.Should().Be(CardType.Creature);
-        def.ActivatedAbilities[0].Effect.Should().BeOfType<SearchLibraryByTypeEffect>();
+        def.ActivatedAbilities[0].Effect.Should().BeOfType<SearchLibraryEffect>();
     }
 
     [Fact]

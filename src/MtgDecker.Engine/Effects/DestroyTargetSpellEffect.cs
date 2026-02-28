@@ -1,6 +1,6 @@
 namespace MtgDecker.Engine.Effects;
 
-public class NaturalizeEffect : SpellEffect
+public class DestroyTargetSpellEffect : SpellEffect
 {
     public override void Resolve(GameState state, StackObject spell)
     {
@@ -10,6 +10,6 @@ public class NaturalizeEffect : SpellEffect
         var permanent = owner.Battlefield.RemoveById(target.CardId);
         if (permanent == null) return;
         owner.Graveyard.Add(permanent);
-        state.Log($"{permanent.Name} is destroyed.");
+        state.Log($"{spell.Card.Name} destroys {permanent.Name}.");
     }
 }

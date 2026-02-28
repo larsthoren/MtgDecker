@@ -143,9 +143,7 @@ internal class TapCardHandler : IActionHandler
         // Fire mana triggers from auras attached to this permanent (immediate — mana abilities don't use stack)
         foreach (var aura in player.Battlefield.Cards.Where(c => c.AttachedTo == tapTarget.Id).ToList())
         {
-            var auraTriggers = aura.Triggers.Count > 0
-                ? aura.Triggers
-                : (CardDefinitions.TryGet(aura.Name, out var auraDef2) ? auraDef2.Triggers : []);
+            var auraTriggers = aura.EffectiveTriggers;
 
             foreach (var trigger in auraTriggers)
             {
@@ -162,8 +160,7 @@ internal class TapCardHandler : IActionHandler
                     {
                         FireLeaveBattlefieldTriggers = async card =>
                         {
-                            var ctrl = state.Player1.Battlefield.Contains(card.Id) ? state.Player1
-                                : state.Player2.Battlefield.Contains(card.Id) ? state.Player2 : null;
+                            var ctrl = state.GetCardController(card.Id);
                             if (ctrl != null) await engine.FireLeaveBattlefieldTriggersAsync(card, ctrl, ct);
                         },
                     };

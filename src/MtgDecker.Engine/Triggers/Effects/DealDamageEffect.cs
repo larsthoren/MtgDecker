@@ -19,8 +19,7 @@ public class DealDamageEffect(int amount) : IEffect
 
             var hasDamageProtection = context.State.ActiveEffects.Any(e =>
                 e.Type == ContinuousEffectType.PreventDamageToPlayer
-                && (context.State.Player1.Battlefield.Contains(e.SourceId)
-                    ? context.State.Player1 : context.State.Player2).Id == target.Id);
+                && context.State.GetCardController(e.SourceId)?.Id == target.Id);
 
             // Check for color-specific shield (Circle of Protection)
             var colorShield = target.DamagePreventionShields

@@ -4,7 +4,7 @@ public class DestroyAllLandsEffect : SpellEffect
 {
     public override void Resolve(GameState state, StackObject spell)
     {
-        foreach (var player in new[] { state.Player1, state.Player2 })
+        foreach (var player in state.Players)
         {
             var lands = player.Battlefield.Cards.Where(c => c.IsLand).ToList();
             foreach (var land in lands)

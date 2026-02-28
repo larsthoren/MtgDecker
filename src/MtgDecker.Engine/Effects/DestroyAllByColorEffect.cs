@@ -19,7 +19,7 @@ public class DestroyAllByColorEffect : SpellEffect
 
     public override void Resolve(GameState state, StackObject spell)
     {
-        foreach (var player in new[] { state.Player1, state.Player2 })
+        foreach (var player in state.Players)
         {
             var targets = player.Battlefield.Cards
                 .Where(c => HasColor(c, Color))

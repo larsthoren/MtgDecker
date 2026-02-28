@@ -92,7 +92,7 @@ public class ActivatedAbilityCardRegistrationTests
     {
         CardDefinitions.TryGet("Sterling Grove", out var def).Should().BeTrue();
         def!.ActivatedAbilities.Should().NotBeEmpty();
-        def.ActivatedAbilities[0].Effect.Should().BeOfType<SearchLibraryToTopEffect>();
+        def.ActivatedAbilities[0].Effect.Should().BeOfType<SearchLibraryEffect>();
         def.ActivatedAbilities[0].Cost.SacrificeSelf.Should().BeTrue();
         def.ActivatedAbilities[0].Cost.ManaCost.Should().NotBeNull();
         def.ActivatedAbilities[0].Cost.ManaCost!.GenericCost.Should().Be(1);

@@ -4,7 +4,7 @@ public class DestroyAllSubtypeEffect(string subtype) : IEffect
 {
     public Task Execute(EffectContext context, CancellationToken ct = default)
     {
-        foreach (var player in new[] { context.State.Player1, context.State.Player2 })
+        foreach (var player in context.State.Players)
         {
             var toDestroy = player.Battlefield.Cards
                 .Where(c => c.Subtypes.Contains(subtype, StringComparer.OrdinalIgnoreCase))

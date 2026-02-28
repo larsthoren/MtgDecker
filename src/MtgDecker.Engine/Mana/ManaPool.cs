@@ -7,7 +7,16 @@ public class ManaPool
     private readonly Dictionary<ManaColor, int> _pool = new();
 
     public int this[ManaColor color] => _pool.GetValueOrDefault(color, 0);
-    public int Total => _pool.Values.Sum();
+    public int Total
+    {
+        get
+        {
+            var sum = 0;
+            foreach (var kv in _pool)
+                sum += kv.Value;
+            return sum;
+        }
+    }
 
     public IReadOnlyDictionary<ManaColor, int> Available =>
         _pool.Where(kv => kv.Value > 0).ToDictionary(kv => kv.Key, kv => kv.Value);
@@ -20,10 +29,13 @@ public class ManaPool
 
     public bool CanPay(ManaCost cost)
     {
+        var coloredTotal = 0;
         foreach (var (color, required) in cost.ColorRequirements)
+        {
             if (this[color] < required) return false;
-        var totalAfterColored = Total - cost.ColorRequirements.Values.Sum();
-        return totalAfterColored >= cost.GenericCost;
+            coloredTotal += required;
+        }
+        return Total - coloredTotal >= cost.GenericCost;
     }
 
     public bool Pay(ManaCost cost)
@@ -37,11 +49,21 @@ public class ManaPool
         var remaining = cost.GenericCost;
         while (remaining > 0)
         {
-            var largest = _pool.OrderByDescending(kv => kv.Value).FirstOrDefault();
-            if (largest.Value <= 0) break;
-            var take = Math.Min(remaining, largest.Value);
-            _pool[largest.Key] -= take;
-            if (_pool[largest.Key] == 0) _pool.Remove(largest.Key);
+            // Find color with largest pool (no sort allocation)
+            ManaColor largestColor = default;
+            int largestValue = 0;
+            foreach (var (color, value) in _pool)
+            {
+                if (value > largestValue)
+                {
+                    largestColor = color;
+                    largestValue = value;
+                }
+            }
+            if (largestValue <= 0) break;
+            var take = Math.Min(remaining, largestValue);
+            _pool[largestColor] -= take;
+            if (_pool[largestColor] == 0) _pool.Remove(largestColor);
             remaining -= take;
         }
         return true;

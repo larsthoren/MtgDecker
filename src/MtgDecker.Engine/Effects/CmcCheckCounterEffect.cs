@@ -8,17 +8,8 @@ public class CmcCheckCounterEffect : SpellEffect
 
     public override void Resolve(GameState state, StackObject spell)
     {
-        if (spell.Targets.Count == 0) return;
-        var target = spell.Targets[0];
-
-        var targetSpell = state.Stack
-            .OfType<StackObject>()
-            .FirstOrDefault(s => s.Card.Id == target.CardId);
-        if (targetSpell == null)
-        {
-            state.Log($"{spell.Card.Name} fizzles (target spell already resolved).");
-            return;
-        }
+        var targetSpell = FindTargetSpellOnStack(state, spell);
+        if (targetSpell == null) return;
 
         var cmc = targetSpell.Card.ManaCost?.ConvertedManaCost ?? 0;
         if (cmc <= MaxCmc)

@@ -6,7 +6,7 @@ public class DestroyAllNonAuraEnchantmentsEffect : SpellEffect
 {
     public override void Resolve(GameState state, StackObject spell)
     {
-        foreach (var player in new[] { state.Player1, state.Player2 })
+        foreach (var player in state.Players)
         {
             var enchantments = player.Battlefield.Cards
                 .Where(c => c.CardTypes.HasFlag(CardType.Enchantment)

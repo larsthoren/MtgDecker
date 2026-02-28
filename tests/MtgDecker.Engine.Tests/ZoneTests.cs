@@ -223,4 +223,71 @@ public class ZoneTests
         var card = new GameCard { Name = "NotHere" };
         zone.Remove(card).Should().BeFalse();
     }
+
+    [Fact]
+    public void Contains_ReflectsAddAndRemove()
+    {
+        var zone = new Zone(ZoneType.Battlefield);
+        var card = new GameCard { Name = "Test" };
+
+        zone.Contains(card.Id).Should().BeFalse();
+        zone.Add(card);
+        zone.Contains(card.Id).Should().BeTrue();
+        zone.Remove(card);
+        zone.Contains(card.Id).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Contains_ReflectsRemoveById()
+    {
+        var zone = new Zone(ZoneType.Battlefield);
+        var card = new GameCard { Name = "Test" };
+        zone.Add(card);
+
+        zone.RemoveById(card.Id);
+        zone.Contains(card.Id).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Contains_ReflectsDrawFromTop()
+    {
+        var zone = new Zone(ZoneType.Library);
+        var card = new GameCard { Name = "Test" };
+        zone.Add(card);
+
+        zone.DrawFromTop();
+        zone.Contains(card.Id).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Contains_ReflectsClear()
+    {
+        var zone = new Zone(ZoneType.Hand);
+        var card = new GameCard { Name = "Test" };
+        zone.Add(card);
+
+        zone.Clear();
+        zone.Contains(card.Id).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Contains_ReflectsAddRange()
+    {
+        var zone = new Zone(ZoneType.Battlefield);
+        var cards = new[] { new GameCard { Name = "A" }, new GameCard { Name = "B" } };
+
+        zone.AddRange(cards);
+        zone.Contains(cards[0].Id).Should().BeTrue();
+        zone.Contains(cards[1].Id).Should().BeTrue();
+    }
+
+    [Fact]
+    public void Contains_ReflectsAddToBottom()
+    {
+        var zone = new Zone(ZoneType.Library);
+        var card = new GameCard { Name = "Test" };
+
+        zone.AddToBottom(card);
+        zone.Contains(card.Id).Should().BeTrue();
+    }
 }

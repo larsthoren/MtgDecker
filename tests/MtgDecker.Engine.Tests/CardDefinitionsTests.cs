@@ -688,7 +688,7 @@ public class CardDefinitionsTests
     public void SterlingGrove_SearchPutsOnTopOfLibrary()
     {
         CardDefinitions.TryGet("Sterling Grove", out var def);
-        def!.ActivatedAbilities[0].Effect.Should().BeOfType<SearchLibraryToTopEffect>();
+        def!.ActivatedAbilities[0].Effect.Should().BeOfType<SearchLibraryEffect>();
     }
 
     // === Card audit Batch 4d: Yavimaya Granger ===

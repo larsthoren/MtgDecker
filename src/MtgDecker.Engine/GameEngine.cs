@@ -8,6 +8,23 @@ namespace MtgDecker.Engine;
 
 public class GameEngine
 {
+    private static readonly (Keyword Protection, ManaColor Color, string Name)[] ProtectionColors =
+    [
+        (Keyword.ProtectionFromBlack, ManaColor.Black, "black"),
+        (Keyword.ProtectionFromRed, ManaColor.Red, "red"),
+        (Keyword.ProtectionFromBlue, ManaColor.Blue, "blue"),
+        (Keyword.ProtectionFromWhite, ManaColor.White, "white"),
+    ];
+
+    private static readonly (Keyword Walk, string LandSubtype)[] LandwalkKeywords =
+    [
+        (Keyword.Mountainwalk, "Mountain"),
+        (Keyword.Swampwalk, "Swamp"),
+        (Keyword.Forestwalk, "Forest"),
+        (Keyword.Islandwalk, "Island"),
+        (Keyword.Plainswalk, "Plains"),
+    ];
+
     private readonly GameState _state;
     private readonly TurnStateMachine _turnStateMachine = new();
     private readonly Dictionary<ActionType, IActionHandler> _handlers = new();
@@ -50,31 +67,10 @@ public class GameEngine
     {
         _turnStateMachine.Reset();
         _state.ActivePlayer.LandsPlayedThisTurn = 0;
-        _state.Player1.CreaturesDiedThisTurn = 0;
-        _state.Player2.CreaturesDiedThisTurn = 0;
-        _state.Player1.DrawsThisTurn = 0;
-        _state.Player2.DrawsThisTurn = 0;
+        foreach (var player in _state.Players)
+            player.ResetTurnState();
         RemoveExpiredEffects();
-        _state.Player1.DrawStepDrawExempted = false;
-        _state.Player2.DrawStepDrawExempted = false;
-        _state.Player1.PlaneswalkerAbilitiesUsedThisTurn.Clear();
-        _state.Player2.PlaneswalkerAbilitiesUsedThisTurn.Clear();
-        _state.Player1.LifeLostThisTurn = 0;
-        _state.Player2.LifeLostThisTurn = 0;
         _state.SpellsCastThisTurn = 0;
-        _state.Player1.PermanentLeftBattlefieldThisTurn = false;
-        _state.Player2.PermanentLeftBattlefieldThisTurn = false;
-        // Reset Carpet of Flowers once-per-turn flags and activated ability tracking
-        foreach (var card in _state.Player1.Battlefield.Cards)
-        {
-            card.CarpetUsedThisTurn = false;
-            card.AbilitiesActivatedThisTurn.Clear();
-        }
-        foreach (var card in _state.Player2.Battlefield.Cards)
-        {
-            card.CarpetUsedThisTurn = false;
-            card.AbilitiesActivatedThisTurn.Clear();
-        }
         _state.Log($"Turn {_state.TurnNumber}: {_state.ActivePlayer.Name}'s turn.");
 
         do
@@ -210,8 +206,7 @@ public class GameEngine
                 // Check for SkipDraw effects on the active player's permanents
                 var hasSkipDraw = _state.ActiveEffects.Any(e =>
                     e.Type == ContinuousEffectType.SkipDraw
-                    && (_state.Player1.Battlefield.Contains(e.SourceId)
-                        ? _state.Player1 : _state.Player2).Id == _state.ActivePlayer.Id);
+                    && _state.GetCardController(e.SourceId)?.Id == _state.ActivePlayer.Id);
 
                 if (hasSkipDraw)
                 {
@@ -655,25 +650,13 @@ public class GameEngine
             .Where(c => c != ManaColor.Colorless)
             .ToHashSet() ?? new HashSet<ManaColor>();
 
-        if (attacker.ActiveKeywords.Contains(Keyword.ProtectionFromBlack) && blockerColors.Contains(ManaColor.Black))
+        foreach (var (protection, color, name) in ProtectionColors)
         {
-            _state.Log($"{blocker.Name} cannot block {attacker.Name} — protection from black.");
-            return true;
-        }
-        if (attacker.ActiveKeywords.Contains(Keyword.ProtectionFromRed) && blockerColors.Contains(ManaColor.Red))
-        {
-            _state.Log($"{blocker.Name} cannot block {attacker.Name} — protection from red.");
-            return true;
-        }
-        if (attacker.ActiveKeywords.Contains(Keyword.ProtectionFromBlue) && blockerColors.Contains(ManaColor.Blue))
-        {
-            _state.Log($"{blocker.Name} cannot block {attacker.Name} — protection from blue.");
-            return true;
-        }
-        if (attacker.ActiveKeywords.Contains(Keyword.ProtectionFromWhite) && blockerColors.Contains(ManaColor.White))
-        {
-            _state.Log($"{blocker.Name} cannot block {attacker.Name} — protection from white.");
-            return true;
+            if (attacker.ActiveKeywords.Contains(protection) && blockerColors.Contains(color))
+            {
+                _state.Log($"{blocker.Name} cannot block {attacker.Name} — protection from {name}.");
+                return true;
+            }
         }
 
         return false;
@@ -755,12 +738,7 @@ public class GameEngine
         return false;
     }
 
-    private Player? GetCardController(GameCard card)
-    {
-        if (_state.Player1.Battlefield.Contains(card.Id)) return _state.Player1;
-        if (_state.Player2.Battlefield.Contains(card.Id)) return _state.Player2;
-        return null;
-    }
+    private Player? GetCardController(GameCard card) => _state.GetCardController(card.Id);
 
     internal bool HasPlayerShroud(Guid playerId)
     {
@@ -818,12 +796,7 @@ public class GameEngine
         return damage;
     }
 
-    private Player? GetEffectController(Guid sourceId)
-    {
-        if (_state.Player1.Battlefield.Contains(sourceId)) return _state.Player1;
-        if (_state.Player2.Battlefield.Contains(sourceId)) return _state.Player2;
-        return null;
-    }
+    private Player? GetEffectController(Guid sourceId) => _state.GetCardController(sourceId);
 
     internal async Task TryAttachAuraAsync(GameCard playCard, Player player, CancellationToken ct)
     {
@@ -1089,6 +1062,11 @@ public class GameEngine
         {
             var blockerAssignments = await defender.DecisionHandler.ChooseBlockers(eligibleBlockers, attackerCards, ct);
 
+            var defenderLandSubtypes = defender.Battlefield.Cards
+                .Where(c => c.IsLand)
+                .SelectMany(c => c.Subtypes)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
             // Validate and register blocker assignments
             foreach (var (blockerId, attackerCardId) in blockerAssignments)
             {
@@ -1098,45 +1076,18 @@ public class GameEngine
                     var blockerCard = defender.Battlefield.Cards.FirstOrDefault(c => c.Id == blockerId);
                     if (attackerCard == null || blockerCard == null) continue;
 
-                    // Mountainwalk: cannot be blocked if defender controls a Mountain
-                    if (attackerCard.ActiveKeywords.Contains(Keyword.Mountainwalk)
-                        && defender.Battlefield.Cards.Any(c => c.Subtypes.Contains("Mountain")))
+                    // Landwalk: cannot be blocked if defender controls a land with matching subtype
+                    var hasLandwalk = false;
+                    foreach (var (walk, landSubtype) in LandwalkKeywords)
                     {
-                        _state.Log($"{attackerCard.Name} has mountainwalk — cannot be blocked.");
-                        continue;
+                        if (attackerCard.ActiveKeywords.Contains(walk) && defenderLandSubtypes.Contains(landSubtype))
+                        {
+                            _state.Log($"{attackerCard.Name} has {walk} — cannot be blocked.");
+                            hasLandwalk = true;
+                            break;
+                        }
                     }
-
-                    // Swampwalk: cannot be blocked if defender controls a Swamp
-                    if (attackerCard.ActiveKeywords.Contains(Keyword.Swampwalk)
-                        && defender.Battlefield.Cards.Any(c => c.Subtypes.Contains("Swamp")))
-                    {
-                        _state.Log($"{attackerCard.Name} has swampwalk — cannot be blocked.");
-                        continue;
-                    }
-
-                    // Forestwalk: cannot be blocked if defender controls a Forest
-                    if (attackerCard.ActiveKeywords.Contains(Keyword.Forestwalk)
-                        && defender.Battlefield.Cards.Any(c => c.Subtypes.Contains("Forest")))
-                    {
-                        _state.Log($"{attackerCard.Name} has forestwalk — cannot be blocked.");
-                        continue;
-                    }
-
-                    // Islandwalk: cannot be blocked if defender controls an Island
-                    if (attackerCard.ActiveKeywords.Contains(Keyword.Islandwalk)
-                        && defender.Battlefield.Cards.Any(c => c.Subtypes.Contains("Island")))
-                    {
-                        _state.Log($"{attackerCard.Name} has islandwalk — cannot be blocked.");
-                        continue;
-                    }
-
-                    // Plainswalk: cannot be blocked if defender controls a Plains
-                    if (attackerCard.ActiveKeywords.Contains(Keyword.Plainswalk)
-                        && defender.Battlefield.Cards.Any(c => c.Subtypes.Contains("Plains")))
-                    {
-                        _state.Log($"{attackerCard.Name} has plainswalk — cannot be blocked.");
-                        continue;
-                    }
+                    if (hasLandwalk) continue;
 
                     // Shadow: shadow can only be blocked by shadow; non-shadow can't be blocked by shadow
                     if (attackerCard.ActiveKeywords.Contains(Keyword.Shadow)
@@ -1498,7 +1449,7 @@ public class GameEngine
         }
 
         // Reset all effective values for both players
-        foreach (var player in new[] { _state.Player1, _state.Player2 })
+        foreach (var player in _state.Players)
         {
             foreach (var card in player.Battlefield.Cards)
             {
@@ -1548,7 +1499,7 @@ public class GameEngine
             if (effect.StateCondition != null && !effect.StateCondition(_state))
                 continue;
 
-            foreach (var player in new[] { _state.Player1, _state.Player2 })
+            foreach (var player in _state.Players)
             {
                 foreach (var card in player.Battlefield.Cards)
                 {
@@ -1577,7 +1528,7 @@ public class GameEngine
         }
 
         // === LAYER 7a: CDA (characteristic-defining abilities) ===
-        foreach (var player in new[] { _state.Player1, _state.Player2 })
+        foreach (var player in _state.Players)
         {
             foreach (var card in player.Battlefield.Cards)
             {
@@ -1603,7 +1554,7 @@ public class GameEngine
             if (effect.StateCondition != null && !effect.StateCondition(_state))
                 continue;
 
-            foreach (var player in new[] { _state.Player1, _state.Player2 })
+            foreach (var player in _state.Players)
             {
                 foreach (var card in player.Battlefield.Cards)
                 {
@@ -1634,7 +1585,7 @@ public class GameEngine
         }
 
         // === LAYER 7d: +1/+1 counter adjustments (MTG Layer 7d) ===
-        foreach (var player in new[] { _state.Player1, _state.Player2 })
+        foreach (var player in _state.Players)
         {
             foreach (var card in player.Battlefield.Cards)
             {
@@ -1795,26 +1746,7 @@ public class GameEngine
         => CollectBoardTriggers(evt, relevantCard, player);
 
     internal int ComputeCostModification(GameCard card, Player caster)
-    {
-        return _state.ActiveEffects
-            .Where(e => e.Type == ContinuousEffectType.ModifyCost
-                   && e.CostApplies != null
-                   && e.CostApplies(card)
-                   && IsCostEffectApplicable(e, caster))
-            .Sum(e => e.CostMod);
-    }
-
-    private bool IsCostEffectApplicable(ContinuousEffect effect, Player caster)
-    {
-        if (!effect.CostAppliesToOpponent) return true;
-
-        // For opponent-only effects, find who controls the source
-        var effectController = _state.Player1.Battlefield.Contains(effect.SourceId) ? _state.Player1
-            : _state.Player2.Battlefield.Contains(effect.SourceId) ? _state.Player2 : null;
-
-        // Only apply if the caster is the opponent (not the controller)
-        return effectController != null && effectController.Id != caster.Id;
-    }
+        => _state.ComputeCostModification(card, caster);
 
     internal async Task OnBoardChangedAsync(CancellationToken ct = default)
     {
@@ -1885,13 +1817,12 @@ public class GameEngine
             }
 
             // Aura detachment (MTG 704.5m) — aura goes to graveyard if enchanted permanent is gone
-            foreach (var p in new[] { _state.Player1, _state.Player2 })
+            foreach (var p in _state.Players)
             {
                 var auras = p.Battlefield.Cards.Where(c => c.AttachedTo.HasValue).ToList();
                 foreach (var aura in auras)
                 {
-                    var targetExists = _state.Player1.Battlefield.Contains(aura.AttachedTo!.Value)
-                        || _state.Player2.Battlefield.Contains(aura.AttachedTo!.Value);
+                    var targetExists = _state.GetCardController(aura.AttachedTo!.Value) != null;
                     if (!targetExists)
                     {
                         await FireLeaveBattlefieldTriggersAsync(aura, p, ct);
@@ -1904,7 +1835,7 @@ public class GameEngine
             }
 
             // SBA: Planeswalker with 0 or less loyalty → graveyard (MTG 704.5i)
-            foreach (var player in new[] { _state.Player1, _state.Player2 })
+            foreach (var player in _state.Players)
             {
                 var dyingPws = player.Battlefield.Cards
                     .Where(c => c.IsPlaneswalker && c.Loyalty <= 0)
@@ -2083,13 +2014,11 @@ public class GameEngine
     private List<TriggeredAbilityStackObject> CollectBoardTriggers(GameEvent evt, GameCard? relevantCard, Player player)
     {
         var result = new List<TriggeredAbilityStackObject>();
-        var permanents = player.Battlefield.Cards.ToList();
+        var permanents = player.Battlefield.Cards;
 
         foreach (var permanent in permanents)
         {
-            var triggers = permanent.Triggers.Count > 0
-                ? permanent.Triggers
-                : (CardDefinitions.TryGet(permanent.Name, out var def) ? def.Triggers : []);
+            var triggers = permanent.EffectiveTriggers;
             if (triggers.Count == 0) continue;
             // Suppression: if this permanent is a creature that lost abilities, skip its triggers
             if (permanent.IsCreature && permanent.AbilitiesRemoved) continue;
@@ -2198,9 +2127,7 @@ public class GameEngine
         if (attacker.AbilitiesRemoved) return Task.CompletedTask;
 
         var player = _state.ActivePlayer;
-        var triggers = attacker.Triggers.Count > 0
-            ? attacker.Triggers
-            : (CardDefinitions.TryGet(attacker.Name, out var def) ? def.Triggers : []);
+        var triggers = attacker.EffectiveTriggers;
 
         foreach (var trigger in triggers)
         {
@@ -2216,10 +2143,7 @@ public class GameEngine
     /// <summary>Queues cast triggers from the spell itself (e.g., Emrakul extra turn on cast).</summary>
     internal Task QueueSelfCastTriggersAsync(GameCard card, Player controller, CancellationToken ct)
     {
-        // Check triggers on the card instance first, then fall back to CardDefinitions
-        var triggers = card.Triggers.Count > 0
-            ? card.Triggers
-            : (CardDefinitions.TryGet(card.Name, out var def) ? def.Triggers : []);
+        var triggers = card.EffectiveTriggers;
 
         foreach (var trigger in triggers)
         {
@@ -2240,9 +2164,7 @@ public class GameEngine
 
         foreach (var card in activePlayer.Graveyard.Cards)
         {
-            var triggers = card.Triggers.Count > 0
-                ? card.Triggers
-                : (CardDefinitions.TryGet(card.Name, out var def) ? def.Triggers : []);
+            var triggers = card.EffectiveTriggers;
 
             foreach (var trigger in triggers)
             {
@@ -2445,8 +2367,7 @@ public class GameEngine
                 TargetPlayerId = triggered.TargetPlayerId,
                 FireLeaveBattlefieldTriggers = async card =>
                 {
-                    var ctrl = _state.Player1.Battlefield.Contains(card.Id) ? _state.Player1
-                        : _state.Player2.Battlefield.Contains(card.Id) ? _state.Player2 : null;
+                    var ctrl = _state.GetCardController(card.Id);
                     if (ctrl != null) await FireLeaveBattlefieldTriggersAsync(card, ctrl, ct);
                 },
             };
@@ -2465,8 +2386,7 @@ public class GameEngine
                 TargetPlayerId = loyaltyAbility.TargetPlayerId,
                 FireLeaveBattlefieldTriggers = async card =>
                 {
-                    var ctrl = _state.Player1.Battlefield.Contains(card.Id) ? _state.Player1
-                        : _state.Player2.Battlefield.Contains(card.Id) ? _state.Player2 : null;
+                    var ctrl = _state.GetCardController(card.Id);
                     if (ctrl != null) await FireLeaveBattlefieldTriggersAsync(card, ctrl, ct);
                 },
             };
@@ -2712,7 +2632,7 @@ public class GameEngine
 
     private void QueueDrawTriggers(Player drawingPlayer)
     {
-        foreach (var player in new[] { _state.Player1, _state.Player2 })
+        foreach (var player in _state.Players)
         {
             foreach (var card in player.Battlefield.Cards)
             {
@@ -2825,15 +2745,13 @@ public class GameEngine
 
     internal void QueueDiscardTriggers(Player discardingPlayer)
     {
-        foreach (var player in new[] { _state.Player1, _state.Player2 })
+        foreach (var player in _state.Players)
         {
             foreach (var card in player.Battlefield.Cards)
             {
                 if (card.AbilitiesRemoved) continue;
 
-                var triggers = card.Triggers.Count > 0
-                    ? card.Triggers
-                    : (CardDefinitions.TryGet(card.Name, out var def) ? def.Triggers : []);
+                var triggers = card.EffectiveTriggers;
 
                 foreach (var trigger in triggers)
                 {
