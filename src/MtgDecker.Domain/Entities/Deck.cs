@@ -95,16 +95,14 @@ public class Deck
         if (to == DeckCategory.Sideboard && !FormatRules.HasSideboard(Format))
             throw new DomainException($"{Format} does not allow a sideboard.");
 
-        ValidateMaxCopies(card, to, quantity);
-
         // Check if card already exists in target category
         var existingInTarget = Entries.FirstOrDefault(e => e.CardId == card.Id && e.Category == to);
+        var effectiveQuantity = (existingInTarget?.Quantity ?? 0) + quantity;
+        ValidateMaxCopies(card, to, effectiveQuantity);
+
         if (existingInTarget != null)
         {
-            var newQuantity = existingInTarget.Quantity + quantity;
-            ValidateMaxCopies(card, to, newQuantity);
-
-            existingInTarget.Quantity = newQuantity;
+            existingInTarget.Quantity = effectiveQuantity;
         }
         else
         {

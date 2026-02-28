@@ -143,6 +143,8 @@ public class CardRepository : ICardRepository
                 existing.PriceUsdFoil = card.PriceUsdFoil;
                 existing.PriceEur = card.PriceEur;
                 existing.PriceEurFoil = card.PriceEurFoil;
+                existing.Power = card.Power;
+                existing.Toughness = card.Toughness;
                 existing.PriceTix = card.PriceTix;
 
                 existing.Legalities.Clear();

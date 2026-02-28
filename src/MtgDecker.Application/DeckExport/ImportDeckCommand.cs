@@ -76,25 +76,21 @@ public class ImportDeckHandler : IRequestHandler<ImportDeckCommand, ImportDeckRe
 
         var unresolved = new List<string>();
 
-        foreach (var entry in parsed.MainDeck)
+        void AddEntries(IEnumerable<ParsedDeckEntry> entries, DeckCategory category)
         {
-            if (!cardsByName.TryGetValue(entry.CardName, out var card))
+            foreach (var entry in entries)
             {
-                unresolved.Add(entry.CardName);
-                continue;
+                if (!cardsByName.TryGetValue(entry.CardName, out var card))
+                {
+                    unresolved.Add(entry.CardName);
+                    continue;
+                }
+                deck.AddCard(card, entry.Quantity, category, utcNow);
             }
-            deck.AddCard(card, entry.Quantity, DeckCategory.MainDeck, utcNow);
         }
 
-        foreach (var entry in parsed.Sideboard)
-        {
-            if (!cardsByName.TryGetValue(entry.CardName, out var card))
-            {
-                unresolved.Add(entry.CardName);
-                continue;
-            }
-            deck.AddCard(card, entry.Quantity, DeckCategory.Sideboard, utcNow);
-        }
+        AddEntries(parsed.MainDeck, DeckCategory.MainDeck);
+        AddEntries(parsed.Sideboard, DeckCategory.Sideboard);
 
         await _deckRepository.AddAsync(deck, cancellationToken);
 

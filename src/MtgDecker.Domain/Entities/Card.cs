@@ -36,22 +36,21 @@ public class Card
     public List<CardFace> Faces { get; set; } = new();
     public List<CardLegality> Legalities { get; set; } = new();
 
-    public bool IsBasicLand => TypeLine.Contains("Basic", StringComparison.OrdinalIgnoreCase)
-                               && TypeLine.Contains("Land", StringComparison.OrdinalIgnoreCase);
+    public bool IsLand => TypeLine.Contains("Land", StringComparison.OrdinalIgnoreCase);
+
+    public bool IsBasicLand => IsLand && TypeLine.Contains("Basic", StringComparison.OrdinalIgnoreCase);
 
     public bool HasMultipleFaces => Faces.Count > 1;
 
-    public bool IsLegalIn(Format format)
-    {
-        var scryfallName = FormatRules.GetScryfallName(format);
-        var legality = Legalities.FirstOrDefault(l => l.FormatName == scryfallName);
-        return legality?.Status is LegalityStatus.Legal or LegalityStatus.Restricted;
-    }
+    public bool IsLegalIn(Format format) =>
+        GetLegalityStatus(format) is LegalityStatus.Legal or LegalityStatus.Restricted;
 
-    public bool IsRestrictedIn(Format format)
+    public bool IsRestrictedIn(Format format) =>
+        GetLegalityStatus(format) == LegalityStatus.Restricted;
+
+    private LegalityStatus? GetLegalityStatus(Format format)
     {
         var scryfallName = FormatRules.GetScryfallName(format);
-        var legality = Legalities.FirstOrDefault(l => l.FormatName == scryfallName);
-        return legality?.Status == LegalityStatus.Restricted;
+        return Legalities.FirstOrDefault(l => l.FormatName == scryfallName)?.Status;
     }
 }
