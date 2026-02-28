@@ -409,9 +409,8 @@ public class TriggeredAbilityEffectTests
         player.Library.Add(card2);
         player.Library.Add(card3); // top
 
-        // Choose card2 on top, card3 second (card1 goes last automatically)
-        handler.EnqueueCardChoice(card2.Id);
-        handler.EnqueueCardChoice(card3.Id);
+        // Reorder: card2 on top (last in returned list = top)
+        handler.EnqueueReorder(cards => cards.OrderBy(c => c.Id == card2.Id ? 1 : 0).ToList(), false);
 
         var effect = new RearrangeTopEffect(3);
         var source = new GameCard { Name = "Mirri's Guile" };
@@ -436,9 +435,13 @@ public class TriggeredAbilityEffectTests
         player.Library.Add(card2);
         player.Library.Add(card3); // top
 
-        // Choose full ordering: card1 on top, then card3 second (card2 goes last automatically)
-        handler.EnqueueCardChoice(card1.Id);
-        handler.EnqueueCardChoice(card3.Id);
+        // Reorder: card1 on top, card3 second, card2 on bottom
+        // First in list = deepest, last = top
+        handler.EnqueueReorder(cards =>
+        {
+            var ordered = new List<GameCard> { card2, card3, card1 };
+            return ordered;
+        }, false);
 
         var effect = new RearrangeTopEffect(3);
         var source = new GameCard { Name = "Mirri's Guile" };

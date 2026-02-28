@@ -24,8 +24,8 @@ public class CloneDeckCommandTests
         var sourceDeck = new Deck
         {
             Id = sourceId,
-            Name = "Legacy Goblins",
-            Format = Format.Legacy,
+            Name = "PM Goblins",
+            Format = Format.Premodern,
             Description = "Goblin tribal",
             UserId = null,
             Entries = new List<DeckEntry>
@@ -44,8 +44,8 @@ public class CloneDeckCommandTests
         var result = await handler.Handle(command, CancellationToken.None);
 
         // Assert
-        result.Name.Should().Be("Legacy Goblins");
-        result.Format.Should().Be(Format.Legacy);
+        result.Name.Should().Be("PM Goblins");
+        result.Format.Should().Be(Format.Premodern);
         result.Description.Should().Be("Goblin tribal");
         result.UserId.Should().Be(userId);
         result.Entries.Should().HaveCount(1);

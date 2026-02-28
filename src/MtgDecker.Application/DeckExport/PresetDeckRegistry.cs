@@ -8,7 +8,7 @@ public static class PresetDeckRegistry
 {
     public static IReadOnlyList<PresetDeck> All { get; } = new List<PresetDeck>
     {
-        new("Legacy Goblins", Format.Legacy, """
+        new("PM Goblins", Format.Premodern, """
             4 Goblin Lackey
             4 Goblin Matron
             4 Goblin Piledriver
@@ -39,7 +39,7 @@ public static class PresetDeckRegistry
             SB: 1 Sulfuric Vortex
             """),
 
-        new("Legacy Enchantress", Format.Legacy, """
+        new("PM Enchantress", Format.Premodern, """
             4 Argothian Enchantress
             3 Swords to Plowshares
             2 Replenish
