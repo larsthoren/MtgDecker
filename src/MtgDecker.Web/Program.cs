@@ -97,6 +97,9 @@ if (!app.Environment.IsDevelopment())
                         path.StartsWith("/_blazor", StringComparison.OrdinalIgnoreCase) ||
                         path.StartsWith("/css", StringComparison.OrdinalIgnoreCase) ||
                         path.StartsWith("/favicon", StringComparison.OrdinalIgnoreCase) ||
+                        path.StartsWith("/Components", StringComparison.OrdinalIgnoreCase) ||
+                        path.EndsWith(".js", StringComparison.OrdinalIgnoreCase) ||
+                        path.EndsWith(".css", StringComparison.OrdinalIgnoreCase) ||
                         path == "/not-found" ||
                         path == "/health";
 
@@ -110,11 +113,17 @@ if (!app.Environment.IsDevelopment())
     });
 }
 app.UseStatusCodePagesWithReExecute("/not-found");
-app.UseHttpsRedirection();
+
+// Skip HTTPS redirection — Azure Container Apps handles TLS termination
+if (app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 
 app.UseAntiforgery();
 
 app.MapGet("/health", () => Results.Ok("healthy"));
+app.UseStaticFiles();
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
