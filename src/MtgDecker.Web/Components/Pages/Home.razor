@@ -1,26 +1,40 @@
 @page "/"
 @inject NavigationManager Navigation
+@inject IWebHostEnvironment Environment
 
-<PageTitle>MtgDecker</PageTitle>
+@if (Environment.IsDevelopment())
+{
+    <PageTitle>MtgDecker</PageTitle>
 
-<MudContainer MaxWidth="MaxWidth.Medium" Class="mt-8">
-    <MudCard>
-        <MudCardContent Class="d-flex flex-column align-center pa-8">
-            <MudText Typo="Typo.h3" Class="mb-4">MtgDecker</MudText>
-            <MudText Typo="Typo.h6" Color="Color.Secondary" Class="mb-6">
-                Magic: The Gathering Deck Builder
-            </MudText>
-            <MudText Typo="Typo.body1" Class="mb-8" Align="Align.Center">
-                Build decks, track your collection, and manage format legality.
-            </MudText>
-            <MudButtonGroup Variant="Variant.Filled">
-                <MudButton Color="Color.Primary" Href="/cards" StartIcon="@Icons.Material.Filled.Search">
-                    Search Cards
-                </MudButton>
-                <MudButton Color="Color.Secondary" Href="/decks" StartIcon="@Icons.Material.Filled.LibraryBooks">
-                    My Decks
-                </MudButton>
-            </MudButtonGroup>
-        </MudCardContent>
-    </MudCard>
-</MudContainer>
+    <MudContainer MaxWidth="MaxWidth.Medium" Class="mt-8">
+        <MudCard>
+            <MudCardContent Class="d-flex flex-column align-center pa-8">
+                <MudText Typo="Typo.h3" Class="mb-4">MtgDecker</MudText>
+                <MudText Typo="Typo.h6" Color="Color.Secondary" Class="mb-6">
+                    Magic: The Gathering Deck Builder
+                </MudText>
+                <MudText Typo="Typo.body1" Class="mb-8" Align="Align.Center">
+                    Build decks, track your collection, and manage format legality.
+                </MudText>
+                <MudButtonGroup Variant="Variant.Filled">
+                    <MudButton Color="Color.Primary" Href="/cards" StartIcon="@Icons.Material.Filled.Search">
+                        Search Cards
+                    </MudButton>
+                    <MudButton Color="Color.Secondary" Href="/decks" StartIcon="@Icons.Material.Filled.LibraryBooks">
+                        My Decks
+                    </MudButton>
+                </MudButtonGroup>
+            </MudCardContent>
+        </MudCard>
+    </MudContainer>
+}
+
+@code {
+    protected override void OnInitialized()
+    {
+        if (!Environment.IsDevelopment())
+        {
+            Navigation.NavigateTo("/game/new", replace: true);
+        }
+    }
+}
