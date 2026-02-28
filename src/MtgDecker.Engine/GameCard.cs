@@ -81,6 +81,7 @@ public class GameCard
         Triggers.Count > 0
             ? Triggers
             : (CardDefinitions.TryGet(FrontName, out var def) ? def.Triggers : []);
+
     public bool IsToken { get; init; }
     public bool IsLegendary { get; init; }
     public bool EntersTapped { get; init; }
