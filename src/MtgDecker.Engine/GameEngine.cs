@@ -50,31 +50,10 @@ public class GameEngine
     {
         _turnStateMachine.Reset();
         _state.ActivePlayer.LandsPlayedThisTurn = 0;
-        _state.Player1.CreaturesDiedThisTurn = 0;
-        _state.Player2.CreaturesDiedThisTurn = 0;
-        _state.Player1.DrawsThisTurn = 0;
-        _state.Player2.DrawsThisTurn = 0;
+        foreach (var player in _state.Players)
+            player.ResetTurnState();
         RemoveExpiredEffects();
-        _state.Player1.DrawStepDrawExempted = false;
-        _state.Player2.DrawStepDrawExempted = false;
-        _state.Player1.PlaneswalkerAbilitiesUsedThisTurn.Clear();
-        _state.Player2.PlaneswalkerAbilitiesUsedThisTurn.Clear();
-        _state.Player1.LifeLostThisTurn = 0;
-        _state.Player2.LifeLostThisTurn = 0;
         _state.SpellsCastThisTurn = 0;
-        _state.Player1.PermanentLeftBattlefieldThisTurn = false;
-        _state.Player2.PermanentLeftBattlefieldThisTurn = false;
-        // Reset Carpet of Flowers once-per-turn flags and activated ability tracking
-        foreach (var card in _state.Player1.Battlefield.Cards)
-        {
-            card.CarpetUsedThisTurn = false;
-            card.AbilitiesActivatedThisTurn.Clear();
-        }
-        foreach (var card in _state.Player2.Battlefield.Cards)
-        {
-            card.CarpetUsedThisTurn = false;
-            card.AbilitiesActivatedThisTurn.Clear();
-        }
         _state.Log($"Turn {_state.TurnNumber}: {_state.ActivePlayer.Name}'s turn.");
 
         do
