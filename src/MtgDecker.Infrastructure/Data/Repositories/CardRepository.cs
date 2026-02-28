@@ -139,12 +139,12 @@ public class CardRepository : ICardRepository
                 existing.ImageUriSmall = card.ImageUriSmall;
                 existing.ImageUriArtCrop = card.ImageUriArtCrop;
                 existing.Layout = card.Layout;
+                existing.Power = card.Power;
+                existing.Toughness = card.Toughness;
                 existing.PriceUsd = card.PriceUsd;
                 existing.PriceUsdFoil = card.PriceUsdFoil;
                 existing.PriceEur = card.PriceEur;
                 existing.PriceEurFoil = card.PriceEurFoil;
-                existing.Power = card.Power;
-                existing.Toughness = card.Toughness;
                 existing.PriceTix = card.PriceTix;
 
                 existing.Legalities.Clear();
