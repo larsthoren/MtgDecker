@@ -36,11 +36,7 @@ public class MoveCardCategoryHandler : IRequestHandler<MoveCardCategoryCommand, 
 
     public async Task<Deck> Handle(MoveCardCategoryCommand request, CancellationToken cancellationToken)
     {
-        var deck = await _deckRepository.GetByIdAsync(request.DeckId, cancellationToken)
-            ?? throw new KeyNotFoundException($"Deck {request.DeckId} not found.");
-
-        if (deck.IsSystemDeck)
-            throw new InvalidOperationException("System decks cannot be modified.");
+        var deck = await _deckRepository.GetMutableDeckAsync(request.DeckId, cancellationToken);
 
         var card = await _cardRepository.GetByIdAsync(request.CardId, cancellationToken)
             ?? throw new KeyNotFoundException($"Card {request.CardId} not found.");

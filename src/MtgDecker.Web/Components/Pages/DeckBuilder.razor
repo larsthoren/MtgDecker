@@ -262,7 +262,6 @@ else
     private MtgDecker.Domain.Entities.Deck? _deck;
     private MtgDecker.Application.Stats.DeckStats? _stats;
     private List<MtgDecker.Domain.Entities.Card> _searchResults = new();
-    private Dictionary<Guid, string> _cardNames = new();
     private Dictionary<Guid, MtgDecker.Domain.Entities.Card> _cardData = new();
     private Dictionary<Guid, int> _shortages = new();
     private string? _searchText;
@@ -321,7 +320,6 @@ else
         foreach (var card in cards)
         {
             _cardData[card.Id] = card;
-            _cardNames[card.Id] = card.Name;
         }
     }
 
@@ -349,7 +347,7 @@ else
             _shortages = _deck.Entries
                 .ToDictionary(e => e.CardId, e =>
                 {
-                    var name = _cardNames.GetValueOrDefault(e.CardId, "");
+                    var name = GetCardName(e.CardId);
                     return shortageList.FirstOrDefault(s => s.CardName == name)?.Shortage ?? 0;
                 });
         }
@@ -416,7 +414,6 @@ else
         {
             _deck = await Mediator.Send(new MtgDecker.Application.Decks.AddCardToDeckCommand(
                 DeckId, card.Id, 1, category));
-            _cardNames[card.Id] = card.Name;
             _cardData[card.Id] = card;
             await LoadStats();
             await LoadShortages();
@@ -456,7 +453,6 @@ else
             _deck = await Mediator.Send(new MtgDecker.Application.Decks.RemoveCardFromDeckCommand(DeckId, cardId, category));
             if (_deck.Entries.All(e => e.CardId != cardId))
             {
-                _cardNames.Remove(cardId);
                 _cardData.Remove(cardId);
             }
             await LoadStats();
@@ -468,7 +464,7 @@ else
         }
     }
 
-    private string GetCardName(Guid cardId) => _cardNames.GetValueOrDefault(cardId, "Unknown Card");
+    private string GetCardName(Guid cardId) => _cardData.TryGetValue(cardId, out var card) ? card.Name : "Unknown Card";
 
     private decimal? GetCardPrice(Guid cardId) =>
         _cardData.TryGetValue(cardId, out var card) ? card.PriceUsd : null;
