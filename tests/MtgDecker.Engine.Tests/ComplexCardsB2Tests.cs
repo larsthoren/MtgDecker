@@ -283,7 +283,7 @@ public class ComplexCardsB2Tests
         };
         p1.Library.Add(lowRebel);
 
-        var effect = new SearchLibraryToBattlefieldEffect("Rebel", maxCmc: 2);
+        var effect = new SearchLibraryEffect(c => c.Subtypes.Contains("Rebel", StringComparer.OrdinalIgnoreCase) && (c.ManaCost?.ConvertedManaCost ?? 0) <= 2, "Rebel (CMC 2 or less)", SearchDestination.Battlefield);
         var sergeant = GameCard.Create("Ramosian Sergeant");
 
         h1.EnqueueCardChoice(lowRebel.Id); // Choose the CMC 2 rebel
@@ -298,7 +298,7 @@ public class ComplexCardsB2Tests
     }
 
     [Fact]
-    public async Task SearchLibraryToBattlefieldEffect_FiltersOutHighCMC()
+    public async Task SearchLibraryEffect_Battlefield_FiltersOutHighCMC()
     {
         var (state, _, h1, _) = CreateEngineState();
         var p1 = state.Player1;
@@ -313,7 +313,7 @@ public class ComplexCardsB2Tests
         };
         p1.Library.Add(highRebel);
 
-        var effect = new SearchLibraryToBattlefieldEffect("Rebel", maxCmc: 2);
+        var effect = new SearchLibraryEffect(c => c.Subtypes.Contains("Rebel", StringComparer.OrdinalIgnoreCase) && (c.ManaCost?.ConvertedManaCost ?? 0) <= 2, "Rebel (CMC 2 or less)", SearchDestination.Battlefield);
         var source = GameCard.Create("Ramosian Sergeant");
 
         var context = new EffectContext(state, p1, source, h1);

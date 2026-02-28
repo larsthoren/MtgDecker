@@ -228,7 +228,7 @@ public static class CardDefinitions
                         ControllerOnly: true,
                         Layer: EffectLayer.Layer6_AbilityAddRemove),
                 ],
-                ActivatedAbilities = [new(new ActivatedAbilityCost(SacrificeSelf: true, ManaCost: ManaCost.Parse("{1}")), new SearchLibraryToTopEffect(CardType.Enchantment))],
+                ActivatedAbilities = [new(new ActivatedAbilityCost(SacrificeSelf: true, ManaCost: ManaCost.Parse("{1}")), new SearchLibraryEffect(c => c.CardTypes.HasFlag(CardType.Enchantment), "Enchantment", SearchDestination.TopOfLibrary))],
             },
             ["Aura of Silence"] = new(ManaCost.Parse("{1}{W}{W}"), null, null, null, CardType.Enchantment)
             {
@@ -952,7 +952,7 @@ public static class CardDefinitions
             {
                 ActivatedAbilities = [new(
                     new ActivatedAbilityCost(ManaCost: ManaCost.Parse("{G}"), DiscardCardType: CardType.Creature),
-                    new SearchLibraryByTypeEffect(CardType.Creature))],
+                    new SearchLibraryEffect(c => c.CardTypes.HasFlag(CardType.Creature), "Creature"))],
             },
             ["Gaea's Cradle"] = new(null, ManaAbility.Dynamic(ManaColor.Green,
                 p => p.Battlefield.Cards.Count(c => c.IsCreature)),
@@ -1852,7 +1852,7 @@ public static class CardDefinitions
             {
                 Subtypes = ["Human", "Rebel"],
                 ActivatedAbilities = [new(new ActivatedAbilityCost(TapSelf: true, ManaCost: ManaCost.Parse("{3}")),
-                    new SearchLibraryToBattlefieldEffect("Rebel", maxCmc: 2))],
+                    new SearchLibraryEffect(c => c.Subtypes.Contains("Rebel", StringComparer.OrdinalIgnoreCase) && (c.ManaCost?.ConvertedManaCost ?? 0) <= 2, "Rebel (CMC 2 or less)", SearchDestination.Battlefield))],
             },
 
             // Eternal Dragon ({5}{W}{W}, 5/5 Dragon Spirit, Flying, Plainscycling {2}, graveyard return)

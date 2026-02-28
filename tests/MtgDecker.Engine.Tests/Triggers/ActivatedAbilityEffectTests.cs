@@ -255,10 +255,10 @@ public class ActivatedAbilityEffectTests
         state.GameLog.Should().BeEmpty();
     }
 
-    // === SearchLibraryByTypeEffect ===
+    // === SearchLibraryEffect (type filter) ===
 
     [Fact]
-    public async Task SearchLibraryByTypeEffect_FindsMatchingCard_AddsToHand()
+    public async Task SearchLibraryEffect_TypeFilter_FindsMatchingCard_AddsToHand()
     {
         var (state, player, _, handler, _) = CreateSetup();
         var enchantment = new GameCard { Name = "Wild Growth", CardTypes = CardType.Enchantment };
@@ -267,7 +267,7 @@ public class ActivatedAbilityEffectTests
         player.Library.Add(enchantment);
         handler.EnqueueCardChoice(enchantment.Id);
 
-        var effect = new SearchLibraryByTypeEffect(CardType.Enchantment);
+        var effect = new SearchLibraryEffect(c => c.CardTypes.HasFlag(CardType.Enchantment), "Enchantment");
         var source = new GameCard { Name = "Sterling Grove" };
         var context = new EffectContext(state, player, source, handler);
 
@@ -278,13 +278,13 @@ public class ActivatedAbilityEffectTests
     }
 
     [Fact]
-    public async Task SearchLibraryByTypeEffect_NoMatches_LogsAndShuffles()
+    public async Task SearchLibraryEffect_TypeFilter_NoMatches_LogsAndShuffles()
     {
         var (state, player, _, handler, _) = CreateSetup();
         var creature = new GameCard { Name = "Bear", CardTypes = CardType.Creature };
         player.Library.Add(creature);
 
-        var effect = new SearchLibraryByTypeEffect(CardType.Enchantment);
+        var effect = new SearchLibraryEffect(c => c.CardTypes.HasFlag(CardType.Enchantment), "Enchantment");
         var source = new GameCard { Name = "Sterling Grove" };
         var context = new EffectContext(state, player, source, handler);
 
@@ -295,14 +295,14 @@ public class ActivatedAbilityEffectTests
     }
 
     [Fact]
-    public async Task SearchLibraryByTypeEffect_PlayerDeclines_NoCardAdded()
+    public async Task SearchLibraryEffect_TypeFilter_PlayerDeclines_NoCardAdded()
     {
         var (state, player, _, handler, _) = CreateSetup();
         var enchantment = new GameCard { Name = "Wild Growth", CardTypes = CardType.Enchantment };
         player.Library.Add(enchantment);
         handler.EnqueueCardChoice(null);
 
-        var effect = new SearchLibraryByTypeEffect(CardType.Enchantment);
+        var effect = new SearchLibraryEffect(c => c.CardTypes.HasFlag(CardType.Enchantment), "Enchantment");
         var source = new GameCard { Name = "Sterling Grove" };
         var context = new EffectContext(state, player, source, handler);
 
@@ -313,7 +313,7 @@ public class ActivatedAbilityEffectTests
     }
 
     [Fact]
-    public async Task SearchLibraryByTypeEffect_ShufflesLibraryAfterSearch()
+    public async Task SearchLibraryEffect_TypeFilter_ShufflesLibraryAfterSearch()
     {
         var (state, player, _, handler, _) = CreateSetup();
         for (int i = 0; i < 20; i++)
@@ -324,7 +324,7 @@ public class ActivatedAbilityEffectTests
             });
         handler.EnqueueCardChoice(player.Library.Cards[0].Id);
 
-        var effect = new SearchLibraryByTypeEffect(CardType.Enchantment);
+        var effect = new SearchLibraryEffect(c => c.CardTypes.HasFlag(CardType.Enchantment), "Enchantment");
         var source = new GameCard { Name = "Sterling Grove" };
         var context = new EffectContext(state, player, source, handler);
 
