@@ -21,10 +21,29 @@ public class SeedPresetDecksHandler : IRequestHandler<SeedPresetDecksCommand, Se
         _deckRepository = deckRepository;
     }
 
+    // One-time renames for misclassified decks (safe to leave — skips if already renamed)
+    private static readonly Dictionary<string, (string NewName, Domain.Enums.Format NewFormat)> Renames = new()
+    {
+        ["Legacy Goblins"] = ("PM Goblins", Domain.Enums.Format.Premodern),
+        ["Legacy Enchantress"] = ("PM Enchantress", Domain.Enums.Format.Premodern),
+    };
+
     public async Task<SeedPresetDecksResult> Handle(
         SeedPresetDecksCommand request, CancellationToken cancellationToken)
     {
         var existingDecks = await _deckRepository.ListSystemDecksAsync(cancellationToken);
+
+        // Rename misclassified decks
+        foreach (var deck in existingDecks)
+        {
+            if (Renames.TryGetValue(deck.Name, out var rename))
+            {
+                deck.Name = rename.NewName;
+                deck.Format = rename.NewFormat;
+                await _deckRepository.UpdateAsync(deck, cancellationToken);
+            }
+        }
+
         var existingNames = existingDecks.Select(d => d.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         var created = new List<string>();
