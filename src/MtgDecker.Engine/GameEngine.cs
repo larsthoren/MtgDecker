@@ -16,6 +16,15 @@ public class GameEngine
         (Keyword.ProtectionFromWhite, ManaColor.White, "white"),
     ];
 
+    private static readonly (Keyword Walk, string LandSubtype)[] LandwalkKeywords =
+    [
+        (Keyword.Mountainwalk, "Mountain"),
+        (Keyword.Swampwalk, "Swamp"),
+        (Keyword.Forestwalk, "Forest"),
+        (Keyword.Islandwalk, "Island"),
+        (Keyword.Plainswalk, "Plains"),
+    ];
+
     private readonly GameState _state;
     private readonly TurnStateMachine _turnStateMachine = new();
     private readonly Dictionary<ActionType, IActionHandler> _handlers = new();
@@ -1053,6 +1062,11 @@ public class GameEngine
         {
             var blockerAssignments = await defender.DecisionHandler.ChooseBlockers(eligibleBlockers, attackerCards, ct);
 
+            var defenderLandSubtypes = defender.Battlefield.Cards
+                .Where(c => c.IsLand)
+                .SelectMany(c => c.Subtypes)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
             // Validate and register blocker assignments
             foreach (var (blockerId, attackerCardId) in blockerAssignments)
             {
@@ -1062,45 +1076,18 @@ public class GameEngine
                     var blockerCard = defender.Battlefield.Cards.FirstOrDefault(c => c.Id == blockerId);
                     if (attackerCard == null || blockerCard == null) continue;
 
-                    // Mountainwalk: cannot be blocked if defender controls a Mountain
-                    if (attackerCard.ActiveKeywords.Contains(Keyword.Mountainwalk)
-                        && defender.Battlefield.Cards.Any(c => c.Subtypes.Contains("Mountain")))
+                    // Landwalk: cannot be blocked if defender controls a land with matching subtype
+                    var hasLandwalk = false;
+                    foreach (var (walk, landSubtype) in LandwalkKeywords)
                     {
-                        _state.Log($"{attackerCard.Name} has mountainwalk — cannot be blocked.");
-                        continue;
+                        if (attackerCard.ActiveKeywords.Contains(walk) && defenderLandSubtypes.Contains(landSubtype))
+                        {
+                            _state.Log($"{attackerCard.Name} has {walk} — cannot be blocked.");
+                            hasLandwalk = true;
+                            break;
+                        }
                     }
-
-                    // Swampwalk: cannot be blocked if defender controls a Swamp
-                    if (attackerCard.ActiveKeywords.Contains(Keyword.Swampwalk)
-                        && defender.Battlefield.Cards.Any(c => c.Subtypes.Contains("Swamp")))
-                    {
-                        _state.Log($"{attackerCard.Name} has swampwalk — cannot be blocked.");
-                        continue;
-                    }
-
-                    // Forestwalk: cannot be blocked if defender controls a Forest
-                    if (attackerCard.ActiveKeywords.Contains(Keyword.Forestwalk)
-                        && defender.Battlefield.Cards.Any(c => c.Subtypes.Contains("Forest")))
-                    {
-                        _state.Log($"{attackerCard.Name} has forestwalk — cannot be blocked.");
-                        continue;
-                    }
-
-                    // Islandwalk: cannot be blocked if defender controls an Island
-                    if (attackerCard.ActiveKeywords.Contains(Keyword.Islandwalk)
-                        && defender.Battlefield.Cards.Any(c => c.Subtypes.Contains("Island")))
-                    {
-                        _state.Log($"{attackerCard.Name} has islandwalk — cannot be blocked.");
-                        continue;
-                    }
-
-                    // Plainswalk: cannot be blocked if defender controls a Plains
-                    if (attackerCard.ActiveKeywords.Contains(Keyword.Plainswalk)
-                        && defender.Battlefield.Cards.Any(c => c.Subtypes.Contains("Plains")))
-                    {
-                        _state.Log($"{attackerCard.Name} has plainswalk — cannot be blocked.");
-                        continue;
-                    }
+                    if (hasLandwalk) continue;
 
                     // Shadow: shadow can only be blocked by shadow; non-shadow can't be blocked by shadow
                     if (attackerCard.ActiveKeywords.Contains(Keyword.Shadow)
