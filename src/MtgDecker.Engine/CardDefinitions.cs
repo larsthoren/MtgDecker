@@ -130,7 +130,7 @@ public static class CardDefinitions
                 ActivatedAbilities = [new(new ActivatedAbilityCost(SacrificeSubtype: "Goblin"), new AddManaEffect(ManaColor.Red))],
             },
             ["Naturalize"] = new(ManaCost.Parse("{1}{G}"), null, null, null, CardType.Instant,
-                TargetFilter.EnchantmentOrArtifact(), new NaturalizeEffect())
+                TargetFilter.EnchantmentOrArtifact(), new DestroyTargetSpellEffect())
             {
                 SpellRole = SpellRole.InstantRemoval,
             },
@@ -429,19 +429,19 @@ public static class CardDefinitions
 
             // Common removal
             ["Disenchant"] = new(ManaCost.Parse("{1}{W}"), null, null, null, CardType.Instant,
-                TargetFilter.EnchantmentOrArtifact(), new NaturalizeEffect())
+                TargetFilter.EnchantmentOrArtifact(), new DestroyTargetSpellEffect())
             {
                 SpellRole = SpellRole.InstantRemoval,
             },
             ["Vindicate"] = new(ManaCost.Parse("{1}{W}{B}"), null, null, null, CardType.Sorcery,
-                TargetFilter.AnyPermanent(), new DestroyPermanentEffect()),
+                TargetFilter.AnyPermanent(), new DestroyTargetSpellEffect()),
             ["Smother"] = new(ManaCost.Parse("{1}{B}"), null, null, null, CardType.Instant,
-                TargetFilter.CreatureWithCMCAtMost(3), new DestroyCreatureEffect())
+                TargetFilter.CreatureWithCMCAtMost(3), new DestroyTargetSpellEffect())
             {
                 SpellRole = SpellRole.InstantRemoval,
             },
             ["Snuff Out"] = new(ManaCost.Parse("{3}{B}"), null, null, null, CardType.Instant,
-                TargetFilter.NonBlackCreature(), new DestroyCreatureEffect())
+                TargetFilter.NonBlackCreature(), new DestroyTargetSpellEffect())
             {
                 AlternateCost = new AlternateCost(LifeCost: 4, RequiresControlSubtype: "Swamp"),
                 SpellRole = SpellRole.InstantRemoval,
@@ -761,7 +761,7 @@ public static class CardDefinitions
                 Triggers = [new Trigger(GameEvent.Upkeep, TriggerCondition.AnyUpkeep, new OathOfDruidsEffect())],
             },
             ["Ray of Revelation"] = new(ManaCost.Parse("{1}{W}"), null, null, null, CardType.Instant,
-                TargetFilter.Enchantment(), new NaturalizeEffect())
+                TargetFilter.Enchantment(), new DestroyTargetSpellEffect())
             {
                 FlashbackCost = new FlashbackCost(ManaCost.Parse("{G}")),
                 SpellRole = SpellRole.InstantRemoval,
@@ -1574,7 +1574,7 @@ public static class CardDefinitions
                 AlternateCost = new AlternateCost(ExileFromGraveyardCount: 3, ExileFromGraveyardColor: ManaColor.Black),
             },
             ["Mogg Salvage"] = new(ManaCost.Parse("{2}{R}"), null, null, null, CardType.Instant,
-                TargetFilter.Artifact(), new NaturalizeEffect())
+                TargetFilter.Artifact(), new DestroyTargetSpellEffect())
             {
                 AlternateCost = new AlternateCost(RequiresControlSubtype: "Mountain", RequiresOpponentSubtype: "Island"),
             },
