@@ -86,20 +86,6 @@ public class SimulationRunner
             Games: results);
     }
 
-    private static GameCard CloneCard(GameCard original) => new()
-    {
-        Name = original.Name,
-        TypeLine = original.TypeLine,
-        ImageUrl = original.ImageUrl,
-        ManaCost = original.ManaCost,
-        ManaAbility = original.ManaAbility,
-        Power = original.Power,
-        Toughness = original.Toughness,
-        CardTypes = original.CardTypes,
-        Subtypes = original.Subtypes,
-        Triggers = original.Triggers,
-        IsToken = original.IsToken,
-        IsLegendary = original.IsLegendary,
-        FetchAbility = original.FetchAbility,
-    };
+    private static GameCard CloneCard(GameCard original) => GameCard.Create(
+        original.Name, original.TypeLine, original.ImageUrl);
 }
