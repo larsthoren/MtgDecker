@@ -8,6 +8,14 @@ namespace MtgDecker.Engine;
 
 public class GameEngine
 {
+    private static readonly (Keyword Protection, ManaColor Color, string Name)[] ProtectionColors =
+    [
+        (Keyword.ProtectionFromBlack, ManaColor.Black, "black"),
+        (Keyword.ProtectionFromRed, ManaColor.Red, "red"),
+        (Keyword.ProtectionFromBlue, ManaColor.Blue, "blue"),
+        (Keyword.ProtectionFromWhite, ManaColor.White, "white"),
+    ];
+
     private readonly GameState _state;
     private readonly TurnStateMachine _turnStateMachine = new();
     private readonly Dictionary<ActionType, IActionHandler> _handlers = new();
@@ -633,25 +641,13 @@ public class GameEngine
             .Where(c => c != ManaColor.Colorless)
             .ToHashSet() ?? new HashSet<ManaColor>();
 
-        if (attacker.ActiveKeywords.Contains(Keyword.ProtectionFromBlack) && blockerColors.Contains(ManaColor.Black))
+        foreach (var (protection, color, name) in ProtectionColors)
         {
-            _state.Log($"{blocker.Name} cannot block {attacker.Name} — protection from black.");
-            return true;
-        }
-        if (attacker.ActiveKeywords.Contains(Keyword.ProtectionFromRed) && blockerColors.Contains(ManaColor.Red))
-        {
-            _state.Log($"{blocker.Name} cannot block {attacker.Name} — protection from red.");
-            return true;
-        }
-        if (attacker.ActiveKeywords.Contains(Keyword.ProtectionFromBlue) && blockerColors.Contains(ManaColor.Blue))
-        {
-            _state.Log($"{blocker.Name} cannot block {attacker.Name} — protection from blue.");
-            return true;
-        }
-        if (attacker.ActiveKeywords.Contains(Keyword.ProtectionFromWhite) && blockerColors.Contains(ManaColor.White))
-        {
-            _state.Log($"{blocker.Name} cannot block {attacker.Name} — protection from white.");
-            return true;
+            if (attacker.ActiveKeywords.Contains(protection) && blockerColors.Contains(color))
+            {
+                _state.Log($"{blocker.Name} cannot block {attacker.Name} — protection from {name}.");
+                return true;
+            }
         }
 
         return false;
