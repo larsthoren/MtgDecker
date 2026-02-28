@@ -45,7 +45,7 @@ public class ScryfallClient : IScryfallClient
     public async Task<(List<Card> Found, List<string> NotFound)> FetchCardsByNamesAsync(
         IEnumerable<string> names, CancellationToken ct = default)
     {
-        var nameList = names.ToList();
+        var nameList = names.Where(n => !string.IsNullOrWhiteSpace(n)).ToList();
         var allCards = new List<Card>();
         var allNotFound = new List<string>();
 
@@ -58,10 +58,15 @@ public class ScryfallClient : IScryfallClient
             var requestBody = new { identifiers };
 
             var json = JsonSerializer.Serialize(requestBody);
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            var content = new StringContent(json, Encoding.UTF8, System.Net.Http.Headers.MediaTypeHeaderValue.Parse("application/json"));
 
             var response = await _httpClient.PostAsync("cards/collection", content, ct);
-            response.EnsureSuccessStatusCode();
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorBody = await response.Content.ReadAsStringAsync(ct);
+                throw new HttpRequestException(
+                    $"Scryfall collection API returned {(int)response.StatusCode}: {errorBody}");
+            }
 
             var responseStream = await response.Content.ReadAsStreamAsync(ct);
             var result = await JsonSerializer.DeserializeAsync<ScryfallCollectionResponse>(
