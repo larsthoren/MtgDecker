@@ -1498,7 +1498,7 @@ public class GameEngine
         }
 
         // Reset all effective values for both players
-        foreach (var player in new[] { _state.Player1, _state.Player2 })
+        foreach (var player in _state.Players)
         {
             foreach (var card in player.Battlefield.Cards)
             {
@@ -1548,7 +1548,7 @@ public class GameEngine
             if (effect.StateCondition != null && !effect.StateCondition(_state))
                 continue;
 
-            foreach (var player in new[] { _state.Player1, _state.Player2 })
+            foreach (var player in _state.Players)
             {
                 foreach (var card in player.Battlefield.Cards)
                 {
@@ -1577,7 +1577,7 @@ public class GameEngine
         }
 
         // === LAYER 7a: CDA (characteristic-defining abilities) ===
-        foreach (var player in new[] { _state.Player1, _state.Player2 })
+        foreach (var player in _state.Players)
         {
             foreach (var card in player.Battlefield.Cards)
             {
@@ -1603,7 +1603,7 @@ public class GameEngine
             if (effect.StateCondition != null && !effect.StateCondition(_state))
                 continue;
 
-            foreach (var player in new[] { _state.Player1, _state.Player2 })
+            foreach (var player in _state.Players)
             {
                 foreach (var card in player.Battlefield.Cards)
                 {
@@ -1634,7 +1634,7 @@ public class GameEngine
         }
 
         // === LAYER 7d: +1/+1 counter adjustments (MTG Layer 7d) ===
-        foreach (var player in new[] { _state.Player1, _state.Player2 })
+        foreach (var player in _state.Players)
         {
             foreach (var card in player.Battlefield.Cards)
             {
@@ -1885,7 +1885,7 @@ public class GameEngine
             }
 
             // Aura detachment (MTG 704.5m) — aura goes to graveyard if enchanted permanent is gone
-            foreach (var p in new[] { _state.Player1, _state.Player2 })
+            foreach (var p in _state.Players)
             {
                 var auras = p.Battlefield.Cards.Where(c => c.AttachedTo.HasValue).ToList();
                 foreach (var aura in auras)
@@ -1904,7 +1904,7 @@ public class GameEngine
             }
 
             // SBA: Planeswalker with 0 or less loyalty → graveyard (MTG 704.5i)
-            foreach (var player in new[] { _state.Player1, _state.Player2 })
+            foreach (var player in _state.Players)
             {
                 var dyingPws = player.Battlefield.Cards
                     .Where(c => c.IsPlaneswalker && c.Loyalty <= 0)
@@ -2083,7 +2083,7 @@ public class GameEngine
     private List<TriggeredAbilityStackObject> CollectBoardTriggers(GameEvent evt, GameCard? relevantCard, Player player)
     {
         var result = new List<TriggeredAbilityStackObject>();
-        var permanents = player.Battlefield.Cards.ToList();
+        var permanents = player.Battlefield.Cards;
 
         foreach (var permanent in permanents)
         {
@@ -2712,7 +2712,7 @@ public class GameEngine
 
     private void QueueDrawTriggers(Player drawingPlayer)
     {
-        foreach (var player in new[] { _state.Player1, _state.Player2 })
+        foreach (var player in _state.Players)
         {
             foreach (var card in player.Battlefield.Cards)
             {
@@ -2825,7 +2825,7 @@ public class GameEngine
 
     internal void QueueDiscardTriggers(Player discardingPlayer)
     {
-        foreach (var player in new[] { _state.Player1, _state.Player2 })
+        foreach (var player in _state.Players)
         {
             foreach (var card in player.Battlefield.Cards)
             {

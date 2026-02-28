@@ -7,7 +7,7 @@ public class EachPlayerDiscardsEffect : IEffect
 
     public async Task Execute(EffectContext context, CancellationToken ct = default)
     {
-        foreach (var player in new[] { context.State.Player1, context.State.Player2 })
+        foreach (var player in context.State.Players)
         {
             for (int i = 0; i < Count && player.Hand.Cards.Count > 0; i++)
             {

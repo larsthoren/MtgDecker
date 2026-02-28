@@ -7,6 +7,7 @@ public class GameState
 {
     public Player Player1 { get; }
     public Player Player2 { get; }
+    public IReadOnlyList<Player> Players { get; }
     public Player ActivePlayer { get; set; }
     public Player PriorityPlayer { get; set; }
     public Phase CurrentPhase { get; set; }
@@ -100,6 +101,7 @@ public class GameState
     {
         Player1 = player1;
         Player2 = player2;
+        Players = [player1, player2];
         ActivePlayer = player1;
         PriorityPlayer = player1;
         CurrentPhase = Phase.Untap;

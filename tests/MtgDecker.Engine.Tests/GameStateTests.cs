@@ -61,4 +61,22 @@ public class GameStateTests
 
         fired.Should().BeTrue();
     }
+
+    [Fact]
+    public void Players_ReturnsBothPlayers()
+    {
+        var state = TestHelper.CreateState();
+
+        state.Players.Should().HaveCount(2);
+        state.Players.Should().Contain(state.Player1);
+        state.Players.Should().Contain(state.Player2);
+    }
+
+    [Fact]
+    public void Players_ReturnsSameInstance()
+    {
+        var state = TestHelper.CreateState();
+
+        state.Players.Should().BeSameAs(state.Players);
+    }
 }

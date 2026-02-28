@@ -12,7 +12,7 @@ public class PowderKegDestroyEffect : IEffect
     {
         var fuseCount = context.Source.GetCounters(CounterType.Fuse);
 
-        foreach (var player in new[] { context.State.Player1, context.State.Player2 })
+        foreach (var player in context.State.Players)
         {
             var toDestroy = player.Battlefield.Cards
                 .Where(c => (c.IsCreature || c.CardTypes.HasFlag(CardType.Artifact))

@@ -8,7 +8,7 @@ public class PriceOfProgressEffect : SpellEffect
 {
     public override void Resolve(GameState state, StackObject spell)
     {
-        foreach (var player in new[] { state.Player1, state.Player2 })
+        foreach (var player in state.Players)
         {
             var nonbasicCount = player.Battlefield.Cards
                 .Count(c => c.IsLand && !c.IsBasicLand);

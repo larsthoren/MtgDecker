@@ -47,7 +47,7 @@ public class EarthquakeEffect : SpellEffect
         }
 
         // Deal X damage to each creature without flying
-        foreach (var player in new[] { state.Player1, state.Player2 })
+        foreach (var player in state.Players)
         {
             foreach (var creature in player.Battlefield.Cards.Where(c => c.IsCreature))
             {
