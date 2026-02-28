@@ -2,6 +2,8 @@ using FluentAssertions;
 using MtgDecker.Engine;
 using MtgDecker.Engine.Enums;
 using MtgDecker.Engine.Mana;
+using MtgDecker.Engine.Triggers;
+using MtgDecker.Engine.Triggers.Effects;
 
 namespace MtgDecker.Engine.Tests;
 
@@ -140,5 +142,32 @@ public class GameCardTests
         var card = new GameCard { Name = "Some Custom Land", TypeLine = "Land" };
 
         card.IsLand.Should().BeTrue();
+    }
+
+    [Fact]
+    public void EffectiveTriggers_ReturnsTriggers_WhenCardHasTriggers()
+    {
+        var trigger = new Trigger(GameEvent.EnterBattlefield, TriggerCondition.Self, new DrawCardEffect());
+        var card = new GameCard { Name = "Test", Triggers = [trigger] };
+
+        card.EffectiveTriggers.Should().HaveCount(1);
+        card.EffectiveTriggers[0].Should().BeSameAs(trigger);
+    }
+
+    [Fact]
+    public void EffectiveTriggers_FallsBackToCardDefinitions_WhenEmpty()
+    {
+        // Goblin Matron is registered in CardDefinitions with triggers
+        var card = new GameCard { Name = "Goblin Matron" };
+
+        card.EffectiveTriggers.Should().NotBeEmpty();
+    }
+
+    [Fact]
+    public void EffectiveTriggers_ReturnsEmpty_WhenNoTriggersAndNotRegistered()
+    {
+        var card = new GameCard { Name = "Totally Fake Card Name 12345" };
+
+        card.EffectiveTriggers.Should().BeEmpty();
     }
 }

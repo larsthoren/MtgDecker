@@ -2035,9 +2035,7 @@ public class GameEngine
 
         foreach (var permanent in permanents)
         {
-            var triggers = permanent.Triggers.Count > 0
-                ? permanent.Triggers
-                : (CardDefinitions.TryGet(permanent.Name, out var def) ? def.Triggers : []);
+            var triggers = permanent.EffectiveTriggers;
             if (triggers.Count == 0) continue;
             // Suppression: if this permanent is a creature that lost abilities, skip its triggers
             if (permanent.IsCreature && permanent.AbilitiesRemoved) continue;
@@ -2146,9 +2144,7 @@ public class GameEngine
         if (attacker.AbilitiesRemoved) return Task.CompletedTask;
 
         var player = _state.ActivePlayer;
-        var triggers = attacker.Triggers.Count > 0
-            ? attacker.Triggers
-            : (CardDefinitions.TryGet(attacker.Name, out var def) ? def.Triggers : []);
+        var triggers = attacker.EffectiveTriggers;
 
         foreach (var trigger in triggers)
         {
@@ -2164,10 +2160,7 @@ public class GameEngine
     /// <summary>Queues cast triggers from the spell itself (e.g., Emrakul extra turn on cast).</summary>
     internal Task QueueSelfCastTriggersAsync(GameCard card, Player controller, CancellationToken ct)
     {
-        // Check triggers on the card instance first, then fall back to CardDefinitions
-        var triggers = card.Triggers.Count > 0
-            ? card.Triggers
-            : (CardDefinitions.TryGet(card.Name, out var def) ? def.Triggers : []);
+        var triggers = card.EffectiveTriggers;
 
         foreach (var trigger in triggers)
         {
@@ -2188,9 +2181,7 @@ public class GameEngine
 
         foreach (var card in activePlayer.Graveyard.Cards)
         {
-            var triggers = card.Triggers.Count > 0
-                ? card.Triggers
-                : (CardDefinitions.TryGet(card.Name, out var def) ? def.Triggers : []);
+            var triggers = card.EffectiveTriggers;
 
             foreach (var trigger in triggers)
             {
@@ -2777,9 +2768,7 @@ public class GameEngine
             {
                 if (card.AbilitiesRemoved) continue;
 
-                var triggers = card.Triggers.Count > 0
-                    ? card.Triggers
-                    : (CardDefinitions.TryGet(card.Name, out var def) ? def.Triggers : []);
+                var triggers = card.EffectiveTriggers;
 
                 foreach (var trigger in triggers)
                 {

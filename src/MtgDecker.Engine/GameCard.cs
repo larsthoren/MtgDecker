@@ -72,6 +72,15 @@ public class GameCard
 
     public IReadOnlyList<string> Subtypes { get; init; } = [];
     public IReadOnlyList<Trigger> Triggers { get; init; } = [];
+
+    /// <summary>
+    /// Returns card instance triggers if any, otherwise falls back to CardDefinitions registry.
+    /// Uses FrontName for the lookup since CardDefinitions registers cards by front name.
+    /// </summary>
+    public IReadOnlyList<Trigger> EffectiveTriggers =>
+        Triggers.Count > 0
+            ? Triggers
+            : (CardDefinitions.TryGet(FrontName, out var def) ? def.Triggers : []);
     public bool IsToken { get; init; }
     public bool IsLegendary { get; init; }
     public bool EntersTapped { get; init; }
