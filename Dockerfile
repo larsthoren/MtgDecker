@@ -12,7 +12,7 @@ RUN dotnet restore src/MtgDecker.Web/MtgDecker.Web.csproj
 
 # Copy everything and publish
 COPY src/ src/
-RUN dotnet publish src/MtgDecker.Web/MtgDecker.Web.csproj -c Release -o /app/publish --no-restore
+RUN dotnet publish src/MtgDecker.Web/MtgDecker.Web.csproj -c Release -o /app/publish
 
 # Runtime stage
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime

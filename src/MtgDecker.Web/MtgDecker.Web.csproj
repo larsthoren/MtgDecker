@@ -16,6 +16,9 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
+    <!-- .NET 10 no longer embeds blazor.web.js in assemblies; this ensures
+         the _framework static assets are generated during dotnet publish -->
+    <RequiresAspNetWebAssets>true</RequiresAspNetWebAssets>
   </PropertyGroup>
 
 </Project>
