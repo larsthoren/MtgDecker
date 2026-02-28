@@ -72,6 +72,18 @@ _ = Task.Run(async () =>
         }
 
         Console.WriteLine("[Startup] Seeding complete.");
+
+        // Readiness check — verify DB has the data the app needs
+        using (var checkScope = app.Services.CreateScope())
+        {
+            var checkDb = checkScope.ServiceProvider.GetRequiredService<MtgDeckerDbContext>();
+            var readiness = await GetReadinessAsync(checkDb);
+            Console.WriteLine($"[Startup] Readiness: {readiness.CardCount} cards, {readiness.SystemDeckCount} system decks, {readiness.FormatSummary}");
+            if (readiness.CardCount == 0)
+                Console.WriteLine("[Startup] WARNING: No cards in database — game lobby will have no decks to choose.");
+            if (readiness.SystemDeckCount == 0)
+                Console.WriteLine("[Startup] WARNING: No system decks — game lobby will be empty.");
+        }
     }
     catch (Exception ex)
     {
@@ -101,7 +113,7 @@ if (!app.Environment.IsDevelopment())
                         path.EndsWith(".js", StringComparison.OrdinalIgnoreCase) ||
                         path.EndsWith(".css", StringComparison.OrdinalIgnoreCase) ||
                         path == "/not-found" ||
-                        path == "/health";
+                        path.StartsWith("/health", StringComparison.OrdinalIgnoreCase);
 
         if (!isAllowed)
         {
@@ -123,9 +135,48 @@ if (app.Environment.IsDevelopment())
 app.UseAntiforgery();
 
 app.MapGet("/health", () => Results.Ok("healthy"));
+app.MapGet("/health/ready", async (MtgDeckerDbContext db) =>
+{
+    var readiness = await GetReadinessAsync(db);
+    return Results.Ok(readiness);
+});
 app.UseStaticFiles();
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
 app.Run();
+
+static async Task<ReadinessResult> GetReadinessAsync(MtgDeckerDbContext db)
+{
+    var cardCount = await db.Cards.CountAsync();
+    var systemDecks = await db.Decks
+        .Where(d => d.UserId == null)
+        .Select(d => new { d.Name, d.Format })
+        .ToListAsync();
+    var userDeckCount = await db.Decks.CountAsync(d => d.UserId != null);
+
+    var byFormat = systemDecks
+        .GroupBy(d => d.Format)
+        .ToDictionary(g => g.Key.ToString(), g => g.Count());
+
+    var formatSummary = byFormat.Count > 0
+        ? string.Join(", ", byFormat.Select(kv => $"{kv.Key}: {kv.Value}"))
+        : "none";
+
+    return new ReadinessResult(
+        cardCount,
+        systemDecks.Count,
+        userDeckCount,
+        byFormat,
+        systemDecks.Select(d => d.Name).Order().ToList(),
+        formatSummary);
+}
+
+record ReadinessResult(
+    int CardCount,
+    int SystemDeckCount,
+    int UserDeckCount,
+    Dictionary<string, int> DecksByFormat,
+    List<string> SystemDeckNames,
+    string FormatSummary);
