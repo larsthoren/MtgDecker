@@ -138,6 +138,19 @@ public class GameState
         return effectController != null && effectController.Id != caster.Id;
     }
 
+    public async Task PerformDiscardAsync(GameCard card, Player player, Guid causedByPlayerId, CancellationToken ct = default)
+    {
+        player.Hand.Remove(card);
+        LastDiscardCausedByPlayerId = causedByPlayerId;
+        if (HandleDiscardAsync != null)
+            await HandleDiscardAsync(card, player, ct);
+        else
+        {
+            player.Graveyard.Add(card);
+            Log($"{player.Name} discards {card.Name}.");
+        }
+    }
+
     public void Log(string message)
     {
         lock (_logLock)

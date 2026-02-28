@@ -155,4 +155,32 @@ public class GameStateTests
         // Player1 controls the source, so it shouldn't apply to Player1's spells
         state.ComputeCostModification(card, state.Player1).Should().Be(0);
     }
+
+    [Fact]
+    public async Task PerformDiscardAsync_MovesCardToGraveyard_WhenNoHandler()
+    {
+        var state = TestHelper.CreateState();
+        var card = new GameCard { Name = "Test" };
+        state.Player1.Hand.Add(card);
+
+        await state.PerformDiscardAsync(card, state.Player1, state.Player2.Id);
+
+        state.Player1.Hand.Cards.Should().NotContain(c => c.Id == card.Id);
+        state.Player1.Graveyard.Cards.Should().Contain(c => c.Id == card.Id);
+        state.LastDiscardCausedByPlayerId.Should().Be(state.Player2.Id);
+    }
+
+    [Fact]
+    public async Task PerformDiscardAsync_CallsHandler_WhenSet()
+    {
+        var state = TestHelper.CreateState();
+        var card = new GameCard { Name = "Test" };
+        state.Player1.Hand.Add(card);
+        var handlerCalled = false;
+        state.HandleDiscardAsync = (c, p, ct) => { handlerCalled = true; return Task.CompletedTask; };
+
+        await state.PerformDiscardAsync(card, state.Player1, state.Player2.Id);
+
+        handlerCalled.Should().BeTrue();
+    }
 }

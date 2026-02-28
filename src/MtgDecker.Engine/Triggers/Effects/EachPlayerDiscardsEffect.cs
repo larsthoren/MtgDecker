@@ -12,15 +12,7 @@ public class EachPlayerDiscardsEffect : IEffect
             for (int i = 0; i < Count && player.Hand.Cards.Count > 0; i++)
             {
                 var card = player.Hand.Cards[^1];
-                player.Hand.Remove(card);
-                context.State.LastDiscardCausedByPlayerId = context.Controller.Id;
-                if (context.State.HandleDiscardAsync != null)
-                    await context.State.HandleDiscardAsync(card, player, ct);
-                else
-                {
-                    player.Graveyard.Add(card);
-                    context.State.Log($"{player.Name} discards {card.Name} to {context.Source.Name}.");
-                }
+                await context.State.PerformDiscardAsync(card, player, context.Controller.Id, ct);
             }
         }
     }
