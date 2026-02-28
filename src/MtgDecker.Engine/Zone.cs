@@ -25,7 +25,11 @@ public class Zone
 
     public void Add(GameCard card) { lock (_lock) { _cards.Add(card); _cardIds.Add(card.Id); } }
 
-    public void AddToTop(GameCard card) { lock (_lock) { _cards.Add(card); _cardIds.Add(card.Id); } }
+    /// <summary>
+    /// Adds card to the top of the zone (same as Add — top is the end of the internal list,
+    /// which is where DrawFromTop reads from).
+    /// </summary>
+    public void AddToTop(GameCard card) => Add(card);
 
     public void AddToBottom(GameCard card) { lock (_lock) { _cards.Insert(0, card); _cardIds.Add(card.Id); } }
 
