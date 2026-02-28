@@ -121,6 +121,23 @@ public class GameState
         return null;
     }
 
+    public int ComputeCostModification(GameCard card, Player caster)
+    {
+        return ActiveEffects
+            .Where(e => e.Type == ContinuousEffectType.ModifyCost
+                   && e.CostApplies != null
+                   && e.CostApplies(card)
+                   && IsCostEffectApplicable(e, caster))
+            .Sum(e => e.CostMod);
+    }
+
+    private bool IsCostEffectApplicable(ContinuousEffect effect, Player caster)
+    {
+        if (!effect.CostAppliesToOpponent) return true;
+        var effectController = GetCardController(effect.SourceId);
+        return effectController != null && effectController.Id != caster.Id;
+    }
+
     public void Log(string message)
     {
         lock (_logLock)

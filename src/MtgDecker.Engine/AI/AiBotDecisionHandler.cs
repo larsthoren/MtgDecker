@@ -336,7 +336,7 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
     private static ManaCost GetEffectiveCost(GameCard card, GameState gameState, Player player)
     {
         var cost = card.ManaCost!;
-        var reduction = ComputeCostModification(gameState, card, player);
+        var reduction = gameState.ComputeCostModification(card, player);
         if (reduction != 0)
             cost = cost.WithGenericReduction(-reduction);
         return cost;
@@ -1208,7 +1208,7 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
                         {
                             var spellCost = c.ManaCost!;
                             // Apply cost modification
-                            var reduction = ComputeCostModification(gameState, c, player);
+                            var reduction = gameState.ComputeCostModification(c, player);
                             if (reduction != 0)
                                 spellCost = spellCost.WithGenericReduction(-reduction);
 
@@ -1229,22 +1229,4 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
         return null;
     }
 
-    private static int ComputeCostModification(GameState gameState, GameCard card, Player caster)
-    {
-        return gameState.ActiveEffects
-            .Where(e => e.Type == ContinuousEffectType.ModifyCost
-                   && e.CostApplies != null
-                   && e.CostApplies(card)
-                   && IsCostEffectApplicable(gameState, e, caster))
-            .Sum(e => e.CostMod);
-    }
-
-    private static bool IsCostEffectApplicable(GameState gameState, ContinuousEffect effect, Player caster)
-    {
-        if (!effect.CostAppliesToOpponent) return true;
-
-        var effectController = gameState.GetCardController(effect.SourceId);
-
-        return effectController != null && effectController.Id != caster.Id;
-    }
 }

@@ -1763,25 +1763,7 @@ public class GameEngine
         => CollectBoardTriggers(evt, relevantCard, player);
 
     internal int ComputeCostModification(GameCard card, Player caster)
-    {
-        return _state.ActiveEffects
-            .Where(e => e.Type == ContinuousEffectType.ModifyCost
-                   && e.CostApplies != null
-                   && e.CostApplies(card)
-                   && IsCostEffectApplicable(e, caster))
-            .Sum(e => e.CostMod);
-    }
-
-    private bool IsCostEffectApplicable(ContinuousEffect effect, Player caster)
-    {
-        if (!effect.CostAppliesToOpponent) return true;
-
-        // For opponent-only effects, find who controls the source
-        var effectController = _state.GetCardController(effect.SourceId);
-
-        // Only apply if the caster is the opponent (not the controller)
-        return effectController != null && effectController.Id != caster.Id;
-    }
+        => _state.ComputeCostModification(card, caster);
 
     internal async Task OnBoardChangedAsync(CancellationToken ct = default)
     {

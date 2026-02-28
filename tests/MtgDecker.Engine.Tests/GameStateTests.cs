@@ -107,4 +107,52 @@ public class GameStateTests
 
         state.GetCardController(Guid.NewGuid()).Should().BeNull();
     }
+
+    [Fact]
+    public void ComputeCostModification_ReturnsZero_WhenNoEffects()
+    {
+        var state = TestHelper.CreateState();
+        var card = new GameCard { Name = "Lightning Bolt" };
+
+        state.ComputeCostModification(card, state.Player1).Should().Be(0);
+    }
+
+    [Fact]
+    public void ComputeCostModification_SumsApplicableEffects()
+    {
+        var state = TestHelper.CreateState();
+        var card = new GameCard { Name = "Lightning Bolt", CardTypes = CardType.Instant };
+        var source = new GameCard { Name = "Sphere of Resistance" };
+        state.Player2.Battlefield.Add(source);
+
+        state.ActiveEffects.Add(new ContinuousEffect(
+            SourceId: source.Id,
+            Type: ContinuousEffectType.ModifyCost,
+            Applies: (_, _) => false,
+            CostMod: 1,
+            CostApplies: _ => true,
+            CostAppliesToOpponent: true));
+
+        state.ComputeCostModification(card, state.Player1).Should().Be(1);
+    }
+
+    [Fact]
+    public void ComputeCostModification_SkipsOwnEffects_WhenCostAppliesToOpponent()
+    {
+        var state = TestHelper.CreateState();
+        var card = new GameCard { Name = "Lightning Bolt" };
+        var source = new GameCard { Name = "Sphere" };
+        state.Player1.Battlefield.Add(source);
+
+        state.ActiveEffects.Add(new ContinuousEffect(
+            SourceId: source.Id,
+            Type: ContinuousEffectType.ModifyCost,
+            Applies: (_, _) => false,
+            CostMod: 1,
+            CostApplies: _ => true,
+            CostAppliesToOpponent: true));
+
+        // Player1 controls the source, so it shouldn't apply to Player1's spells
+        state.ComputeCostModification(card, state.Player1).Should().Be(0);
+    }
 }
