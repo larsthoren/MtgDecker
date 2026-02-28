@@ -79,4 +79,32 @@ public class GameStateTests
 
         state.Players.Should().BeSameAs(state.Players);
     }
+
+    [Fact]
+    public void GetCardController_ReturnsPlayer1_WhenCardOnPlayer1Battlefield()
+    {
+        var state = TestHelper.CreateState();
+        var card = new GameCard { Name = "Test" };
+        state.Player1.Battlefield.Add(card);
+
+        state.GetCardController(card.Id).Should().Be(state.Player1);
+    }
+
+    [Fact]
+    public void GetCardController_ReturnsPlayer2_WhenCardOnPlayer2Battlefield()
+    {
+        var state = TestHelper.CreateState();
+        var card = new GameCard { Name = "Test" };
+        state.Player2.Battlefield.Add(card);
+
+        state.GetCardController(card.Id).Should().Be(state.Player2);
+    }
+
+    [Fact]
+    public void GetCardController_ReturnsNull_WhenCardNotOnBattlefield()
+    {
+        var state = TestHelper.CreateState();
+
+        state.GetCardController(Guid.NewGuid()).Should().BeNull();
+    }
 }

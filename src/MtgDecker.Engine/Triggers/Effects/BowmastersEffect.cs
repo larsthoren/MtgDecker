@@ -69,8 +69,7 @@ public class BowmastersEffect : IEffect
     {
         var hasDamageProtection = context.State.ActiveEffects.Any(e =>
             e.Type == ContinuousEffectType.PreventDamageToPlayer
-            && (context.State.Player1.Battlefield.Contains(e.SourceId)
-                ? context.State.Player1 : context.State.Player2).Id == player.Id);
+            && context.State.GetCardController(e.SourceId)?.Id == player.Id);
 
         // Check for color-specific shield (Circle of Protection)
         var colorShield = player.DamagePreventionShields

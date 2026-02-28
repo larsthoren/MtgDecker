@@ -114,6 +114,13 @@ public class GameState
     public Player GetPlayer(Guid playerId) =>
         playerId == Player1.Id ? Player1 : Player2;
 
+    public Player? GetCardController(Guid cardId)
+    {
+        if (Player1.Battlefield.Contains(cardId)) return Player1;
+        if (Player2.Battlefield.Contains(cardId)) return Player2;
+        return null;
+    }
+
     public void Log(string message)
     {
         lock (_logLock)

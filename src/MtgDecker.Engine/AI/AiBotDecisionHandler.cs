@@ -1243,8 +1243,7 @@ public class AiBotDecisionHandler : IPlayerDecisionHandler
     {
         if (!effect.CostAppliesToOpponent) return true;
 
-        var effectController = gameState.Player1.Battlefield.Contains(effect.SourceId) ? gameState.Player1
-            : gameState.Player2.Battlefield.Contains(effect.SourceId) ? gameState.Player2 : null;
+        var effectController = gameState.GetCardController(effect.SourceId);
 
         return effectController != null && effectController.Id != caster.Id;
     }

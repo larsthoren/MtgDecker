@@ -7,12 +7,7 @@ public class ExileCreatureEffect : IEffect
         var target = context.Target;
         if (target == null) return;
 
-        Player? owner = null;
-        if (context.State.Player1.Battlefield.Contains(target.Id))
-            owner = context.State.Player1;
-        else if (context.State.Player2.Battlefield.Contains(target.Id))
-            owner = context.State.Player2;
-
+        var owner = context.State.GetCardController(target.Id);
         if (owner == null) return;
 
         if (context.FireLeaveBattlefieldTriggers != null)

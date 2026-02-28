@@ -162,8 +162,7 @@ internal class TapCardHandler : IActionHandler
                     {
                         FireLeaveBattlefieldTriggers = async card =>
                         {
-                            var ctrl = state.Player1.Battlefield.Contains(card.Id) ? state.Player1
-                                : state.Player2.Battlefield.Contains(card.Id) ? state.Player2 : null;
+                            var ctrl = state.GetCardController(card.Id);
                             if (ctrl != null) await engine.FireLeaveBattlefieldTriggersAsync(card, ctrl, ct);
                         },
                     };

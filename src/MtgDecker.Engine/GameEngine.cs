@@ -210,8 +210,7 @@ public class GameEngine
                 // Check for SkipDraw effects on the active player's permanents
                 var hasSkipDraw = _state.ActiveEffects.Any(e =>
                     e.Type == ContinuousEffectType.SkipDraw
-                    && (_state.Player1.Battlefield.Contains(e.SourceId)
-                        ? _state.Player1 : _state.Player2).Id == _state.ActivePlayer.Id);
+                    && _state.GetCardController(e.SourceId)?.Id == _state.ActivePlayer.Id);
 
                 if (hasSkipDraw)
                 {
@@ -755,12 +754,7 @@ public class GameEngine
         return false;
     }
 
-    private Player? GetCardController(GameCard card)
-    {
-        if (_state.Player1.Battlefield.Contains(card.Id)) return _state.Player1;
-        if (_state.Player2.Battlefield.Contains(card.Id)) return _state.Player2;
-        return null;
-    }
+    private Player? GetCardController(GameCard card) => _state.GetCardController(card.Id);
 
     internal bool HasPlayerShroud(Guid playerId)
     {
@@ -818,12 +812,7 @@ public class GameEngine
         return damage;
     }
 
-    private Player? GetEffectController(Guid sourceId)
-    {
-        if (_state.Player1.Battlefield.Contains(sourceId)) return _state.Player1;
-        if (_state.Player2.Battlefield.Contains(sourceId)) return _state.Player2;
-        return null;
-    }
+    private Player? GetEffectController(Guid sourceId) => _state.GetCardController(sourceId);
 
     internal async Task TryAttachAuraAsync(GameCard playCard, Player player, CancellationToken ct)
     {
@@ -1809,8 +1798,7 @@ public class GameEngine
         if (!effect.CostAppliesToOpponent) return true;
 
         // For opponent-only effects, find who controls the source
-        var effectController = _state.Player1.Battlefield.Contains(effect.SourceId) ? _state.Player1
-            : _state.Player2.Battlefield.Contains(effect.SourceId) ? _state.Player2 : null;
+        var effectController = _state.GetCardController(effect.SourceId);
 
         // Only apply if the caster is the opponent (not the controller)
         return effectController != null && effectController.Id != caster.Id;
@@ -1890,8 +1878,7 @@ public class GameEngine
                 var auras = p.Battlefield.Cards.Where(c => c.AttachedTo.HasValue).ToList();
                 foreach (var aura in auras)
                 {
-                    var targetExists = _state.Player1.Battlefield.Contains(aura.AttachedTo!.Value)
-                        || _state.Player2.Battlefield.Contains(aura.AttachedTo!.Value);
+                    var targetExists = _state.GetCardController(aura.AttachedTo!.Value) != null;
                     if (!targetExists)
                     {
                         await FireLeaveBattlefieldTriggersAsync(aura, p, ct);
@@ -2445,8 +2432,7 @@ public class GameEngine
                 TargetPlayerId = triggered.TargetPlayerId,
                 FireLeaveBattlefieldTriggers = async card =>
                 {
-                    var ctrl = _state.Player1.Battlefield.Contains(card.Id) ? _state.Player1
-                        : _state.Player2.Battlefield.Contains(card.Id) ? _state.Player2 : null;
+                    var ctrl = _state.GetCardController(card.Id);
                     if (ctrl != null) await FireLeaveBattlefieldTriggersAsync(card, ctrl, ct);
                 },
             };
@@ -2465,8 +2451,7 @@ public class GameEngine
                 TargetPlayerId = loyaltyAbility.TargetPlayerId,
                 FireLeaveBattlefieldTriggers = async card =>
                 {
-                    var ctrl = _state.Player1.Battlefield.Contains(card.Id) ? _state.Player1
-                        : _state.Player2.Battlefield.Contains(card.Id) ? _state.Player2 : null;
+                    var ctrl = _state.GetCardController(card.Id);
                     if (ctrl != null) await FireLeaveBattlefieldTriggersAsync(card, ctrl, ct);
                 },
             };
