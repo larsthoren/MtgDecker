@@ -53,7 +53,7 @@ public class SimulationRunner
             TotalTurns: state.TurnNumber,
             Player1FinalLife: p1.Life,
             Player2FinalLife: p2.Life,
-            GameLog: state.GameLog.ToList(),
+            GameLog: state.GameLog,
             Duration: sw.Elapsed);
     }
 
