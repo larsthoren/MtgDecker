@@ -23,7 +23,7 @@ public class ListSystemDecksQueryTests
         // Arrange
         var systemDecks = new List<Deck>
         {
-            new() { Name = "Legacy Goblins", Format = Format.Legacy, UserId = null },
+            new() { Name = "PM Goblins", Format = Format.Premodern, UserId = null },
             new() { Name = "Modern Burn", Format = Format.Modern, UserId = null }
         };
         _deckRepo.ListSystemDecksAsync(Arg.Any<CancellationToken>())
