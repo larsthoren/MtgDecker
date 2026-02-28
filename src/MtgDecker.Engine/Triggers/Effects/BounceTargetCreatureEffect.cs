@@ -7,9 +7,8 @@ public class BounceTargetCreatureEffect : IEffect
         if (context.Target == null) return Task.CompletedTask;
 
         var target = context.Target;
-        var owner = context.State.Player1.Battlefield.Contains(target.Id)
-            ? context.State.Player1
-            : context.State.Player2;
+        var owner = context.State.GetCardController(target.Id);
+        if (owner == null) return Task.CompletedTask;
 
         owner.Battlefield.RemoveById(target.Id);
         if (target.IsToken)

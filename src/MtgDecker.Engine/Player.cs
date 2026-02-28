@@ -60,6 +60,21 @@ public class Player
         Exile = new Zone(ZoneType.Exile);
     }
 
+    public void ResetTurnState()
+    {
+        CreaturesDiedThisTurn = 0;
+        DrawsThisTurn = 0;
+        DrawStepDrawExempted = false;
+        PlaneswalkerAbilitiesUsedThisTurn.Clear();
+        LifeLostThisTurn = 0;
+        PermanentLeftBattlefieldThisTurn = false;
+        foreach (var card in Battlefield.Cards)
+        {
+            card.CarpetUsedThisTurn = false;
+            card.AbilitiesActivatedThisTurn.Clear();
+        }
+    }
+
     public Zone GetZone(ZoneType type) => type switch
     {
         ZoneType.Library => Library,

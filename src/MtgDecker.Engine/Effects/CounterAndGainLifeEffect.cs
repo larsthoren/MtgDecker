@@ -11,18 +11,8 @@ public class CounterAndGainLifeEffect : SpellEffect
 
     public override void Resolve(GameState state, StackObject spell)
     {
-        if (spell.Targets.Count == 0) return;
-        var target = spell.Targets[0];
-
-        // Find the targeted spell on the stack (only StackObjects have Card)
-        var targetSpell = state.Stack
-            .OfType<StackObject>()
-            .FirstOrDefault(s => s.Card.Id == target.CardId);
-        if (targetSpell == null)
-        {
-            state.Log($"{spell.Card.Name} fizzles (target spell already resolved).");
-            return;
-        }
+        var targetSpell = FindTargetSpellOnStack(state, spell);
+        if (targetSpell == null) return;
 
         // Remove from stack
         state.StackRemove(targetSpell);

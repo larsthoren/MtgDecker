@@ -7,6 +7,7 @@ public class GameState
 {
     public Player Player1 { get; }
     public Player Player2 { get; }
+    public IReadOnlyList<Player> Players { get; }
     public Player ActivePlayer { get; set; }
     public Player PriorityPlayer { get; set; }
     public Phase CurrentPhase { get; set; }
@@ -100,6 +101,7 @@ public class GameState
     {
         Player1 = player1;
         Player2 = player2;
+        Players = [player1, player2];
         ActivePlayer = player1;
         PriorityPlayer = player1;
         CurrentPhase = Phase.Untap;
@@ -111,6 +113,43 @@ public class GameState
 
     public Player GetPlayer(Guid playerId) =>
         playerId == Player1.Id ? Player1 : Player2;
+
+    public Player? GetCardController(Guid cardId)
+    {
+        if (Player1.Battlefield.Contains(cardId)) return Player1;
+        if (Player2.Battlefield.Contains(cardId)) return Player2;
+        return null;
+    }
+
+    public int ComputeCostModification(GameCard card, Player caster)
+    {
+        return ActiveEffects
+            .Where(e => e.Type == ContinuousEffectType.ModifyCost
+                   && e.CostApplies != null
+                   && e.CostApplies(card)
+                   && IsCostEffectApplicable(e, caster))
+            .Sum(e => e.CostMod);
+    }
+
+    private bool IsCostEffectApplicable(ContinuousEffect effect, Player caster)
+    {
+        if (!effect.CostAppliesToOpponent) return true;
+        var effectController = GetCardController(effect.SourceId);
+        return effectController != null && effectController.Id != caster.Id;
+    }
+
+    public async Task PerformDiscardAsync(GameCard card, Player player, Guid causedByPlayerId, CancellationToken ct = default)
+    {
+        player.Hand.Remove(card);
+        LastDiscardCausedByPlayerId = causedByPlayerId;
+        if (HandleDiscardAsync != null)
+            await HandleDiscardAsync(card, player, ct);
+        else
+        {
+            player.Graveyard.Add(card);
+            Log($"{player.Name} discards {card.Name}.");
+        }
+    }
 
     public void Log(string message)
     {

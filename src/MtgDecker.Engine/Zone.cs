@@ -5,6 +5,7 @@ namespace MtgDecker.Engine;
 public class Zone
 {
     private readonly List<GameCard> _cards = new();
+    private readonly HashSet<Guid> _cardIds = new();
     private readonly object _lock = new();
 
     public ZoneType Type { get; }
@@ -22,20 +23,36 @@ public class Zone
 
     public Zone(ZoneType type) => Type = type;
 
-    public void Add(GameCard card) { lock (_lock) { _cards.Add(card); } }
+    public void Add(GameCard card) { lock (_lock) { _cards.Add(card); _cardIds.Add(card.Id); } }
 
-    public void AddToTop(GameCard card) { lock (_lock) { _cards.Add(card); } }
+    /// <summary>
+    /// Adds card to the top of the zone (same as Add — top is the end of the internal list,
+    /// which is where DrawFromTop reads from).
+    /// </summary>
+    public void AddToTop(GameCard card) => Add(card);
 
-    public void AddToBottom(GameCard card) { lock (_lock) { _cards.Insert(0, card); } }
+    public void AddToBottom(GameCard card) { lock (_lock) { _cards.Insert(0, card); _cardIds.Add(card.Id); } }
 
-    public void AddRange(IEnumerable<GameCard> cards) { lock (_lock) { _cards.AddRange(cards); } }
+    public void AddRange(IEnumerable<GameCard> cards)
+    {
+        lock (_lock)
+        {
+            var list = cards as IList<GameCard> ?? cards.ToList();
+            _cards.AddRange(list);
+            foreach (var card in list)
+                _cardIds.Add(card.Id);
+        }
+    }
 
     public GameCard? RemoveById(Guid cardId)
     {
         lock (_lock)
         {
-            var card = _cards.FirstOrDefault(c => c.Id == cardId);
-            if (card != null) _cards.Remove(card);
+            var index = _cards.FindIndex(c => c.Id == cardId);
+            if (index < 0) return null;
+            var card = _cards[index];
+            _cards.RemoveAt(index);
+            _cardIds.Remove(cardId);
             return card;
         }
     }
@@ -47,6 +64,7 @@ public class Zone
             if (_cards.Count == 0) return null;
             var card = _cards[^1];
             _cards.RemoveAt(_cards.Count - 1);
+            _cardIds.Remove(card.Id);
             return card;
         }
     }
@@ -74,9 +92,17 @@ public class Zone
         }
     }
 
-    public bool Remove(GameCard card) { lock (_lock) { return _cards.Remove(card); } }
+    public bool Remove(GameCard card)
+    {
+        lock (_lock)
+        {
+            var removed = _cards.Remove(card);
+            if (removed) _cardIds.Remove(card.Id);
+            return removed;
+        }
+    }
 
-    public void Clear() { lock (_lock) { _cards.Clear(); } }
+    public void Clear() { lock (_lock) { _cards.Clear(); _cardIds.Clear(); } }
 
-    public bool Contains(Guid cardId) { lock (_lock) { return _cards.Any(c => c.Id == cardId); } }
+    public bool Contains(Guid cardId) { lock (_lock) { return _cardIds.Contains(cardId); } }
 }

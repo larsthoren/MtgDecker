@@ -167,4 +167,34 @@ public class ManaPoolTests
         var cost = ManaCost.Parse("{0}");
         pool.CanPay(cost).Should().BeTrue();
     }
+
+    [Fact]
+    public void Pay_GenericCost_PaysFromLargestPoolFirst()
+    {
+        var pool = new ManaPool();
+        pool.Add(ManaColor.Red, 1);
+        pool.Add(ManaColor.Green, 3);
+        var cost = ManaCost.Parse("{2}");
+
+        pool.Pay(cost).Should().BeTrue();
+        pool[ManaColor.Green].Should().Be(1); // Largest pool paid first
+        pool[ManaColor.Red].Should().Be(1);   // Untouched
+    }
+
+    [Fact]
+    public void Total_ReturnsZero_WhenEmpty()
+    {
+        var pool = new ManaPool();
+        pool.Total.Should().Be(0);
+    }
+
+    [Fact]
+    public void Total_AfterDeduct_Decreases()
+    {
+        var pool = new ManaPool();
+        pool.Add(ManaColor.Red, 3);
+        pool.Add(ManaColor.Blue, 2);
+        pool.Deduct(ManaColor.Red, 1);
+        pool.Total.Should().Be(4);
+    }
 }

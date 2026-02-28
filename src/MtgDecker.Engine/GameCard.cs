@@ -72,6 +72,16 @@ public class GameCard
 
     public IReadOnlyList<string> Subtypes { get; init; } = [];
     public IReadOnlyList<Trigger> Triggers { get; init; } = [];
+
+    /// <summary>
+    /// Returns card instance triggers if any, otherwise falls back to CardDefinitions registry.
+    /// Uses FrontName for the lookup since CardDefinitions registers cards by front name.
+    /// </summary>
+    public IReadOnlyList<Trigger> EffectiveTriggers =>
+        Triggers.Count > 0
+            ? Triggers
+            : (CardDefinitions.TryGet(FrontName, out var def) ? def.Triggers : []);
+
     public bool IsToken { get; init; }
     public bool IsLegendary { get; init; }
     public bool EntersTapped { get; init; }
@@ -208,28 +218,8 @@ public class GameCard
     public static GameCard Create(string name, string typeLine = "", string? imageUrl = null)
     {
         if (CardDefinitions.TryGet(name, out var def))
-        {
-            var card = new GameCard
-            {
-                Name = name,
-                TypeLine = typeLine,
-                ImageUrl = imageUrl,
-                ManaCost = def.ManaCost,
-                BaseManaAbility = def.ManaAbility,
-                ManaAbility = def.ManaAbility,
-                BasePower = def.Power,
-                BaseToughness = def.Toughness,
-                CardTypes = def.CardTypes,
-                Subtypes = def.Subtypes,
-                Triggers = def.Triggers,
-                IsLegendary = def.IsLegendary,
-                EntersTapped = def.EntersTapped,
-                FetchAbility = def.FetchAbility,
-                EchoPaid = def.EchoCost == null,
-                BackFaceDefinition = def.TransformInto,
-            };
-            return card;
-        }
+            return CreateFromDefinition(def, name, typeLine, imageUrl);
+
         return new GameCard
         {
             Name = name,
@@ -248,27 +238,7 @@ public class GameCard
     {
         // CardDefinitions registry takes full precedence if the card is registered
         if (CardDefinitions.TryGet(name, out var def))
-        {
-            return new GameCard
-            {
-                Name = name,
-                TypeLine = typeLine,
-                ImageUrl = imageUrl,
-                ManaCost = def.ManaCost,
-                BaseManaAbility = def.ManaAbility,
-                ManaAbility = def.ManaAbility,
-                BasePower = def.Power,
-                BaseToughness = def.Toughness,
-                CardTypes = def.CardTypes,
-                Subtypes = def.Subtypes,
-                Triggers = def.Triggers,
-                IsLegendary = def.IsLegendary,
-                EntersTapped = def.EntersTapped,
-                FetchAbility = def.FetchAbility,
-                EchoPaid = def.EchoCost == null,
-                BackFaceDefinition = def.TransformInto,
-            };
-        }
+            return CreateFromDefinition(def, name, typeLine, imageUrl);
 
         // Auto-parse from raw data
         var parsed = CardTypeParser.ParseFull(typeLine);
@@ -297,6 +267,26 @@ public class GameCard
 
         return autoCard;
     }
+
+    private static GameCard CreateFromDefinition(CardDefinition def, string name, string typeLine, string? imageUrl) => new()
+    {
+        Name = name,
+        TypeLine = typeLine,
+        ImageUrl = imageUrl,
+        ManaCost = def.ManaCost,
+        BaseManaAbility = def.ManaAbility,
+        ManaAbility = def.ManaAbility,
+        BasePower = def.Power,
+        BaseToughness = def.Toughness,
+        CardTypes = def.CardTypes,
+        Subtypes = def.Subtypes,
+        Triggers = def.Triggers,
+        IsLegendary = def.IsLegendary,
+        EntersTapped = def.EntersTapped,
+        FetchAbility = def.FetchAbility,
+        EchoPaid = def.EchoCost == null,
+        BackFaceDefinition = def.TransformInto,
+    };
 
     private static ManaAbility? DetectBasicLandManaAbility(string typeLine)
     {

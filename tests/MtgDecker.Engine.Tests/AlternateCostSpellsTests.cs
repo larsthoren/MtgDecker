@@ -484,7 +484,7 @@ public class AlternateCostSpellsTests
         def.AlternateCost.Should().NotBeNull();
         def.AlternateCost!.RequiresControlSubtype.Should().Be("Mountain");
         def.AlternateCost.RequiresOpponentSubtype.Should().Be("Island");
-        def.Effect.Should().BeOfType<MtgDecker.Engine.Effects.NaturalizeEffect>();
+        def.Effect.Should().BeOfType<MtgDecker.Engine.Effects.DestroyTargetSpellEffect>();
     }
 
     // =============================================

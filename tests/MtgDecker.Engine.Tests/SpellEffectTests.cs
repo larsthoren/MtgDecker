@@ -66,7 +66,7 @@ public class SpellEffectTests
             new Dictionary<ManaColor, int>(),
             new List<TargetInfo> { new(enchantment.Id, state.Player2.Id, ZoneType.Battlefield) }, 0);
 
-        new NaturalizeEffect().Resolve(state, spell);
+        new DestroyTargetSpellEffect().Resolve(state, spell);
 
         state.Player2.Battlefield.Cards.Should().NotContain(c => c.Id == enchantment.Id);
         state.Player2.Graveyard.Cards.Should().Contain(c => c.Id == enchantment.Id);

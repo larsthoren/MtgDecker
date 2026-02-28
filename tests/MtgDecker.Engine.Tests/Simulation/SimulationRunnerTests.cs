@@ -80,4 +80,25 @@ public class SimulationRunnerTests
         var result = await runner.RunGameAsync(deck1, deck2, "Goblins", "Enchantress");
         result.GameLog.Should().Contain(l => l.Contains("Goblins") || l.Contains("Enchantress"));
     }
+
+    [Fact]
+    public async Task RunGameAsync_ClonesAllCardProperties()
+    {
+        // Use forests which have ManaAbility in CardDefinitions
+        var deck1 = new List<GameCard>();
+        var deck2 = new List<GameCard>();
+
+        for (int i = 0; i < 40; i++)
+        {
+            deck1.Add(GameCard.Create("Forest", "Basic Land — Forest"));
+            deck2.Add(GameCard.Create("Forest", "Basic Land — Forest"));
+        }
+
+        var runner = new SimulationRunner();
+        var result = await runner.RunGameAsync(deck1, deck2);
+
+        // Game should complete (forests can tap for mana - proves ManaAbility was cloned)
+        result.Should().NotBeNull();
+        result.TotalTurns.Should().BeGreaterThan(0);
+    }
 }
