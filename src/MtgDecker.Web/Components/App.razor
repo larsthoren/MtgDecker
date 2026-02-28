@@ -26,6 +26,7 @@
         };
         window.panelDrag = {
             start: function (el, dotNetRef, callbackMethod, startX, startY) {
+                if (!el) return;
                 const rect = el.getBoundingClientRect();
                 const offsetX = startX - rect.left;
                 const offsetY = startY - rect.top;
