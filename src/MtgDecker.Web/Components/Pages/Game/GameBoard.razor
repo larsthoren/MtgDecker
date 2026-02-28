@@ -1259,6 +1259,14 @@
                 return;
             }
 
+            // Check for Delve — let engine handle exile prompt and cost reduction
+            if (CardDefinitions.TryGet(_selectedCard.Name, out var def) && def.HasDelve)
+            {
+                await OnAction.InvokeAsync(GameAction.CastSpell(LocalPlayer.Id, _selectedCard.Id));
+                ClearSelection();
+                return;
+            }
+
             // Enter pending cast mode — player taps lands to pay
             _pendingCastCard = _selectedCard;
             ClearSelection();
