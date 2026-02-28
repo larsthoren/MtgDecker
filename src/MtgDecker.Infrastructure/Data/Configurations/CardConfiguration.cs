@@ -52,6 +52,7 @@ public class CardConfiguration : IEntityTypeConfiguration<Card>
             .HasForeignKey("CardId")
             .OnDelete(DeleteBehavior.Cascade);
 
+        builder.Ignore(c => c.IsLand);
         builder.Ignore(c => c.IsBasicLand);
         builder.Ignore(c => c.HasMultipleFaces);
     }

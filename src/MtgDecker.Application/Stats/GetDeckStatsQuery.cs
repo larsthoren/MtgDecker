@@ -63,23 +63,21 @@ public class GetDeckStatsHandler : IRequestHandler<GetDeckStatsQuery, DeckStats>
         {
             if (!cards.TryGetValue(entry.CardId, out var card)) continue;
 
-            bool isLand = card.TypeLine.Contains("Land", StringComparison.OrdinalIgnoreCase);
-
             // Mana curve (lands excluded)
-            if (!isLand)
+            if (!card.IsLand)
             {
                 var cmcKey = (int)Math.Min(card.Cmc, 7); // 7+ grouped
                 manaCurve[cmcKey] = manaCurve.GetValueOrDefault(cmcKey) + entry.Quantity;
             }
 
             // Land vs spell count
-            if (isLand)
+            if (card.IsLand)
                 landCount += entry.Quantity;
             else
                 spellCount += entry.Quantity;
 
             // Average CMC (exclude lands)
-            if (!isLand)
+            if (!card.IsLand)
             {
                 totalCmc += card.Cmc * entry.Quantity;
                 nonLandCardCount += entry.Quantity;
